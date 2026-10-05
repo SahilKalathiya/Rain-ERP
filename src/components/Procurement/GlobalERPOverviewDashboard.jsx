@@ -56,8 +56,17 @@ export default function GlobalERPOverviewDashboard({
         <div className="card-body p-4 position-relative" style={{ zIndex: 1 }}>
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
-              <div className="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white bg-opacity-20 text-white border border-white border-opacity-25 fs-12 fw-semibold mb-2 shadow-sm">
-                <i className="ti ti-activity-heartbeat"></i> Real-time Live Operations Feed
+              <div 
+                className="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-2 shadow-sm fs-12 fw-semibold"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(8px)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.3)'
+                }}
+              >
+                <i className="ti ti-activity-heartbeat text-warning"></i> 
+                <span>Real-time Live Operations Feed</span>
               </div>
               <h2 className="fw-bold mb-1 fs-24 text-white">Rain Drop ERP — Procurement &amp; Inventory Dashboard</h2>
               <p className="text-white text-opacity-75 mb-0 fs-13">

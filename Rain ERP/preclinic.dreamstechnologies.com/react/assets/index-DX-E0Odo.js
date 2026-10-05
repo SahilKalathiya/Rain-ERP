@@ -14622,15 +14622,13 @@
   // src/components/Sidebar/Sidebar.jsx
   function Sidebar({ currentRoute = "/dashboard", onNavigate }) {
     const [openMenus, setOpenMenus] = (0, import_react.useState)({
-      "Procurement Workflow": true,
-      "Master Data": true,
-      Procurement: true,
-      Masters: true
+      "Procurement Workflow": false,
+      "Master Data": false
     });
     const toggleSubmenu = (label) => {
       setOpenMenus((prev) => ({
         ...prev,
-        [label]: prev[label] === void 0 ? false : !prev[label]
+        [label]: !prev[label]
       }));
     };
     return /* @__PURE__ */ import_react.default.createElement(
@@ -14674,7 +14672,7 @@
         section.title
       ), /* @__PURE__ */ import_react.default.createElement("ul", { className: "list-unstyled mb-0 d-flex flex-column gap-1" }, section.items.map((item, idx) => {
         const hasSub = item.submenu && item.submenu.length > 0;
-        const isOpen = openMenus[item.label] !== false;
+        const isOpen = !!openMenus[item.label];
         const isActive = item.link === currentRoute;
         return /* @__PURE__ */ import_react.default.createElement("li", { key: idx }, hasSub ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(
           "button",
@@ -14890,7 +14888,20 @@
           boxShadow: "0 8px 24px rgba(46, 55, 164, 0.18)"
         }
       },
-      /* @__PURE__ */ import_react15.default.createElement("div", { className: "card-body p-4 position-relative", style: { zIndex: 1 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white bg-opacity-20 text-white border border-white border-opacity-25 fs-12 fw-semibold mb-2 shadow-sm" }, /* @__PURE__ */ import_react15.default.createElement("i", { className: "ti ti-activity-heartbeat" }), " Real-time Live Operations Feed"), /* @__PURE__ */ import_react15.default.createElement("h2", { className: "fw-bold mb-1 fs-24 text-white" }, "Rain Drop ERP \u2014 Procurement & Inventory Dashboard"), /* @__PURE__ */ import_react15.default.createElement("p", { className: "text-white text-opacity-75 mb-0 fs-13" }, "Module 1 (Raw Material Procurement) Live Operational Metrics, Master Catalogs & Audit Trail.")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react15.default.createElement(
+      /* @__PURE__ */ import_react15.default.createElement("div", { className: "card-body p-4 position-relative", style: { zIndex: 1 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement(
+        "div",
+        {
+          className: "d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-2 shadow-sm fs-12 fw-semibold",
+          style: {
+            background: "rgba(255, 255, 255, 0.15)",
+            backdropFilter: "blur(8px)",
+            color: "#ffffff",
+            border: "1px solid rgba(255, 255, 255, 0.3)"
+          }
+        },
+        /* @__PURE__ */ import_react15.default.createElement("i", { className: "ti ti-activity-heartbeat text-warning" }),
+        /* @__PURE__ */ import_react15.default.createElement("span", null, "Real-time Live Operations Feed")
+      ), /* @__PURE__ */ import_react15.default.createElement("h2", { className: "fw-bold mb-1 fs-24 text-white" }, "Rain Drop ERP \u2014 Procurement & Inventory Dashboard"), /* @__PURE__ */ import_react15.default.createElement("p", { className: "text-white text-opacity-75 mb-0 fs-13" }, "Module 1 (Raw Material Procurement) Live Operational Metrics, Master Catalogs & Audit Trail.")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react15.default.createElement(
         "button",
         {
           type: "button",
@@ -18257,8 +18268,18 @@ QC Record generated automatically.`);
   ];
 
   // src/components/Procurement/ProcurementDashboard.jsx
-  function ProcurementDashboard({ initialSubmodule = "overview" }) {
+  function ProcurementDashboard({ initialSubmodule = "overview", onNavigate }) {
     const [activeTab, setActiveTab] = (0, import_react28.useState)(initialSubmodule);
+    const tabToRouteMap = {
+      overview: "/dashboard",
+      pos: "/procurement-pos",
+      grn: "/goods-inward",
+      qc: "/quality-batches",
+      rejected_stock: "/rejected-stock",
+      vendors: "/vendors",
+      fabrics: "/fabrics",
+      transporters: "/transporters"
+    };
     (0, import_react28.useEffect)(() => {
       setActiveTab(initialSubmodule);
       if (initialSubmodule === "pos") setActivePoView("list");
@@ -18526,6 +18547,9 @@ QC Record generated automatically.`);
           if (tab === "pos") setActivePoView("list");
           if (tab === "grn") setActiveGrnView("list");
           if (tab === "qc") setActiveQcView("list");
+          if (onNavigate && tabToRouteMap[tab]) {
+            onNavigate(tabToRouteMap[tab]);
+          }
         },
         onOpenAuditModal: () => setShowAuditModal(true)
       }
@@ -18656,30 +18680,33 @@ QC Record generated automatically.`);
     const [currentRoute, setCurrentRoute] = (0, import_react29.useState)("/dashboard");
     const renderContent = () => {
       if (currentRoute === "/dashboard" || currentRoute === "/") {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "overview" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "overview", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/procurement-pos") || currentRoute.startsWith("/procurement") || currentRoute.startsWith("/po")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "pos" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "pos", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/goods-inward") || currentRoute.startsWith("/grn")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "grn" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "grn", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/quality-batches") || currentRoute.startsWith("/quality") || currentRoute.startsWith("/qc")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "qc" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "qc", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/rejected-stock") || currentRoute.includes("rejected")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "rejected_stock" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "rejected_stock", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/vendors")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "vendors" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "vendors", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/fabrics")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "fabrics" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "fabrics", onNavigate: setCurrentRoute });
       }
       if (currentRoute.startsWith("/transporters")) {
-        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "transporters" });
+        return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "transporters", onNavigate: setCurrentRoute });
       }
-      return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "overview" });
+      return /* @__PURE__ */ import_react29.default.createElement(ProcurementDashboard, { initialSubmodule: "overview", onNavigate: setCurrentRoute });
+    };
+    const handleRouteNavigate = (route) => {
+      setCurrentRoute(route);
     };
     return /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex", style: { minHeight: "100vh", background: "#f8f9fa" } }, /* @__PURE__ */ import_react29.default.createElement(Sidebar, { currentRoute, onNavigate: setCurrentRoute }), /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex flex-column flex-grow-1", style: { minWidth: 0 } }, /* @__PURE__ */ import_react29.default.createElement(Header, null), /* @__PURE__ */ import_react29.default.createElement("main", { className: "flex-grow-1 overflow-auto" }, renderContent())));
   }

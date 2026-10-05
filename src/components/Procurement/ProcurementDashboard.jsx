@@ -38,9 +38,20 @@ import {
  *   - Master catalogs (Vendors, Fabrics, Transporters)
  *   - Runtime Activity History audit logging (9.4)
  */
-export default function ProcurementDashboard({ initialSubmodule = 'overview' }) {
+export default function ProcurementDashboard({ initialSubmodule = 'overview', onNavigate }) {
   // Tabs: 'overview', 'pos', 'grn', 'qc', 'rejected_stock', 'vendors', 'fabrics', 'transporters'
   const [activeTab, setActiveTab] = useState(initialSubmodule);
+
+  const tabToRouteMap = {
+    overview: '/dashboard',
+    pos: '/procurement-pos',
+    grn: '/goods-inward',
+    qc: '/quality-batches',
+    rejected_stock: '/rejected-stock',
+    vendors: '/vendors',
+    fabrics: '/fabrics',
+    transporters: '/transporters'
+  };
 
   // Sync active tab whenever sidebar navigation route changes
   useEffect(() => {
@@ -368,6 +379,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview' }) 
             if (tab === 'pos') setActivePoView('list');
             if (tab === 'grn') setActiveGrnView('list');
             if (tab === 'qc') setActiveQcView('list');
+            if (onNavigate && tabToRouteMap[tab]) {
+              onNavigate(tabToRouteMap[tab]);
+            }
           }}
           onOpenAuditModal={() => setShowAuditModal(true)}
         />

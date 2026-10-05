@@ -8,18 +8,16 @@ import { navigationMenu } from './menuConfig';
  * - Smooth active states without collapsing menus
  */
 export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
-  // Always keep Procurement and Master submenus open so navigation never collapses
+  // Submenus are collapsible - user can click to open or close
   const [openMenus, setOpenMenus] = useState({
-    'Procurement Workflow': true,
-    'Master Data': true,
-    Procurement: true,
-    Masters: true
+    'Procurement Workflow': false,
+    'Master Data': false
   });
 
   const toggleSubmenu = (label) => {
     setOpenMenus((prev) => ({
       ...prev,
-      [label]: prev[label] === undefined ? false : !prev[label]
+      [label]: !prev[label]
     }));
   };
 
@@ -74,7 +72,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
             <ul className="list-unstyled mb-0 d-flex flex-column gap-1">
               {section.items.map((item, idx) => {
                 const hasSub = item.submenu && item.submenu.length > 0;
-                const isOpen = openMenus[item.label] !== false;
+                const isOpen = !!openMenus[item.label];
                 const isActive = item.link === currentRoute;
 
                 return (

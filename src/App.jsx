@@ -15,7 +15,7 @@ export default function App() {
   const renderContent = () => {
     // 0. Global Overview Dashboard (Section 9.4)
     if (currentRoute === '/dashboard' || currentRoute === '/') {
-      return <ProcurementDashboard initialSubmodule="overview" />;
+      return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
     }
 
     // Phase 1: Raw Material Procurement & Masters (In Scope)
@@ -24,14 +24,14 @@ export default function App() {
       currentRoute.startsWith('/procurement') ||
       currentRoute.startsWith('/po')
     ) {
-      return <ProcurementDashboard initialSubmodule="pos" />;
+      return <ProcurementDashboard initialSubmodule="pos" onNavigate={setCurrentRoute} />;
     }
 
     if (
       currentRoute.startsWith('/goods-inward') ||
       currentRoute.startsWith('/grn')
     ) {
-      return <ProcurementDashboard initialSubmodule="grn" />;
+      return <ProcurementDashboard initialSubmodule="grn" onNavigate={setCurrentRoute} />;
     }
 
     if (
@@ -39,26 +39,26 @@ export default function App() {
       currentRoute.startsWith('/quality') ||
       currentRoute.startsWith('/qc')
     ) {
-      return <ProcurementDashboard initialSubmodule="qc" />;
+      return <ProcurementDashboard initialSubmodule="qc" onNavigate={setCurrentRoute} />;
     }
 
     if (
       currentRoute.startsWith('/rejected-stock') ||
       currentRoute.includes('rejected')
     ) {
-      return <ProcurementDashboard initialSubmodule="rejected_stock" />;
+      return <ProcurementDashboard initialSubmodule="rejected_stock" onNavigate={setCurrentRoute} />;
     }
 
     if (currentRoute.startsWith('/vendors')) {
-      return <ProcurementDashboard initialSubmodule="vendors" />;
+      return <ProcurementDashboard initialSubmodule="vendors" onNavigate={setCurrentRoute} />;
     }
 
     if (currentRoute.startsWith('/fabrics')) {
-      return <ProcurementDashboard initialSubmodule="fabrics" />;
+      return <ProcurementDashboard initialSubmodule="fabrics" onNavigate={setCurrentRoute} />;
     }
 
     if (currentRoute.startsWith('/transporters')) {
-      return <ProcurementDashboard initialSubmodule="transporters" />;
+      return <ProcurementDashboard initialSubmodule="transporters" onNavigate={setCurrentRoute} />;
     }
 
     /* =========================================================================
@@ -89,7 +89,11 @@ export default function App() {
     ========================================================================= */
 
     // Default to Overview Dashboard
-    return <ProcurementDashboard initialSubmodule="overview" />;
+    return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
+  };
+
+  const handleRouteNavigate = (route) => {
+    setCurrentRoute(route);
   };
 
   return (
