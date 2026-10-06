@@ -3,7 +3,7 @@ const path = require('path');
 
 try {
   esbuild.buildSync({
-    entryPoints: ['./src/main.jsx'],
+    entryPoints: ['./frontend/src/main.jsx'],
     bundle: true,
     outfile: path.join(__dirname, 'Rain ERP', 'preclinic.dreamstechnologies.com', 'react', 'assets', 'index-DX-E0Odo.js'),
     loader: { '.jsx': 'jsx', '.js': 'jsx' },

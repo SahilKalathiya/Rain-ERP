@@ -1,0 +1,8 @@
+node_modules/
+.env
+backend/.env
+.system_generated/
+.tempmediaStorage/
+.DS_Store
+dist/
+build/

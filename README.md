@@ -6,17 +6,14 @@ This project contains a client-side React SPA (Vite + Bootstrap 5) for the Precl
 
 Because this application uses modern ES modules (`<script type="module">`) and React Router, it requires a local web server (opening the `.html` file directly using `file:///` causes browser CORS/module errors).
 
-### Option 1: Double-Click (Easiest on Windows)
-Simply double-click [`start.bat`](start.bat). It will launch the local server and automatically open your default browser.
-
-### Option 2: Using Node / NPM (Terminal)
-Open terminal in this directory and run:
+### How to Run (Terminal)
+Open terminal in the project root directory and run:
 ```bash
-npm start
+npm run dev
 ```
 or
 ```bash
-node server.js
+npm start
 ```
 
 ### Accessing the Application

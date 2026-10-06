@@ -13,7 +13,7 @@ const SITE_DIR = path.join(BASE_DIR, 'Rain ERP', 'preclinic.dreamstechnologies.c
 try {
   const esbuild = require('esbuild');
   esbuild.buildSync({
-    entryPoints: [path.join(BASE_DIR, 'src', 'main.jsx')],
+    entryPoints: [path.join(BASE_DIR, 'frontend', 'src', 'main.jsx')],
     bundle: true,
     outfile: path.join(REACT_DIR, 'assets', 'index-DX-E0Odo.js'),
     loader: { '.jsx': 'jsx', '.js': 'jsx' },
