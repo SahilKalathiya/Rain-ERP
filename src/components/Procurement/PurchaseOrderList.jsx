@@ -6,9 +6,11 @@ import React, { useState } from 'react';
  */
 export default function PurchaseOrderList({
   purchaseOrders = [],
+  vendors = [],
   onNewPO,
   onSelectPO,
-  onPrintPO
+  onPrintPO,
+  onInwardGRN
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [colFilters, setColFilters] = useState({
@@ -20,17 +22,26 @@ export default function PurchaseOrderList({
     amount: ''
   });
 
+  const getVendorName = (po) => {
+    if (po.vendorName && po.vendorName.trim()) return po.vendorName;
+    const found = vendors.find((v) => v.id === po.vendorId);
+    return found ? found.name : (po.vendorId || 'Unknown Vendor');
+  };
+
   const filtered = purchaseOrders.filter((po) => {
+    const vName = getVendorName(po);
     const matchesSearch =
       searchTerm === '' ||
       po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.items.some((it) => it.fabricName.toLowerCase().includes(searchTerm.toLowerCase()));
+      vName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (po.vendorId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (po.items || []).some((it) => it.fabricName.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesCol =
       po.id.toLowerCase().includes(colFilters.id.toLowerCase()) &&
       po.date.includes(colFilters.date) &&
-      po.vendorName.toLowerCase().includes(colFilters.vendor.toLowerCase()) &&
+      (vName.toLowerCase().includes(colFilters.vendor.toLowerCase()) ||
+        (po.vendorId || '').toLowerCase().includes(colFilters.vendor.toLowerCase())) &&
       (colFilters.expected === '' || (po.expectedDeliveryDate || '').includes(colFilters.expected)) &&
       (colFilters.status === '' || po.status === colFilters.status);
 
@@ -89,73 +100,17 @@ export default function PurchaseOrderList({
 
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary">
-              {/* Column Filters (9.3) */}
-              <tr className="bg-light">
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter PO"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.id}
-                    onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Date"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.date}
-                    onChange={(e) => setColFilters({ ...colFilters, date: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter Vendor"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.vendor}
-                    onChange={(e) => setColFilters({ ...colFilters, vendor: e.target.value })}
-                  />
-                </th>
-                <th>Fabric Items</th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Expected"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.expected}
-                    onChange={(e) => setColFilters({ ...colFilters, expected: e.target.value })}
-                  />
-                </th>
-                <th>Buffer %</th>
-                <th className="text-end">Total Amount</th>
-                <th>
-                  <select
-                    className="form-select form-select-sm fs-11"
-                    value={colFilters.status}
-                    onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
-                  >
-                    <option value="">All Status</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Sent">Sent</option>
-                    <option value="Partially Received">Partially Received</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </th>
-                <th className="text-center">Actions</th>
-              </tr>
+            <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th>PO No.</th>
-                <th>Date</th>
-                <th>Vendor</th>
-                <th>Fabrics / Qualities</th>
-                <th>Expected Date</th>
-                <th>Buffer %</th>
-                <th className="text-end">Total Amount</th>
-                <th>Status</th>
-                <th className="text-center">Actions</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PO No.</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fabrics / Qualities</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expected Date</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buffer %</th>
+                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Amount</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -172,14 +127,14 @@ export default function PurchaseOrderList({
                     <td className="fw-bold text-primary font-monospace">{po.id}</td>
                     <td>{po.date}</td>
                     <td>
-                      <div className="fw-medium text-dark">{po.vendorName}</div>
+                      <div className="fw-medium text-dark">{getVendorName(po)}</div>
                       <div className="text-muted fs-11">{po.vendorId}</div>
                     </td>
                     <td>
                       <div className="d-flex flex-column gap-1">
                         {(po.items || []).map((it, idx) => (
                           <span key={idx} className="text-dark">
-                            {it.fabricName} ({Number(it.quantity).toLocaleString()}m @ ₹{it.rate})
+                            {it.fabricName} {it.colorName ? `(${it.colorName})` : ''} ({Number(it.quantity).toLocaleString()}m @ ₹{it.rate})
                           </span>
                         ))}
                       </div>
@@ -219,23 +174,44 @@ export default function PurchaseOrderList({
                         <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
                       </span>
                     </td>
-                    <td className="text-center">
-                      <div className="d-flex align-items-center justify-content-center gap-1">
+                    <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
+                      <div className="d-inline-flex align-items-center justify-content-center gap-1">
+                        {po.status !== 'Completed' && po.status !== 'Draft' && (
+                          <button
+                            type="button"
+                            className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                            style={{
+                              background: '#ecfdf5',
+                              color: '#059669',
+                              border: '1px solid #a7f3d0',
+                              height: '32px',
+                              lineHeight: 1,
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Create Inward Delivery GRN for this PO"
+                            onClick={() => onInwardGRN && onInwardGRN(po)}
+                          >
+                            <i className="ti ti-package fs-13"></i>
+                            <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="btn btn-outline-primary btn-sm px-2 py-1 rounded-2"
+                          className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
+                          style={{ width: '32px', height: '32px' }}
                           title="View / Edit PO Details"
                           onClick={() => onSelectPO && onSelectPO(po)}
                         >
-                          <i className="ti ti-eye fs-14"></i>
+                          <i className="ti ti-eye fs-15"></i>
                         </button>
                         <button
                           type="button"
-                          className="btn btn-outline-secondary btn-sm px-2 py-1 rounded-2"
-                          title="Print PO Invoice (Page 28 Format)"
+                          className="btn btn-outline-secondary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
+                          style={{ width: '32px', height: '32px' }}
+                          title="Print PO Invoice"
                           onClick={() => onPrintPO && onPrintPO(po)}
                         >
-                          <i className="ti ti-printer fs-14"></i>
+                          <i className="ti ti-printer fs-15"></i>
                         </button>
                       </div>
                     </td>

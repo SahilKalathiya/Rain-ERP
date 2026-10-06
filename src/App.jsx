@@ -5,14 +5,41 @@ import ProductionModule from './components/Production/ProductionModule';
 import OrdersModule from './components/Orders/OrdersModule';
 import CuttingModule from './components/Cutting/CuttingModule';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
+import ProfileSettingsView from './components/Profile/ProfileSettingsView';
+import AuthPage from './components/Auth/AuthPage';
 
 /**
  * Main ERP Rain Application Component
  */
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [currentUser, setCurrentUser] = useState({
+    name: 'Saksham Garg',
+    role: 'Procurement & Quality Manager',
+    email: 'saksham.garg@rainerp.com',
+    phone: '+91 98765 43210',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=faces',
+    addressLine1: 'Rain Textiles Pvt Ltd, Ring Road',
+    addressLine2: 'Industrial Area',
+    country: 'India',
+    state: 'Gujarat',
+    city: 'Surat',
+    pincode: '395002'
+  });
 
   const renderContent = () => {
+    // Profile & Settings View
+    if (currentRoute === '/profile-settings' || currentRoute === '/settings' || currentRoute === '/profile') {
+      return (
+        <ProfileSettingsView
+          currentUser={currentUser}
+          onUpdateUser={(updated) => setCurrentUser(updated)}
+          onBack={() => setCurrentRoute('/dashboard')}
+        />
+      );
+    }
+
     // 0. Global Overview Dashboard (Section 9.4)
     if (currentRoute === '/dashboard' || currentRoute === '/') {
       return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
@@ -61,33 +88,6 @@ export default function App() {
       return <ProcurementDashboard initialSubmodule="transporters" onNavigate={setCurrentRoute} />;
     }
 
-    /* =========================================================================
-     * OUT OF SCOPE FOR MODULE 1 (Deferred to Future Stages - Section 2.2 / 10)
-     * =========================================================================
-    if (
-      currentRoute.startsWith('/production') ||
-      currentRoute.includes('embroidery') ||
-      currentRoute.includes('single-cut') ||
-      currentRoute.includes('stitching')
-    ) {
-      let initialTab = 'embroidery';
-      if (currentRoute.includes('single-cut') || currentRoute.includes('single-cuts')) {
-        initialTab = 'single_cuts';
-      } else if (currentRoute.includes('stitching')) {
-        initialTab = 'stitching';
-      }
-      return <ProductionModule initialTab={initialTab} />;
-    }
-
-    if (currentRoute.startsWith('/orders')) {
-      return <OrdersModule />;
-    }
-
-    if (currentRoute.startsWith('/cutting')) {
-      return <CuttingModule />;
-    }
-    ========================================================================= */
-
     // Default to Overview Dashboard
     return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
   };
@@ -96,6 +96,23 @@ export default function App() {
     setCurrentRoute(route);
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+
+  // If unauthenticated, display the full standalone Login / Register page
+  if (!isAuthenticated) {
+    return (
+      <AuthPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          setCurrentRoute('/dashboard');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="d-flex" style={{ minHeight: '100vh', background: '#f8f9fa' }}>
       {/* Sidebar */}
@@ -103,9 +120,15 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
-        <Header />
+        <Header
+          currentUser={currentUser}
+          onNavigate={setCurrentRoute}
+          onOpenAuth={() => setIsAuthenticated(false)}
+          onLogout={handleLogout}
+        />
         <main className="flex-grow-1 overflow-auto">{renderContent()}</main>
       </div>
     </div>
   );
 }
+

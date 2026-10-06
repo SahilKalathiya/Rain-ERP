@@ -219,6 +219,29 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setActivePoView('list');
   };
 
+  const handleInwardFromPO = (po) => {
+    const declaredMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : '';
+    const vMatch = vendors.find((v) => v.id === po.vendorId);
+    const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : (po.vendorId || ''));
+
+    const newGrn = {
+      id: `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
+      date: new Date().toISOString().split('T')[0],
+      linkedPOs: [po.id],
+      vendorId: po.vendorId,
+      vendorName: resolvedVendorName,
+      fabricName: fabricItem,
+      status: 'Bale Entry in Progress',
+      totalBales: 5,
+      declaredTotalMeters: declaredMeters || 1000,
+      bales: []
+    };
+    setSelectedGRN(newGrn);
+    setActiveGrnView('form');
+    setActiveTab('grn');
+  };
+
   const handleSaveGRN = (grnData, isCompleted = true) => {
     const isEdit = grns.some((g) => g.id === grnData.id);
     let updated;
@@ -305,62 +328,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           -moz-appearance: textfield;
         }
       `}</style>
-      {/* GLOBAL SEARCH & PORTAL HEADER (9.1) */}
-      <div className="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4">
-        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div className="d-flex align-items-center gap-2">
-            <div
-              className="text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm"
-              style={{
-                width: '42px',
-                height: '42px',
-                background: 'linear-gradient(135deg, #2e37a4 0%, #4361ee 100%)'
-              }}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v12.42a1.78 1.78 0 0 0 2.5 1.55L16.5 14.6a1.78 1.78 0 0 0 0-3.2z"></path>
-                <path d="M21 12h-3"></path>
-                <path d="m18 16 3 3"></path>
-                <path d="m18 8 3-3"></path>
-              </svg>
-            </div>
-            <div>
-              <h4 className="fw-bold mb-0 fs-18" style={{ color: '#1b2559' }}>
-                Raw Material Procurement &amp; Inward Management
-              </h4>
-              <p className="mb-0 fs-12" style={{ color: '#4361ee', fontWeight: 500 }}>
-                Masters, PO Buffer Tolerance, 3-Level GRN, Quality Check &amp; Rejected Stock Pool
-              </p>
-            </div>
-          </div>
 
-          <div className="d-flex align-items-center gap-3">
-            {/* Global Search Bar (Section 9.1: Top-Right Corner Static) */}
-            <div className="input-group" style={{ width: '300px' }}>
-              <span className="input-group-text bg-light border-end-0 text-muted">
-                <i className="ti ti-search fs-14"></i>
-              </span>
-              <input
-                type="text"
-                className="form-control form-control-sm bg-light border-start-0 fs-12"
-                placeholder="Global Search across ERP..."
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-              />
-            </div>
-
-            {/* Audit Trail Launcher (9.4) */}
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 rounded-3 px-3 py-1 fs-12"
-              onClick={() => setShowAuditModal(true)}
-            >
-              <i className="ti ti-history fs-15 text-primary"></i>
-              <span>Audit Trail ({auditLogs.length})</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* RENDER ACTIVE MODULE / SUBMODULE */}
       {/* TAB 0: OVERVIEW DASHBOARD (Synchronized in Real-Time) */}
@@ -393,6 +361,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           {activePoView === 'list' && (
             <PurchaseOrderList
               purchaseOrders={purchaseOrders}
+              vendors={vendors}
               onNewPO={() => {
                 setSelectedPO(null);
                 setActivePoView('form');
@@ -405,6 +374,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setSelectedPO(po);
                 setActivePoView('print');
               }}
+              onInwardGRN={handleInwardFromPO}
             />
           )}
 
@@ -418,6 +388,21 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               onPrintPO={(po) => {
                 setSelectedPO(po);
                 setActivePoView('print');
+              }}
+              onInwardGRN={handleInwardFromPO}
+              onSaveVendor={(v) => {
+                setVendors((prev) => {
+                  const exists = prev.some((item) => item.id === v.id);
+                  return exists ? prev.map((item) => (item.id === v.id ? v : item)) : [v, ...prev];
+                });
+                addAuditLog('Save', 'Vendor Master', v.id, 'Vendor Details', 'Record', v.name);
+              }}
+              onSaveFabric={(f) => {
+                setFabrics((prev) => {
+                  const exists = prev.some((item) => item.id === f.id);
+                  return exists ? prev.map((item) => (item.id === f.id ? f : item)) : [f, ...prev];
+                });
+                addAuditLog('Save', 'Fabric Master', f.id, 'Fabric Quality', 'Record', f.qualityName);
               }}
             />
           )}
@@ -449,10 +434,18 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             <GRNForm
               grn={selectedGRN}
               purchaseOrders={purchaseOrders}
+              vendors={vendors}
               fabrics={fabrics}
               transporters={transporters}
               onBack={() => setActiveGrnView('list')}
               onSaveGRN={handleSaveGRN}
+              onSaveTransporter={(t) => {
+                setTransporters((prev) => {
+                  const exists = prev.some((item) => item.id === t.id);
+                  return exists ? prev.map((item) => (item.id === t.id ? t : item)) : [t, ...prev];
+                });
+                addAuditLog('Save', 'Transporter Master', t.id, 'Logistics Carrier', 'Record', t.name);
+              }}
             />
           )}
         </>

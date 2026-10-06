@@ -322,21 +322,59 @@ export default function QualityCheckForm({
 
           {/* Three-Way QC Outcome (6.2) */}
           <div className="p-3 bg-light rounded-3 mb-4 border">
+            <style>{`
+              .qc-decision-card {
+                cursor: pointer;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                border: 2px solid #e2e8f0;
+                background-color: #ffffff;
+                user-select: none;
+              }
+              .qc-decision-card.ok-active {
+                border-color: #10b981 !important;
+                background-color: #ecfdf5 !important;
+                box-shadow: 0 0 0 1px #10b981, 0 4px 14px rgba(16, 185, 129, 0.25) !important;
+              }
+              .qc-decision-card.ok-card:hover {
+                border-color: #10b981 !important;
+                box-shadow: 0 0 0 1px #10b981, 0 4px 12px rgba(16, 185, 129, 0.2) !important;
+                background-color: #f0fdf4;
+              }
+              .qc-decision-card.admin-active {
+                border-color: #f59e0b !important;
+                background-color: #fffbeb !important;
+                box-shadow: 0 0 0 1px #f59e0b, 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+              }
+              .qc-decision-card.admin-card:hover {
+                border-color: #f59e0b !important;
+                box-shadow: 0 0 0 1px #f59e0b, 0 4px 12px rgba(245, 158, 11, 0.2) !important;
+                background-color: #fffbeb;
+              }
+              .qc-decision-card.reject-active {
+                border-color: #ef4444 !important;
+                background-color: #fef2f2 !important;
+                box-shadow: 0 0 0 1px #ef4444, 0 4px 14px rgba(239, 68, 68, 0.25) !important;
+              }
+              .qc-decision-card.reject-card:hover {
+                border-color: #ef4444 !important;
+                box-shadow: 0 0 0 1px #ef4444, 0 4px 12px rgba(239, 68, 68, 0.2) !important;
+                background-color: #fef2f2;
+              }
+            `}</style>
             <label className="form-label fs-13 fw-bold text-dark mb-2">
               Inspection Decision / QC Status *
             </label>
-            <div className="row g-2">
+            <div className="row g-3">
+              {/* Option 1: OK (Approved) */}
               <div className="col-12 col-md-4">
                 <div
-                  className={`card p-3 border-2 cursor-pointer transition-all ${
-                    formData.qcStatus === 'OK'
-                      ? 'border-success bg-success-subtle shadow-sm'
-                      : 'border-light bg-white'
+                  className={`card p-3 rounded-3 qc-decision-card ok-card ${
+                    formData.qcStatus === 'OK' ? 'ok-active' : ''
                   }`}
                   onClick={() => setFormData({ ...formData, qcStatus: 'OK' })}
                 >
                   <div className="d-flex align-items-center gap-2">
-                    <i className="ti ti-circle-check fs-20 text-success"></i>
+                    <i className="ti ti-circle-check fs-22 text-success"></i>
                     <div>
                       <div className="fw-bold text-success fs-14">OK (Approved)</div>
                       <div className="text-muted fs-11">
@@ -347,17 +385,16 @@ export default function QualityCheckForm({
                 </div>
               </div>
 
+              {/* Option 2: Send for Admin Approval */}
               <div className="col-12 col-md-4">
                 <div
-                  className={`card p-3 border-2 cursor-pointer transition-all ${
-                    formData.qcStatus === 'Send for Admin Approval'
-                      ? 'border-warning bg-warning-subtle shadow-sm'
-                      : 'border-light bg-white'
+                  className={`card p-3 rounded-3 qc-decision-card admin-card ${
+                    formData.qcStatus === 'Send for Admin Approval' ? 'admin-active' : ''
                   }`}
                   onClick={() => setFormData({ ...formData, qcStatus: 'Send for Admin Approval' })}
                 >
                   <div className="d-flex align-items-center gap-2">
-                    <i className="ti ti-clock fs-20 text-warning"></i>
+                    <i className="ti ti-clock fs-22 text-warning"></i>
                     <div>
                       <div className="fw-bold text-warning fs-14">Send for Admin Approval</div>
                       <div className="text-muted fs-11">
@@ -368,17 +405,16 @@ export default function QualityCheckForm({
                 </div>
               </div>
 
+              {/* Option 3: Reject (Defective) */}
               <div className="col-12 col-md-4">
                 <div
-                  className={`card p-3 border-2 cursor-pointer transition-all ${
-                    formData.qcStatus === 'Reject'
-                      ? 'border-danger bg-danger-subtle shadow-sm'
-                      : 'border-light bg-white'
+                  className={`card p-3 rounded-3 qc-decision-card reject-card ${
+                    formData.qcStatus === 'Reject' ? 'reject-active' : ''
                   }`}
                   onClick={() => setFormData({ ...formData, qcStatus: 'Reject' })}
                 >
                   <div className="d-flex align-items-center gap-2">
-                    <i className="ti ti-circle-x fs-20 text-danger"></i>
+                    <i className="ti ti-circle-x fs-22 text-danger"></i>
                     <div>
                       <div className="fw-bold text-danger fs-14">Reject (Defective)</div>
                       <div className="text-muted fs-11">

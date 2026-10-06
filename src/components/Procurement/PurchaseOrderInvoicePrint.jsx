@@ -135,7 +135,9 @@ export default function PurchaseOrderInvoicePrint({ po, onBack }) {
                 <tr key={idx}>
                   <td className="text-center">{idx + 1}</td>
                   <td>
-                    <div className="fw-semibold text-dark">{it.fabricName}</div>
+                    <div className="fw-semibold text-dark">
+                      {it.fabricName} {it.colorName ? `— ${it.colorName}` : ''}
+                    </div>
                     <div className="text-muted fs-11">
                       HSN: 520811 | Fold Standard: {it.fold || 97}%
                     </div>

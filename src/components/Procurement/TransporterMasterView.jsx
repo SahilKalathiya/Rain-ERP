@@ -13,7 +13,7 @@ export default function TransporterMasterView({
 }) {
   const [transporterList, setTransporterList] = useState(transporters);
   const [selectedTransporter, setSelectedTransporter] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
 
   // Column Filters
@@ -25,12 +25,23 @@ export default function TransporterMasterView({
   });
 
   // Form State
-  const [formData, setFormData] = useState({
-    id: '',
-    name: '',
-    address: '',
-    phone: '',
-    active: true
+  const [formData, setFormData] = useState(() => {
+    if (isInline) {
+      return {
+        id: `TRN-${String(transporters.length + 1).padStart(4, '0')}`,
+        name: '',
+        address: '',
+        phone: '',
+        active: true
+      };
+    }
+    return {
+      id: '',
+      name: '',
+      address: '',
+      phone: '',
+      active: true
+    };
   });
 
   const handleOpenNew = () => {

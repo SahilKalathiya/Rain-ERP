@@ -85,72 +85,16 @@ export default function QualityCheckList({
 
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary">
-              <tr className="bg-light">
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter QC"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.id}
-                    onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter GRN"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.grn}
-                    onChange={(e) => setColFilters({ ...colFilters, grn: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <select
-                    className="form-select form-select-sm fs-11"
-                    value={colFilters.scope}
-                    onChange={(e) => setColFilters({ ...colFilters, scope: e.target.value })}
-                  >
-                    <option value="">All Scopes</option>
-                    <option value="Whole Shipment">Whole Shipment</option>
-                    <option value="Bale-Level">Bale-Level</option>
-                    <option value="Piece-Level">Piece-Level</option>
-                  </select>
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Inspector"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.inspector}
-                    onChange={(e) => setColFilters({ ...colFilters, inspector: e.target.value })}
-                  />
-                </th>
-                <th>Width (Exp vs Act)</th>
-                <th>Fold (Exp vs Act)</th>
-                <th>
-                  <select
-                    className="form-select form-select-sm fs-11"
-                    value={colFilters.status}
-                    onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
-                  >
-                    <option value="">All Status</option>
-                    <option value="OK">OK</option>
-                    <option value="Send for Admin Approval">Admin Approval</option>
-                    <option value="Reject">Reject</option>
-                  </select>
-                </th>
-                <th className="text-center">Action</th>
-              </tr>
+            <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th>QC ID</th>
-                <th>GRN Ref</th>
-                <th>Scope</th>
-                <th>Inspector</th>
-                <th>Width (Inches)</th>
-                <th>Fold (%)</th>
-                <th>Decision / Status</th>
-                <th className="text-center">Action</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>QC ID</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GRN Ref</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Scope</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inspector</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Width (Inches)</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fold (%)</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Decision / Status</th>
+                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
               </tr>
             </thead>
             <tbody>

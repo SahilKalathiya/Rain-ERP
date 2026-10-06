@@ -13,7 +13,7 @@ export default function FabricMasterView({
 }) {
   const [fabricList, setFabricList] = useState(fabrics);
   const [selectedFabric, setSelectedFabric] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
 
   // Column Filters
@@ -27,16 +27,31 @@ export default function FabricMasterView({
   });
 
   // Form State
-  const [formData, setFormData] = useState({
-    id: '',
-    qualityName: '',
-    fabricType: 'Cotton',
-    gsm: '',
-    widths: ['44', '58'],
-    defaultShrinkage: 3.5,
-    hsnCode: '520811',
-    description: '',
-    active: true
+  const [formData, setFormData] = useState(() => {
+    if (isInline) {
+      return {
+        id: `FAB-${String(fabrics.length + 1).padStart(4, '0')}`,
+        qualityName: '',
+        fabricType: 'Cotton',
+        gsm: '',
+        widths: ['44', '58'],
+        defaultShrinkage: 3.0,
+        hsnCode: '',
+        description: '',
+        active: true
+      };
+    }
+    return {
+      id: '',
+      qualityName: '',
+      fabricType: 'Cotton',
+      gsm: '',
+      widths: ['44', '58'],
+      defaultShrinkage: 3.5,
+      hsnCode: '520811',
+      description: '',
+      active: true
+    };
   });
 
   const [widthInput, setWidthInput] = useState('');
@@ -48,7 +63,7 @@ export default function FabricMasterView({
       qualityName: '',
       fabricType: 'Cotton',
       gsm: '',
-      widths: ['44'],
+      widths: ['44', '58'],
       defaultShrinkage: 3.0,
       hsnCode: '',
       description: '',
@@ -71,13 +86,14 @@ export default function FabricMasterView({
   // Add width tag
   const handleAddWidthTag = (e) => {
     if (e.key === 'Enter' || e.type === 'click') {
-      e.preventDefault();
+      if (e.preventDefault) e.preventDefault();
+      if (e.stopPropagation) e.stopPropagation();
       const trimmed = widthInput.trim().replace(/"/g, '');
       if (trimmed && !formData.widths.includes(trimmed)) {
-        setFormData({
-          ...formData,
-          widths: [...formData.widths, trimmed]
-        });
+        setFormData((prev) => ({
+          ...prev,
+          widths: [...prev.widths, trimmed]
+        }));
         setWidthInput('');
       }
     }
@@ -186,10 +202,20 @@ export default function FabricMasterView({
         <div className={selectedFabric || isCreatingNew ? 'col-12 col-xl-7' : 'col-12'}>
           <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <div className="d-flex align-items-center justify-content-between mb-3">
-              <h5 className="fw-bold text-dark mb-0 fs-16">Fabric Quality Catalog</h5>
-              <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
-                {filteredFabrics.length} of {fabricList.length} Qualities
-              </span>
+              <div className="d-flex align-items-center gap-2">
+                <h5 className="fw-bold text-dark mb-0 fs-16">Fabric Quality Catalog</h5>
+                <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
+                  {filteredFabrics.length} of {fabricList.length} Qualities
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm d-flex align-items-center gap-1 px-3 py-1 fw-semibold rounded-3 shadow-sm"
+                onClick={handleOpenNew}
+              >
+                <i className="ti ti-plus fs-14"></i>
+                <span>+ New Fabric</span>
+              </button>
             </div>
 
             <div className="table-responsive">
@@ -528,7 +554,13 @@ export default function FabricMasterView({
                       type="button"
                       className="btn btn-light btn-sm px-3"
                       onClick={() => {
-                        if (isCreatingNew) setSelectedFabric(null);
+                        if (isCreatingNew) {
+                          setSelectedFabric(null);
+                          setIsCreatingNew(false);
+                        } else if (selectedFabric) {
+                          setFormData({ ...selectedFabric, widths: Array.isArray(selectedFabric.widths) ? [...selectedFabric.widths] : ['44'] });
+                        }
+                        setWidthInput('');
                         setIsEditing(false);
                       }}
                     >

@@ -13,8 +13,8 @@ export default function VendorMasterView({
 }) {
   const [vendorList, setVendorList] = useState(vendors);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [activeSection, setActiveSection] = useState('all'); // 'all', 'basic', 'contact', 'tax', 'bank'
+  const [isEditing, setIsEditing] = useState(isInline);
+  const [activeSection, setActiveSection] = useState(isInline ? 'all' : 'none'); // 'all', 'basic', 'contact', 'tax', 'bank'
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
 
   // Column Filters
@@ -30,23 +30,45 @@ export default function VendorMasterView({
   });
 
   // Form State
-  const [formData, setFormData] = useState({
-    id: '',
-    name: '',
-    type: 'Fabric Supplier',
-    contactPerson: '',
-    phone: '',
-    alternatePhone: '',
-    email: '',
-    address: '',
-    city: '',
-    state: 'Maharashtra',
-    gstin: '',
-    rating: 5,
-    bankName: '',
-    accountNumber: '',
-    ifscCode: '',
-    active: true
+  const [formData, setFormData] = useState(() => {
+    if (isInline) {
+      return {
+        id: `VEND-${String(vendors.length + 1).padStart(4, '0')}`,
+        name: '',
+        type: 'Fabric Supplier',
+        contactPerson: '',
+        phone: '',
+        alternatePhone: '',
+        email: '',
+        address: '',
+        city: '',
+        state: 'Maharashtra',
+        gstin: '',
+        rating: 5,
+        bankName: '',
+        accountNumber: '',
+        ifscCode: '',
+        active: true
+      };
+    }
+    return {
+      id: '',
+      name: '',
+      type: 'Fabric Supplier',
+      contactPerson: '',
+      phone: '',
+      alternatePhone: '',
+      email: '',
+      address: '',
+      city: '',
+      state: 'Maharashtra',
+      gstin: '',
+      rating: 5,
+      bankName: '',
+      accountNumber: '',
+      ifscCode: '',
+      active: true
+    };
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -555,24 +577,55 @@ export default function VendorMasterView({
                       )}
                     </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">State</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <select
-                          className="form-select form-select-sm bg-white"
-                          value={formData.state}
-                          onChange={(e) => handleTextChange('state', e.target.value)}
-                        >
-                          <option value="Maharashtra">Maharashtra</option>
-                          <option value="Gujarat">Gujarat</option>
-                          <option value="Rajasthan">Rajasthan</option>
-                          <option value="Delhi">Delhi</option>
-                          <option value="Karnataka">Karnataka</option>
-                        </select>
-                      ) : (
-                        <div className="text-dark fs-13">{formData.state || '-'}</div>
-                      )}
-                    </div>
+                      <div className="col-6">
+                        <label className="form-label fs-12 fw-semibold mb-1">State</label>
+                        {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
+                          <select
+                            className="form-select form-select-sm bg-white"
+                            value={formData.state}
+                            onChange={(e) => handleTextChange('state', e.target.value)}
+                          >
+                            <option value="Andhra Pradesh">Andhra Pradesh</option>
+                            <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                            <option value="Assam">Assam</option>
+                            <option value="Bihar">Bihar</option>
+                            <option value="Chhattisgarh">Chhattisgarh</option>
+                            <option value="Goa">Goa</option>
+                            <option value="Gujarat">Gujarat</option>
+                            <option value="Haryana">Haryana</option>
+                            <option value="Himachal Pradesh">Himachal Pradesh</option>
+                            <option value="Jharkhand">Jharkhand</option>
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Kerala">Kerala</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh</option>
+                            <option value="Maharashtra">Maharashtra</option>
+                            <option value="Manipur">Manipur</option>
+                            <option value="Meghalaya">Meghalaya</option>
+                            <option value="Mizoram">Mizoram</option>
+                            <option value="Nagaland">Nagaland</option>
+                            <option value="Odisha">Odisha</option>
+                            <option value="Punjab">Punjab</option>
+                            <option value="Rajasthan">Rajasthan</option>
+                            <option value="Sikkim">Sikkim</option>
+                            <option value="Tamil Nadu">Tamil Nadu</option>
+                            <option value="Telangana">Telangana</option>
+                            <option value="Tripura">Tripura</option>
+                            <option value="Uttar Pradesh">Uttar Pradesh</option>
+                            <option value="Uttarakhand">Uttarakhand</option>
+                            <option value="West Bengal">West Bengal</option>
+                            <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                            <option value="Chandigarh">Chandigarh</option>
+                            <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                            <option value="Delhi">Delhi</option>
+                            <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                            <option value="Ladakh">Ladakh</option>
+                            <option value="Lakshadweep">Lakshadweep</option>
+                            <option value="Puducherry">Puducherry</option>
+                          </select>
+                        ) : (
+                          <div className="text-dark fs-13">{formData.state || '-'}</div>
+                        )}
+                      </div>
                   </div>
                 </div>
 

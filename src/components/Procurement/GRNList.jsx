@@ -117,83 +117,18 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
 
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary">
-              {/* Column Filters (9.3) */}
-              <tr className="bg-light">
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter GRN"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.id}
-                    onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Date"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.date}
-                    onChange={(e) => setColFilters({ ...colFilters, date: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Filter Vendor"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.vendor}
-                    onChange={(e) => setColFilters({ ...colFilters, vendor: e.target.value })}
-                  />
-                </th>
-                <th>Linked POs</th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Invoice No"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.invoice}
-                    onChange={(e) => setColFilters({ ...colFilters, invoice: e.target.value })}
-                  />
-                </th>
-                <th>
-                  <input
-                    type="text"
-                    placeholder="Challan No"
-                    className="form-control form-control-sm fs-11"
-                    value={colFilters.challan}
-                    onChange={(e) => setColFilters({ ...colFilters, challan: e.target.value })}
-                  />
-                </th>
-                <th className="text-center">Bales</th>
-                <th className="text-end">Total Mtrs</th>
-                <th>
-                  <select
-                    className="form-select form-select-sm fs-11"
-                    value={colFilters.status}
-                    onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
-                  >
-                    <option value="">All</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Bale Entry in Progress">In Progress</option>
-                    <option value="Header Saved">Header Saved</option>
-                    <option value="Draft">Draft</option>
-                  </select>
-                </th>
-                <th className="text-center">Action</th>
-              </tr>
+            <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th>GRN No.</th>
-                <th>Date</th>
-                <th>Vendor</th>
-                <th>Linked PO(s)</th>
-                <th>Invoice No.</th>
-                <th>Challan No.</th>
-                <th className="text-center">Bales</th>
-                <th className="text-end">Total Length</th>
-                <th>Status</th>
-                <th className="text-center">Action</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GRN No.</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Linked PO(s)</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoice No.</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Challan No.</th>
+                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bales</th>
+                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Length</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '150px' }}>Status</th>
+                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -229,22 +164,26 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
                       {(Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toFixed(2)} Mtrs
                     </td>
                     <td>
-                      <span
-                        className={`badge px-2 py-1 ${
-                          g.status === 'Completed'
-                            ? 'bg-success-subtle text-success'
-                            : g.status === 'Bale Entry in Progress'
-                            ? 'bg-primary-subtle text-primary'
-                            : 'bg-warning-subtle text-warning'
-                        }`}
-                      >
-                        {g.status}
-                      </span>
-                      {g.adminApprovalNeeded && (
-                        <span className="badge bg-danger-subtle text-danger ms-1" title="Buffer Tolerance Exceeded">
-                          Tolerance Hold
+                      <div className="d-inline-flex flex-column align-items-start gap-1">
+                        <span
+                          className={`badge rounded-pill px-2.5 py-1 ${
+                            g.status === 'Completed'
+                              ? 'bg-success-subtle text-success border border-success-subtle'
+                              : g.status === 'Bale Entry in Progress'
+                              ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                              : 'bg-warning-subtle text-warning border border-warning-subtle'
+                          }`}
+                        >
+                          <i className={`ti ${g.status === 'Completed' ? 'ti-check' : 'ti-clock'} me-1 fs-11`}></i>
+                          {g.status}
                         </span>
-                      )}
+                        {g.adminApprovalNeeded && (
+                          <span className="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1" title="Buffer Tolerance Exceeded">
+                            <i className="ti ti-alert-triangle fs-11"></i>
+                            Tolerance Hold
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="text-center">
                       <button

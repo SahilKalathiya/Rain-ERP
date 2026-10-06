@@ -14,7 +14,10 @@ export default function PurchaseOrderForm({
   fabrics = [],
   onBack,
   onSavePO,
-  onPrintPO
+  onPrintPO,
+  onInwardGRN,
+  onSaveVendor,
+  onSaveFabric
 }) {
   const isExisting = Boolean(po && po.id);
 
@@ -40,10 +43,11 @@ export default function PurchaseOrderForm({
         id: 'item-1',
         fabricId: fabrics[0]?.id || '',
         fabricName: fabrics[0]?.qualityName || '',
+        colorName: '',
         width: fabrics[0]?.widths?.[0] || '44',
         quantity: '',
         rate: '',
-        fold: 97,
+        fold: '',
         amount: 0
       }
     ]
@@ -52,14 +56,66 @@ export default function PurchaseOrderForm({
   // Modals for Inline Master Creation (8.1)
   const [showInlineVendorModal, setShowInlineVendorModal] = useState(false);
   const [showInlineFabricModal, setShowInlineFabricModal] = useState(false);
+  const [showNewColorModal, setShowNewColorModal] = useState(false);
+  const [activeColorRowId, setActiveColorRowId] = useState(null);
+  const [customColorInput, setCustomColorInput] = useState('');
 
-  // Sync vendor name when vendorId changes
-  const handleVendorChange = (vId) => {
+  // Standard predefined color catalog with live custom additions
+  const [availableColors, setAvailableColors] = useState(() => {
+    try {
+      const s = localStorage.getItem('raindrop_po_colors_v1');
+      if (s) return JSON.parse(s);
+    } catch (e) {}
+    return [
+      'Navy Blue',
+      'Olive Green',
+      'Jet Black',
+      'Pure White',
+      'Maroon Red',
+      'Royal Blue',
+      'Beige Cream',
+      'Charcoal Grey',
+      'Mustard Yellow',
+      'Bottle Green'
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('raindrop_po_colors_v1', JSON.stringify(availableColors));
+    } catch (e) {}
+  }, [availableColors]);
+
+  const handleCreateNewColor = (e) => {
+    if (e) e.preventDefault();
+    if (!customColorInput.trim()) return;
+    const newColor = customColorInput.trim();
+    if (!availableColors.includes(newColor)) {
+      setAvailableColors((prev) => [...prev, newColor]);
+    }
+    if (activeColorRowId) {
+      handleItemChange(activeColorRowId, 'colorName', newColor);
+    }
+    setCustomColorInput('');
+    setShowNewColorModal(false);
+    setActiveColorRowId(null);
+  };
+
+  // Sync vendor name when vendorId changes or direct object passed
+  const handleVendorChange = (vId, vendorObj = null) => {
+    if (vendorObj) {
+      setFormData((prev) => ({
+        ...prev,
+        vendorId: vendorObj.id,
+        vendorName: vendorObj.name
+      }));
+      return;
+    }
     const v = vendors.find((vend) => vend.id === vId);
     setFormData((prev) => ({
       ...prev,
       vendorId: vId,
-      vendorName: v ? v.name : ''
+      vendorName: v ? v.name : (vId || '')
     }));
   };
 
@@ -74,10 +130,11 @@ export default function PurchaseOrderForm({
           id: `item-${Date.now()}`,
           fabricId: firstFabric?.id || '',
           fabricName: firstFabric?.qualityName || '',
+          colorName: '',
           width: firstFabric?.widths?.[0] || '44',
           quantity: '',
           rate: '',
-          fold: 97,
+          fold: '',
           amount: 0
         }
       ]
@@ -136,6 +193,7 @@ export default function PurchaseOrderForm({
       totalAmount: poTotalAmount,
       items: formData.items.map((it) => ({
         ...it,
+        colorName: it.colorName || '',
         quantity: Number(it.quantity) || 0,
         rate: Number(it.rate) || 0,
         fold: Number(it.fold) || 100,
@@ -193,6 +251,18 @@ export default function PurchaseOrderForm({
             >
               <i className="ti ti-printer fs-16"></i>
               <span>Print PO</span>
+            </button>
+          )}
+
+          {isExisting && formData.status !== 'Completed' && formData.status !== 'Draft' && (
+            <button
+              type="button"
+              className="btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold fs-13 rounded-3 shadow-sm text-white"
+              style={{ background: '#10b981', border: 'none' }}
+              onClick={() => onInwardGRN && onInwardGRN(formData)}
+            >
+              <i className="ti ti-package fs-16"></i>
+              <span>+ Inward Delivery (GRN)</span>
             </button>
           )}
 
@@ -302,9 +372,14 @@ export default function PurchaseOrderForm({
                     .filter((v) => v.active || v.id === formData.vendorId)
                     .map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name} ({v.city})
+                        {v.name} {v.city ? `(${v.city})` : ''}
                       </option>
                     ))}
+                  {formData.vendorId && !vendors.some((v) => v.id === formData.vendorId) && (
+                    <option value={formData.vendorId}>
+                      {formData.vendorName || formData.vendorId}
+                    </option>
+                  )}
                 </select>
               ) : (
                 <div className="fw-semibold text-dark fs-14">{formData.vendorName}</div>
@@ -407,22 +482,37 @@ export default function PurchaseOrderForm({
           <div className="table-responsive">
             <table className="table table-bordered align-middle mb-0 fs-13">
               <thead className="table-light text-secondary">
-                <tr>
-                  <th style={{ width: '30%' }}>Fabric Quality *</th>
-                  <th style={{ width: '15%' }}>Width (Panna) *</th>
-                  <th style={{ width: '15%' }} className="text-end">
+                <tr style={{ whiteSpace: 'nowrap' }}>
+                  <th style={{ minWidth: '270px', verticalAlign: 'middle' }}>
+                    <div className="d-flex align-items-center justify-content-between gap-2">
+                      <span>Fabric Quality *</span>
+                      {isEditing && (
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm p-0 text-primary fs-11 text-decoration-none fw-semibold"
+                          onClick={() => setShowInlineFabricModal(true)}
+                          title="Add New Fabric Quality"
+                        >
+                          <i className="ti ti-plus me-1"></i>New Fabric
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                  <th style={{ minWidth: '170px', verticalAlign: 'middle' }}>Color Name</th>
+                  <th style={{ minWidth: '120px', verticalAlign: 'middle' }}>Width (Panna) *</th>
+                  <th style={{ minWidth: '140px', verticalAlign: 'middle' }} className="text-end">
                     Quantity (Mtrs) *
                   </th>
-                  <th style={{ width: '15%' }} className="text-end">
+                  <th style={{ minWidth: '130px', verticalAlign: 'middle' }} className="text-end">
                     Rate / Mtr (₹) *
                   </th>
-                  <th style={{ width: '10%' }} className="text-center">
+                  <th style={{ minWidth: '90px', verticalAlign: 'middle' }} className="text-center">
                     Fold %
                   </th>
-                  <th style={{ width: '15%' }} className="text-end">
+                  <th style={{ minWidth: '120px', verticalAlign: 'middle' }} className="text-end">
                     Amount (₹)
                   </th>
-                  {isEditing && <th style={{ width: '5%' }}></th>}
+                  {isEditing && <th style={{ width: '40px', verticalAlign: 'middle' }}></th>}
                 </tr>
               </thead>
               <tbody>
@@ -436,7 +526,8 @@ export default function PurchaseOrderForm({
                       <td>
                         {isEditing ? (
                           <select
-                            className="form-select form-select-sm bg-light fs-13"
+                            className="form-select form-select-sm bg-light fs-13 pe-4 text-truncate"
+                            style={{ minWidth: '240px' }}
                             value={row.fabricId}
                             onChange={(e) => handleItemChange(row.id, 'fabricId', e.target.value)}
                           >
@@ -450,6 +541,39 @@ export default function PurchaseOrderForm({
                           </select>
                         ) : (
                           <div className="fw-medium text-dark">{row.fabricName}</div>
+                        )}
+                      </td>
+
+                      {/* Color Name Dropdown */}
+                      <td>
+                        {isEditing ? (
+                          <select
+                            className="form-select form-select-sm bg-light fs-13"
+                            value={row.colorName || ''}
+                            onChange={(e) => {
+                              if (e.target.value === '__NEW_COLOR__') {
+                                setActiveColorRowId(row.id);
+                                setShowNewColorModal(true);
+                              } else {
+                                handleItemChange(row.id, 'colorName', e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="">Select Color...</option>
+                            {availableColors.map((col) => (
+                              <option key={col} value={col}>
+                                {col}
+                              </option>
+                            ))}
+                            {row.colorName && !availableColors.includes(row.colorName) && (
+                              <option value={row.colorName}>{row.colorName}</option>
+                            )}
+                            <option value="__NEW_COLOR__" className="fw-bold text-primary">
+                              + Add New Color...
+                            </option>
+                          </select>
+                        ) : (
+                          <div className="text-dark">{row.colorName || '-'}</div>
                         )}
                       </td>
 
@@ -550,7 +674,7 @@ export default function PurchaseOrderForm({
               </tbody>
               <tfoot className="table-light">
                 <tr>
-                  <td colSpan="5" className="text-end fw-bold fs-14">
+                  <td colSpan="6" className="text-end fw-bold fs-14">
                     PO Total Amount:
                   </td>
                   <td className="text-end fw-bold text-primary fs-16">
@@ -592,9 +716,17 @@ export default function PurchaseOrderForm({
               <VendorMasterView
                 vendors={vendors}
                 isInline={true}
+                onSaveVendor={(newVendor) => {
+                  if (onSaveVendor) {
+                    onSaveVendor(newVendor);
+                  }
+                  if (newVendor) {
+                    handleVendorChange(newVendor.id, newVendor);
+                  }
+                }}
                 onCloseInline={(newCreatedVendor) => {
                   if (newCreatedVendor) {
-                    handleVendorChange(newCreatedVendor.id);
+                    handleVendorChange(newCreatedVendor.id, newCreatedVendor);
                   }
                   setShowInlineVendorModal(false);
                 }}
@@ -612,10 +744,72 @@ export default function PurchaseOrderForm({
               <FabricMasterView
                 fabrics={fabrics}
                 isInline={true}
+                onSaveFabric={(newFabric) => {
+                  if (onSaveFabric) {
+                    onSaveFabric(newFabric);
+                  }
+                }}
                 onCloseInline={(newCreatedFabric) => {
                   setShowInlineFabricModal(false);
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Modal: Add New Color */}
+      {showNewColorModal && (
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1070 }}>
+          <div className="modal-dialog modal-sm modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 p-3">
+              <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                <h6 className="fw-bold text-dark mb-0 fs-15">
+                  <i className="ti ti-palette text-primary me-1"></i> Add New Color
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowNewColorModal(false);
+                    setActiveColorRowId(null);
+                  }}
+                ></button>
+              </div>
+
+              <form onSubmit={handleCreateNewColor}>
+                <div className="mb-3">
+                  <label className="form-label fs-12 fw-semibold mb-1">Color / Shade Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Royal Blue / Maroon 102"
+                    className="form-control form-control-sm bg-light fs-13"
+                    value={customColorInput}
+                    onChange={(e) => setCustomColorInput(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="form-text fs-11 text-muted">
+                    This color will be saved and added into your color dropdowns.
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center justify-content-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light fs-12 px-3"
+                    onClick={() => {
+                      setShowNewColorModal(false);
+                      setActiveColorRowId(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-sm btn-primary fs-12 px-3 fw-semibold">
+                    Save Color
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

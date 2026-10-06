@@ -16,34 +16,127 @@ import TransporterMasterView from './TransporterMasterView';
 export default function GRNForm({
   grn,
   purchaseOrders = [],
+  vendors = [],
   fabrics = [],
   transporters = [],
   onBack,
-  onSaveGRN
+  onSaveGRN,
+  onSaveTransporter
 }) {
   const isExisting = Boolean(grn && grn.id);
 
-  // Level 1: Header State
-  const [formData, setFormData] = useState({
-    id: grn?.id || `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
-    date: grn?.date || new Date().toISOString().split('T')[0],
-    linkedPOs: grn?.linkedPOs || (purchaseOrders[0] ? [purchaseOrders[0].id] : []),
-    vendorId: grn?.vendorId || purchaseOrders[0]?.vendorId || '',
-    vendorName: grn?.vendorName || purchaseOrders[0]?.vendorName || '',
-    transporterId: grn?.transporterId || transporters[0]?.id || '',
-    transporterName: grn?.transporterName || transporters[0]?.name || '',
-    vendorInvoiceNo: grn?.vendorInvoiceNo || 'MST/1360/26-27',
-    vendorInvoiceDate: grn?.vendorInvoiceDate || '2026-09-01',
-    vendorChallanNo: grn?.vendorChallanNo || '1360',
-    vendorChallanDate: grn?.vendorChallanDate || '2026-09-01',
-    totalBales: grn?.totalBales || 5,
-    declaredTotalMeters: grn?.declaredTotalMeters || 10415.25,
-    status: grn?.status || 'Bale Entry in Progress', // Draft / Header Saved / Bale Entry in Progress / Completed
-    adminApprovalNeeded: grn?.adminApprovalNeeded || false,
-    adminJustification: grn?.adminJustification || '',
-    bales: grn?.bales || []
+  const getPoVendorName = (po) => {
+    if (!po) return '';
+    if (po.vendorName && po.vendorName.trim()) return po.vendorName;
+    const found = vendors.find((v) => v.id === po.vendorId);
+    return found ? found.name : (po.vendorId || '');
+  };
+
+  // Level 1: Header State (Dynamic initialization from passed PO/GRN)
+  const [formData, setFormData] = useState(() => {
+    const totalBalesCount = Number(grn?.totalBales) || 5;
+    const declaredMtrs = Number(grn?.declaredTotalMeters) || 10415.25;
+    const initialLinkedPO = grn?.linkedPOs?.[0] ? purchaseOrders.find((p) => p.id === grn.linkedPOs[0]) : purchaseOrders[0];
+    const resolvedVendorName = grn?.vendorName || getPoVendorName(initialLinkedPO);
+    
+    // Auto-generate bales if empty
+    let initialBales = grn?.bales || [];
+    if (initialBales.length === 0) {
+      const defaultFabricName = (grn?.fabricName) || fabrics[0]?.qualityName || 'Grey Cotton Fabrics (100*100)';
+      const perBaleMtrs = declaredMtrs / totalBalesCount;
+      const pieceCountPerBale = 17;
+      const perPieceLen = Math.round((perBaleMtrs / pieceCountPerBale) * 100) / 100;
+
+      for (let i = 0; i < totalBalesCount; i++) {
+        const pieces = [];
+        for (let p = 1; p <= pieceCountPerBale; p++) {
+          pieces.push({
+            pieceNo: `Piece ${String(p).padStart(2, '0')}`,
+            fabric: defaultFabricName,
+            length: p === pieceCountPerBale 
+              ? Math.round((perBaleMtrs - (perPieceLen * (pieceCountPerBale - 1))) * 100) / 100 
+              : perPieceLen,
+            remarks: 'Clean'
+          });
+        }
+        initialBales.push({
+          baleNo: `Bale ${String(i + 1).padStart(2, '0')}`,
+          piecesCount: pieceCountPerBale,
+          totalLength: perBaleMtrs,
+          pieces
+        });
+      }
+    }
+
+    return {
+      id: grn?.id || `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
+      date: grn?.date || new Date().toISOString().split('T')[0],
+      linkedPOs: grn?.linkedPOs || (purchaseOrders[0] ? [purchaseOrders[0].id] : []),
+      vendorId: grn?.vendorId || purchaseOrders[0]?.vendorId || '',
+      vendorName: resolvedVendorName,
+      transporterId: grn?.transporterId || transporters[0]?.id || '',
+      transporterName: grn?.transporterName || transporters[0]?.name || '',
+      vendorInvoiceNo: grn?.vendorInvoiceNo || `MST/${Math.floor(1000 + Math.random() * 9000)}/26-27`,
+      vendorInvoiceDate: grn?.vendorInvoiceDate || new Date().toISOString().split('T')[0],
+      vendorChallanNo: grn?.vendorChallanNo || String(Math.floor(1000 + Math.random() * 9000)),
+      vendorChallanDate: grn?.vendorChallanDate || new Date().toISOString().split('T')[0],
+      totalBales: totalBalesCount,
+      declaredTotalMeters: declaredMtrs,
+      status: grn?.status || 'Bale Entry in Progress',
+      adminApprovalNeeded: grn?.adminApprovalNeeded || false,
+      adminJustification: grn?.adminJustification || '',
+      bales: initialBales
+    };
   });
 
+  // Sync state if a new grn is passed
+  useEffect(() => {
+    if (grn && grn.id) {
+      setFormData((prev) => {
+        const totalBalesCount = Number(grn.totalBales) || prev.totalBales || 5;
+        const declaredMtrs = Number(grn.declaredTotalMeters) || prev.declaredTotalMeters || 10415.25;
+        const initialLinkedPO = grn.linkedPOs?.[0] ? purchaseOrders.find((p) => p.id === grn.linkedPOs[0]) : null;
+        const resolvedVendorName = grn.vendorName || getPoVendorName(initialLinkedPO) || prev.vendorName;
+        
+        let initialBales = grn.bales || [];
+        if (initialBales.length === 0) {
+          const defaultFabricName = (grn.fabricName) || fabrics[0]?.qualityName || 'Grey Cotton Fabrics (100*100)';
+          const perBaleMtrs = declaredMtrs / totalBalesCount;
+          const pieceCountPerBale = 17;
+          const perPieceLen = Math.round((perBaleMtrs / pieceCountPerBale) * 100) / 100;
+
+          for (let i = 0; i < totalBalesCount; i++) {
+            const pieces = [];
+            for (let p = 1; p <= pieceCountPerBale; p++) {
+              pieces.push({
+                pieceNo: `Piece ${String(p).padStart(2, '0')}`,
+                fabric: defaultFabricName,
+                length: p === pieceCountPerBale 
+                  ? Math.round((perBaleMtrs - (perPieceLen * (pieceCountPerBale - 1))) * 100) / 100 
+                  : perPieceLen,
+                remarks: 'Clean'
+              });
+            }
+            initialBales.push({
+              baleNo: `Bale ${String(i + 1).padStart(2, '0')}`,
+              piecesCount: pieceCountPerBale,
+              totalLength: perBaleMtrs,
+              pieces
+            });
+          }
+        }
+
+        return {
+          ...prev,
+          ...grn,
+          vendorName: resolvedVendorName,
+          bales: initialBales
+        };
+      });
+    }
+  }, [grn, purchaseOrders, vendors]);
+
+  const [activeBaleTab, setActiveBaleTab] = useState(0);
   const [showInlineTransporterModal, setShowInlineTransporterModal] = useState(false);
   // Filter POs: Only POs that are 'Sent' or 'Partially Received' (ready for Goods Receipt)
   const availablePOs = purchaseOrders.filter(
@@ -54,6 +147,7 @@ export default function GRNForm({
   const handleTogglePO = (poId) => {
     const selectedPO = purchaseOrders.find((p) => p.id === poId);
     if (!selectedPO) return;
+    const poVendorName = getPoVendorName(selectedPO);
 
     if (formData.linkedPOs.includes(poId)) {
       if (formData.linkedPOs.length === 1) {
@@ -68,7 +162,7 @@ export default function GRNForm({
       // 8.3 Check: Must share the same vendor!
       if (formData.vendorId && selectedPO.vendorId !== formData.vendorId) {
         alert(
-          `Cannot link PO from different vendor. Selected PO belongs to ${selectedPO.vendorName}, but GRN vendor is ${formData.vendorName}.`
+          `Cannot link PO from different vendor. Selected PO belongs to ${poVendorName}, but GRN vendor is ${formData.vendorName}.`
         );
         return;
       }
@@ -77,7 +171,7 @@ export default function GRNForm({
         ...prev,
         linkedPOs: [...prev.linkedPOs, poId],
         vendorId: selectedPO.vendorId,
-        vendorName: selectedPO.vendorName
+        vendorName: poVendorName
       }));
     }
   };
@@ -367,18 +461,48 @@ export default function GRNForm({
               ) : (
                 availablePOs.map((po) => {
                   const isSelected = formData.linkedPOs.includes(po.id);
+                  const vName = getPoVendorName(po);
                   return (
                     <button
                       key={po.id}
                       type="button"
-                      className={`btn btn-sm d-flex align-items-center gap-1 rounded-pill px-3 py-1 ${
-                        isSelected ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white'
+                      className={`btn btn-sm d-flex align-items-center gap-1.5 rounded-pill px-3 py-1 transition-all ${
+                        isSelected
+                          ? 'btn-primary shadow-sm text-white fw-medium'
+                          : 'btn-light border text-dark bg-white shadow-none'
                       }`}
+                      style={{
+                        borderColor: isSelected ? 'transparent' : '#cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#6366f1';
+                          e.currentTarget.style.backgroundColor = '#f1f5f9';
+                          e.currentTarget.style.color = '#0f172a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.color = '#0f172a';
+                        }
+                      }}
                       onClick={() => handleTogglePO(po.id)}
+                      title={`Vendor: ${vName || 'Unknown'}`}
                     >
-                      <span className="fw-semibold">{po.id}</span>
-                      <span className="opacity-75 fs-11">({po.vendorName.split(' ')[0]})</span>
-                      {isSelected && <i className="ti ti-check fs-12"></i>}
+                      <span className="fw-semibold font-monospace">{po.id}</span>
+                      {vName && (
+                        <span
+                          className={`fs-11 ${
+                            isSelected ? 'text-white-50' : 'text-primary fw-medium'
+                          }`}
+                        >
+                          ({vName.split(' ')[0]})
+                        </span>
+                      )}
+                      {isSelected && <i className="ti ti-check fs-12 ms-0.5"></i>}
                     </button>
                   );
                 })
@@ -514,9 +638,9 @@ export default function GRNForm({
 
           {/* Running Totals & Mismatch Box */}
           <div className="col-12 col-md-4">
-            <div className="p-3 bg-light rounded-3 border">
-              <div className="d-flex align-items-center justify-content-between mb-1">
-                <span className="fs-12 text-secondary">Sum of Pieces Entered:</span>
+            <div className="p-2 px-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-center">
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <span className="fs-12 text-secondary fw-medium">Sum of Pieces Entered:</span>
                 <strong
                   className={`fs-14 ${
                     isMismatch ? 'text-danger fw-bold' : 'text-success fw-bold'
@@ -526,24 +650,24 @@ export default function GRNForm({
                 </strong>
               </div>
 
-              <div className="d-flex align-items-center justify-content-between fs-12">
-                <span className="text-secondary">Declared vs Entered:</span>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-1 fs-12">
+                <span className="text-secondary fw-medium">Declared vs Entered:</span>
                 {isMismatch ? (
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="badge bg-danger-subtle text-danger">
+                  <div className="d-flex flex-wrap align-items-center gap-1 justify-content-end">
+                    <span className="badge bg-danger-subtle text-danger py-1 px-2">
                       Mismatch: {variance > 0 ? `+${variance}` : variance} Mtrs
                     </span>
                     <button
                       type="button"
-                      className="btn btn-xs btn-outline-primary py-0 px-2 rounded-pill fs-11 fw-semibold"
+                      className="btn btn-sm btn-outline-primary py-1 px-2 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
                       onClick={handleAutoBalancePieces}
                       title="Automatically distribute pieces to match declared total exactly"
                     >
-                      ⚡ Auto-Balance
+                      <span>⚡ Auto-Balance</span>
                     </button>
                   </div>
                 ) : (
-                  <span className="badge bg-success-subtle text-success">Balanced (100% Match)</span>
+                  <span className="badge bg-success-subtle text-success py-1 px-2">Balanced (100% Match)</span>
                 )}
               </div>
             </div>
@@ -760,6 +884,11 @@ export default function GRNForm({
               <TransporterMasterView
                 transporters={transporters}
                 isInline={true}
+                onSaveTransporter={(newTrn) => {
+                  if (onSaveTransporter) {
+                    onSaveTransporter(newTrn);
+                  }
+                }}
                 onCloseInline={(newCreatedTrn) => {
                   if (newCreatedTrn) {
                     setFormData((prev) => ({

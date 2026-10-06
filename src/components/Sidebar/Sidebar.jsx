@@ -44,13 +44,13 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
             style={{
               width: '38px',
               height: '38px',
-              background: '#2e37a4'
+              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)'
             }}
           >
             RD
           </div>
           <div>
-            <div className="fw-bold fs-15 line-height-1" style={{ color: '#1b2559' }}>
+            <div className="fw-bold fs-15 line-height-1" style={{ color: '#0f172a' }}>
               Rain Drop ERP
             </div>
             <div className="text-muted fs-11 mt-1">Garment Manufacturing</div>
@@ -64,7 +64,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
           <div key={sIdx} className="mb-3">
             <div
               className="text-uppercase fw-bold fs-10 px-2 mb-2 tracking-wider"
-              style={{ color: '#8f9bba', letterSpacing: '0.8px' }}
+              style={{ color: '#94a3b8', letterSpacing: '0.8px' }}
             >
               {section.title}
             </div>
@@ -84,12 +84,12 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                           className="btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 rounded-3 fs-13 border-0 bg-transparent hover-bg-light transition-all"
                           onClick={() => toggleSubmenu(item.label)}
                           style={{
-                            color: '#2b3674',
+                            color: '#334155',
                             fontWeight: 600
                           }}
                         >
                           <div className="d-flex align-items-center gap-2">
-                            <i className={`${item.icon} fs-16`} style={{ color: '#2e37a4' }}></i>
+                            <i className={`${item.icon} fs-16`} style={{ color: '#6366f1' }}></i>
                             <span>{item.label}</span>
                           </div>
                           <i
@@ -116,14 +116,13 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                                 <li key={sIdx}>
                                   <a
                                     href={sub.link}
-                                    className={`d-block px-3 py-2 fs-13 rounded-3 text-decoration-none transition-all ${
-                                      isSubActive
-                                        ? 'fw-bold shadow-sm'
-                                        : 'text-secondary hover-text-dark hover-bg-light'
+                                    className={`sidebar-sub-link d-block px-3 py-2 fs-13 rounded-3 text-decoration-none transition-all ${
+                                      isSubActive ? 'sidebar-sub-link-active' : ''
                                     }`}
                                     style={{
-                                      background: isSubActive ? '#2e37a4' : 'transparent',
-                                      color: isSubActive ? '#ffffff' : '#707eae'
+                                      background: isSubActive ? '#4f46e5' : 'transparent',
+                                      color: isSubActive ? '#ffffff' : '#475569',
+                                      fontWeight: isSubActive ? 600 : 500
                                     }}
                                     onClick={(e) => {
                                       e.preventDefault();
@@ -141,12 +140,12 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                     ) : (
                       <a
                         href={item.link}
-                        className={`d-flex align-items-center gap-2 px-3 py-2 rounded-3 text-decoration-none fs-13 transition-all ${
-                          isActive ? 'fw-bold shadow-sm' : 'text-dark hover-bg-light'
+                        className={`sidebar-main-link d-flex align-items-center gap-2 px-3 py-2 rounded-3 text-decoration-none fs-13 transition-all ${
+                          isActive ? 'sidebar-main-link-active' : ''
                         }`}
                         style={{
-                          background: isActive ? '#2e37a4' : 'transparent',
-                          color: isActive ? '#ffffff' : '#2b3674',
+                          background: isActive ? '#4f46e5' : 'transparent',
+                          color: isActive ? '#ffffff' : '#334155',
                           fontWeight: isActive ? 600 : 500
                         }}
                         onClick={(e) => {
@@ -156,7 +155,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                       >
                         <i
                           className={`${item.icon} fs-16`}
-                          style={{ color: isActive ? '#ffffff' : '#2e37a4' }}
+                          style={{ color: isActive ? '#ffffff' : '#4f46e5' }}
                         ></i>
                         <span>{item.label}</span>
                       </a>
