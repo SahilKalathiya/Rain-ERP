@@ -46,7 +46,7 @@ import { api } from '../../services/api';
  *   - Master catalogs (Vendors, Fabrics, Transporters)
  *   - Runtime Activity History audit logging (9.4)
  */
-export default function ProcurementDashboard({ initialSubmodule = 'overview', onNavigate }) {
+export default function ProcurementDashboard({ initialSubmodule = 'overview', onNavigate, sidebarClickCount = 0 }) {
   // Tabs: 'overview', 'pos', 'grn', 'qc', 'rejected_stock', 'vendors', 'fabrics', 'transporters'
   const [activeTab, setActiveTab] = useState(initialSubmodule);
 
@@ -63,13 +63,29 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     transporters: '/transporters'
   };
 
-  // Sync active tab whenever sidebar navigation route changes
+  // Sync active tab whenever initialSubmodule route changes
   useEffect(() => {
     setActiveTab(initialSubmodule);
-    if (initialSubmodule === 'pos') setActivePoView('list');
-    if (initialSubmodule === 'grn') setActiveGrnView('list');
-    if (initialSubmodule === 'qc') setActiveQcView('list');
   }, [initialSubmodule]);
+
+  // When user explicitly clicks in the sidebar menu, reset to that submodule's main list page
+  useEffect(() => {
+    if (sidebarClickCount > 0) {
+      setActiveTab(initialSubmodule);
+      if (initialSubmodule === 'pos') {
+        setActivePoView('list');
+        setSelectedPO(null);
+      }
+      if (initialSubmodule === 'grn') {
+        setActiveGrnView('list');
+        setSelectedGRN(null);
+      }
+      if (initialSubmodule === 'qc') {
+        setActiveQcView('list');
+        setSelectedQC(null);
+      }
+    }
+  }, [sidebarClickCount]);
 
   // Subviews
   const [activePoView, setActivePoView] = useState('list'); // 'list', 'form', 'print'
@@ -373,7 +389,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   };
 
   const handleInwardFromPO = (po) => {
-    const declaredMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const existingGrnsForPo = grns.filter((g) => g.linkedPOs && g.linkedPOs.includes(po.id));
+    const alreadyReceived = existingGrnsForPo.reduce((sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+    const remainingMeters = Math.max(0, orderedMeters - alreadyReceived) || orderedMeters;
+
     const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : '';
     const vMatch = vendors.find((v) => v.id === po.vendorId);
     const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : (po.vendorId || ''));
@@ -386,13 +406,15 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       vendorName: resolvedVendorName,
       fabricName: fabricItem,
       status: 'Bale Entry in Progress',
-      totalBales: 5,
-      declaredTotalMeters: declaredMeters || 1000,
+      totalBales: 2,
+      totalQty: String(remainingMeters),
+      declaredTotalMeters: remainingMeters,
       bales: []
     };
     setSelectedGRN(newGrn);
     setActiveGrnView('form');
     setActiveTab('grn');
+    if (onNavigate) onNavigate('/goods-inward');
   };
 
   const handleSaveGRN = (grnData, isCompleted = true) => {
@@ -408,10 +430,37 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setGrns(updated);
     api.saveGRN(grnData).catch((e) => console.warn('GRN save sync error:', e));
 
-    // If completed, automatically generate QC record (6.2 rule: "A QC record is generated automatically the moment a GRN is processed")
+    // Update Linked PO Status (Partial Delivery vs Full Delivery)
+    if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
+      const linkedPoId = grnData.linkedPOs[0];
+      const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
+      if (targetPo) {
+        const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+        const allGrnsForPo = updated.filter((g) => g.linkedPOs && g.linkedPOs.includes(linkedPoId));
+        const totalReceivedForPo = allGrnsForPo.reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+        
+        let newPoStatus = targetPo.status;
+        if (totalReceivedForPo >= poOrderedMeters) {
+          newPoStatus = 'Completed';
+        } else if (totalReceivedForPo > 0) {
+          newPoStatus = 'Partially Received';
+        }
+
+        const updatedPo = {
+          ...targetPo,
+          status: newPoStatus,
+          receivedQty: totalReceivedForPo,
+          pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo)
+        };
+        setPurchaseOrders((prev) => prev.map((p) => (p.id === linkedPoId ? updatedPo : p)));
+        api.savePurchaseOrder(updatedPo).catch((e) => console.warn('PO status sync error:', e));
+      }
+    }
+
+    // If completed, automatically generate QC record
     if (isCompleted && grnData.status === 'Completed') {
-      let expFold = '100';
-      let expWidth = '44';
+      let expFold = '3';
+      let expWidth = '42';
 
       if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
         const linkedPO = purchaseOrders.find((p) => grnData.linkedPOs.includes(p.id));
@@ -437,12 +486,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         pieceRef: '',
         inspectorName: 'Saksham Garg',
         expectedWidth: expWidth,
-        actualWidth: Number(expWidth) || 44.0,
+        actualWidth: '',
         expectedFold: expFold,
-        actualFold: Number(expFold) || 100.0,
+        actualFold: '',
         photos: [],
         notes: `Quality inspection generated for inward shipment ${grnData.id}. Awaiting physical check.`,
-        qcStatus: 'Pending', // Pending until QC is actioned, allowing GRN editing
+        qcStatus: 'Pending',
         adminDecision: '',
         adminRemarks: '',
         dateTime: new Date().toLocaleString('en-GB'),
@@ -851,6 +900,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                   setActiveTab('qc');
                   setActiveQcView('detail');
                 }
+                if (onNavigate) onNavigate('/quality-batches');
               }}
             />
           )}
@@ -888,6 +938,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           {activeQcView === 'list' && (
             <QualityCheckList
               qcRecords={qualityChecks}
+              grns={grns}
+              purchaseOrders={purchaseOrders}
+              damagedItems={rejectedStock}
               onSelectQC={(qc) => {
                 setSelectedQC(qc);
                 if (qc.qcStatus === 'Pending') {
@@ -895,6 +948,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 } else {
                   setActiveQcView('detail');
                 }
+                if (onNavigate) onNavigate('/quality-batches');
               }}
             />
           )}
@@ -926,6 +980,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setSelectedGRN(targetGrn);
                 setActiveTab('grn');
                 setActiveGrnView('detail');
+                if (onNavigate) onNavigate('/goods-inward');
               }}
               onBackToQC={() => {
                 setActiveQcView('list');
@@ -936,6 +991,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               }}
               onViewStockPool={() => {
                 setActiveTab('stock_pool');
+                if (onNavigate) onNavigate('/stock-pool');
               }}
             />
           )}

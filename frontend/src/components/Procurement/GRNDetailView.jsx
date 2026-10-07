@@ -195,10 +195,12 @@ export default function GRNDetailView({
               {bales.length > 0 ? (
                 bales.map((b, idx) => {
                   const bMeters = (b.pieces || []).reduce((s, p) => {
-                    const m = typeof p === 'object' && p !== null ? (p.length || 0) : Number(p) || 0;
-                    return s + m;
+                    const raw = typeof p === 'object' && p !== null ? (p.length ?? p.meter ?? p.meters ?? 0) : p;
+                    const num = parseFloat(raw);
+                    return s + (isNaN(num) ? 0 : num);
                   }, 0);
                   const isLocked = Boolean(grn.isQcActioned);
+                  const formattedMeters = Number((Math.round(bMeters * 100) / 100).toFixed(2));
 
                   return (
                     <tr key={idx}>
@@ -207,7 +209,7 @@ export default function GRNDetailView({
                         {grn.fabricName || 'Tussar Silk (42") — Ivory'}
                       </td>
                       <td className="py-3 text-center fw-semibold">{(b.pieces || []).length}</td>
-                      <td className="py-3 text-end fw-bold text-dark">{bMeters}m</td>
+                      <td className="py-3 text-end fw-bold text-dark">{formattedMeters}m</td>
                       <td className="pe-4 py-3 text-center">
                         {isLocked ? (
                           <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
@@ -325,40 +327,136 @@ export default function GRNDetailView({
         </div>
       </div>
 
-      {/* CARD 4: History (Matches Screenshot 2) */}
+      {/* CARD 4: History & Activity Timeline */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-3 fs-16">History</h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3">
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="d-flex align-items-center justify-content-center rounded-3"
+              style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)', color: '#5b47fb' }}
+            >
+              <i className="ti ti-history fs-20"></i>
+            </div>
+            <div>
+              <h5 className="fw-bold text-dark mb-0 fs-16">Audit History &amp; Activity Log</h5>
+              <p className="text-muted mb-0 fs-12">Complete chronological record of inward receipt, pieces entered, and QC dispatch</p>
+            </div>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <span className="badge px-3 py-1.5 rounded-pill bg-light text-secondary border fs-11 fw-medium">
+              <i className="ti ti-shield-check me-1 text-success"></i> Verified Audit Trail
+            </span>
+          </div>
+        </div>
 
-        <div className="position-relative ps-4 border-start border-2 ms-2">
-          <div className="position-relative mb-3">
-            <span
-              className="position-absolute rounded-circle"
+        <div className="position-relative ps-4 ms-2" style={{ borderLeft: '2px dashed #cbd5e1' }}>
+          {/* Event 1: Submitted to Quality Check */}
+          <div className="position-relative mb-4 pb-2">
+            <div
+              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
               style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#94a3b8',
-                left: '-22px',
-                top: '5px'
+                width: '32px',
+                height: '32px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                left: '-33px',
+                top: '0px',
+                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
               }}
-            />
-            <div className="fs-12 text-secondary">
-              <span className="text-dark fw-medium">07 Oct 2026, 11:36 am</span> — Submitted to Quality Check (Saksham Garg (Merchandiser))
+            >
+              <i className="ti ti-check fs-14 fw-bold"></i>
+            </div>
+
+            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
+                    Submitted to Quality Check
+                  </span>
+                  <span className="badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11">
+                    {Number(grn.totalMetersEntered || grn.declaredTotalMeters || 2000).toLocaleString()}m
+                  </span>
+                </div>
+                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                  <i className="ti ti-clock fs-12 text-primary"></i>
+                  <span>07 Oct 2026, 11:36 am</span>
+                </div>
+              </div>
+
+              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                Inward delivery confirmed. <strong>{Number(grn.totalMetersEntered || grn.declaredTotalMeters || 2000).toLocaleString()}m</strong> across {totalPiecesCount} pieces queued for inspection.
+              </p>
+
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                    style={{ width: '26px', height: '26px', backgroundColor: '#5b47fb' }}
+                  >
+                    S
+                  </div>
+                  <div className="fs-12 text-secondary">
+                    Handled by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser)</span>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-3 fs-12 text-muted">
+                  <span>Vendor: <strong className="text-dark">{grn.vendorName || 'M.S. Textiles'}</strong></span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="position-relative mb-1">
-            <span
-              className="position-absolute rounded-circle"
+          {/* Event 2: GRN Created */}
+          <div className="position-relative">
+            <div
+              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
               style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#94a3b8',
-                left: '-22px',
-                top: '5px'
+                width: '32px',
+                height: '32px',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                left: '-33px',
+                top: '0px',
+                boxShadow: '0 4px 10px rgba(59, 130, 246, 0.25)'
               }}
-            />
-            <div className="fs-12 text-secondary">
-              <span className="text-dark fw-medium">07 Oct 2026, 11:23 am</span> — GRN started — Against {linkedPoId || 'PO-1001'} (Saksham Garg (Merchandiser))
+            >
+              <i className="ti ti-file-plus fs-14"></i>
+            </div>
+
+            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
+                    GRN Created Against {linkedPoId || 'PO-1001'}
+                  </span>
+                  <span className="badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11">
+                    {grn.id}
+                  </span>
+                </div>
+                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                  <i className="ti ti-clock fs-12 text-primary"></i>
+                  <span>07 Oct 2026, 11:23 am</span>
+                </div>
+              </div>
+
+              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                Generated goods received note from supplier <strong>{grn.vendorName || 'M.S. Textiles'}</strong>. Challan #{grn.challanNo || 'CH-8821'}.
+              </p>
+
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                    style={{ width: '26px', height: '26px', backgroundColor: '#0284c7' }}
+                  >
+                    S
+                  </div>
+                  <div className="fs-12 text-secondary">
+                    Created by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser)</span>
+                  </div>
+                </div>
+                <div className="text-muted fs-11">
+                  PO Reference: <span className="fw-semibold text-dark">{linkedPoId || 'PO-1001'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -40,6 +40,20 @@ export default function App() {
     };
   });
 
+  const [currentRoute, setCurrentRoute] = useState('/dashboard');
+  const [sidebarClickCount, setSidebarClickCount] = useState(0);
+
+  // When user clicks explicitly in the Sidebar menu
+  const handleSidebarNavigate = (route) => {
+    setCurrentRoute(route);
+    setSidebarClickCount((prev) => prev + 1);
+  };
+
+  // When internal submodules synchronize route (e.g. +GRN from PO, Run QC from GRN)
+  const handleRouteNavigate = (route) => {
+    setCurrentRoute(route);
+  };
+
   const renderContent = () => {
     // Profile & Settings View
     if (currentRoute === '/profile-settings' || currentRoute === '/settings' || currentRoute === '/profile') {
@@ -52,73 +66,36 @@ export default function App() {
       );
     }
 
-    // 0. Global Overview Dashboard (Section 9.4)
-    if (currentRoute === '/dashboard' || currentRoute === '/') {
-      return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
+    // Determine submodule from route
+    let submodule = 'overview';
+    if (currentRoute.startsWith('/procurement-pos') || currentRoute.startsWith('/po')) {
+      submodule = 'pos';
+    } else if (currentRoute.startsWith('/goods-inward') || currentRoute.startsWith('/grn')) {
+      submodule = 'grn';
+    } else if (currentRoute.startsWith('/quality-batches') || currentRoute.startsWith('/quality') || currentRoute.startsWith('/qc')) {
+      submodule = 'qc';
+    } else if (currentRoute.startsWith('/stock-pool') || currentRoute.startsWith('/stock')) {
+      submodule = 'stock_pool';
+    } else if (currentRoute.startsWith('/rejected-stock') || currentRoute.includes('rejected')) {
+      submodule = 'rejected_stock';
+    } else if (currentRoute.startsWith('/vendors')) {
+      submodule = 'vendors';
+    } else if (currentRoute.startsWith('/fabrics')) {
+      submodule = 'fabrics';
+    } else if (currentRoute.startsWith('/colors')) {
+      submodule = 'colors';
+    } else if (currentRoute.startsWith('/transporters')) {
+      submodule = 'transporters';
     }
 
-    // Phase 1: Raw Material Procurement & Masters (In Scope)
-    if (
-      currentRoute.startsWith('/procurement-pos') ||
-      currentRoute.startsWith('/procurement') ||
-      currentRoute.startsWith('/po')
-    ) {
-      return <ProcurementDashboard initialSubmodule="pos" onNavigate={setCurrentRoute} />;
-    }
-
-    if (
-      currentRoute.startsWith('/goods-inward') ||
-      currentRoute.startsWith('/grn')
-    ) {
-      return <ProcurementDashboard initialSubmodule="grn" onNavigate={setCurrentRoute} />;
-    }
-
-    if (
-      currentRoute.startsWith('/quality-batches') ||
-      currentRoute.startsWith('/quality') ||
-      currentRoute.startsWith('/qc')
-    ) {
-      return <ProcurementDashboard initialSubmodule="qc" onNavigate={setCurrentRoute} />;
-    }
-
-    if (
-      currentRoute.startsWith('/stock-pool') ||
-      currentRoute.startsWith('/stock')
-    ) {
-      return <ProcurementDashboard initialSubmodule="stock_pool" onNavigate={setCurrentRoute} />;
-    }
-
-    if (
-      currentRoute.startsWith('/rejected-stock') ||
-      currentRoute.includes('rejected')
-    ) {
-      return <ProcurementDashboard initialSubmodule="rejected_stock" onNavigate={setCurrentRoute} />;
-    }
-
-    if (currentRoute.startsWith('/vendors')) {
-      return <ProcurementDashboard initialSubmodule="vendors" onNavigate={setCurrentRoute} />;
-    }
-
-    if (currentRoute.startsWith('/fabrics')) {
-      return <ProcurementDashboard initialSubmodule="fabrics" onNavigate={setCurrentRoute} />;
-    }
-
-    if (currentRoute.startsWith('/colors')) {
-      return <ProcurementDashboard initialSubmodule="colors" onNavigate={setCurrentRoute} />;
-    }
-
-    if (currentRoute.startsWith('/transporters')) {
-      return <ProcurementDashboard initialSubmodule="transporters" onNavigate={setCurrentRoute} />;
-    }
-
-    // Default to Overview Dashboard
-    return <ProcurementDashboard initialSubmodule="overview" onNavigate={setCurrentRoute} />;
-  };
-
-  const [currentRoute, setCurrentRoute] = useState('/dashboard');
-  
-  const handleRouteNavigate = (route) => {
-    setCurrentRoute(route);
+    return (
+      <ProcurementDashboard
+        currentRoute={currentRoute}
+        initialSubmodule={submodule}
+        onNavigate={handleRouteNavigate}
+        sidebarClickCount={sidebarClickCount}
+      />
+    );
   };
 
   const handleLogout = () => {
@@ -152,13 +129,13 @@ export default function App() {
   return (
     <div className="d-flex" style={{ minHeight: '100vh', background: '#f8f9fa' }}>
       {/* Sidebar */}
-      <Sidebar currentRoute={currentRoute} onNavigate={setCurrentRoute} />
+      <Sidebar currentRoute={currentRoute} onNavigate={handleSidebarNavigate} />
 
       {/* Main Content Area */}
       <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
         <Header
           currentUser={currentUser}
-          onNavigate={setCurrentRoute}
+          onNavigate={handleSidebarNavigate}
           onOpenAuth={() => setIsAuthenticated(false)}
           onLogout={handleLogout}
         />

@@ -169,44 +169,123 @@ export default function DamagedItemDetailView({
         </div>
       </div>
 
-      {/* History Card (Matches Screenshot 5) */}
+      {/* History Card (Modern Audit Timeline) */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-3 fs-16">History</h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3">
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="d-flex align-items-center justify-content-center rounded-3"
+              style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)', color: '#5b47fb' }}
+            >
+              <i className="ti ti-history fs-20"></i>
+            </div>
+            <div>
+              <h5 className="fw-bold text-dark mb-0 fs-16">Audit History &amp; Resolution Trail</h5>
+              <p className="text-muted mb-0 fs-12">Log of flagging, inspection findings, and admin resolution decisions</p>
+            </div>
+          </div>
+          <span className="badge px-3 py-1.5 rounded-pill bg-light text-secondary border fs-11 fw-medium">
+            <i className="ti ti-shield-check me-1 text-success"></i> Audit Logged
+          </span>
+        </div>
 
-        <div className="position-relative ps-4 border-start border-2 ms-2">
+        <div className="position-relative ps-4 ms-2" style={{ borderLeft: '2px dashed #cbd5e1' }}>
           {currentStatus && currentStatus !== 'Pending Admin Review' && (
-            <div className="position-relative mb-3">
-              <span
-                className="position-absolute rounded-circle"
+            <div className="position-relative mb-4 pb-2">
+              <div
+                className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
                 style={{
-                  width: '10px',
-                  height: '10px',
-                  backgroundColor: isCurrentlyInStock ? '#10b981' : '#f59e0b',
-                  left: '-22px',
-                  top: '5px'
+                  width: '32px',
+                  height: '32px',
+                  background: isCurrentlyInStock ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  left: '-33px',
+                  top: '0px',
+                  boxShadow: isCurrentlyInStock ? '0 4px 10px rgba(16, 185, 129, 0.3)' : '0 4px 10px rgba(245, 158, 11, 0.3)'
                 }}
-              />
-              <div className="fs-12 text-secondary">
-                <span className="text-dark fw-medium">
-                  {damagedItem.resolvedAt || '07 Oct 2026, 12:10 pm'}
-                </span> — Resolution: {currentStatus} {damagedItem.resolutionNote ? `(${damagedItem.resolutionNote})` : ''} (Saksham Garg (Merchandiser))
+              >
+                <i className={`ti ${isCurrentlyInStock ? 'ti-check' : 'ti-arrow-back-up'} fs-14 fw-bold`}></i>
+              </div>
+
+              <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`badge ${isCurrentlyInStock ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle'} border px-2.5 py-1 rounded-2 fs-12 fw-semibold`}>
+                      Resolution: {currentStatus}
+                    </span>
+                  </div>
+                  <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                    <i className="ti ti-clock fs-12 text-primary"></i>
+                    <span>{damagedItem.resolvedAt || '07 Oct 2026, 12:10 pm'}</span>
+                  </div>
+                </div>
+
+                <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                  Admin decision applied. {damagedItem.resolutionNote ? `Note: "${damagedItem.resolutionNote}"` : `Item resolved and routed accordingly.`}
+                </p>
+
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                  <div className="d-flex align-items-center gap-2">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                      style={{ width: '26px', height: '26px', backgroundColor: '#5b47fb' }}
+                    >
+                      S
+                    </div>
+                    <div className="fs-12 text-secondary">
+                      Resolved by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser / Admin)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="position-relative mb-1">
-            <span
-              className="position-absolute rounded-circle"
+          {/* Initial Flagged Event */}
+          <div className="position-relative">
+            <div
+              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
               style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#94a3b8',
-                left: '-22px',
-                top: '5px'
+                width: '32px',
+                height: '32px',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                left: '-33px',
+                top: '0px',
+                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.25)'
               }}
-            />
-            <div className="fs-12 text-secondary">
-              <span className="text-dark fw-medium">{dateStr}</span> — {damagedItem.reason || 'Flagged during piece-level QC — Send for Admin Approval'} ({damagedItem.reportedBy || 'Saksham Garg (Merchandiser)'})
+            >
+              <i className="ti ti-alert-triangle fs-14"></i>
+            </div>
+
+            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
+                    Flagged During QC Inspection
+                  </span>
+                </div>
+                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                  <i className="ti ti-clock fs-12 text-primary"></i>
+                  <span>{dateStr}</span>
+                </div>
+              </div>
+
+              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                {damagedItem.reason || 'Flagged during piece-level QC — Send for Admin Approval'}
+              </p>
+
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                    style={{ width: '26px', height: '26px', backgroundColor: '#e11d48' }}
+                  >
+                    {(damagedItem.reportedBy || 'S')[0].toUpperCase()}
+                  </div>
+                  <div className="fs-12 text-secondary">
+                    Reported by: <strong className="text-dark">{damagedItem.reportedBy || 'Saksham Garg (Merchandiser)'}</strong>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

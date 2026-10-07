@@ -30,7 +30,12 @@ export default function QCDetailView({
             </button>
           )}
           {onBackToGRN && (
-            <button type="button" className="btn btn-outline-secondary px-3.5 py-2 rounded-3 fs-13" onClick={onBackToGRN}>
+            <button
+              type="button"
+              className="btn btn-white border px-3.5 py-2 rounded-3 fs-13 text-secondary fw-medium shadow-sm"
+              style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#475569' }}
+              onClick={onBackToGRN}
+            >
               Back to GRN
             </button>
           )}
@@ -98,16 +103,17 @@ export default function QCDetailView({
 
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
           <div>
-            <h2 className="fw-bold text-dark mb-1 fs-24 d-flex align-items-center gap-2.5">
-              <span>Quality Check — {fabricName}</span>
+            <h2 className="fw-bold text-dark mb-1 fs-24 d-flex flex-wrap align-items-center">
+              <span>Quality Check &mdash; {fabricName}</span>
               <span
-                className={`badge px-2.5 py-1 fs-11 rounded-pill ${
+                className={`badge px-3 py-1 fs-12 rounded-pill ms-3 ${
                   qc.qcStatus === 'OK' || qc.qcStatus === 'Partial OK'
                     ? 'bg-success-subtle text-success border border-success border-opacity-25'
                     : qc.qcStatus === 'Reject'
                     ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
                     : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
                 }`}
+                style={{ marginLeft: '14px', verticalAlign: 'middle' }}
               >
                 {qc.qcStatus || 'OK'}
               </span>
@@ -194,7 +200,8 @@ export default function QCDetailView({
 
             <button
               type="button"
-              className="btn btn-outline-secondary btn-sm px-3 py-1 rounded-3 fs-12 fw-medium"
+              className="btn btn-sm px-3.5 py-1.5 rounded-3 fs-12 fw-semibold text-white shadow-sm"
+              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
               onClick={() => onViewResolveDamaged && onViewResolveDamaged(itemToResolve)}
             >
               View / Resolve
@@ -258,40 +265,139 @@ export default function QCDetailView({
         )}
       </div>
 
-      {/* CARD 4: History (Matches Screenshot 4) */}
+      {/* CARD 4: History & Activity Timeline */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-3 fs-16">History</h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3">
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="d-flex align-items-center justify-content-center rounded-3"
+              style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)', color: '#5b47fb' }}
+            >
+              <i className="ti ti-history fs-20"></i>
+            </div>
+            <div>
+              <h5 className="fw-bold text-dark mb-0 fs-16">Audit History &amp; Activity Log</h5>
+              <p className="text-muted mb-0 fs-12">Complete chronological record of inspections, verifications, and approvals</p>
+            </div>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <span className="badge px-3 py-1.5 rounded-pill bg-light text-secondary border fs-11 fw-medium">
+              <i className="ti ti-shield-check me-1 text-success"></i> Verified Audit Trail
+            </span>
+          </div>
+        </div>
 
-        <div className="position-relative ps-4 border-start border-2 ms-2">
-          <div className="position-relative mb-3">
-            <span
-              className="position-absolute rounded-circle"
+        <div className="position-relative ps-4 ms-2" style={{ borderLeft: '2px dashed #cbd5e1' }}>
+          {/* Event 1: QC Completed */}
+          <div className="position-relative mb-4 pb-2">
+            <div
+              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
               style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#94a3b8',
-                left: '-22px',
-                top: '5px'
+                width: '32px',
+                height: '32px',
+                background: qc.qcStatus === 'Reject' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)',
+                left: '-33px',
+                top: '0px',
+                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
               }}
-            />
-            <div className="fs-12 text-secondary">
-              <span className="text-dark fw-medium">07 Oct 2026, 12:03 pm</span> — Marked OK by QC — Wedc (with defect reported) (Saksham Garg (Merchandiser))
+            >
+              <i className={`ti ${qc.qcStatus === 'Reject' ? 'ti-x' : 'ti-check'} fs-14 fw-bold`}></i>
+            </div>
+
+            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className={`badge ${qc.qcStatus === 'Reject' ? 'bg-danger-subtle text-danger border-danger-subtle' : 'bg-success-subtle text-success border-success-subtle'} border px-2.5 py-1 rounded-2 fs-12 fw-semibold`}>
+                    QC Completed: {qc.qcStatus || 'OK'}
+                  </span>
+                  {qc.heldBackQty > 0 && (
+                    <span className="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 rounded-2 fs-11">
+                      {qc.heldBackQty}m Defect Reported
+                    </span>
+                  )}
+                </div>
+                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                  <i className="ti ti-clock fs-12 text-primary"></i>
+                  <span>07 Oct 2026, 12:03 pm</span>
+                </div>
+              </div>
+
+              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                {qc.notes || 'Inspection completed successfully. Fabric width & fold percentage verified against PO specifications.'}
+              </p>
+
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                    style={{ width: '26px', height: '26px', backgroundColor: '#5b47fb' }}
+                  >
+                    {(qc.inspectorName || 'W')[0].toUpperCase()}
+                  </div>
+                  <div className="fs-12 text-secondary">
+                    Inspector: <strong className="text-dark">{qc.inspectorName || 'Wedc'}</strong>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-3 fs-12 text-muted">
+                  <span>Passed: <strong className="text-success">{(passedQty || 0).toLocaleString()}m</strong></span>
+                  {rejectedQty > 0 && <span>Rejected: <strong className="text-danger">{(rejectedQty || 0).toLocaleString()}m</strong></span>}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="position-relative mb-1">
-            <span
-              className="position-absolute rounded-circle"
+          {/* Event 2: Sent to Quality Check */}
+          <div className="position-relative">
+            <div
+              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
               style={{
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#94a3b8',
-                left: '-22px',
-                top: '5px'
+                width: '32px',
+                height: '32px',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                left: '-33px',
+                top: '0px',
+                boxShadow: '0 4px 10px rgba(59, 130, 246, 0.25)'
               }}
-            />
-            <div className="fs-12 text-secondary">
-              <span className="text-dark fw-medium">07 Oct 2026, 11:36 am</span> — Sent to Quality Check — Received 2000m across 7 piece(s) (Saksham Garg (Merchandiser))
+            >
+              <i className="ti ti-truck-delivery fs-14"></i>
+            </div>
+
+            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
+                    Inward QC Generated
+                  </span>
+                  <span className="badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11">
+                    GRN #{grnId}
+                  </span>
+                </div>
+                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
+                  <i className="ti ti-clock fs-12 text-primary"></i>
+                  <span>07 Oct 2026, 11:36 am</span>
+                </div>
+              </div>
+
+              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
+                Inward delivery of <strong>{receivedQty.toLocaleString()}m</strong> received across <strong>{qc.totalPieces || 7} piece(s)</strong>. Queued for inspection.
+              </p>
+
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
+                    style={{ width: '26px', height: '26px', backgroundColor: '#0284c7' }}
+                  >
+                    S
+                  </div>
+                  <div className="fs-12 text-secondary">
+                    Handled by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser)</span>
+                  </div>
+                </div>
+                <div className="text-muted fs-11">
+                  PO Reference: <span className="fw-semibold text-dark">{linkedPoId || 'PO-1001'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -309,7 +415,8 @@ export default function QCDetailView({
         {onBackToGRN && (
           <button
             type="button"
-            className="btn btn-outline-secondary px-4 py-2 fs-13 rounded-3"
+            className="btn btn-white border px-4 py-2 fs-13 rounded-3 fw-medium text-secondary shadow-sm"
+            style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#475569' }}
             onClick={onBackToGRN}
           >
             Back to GRN
