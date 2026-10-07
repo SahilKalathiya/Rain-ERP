@@ -57,6 +57,7 @@ export default function GRNDetailView({
   // Calculate bales total
   const bales = grn.bales || [];
   const totalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
+  const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || 1;
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';

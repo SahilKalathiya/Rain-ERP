@@ -15730,14 +15730,14 @@
         return {
           id: `VEND-${String(vendors.length + 1).padStart(4, "0")}`,
           name: "",
-          type: "Fabric Supplier",
+          type: "",
           contactPerson: "",
           phone: "",
           alternatePhone: "",
           email: "",
           address: "",
           city: "",
-          state: "Maharashtra",
+          state: "Gujarat",
           gstin: "",
           rating: 5,
           bankName: "",
@@ -15749,14 +15749,14 @@
       return {
         id: "",
         name: "",
-        type: "Fabric Supplier",
+        type: "",
         contactPerson: "",
         phone: "",
         alternatePhone: "",
         email: "",
         address: "",
         city: "",
-        state: "Maharashtra",
+        state: "Gujarat",
         gstin: "",
         rating: 5,
         bankName: "",
@@ -15770,14 +15770,14 @@
       setFormData({
         id: `VEND-${String(vendorList.length + 1).padStart(4, "0")}`,
         name: "",
-        type: "Fabric Supplier",
+        type: "",
         contactPerson: "",
         phone: "",
         alternatePhone: "",
         email: "",
         address: "",
         city: "",
-        state: "Maharashtra",
+        state: "Gujarat",
         gstin: "",
         rating: 5,
         bankName: "",
@@ -15808,8 +15808,8 @@
     const validateForm = () => {
       const errors = {};
       if (!formData.name.trim()) errors.name = "Vendor Name is mandatory";
-      if (!formData.phone || formData.phone.length < 10)
-        errors.phone = "10-digit Phone Number is mandatory";
+      if (formData.phone && formData.phone.length < 10)
+        errors.phone = "Phone Number must be 10 digits";
       if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email))
         errors.email = "Invalid Email address format";
       if (formData.gstin && formData.gstin.length !== 15)
@@ -15995,12 +15995,13 @@
       "select",
       {
         className: "form-select form-select-sm bg-white",
-        value: formData.type,
+        value: formData.type || "",
         onChange: (e) => handleTextChange("type", e.target.value)
       },
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "" }, "Select Type..."),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Fabric Supplier" }, "Fabric Supplier"),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Job Worker" }, "Job Worker")
-    ) : /* @__PURE__ */ import_react17.default.createElement("div", { className: "text-secondary fs-13" }, formData.type)), /* @__PURE__ */ import_react17.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react17.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Rating (1-5 \u2605)"), isEditing && (activeSection === "all" || activeSection === "basic") ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "d-flex align-items-center gap-1 cursor-pointer text-warning fs-18" }, [1, 2, 3, 4, 5].map((star) => /* @__PURE__ */ import_react17.default.createElement(
+    ) : /* @__PURE__ */ import_react17.default.createElement("div", { className: "text-secondary fs-13" }, formData.type || "\u2014")), /* @__PURE__ */ import_react17.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react17.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Rating (1-5 \u2605)"), isEditing && (activeSection === "all" || activeSection === "basic") ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "d-flex align-items-center gap-1 cursor-pointer text-warning fs-18" }, [1, 2, 3, 4, 5].map((star) => /* @__PURE__ */ import_react17.default.createElement(
       "span",
       {
         key: star,
@@ -16028,12 +16029,12 @@
         }
       },
       "Edit"
-    )), /* @__PURE__ */ import_react17.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react17.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Phone Number *"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react17.default.createElement(
+    )), /* @__PURE__ */ import_react17.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react17.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Phone Number"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react17.default.createElement(
       "input",
       {
         type: "text",
-        required: true,
         maxLength: "10",
+        placeholder: "e.g. 9876543210",
         className: "form-control form-control-sm bg-white",
         value: formData.phone,
         onChange: (e) => handleTextChange("phone", e.target.value.replace(/\D/g, ""))
@@ -16042,6 +16043,7 @@
       "input",
       {
         type: "text",
+        placeholder: "e.g. Rajesh Shah",
         className: "form-control form-control-sm bg-white",
         value: formData.contactPerson,
         onChange: (e) => handleTextChange("contactPerson", e.target.value, true)
@@ -16050,6 +16052,7 @@
       "input",
       {
         type: "email",
+        placeholder: "e.g. contact@supplier.com",
         className: "form-control form-control-sm bg-white",
         value: formData.email,
         onChange: (e) => handleTextChange("email", e.target.value)
@@ -16058,6 +16061,7 @@
       "textarea",
       {
         rows: "2",
+        placeholder: "e.g. Plot No. 42, GIDC Industrial Estate",
         className: "form-control form-control-sm bg-white fs-12",
         value: formData.address,
         onChange: (e) => handleTextChange("address", e.target.value)
@@ -16066,6 +16070,7 @@
       "input",
       {
         type: "text",
+        placeholder: "e.g. Surat",
         className: "form-control form-control-sm bg-white",
         value: formData.city,
         onChange: (e) => handleTextChange("city", e.target.value, true)
@@ -16077,42 +16082,16 @@
         value: formData.state,
         onChange: (e) => handleTextChange("state", e.target.value)
       },
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Andhra Pradesh" }, "Andhra Pradesh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Arunachal Pradesh" }, "Arunachal Pradesh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Assam" }, "Assam"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Bihar" }, "Bihar"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Chhattisgarh" }, "Chhattisgarh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Goa" }, "Goa"),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Gujarat" }, "Gujarat"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Haryana" }, "Haryana"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Himachal Pradesh" }, "Himachal Pradesh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Jharkhand" }, "Jharkhand"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Karnataka" }, "Karnataka"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Kerala" }, "Kerala"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Madhya Pradesh" }, "Madhya Pradesh"),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Maharashtra" }, "Maharashtra"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Manipur" }, "Manipur"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Meghalaya" }, "Meghalaya"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Mizoram" }, "Mizoram"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Nagaland" }, "Nagaland"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Odisha" }, "Odisha"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Punjab" }, "Punjab"),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Rajasthan" }, "Rajasthan"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Sikkim" }, "Sikkim"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Tamil Nadu" }, "Tamil Nadu"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Telangana" }, "Telangana"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Tripura" }, "Tripura"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Uttar Pradesh" }, "Uttar Pradesh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Uttarakhand" }, "Uttarakhand"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "West Bengal" }, "West Bengal"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Andaman and Nicobar Islands" }, "Andaman and Nicobar Islands"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Chandigarh" }, "Chandigarh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Dadra and Nagar Haveli and Daman and Diu" }, "Dadra and Nagar Haveli and Daman and Diu"),
       /* @__PURE__ */ import_react17.default.createElement("option", { value: "Delhi" }, "Delhi"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Jammu and Kashmir" }, "Jammu and Kashmir"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Ladakh" }, "Ladakh"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Lakshadweep" }, "Lakshadweep"),
-      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Puducherry" }, "Puducherry")
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Karnataka" }, "Karnataka"),
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Tamil Nadu" }, "Tamil Nadu"),
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Punjab" }, "Punjab"),
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "West Bengal" }, "West Bengal"),
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Haryana" }, "Haryana"),
+      /* @__PURE__ */ import_react17.default.createElement("option", { value: "Uttar Pradesh" }, "Uttar Pradesh")
     ) : /* @__PURE__ */ import_react17.default.createElement("div", { className: "text-dark fs-13" }, formData.state || "-")))), /* @__PURE__ */ import_react17.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "3. GSTIN & Banking Details"), !isEditing && /* @__PURE__ */ import_react17.default.createElement(
       "button",
       {
@@ -16129,7 +16108,7 @@
       {
         type: "text",
         maxLength: "15",
-        placeholder: "e.g. 27AFQPA0986G1ZA",
+        placeholder: "e.g. 24AFQPA0986G1ZA",
         className: `form-control form-control-sm bg-white font-monospace text-uppercase ${formErrors.gstin ? "is-invalid" : ""}`,
         value: formData.gstin,
         onChange: (e) => handleTextChange("gstin", e.target.value.toUpperCase())
@@ -16138,6 +16117,7 @@
       "input",
       {
         type: "text",
+        placeholder: "e.g. HDFC Bank",
         className: "form-control form-control-sm bg-white",
         value: formData.bankName,
         onChange: (e) => handleTextChange("bankName", e.target.value, true)
@@ -16146,6 +16126,7 @@
       "input",
       {
         type: "text",
+        placeholder: "e.g. 50200012345678",
         className: "form-control form-control-sm bg-white font-monospace",
         value: formData.accountNumber,
         onChange: (e) => handleTextChange("accountNumber", e.target.value)
@@ -16155,6 +16136,7 @@
       {
         type: "text",
         maxLength: "11",
+        placeholder: "e.g. HDFC0001234",
         className: "form-control form-control-sm bg-white font-monospace text-uppercase",
         value: formData.ifscCode,
         onChange: (e) => handleTextChange("ifscCode", e.target.value.toUpperCase())
@@ -16205,8 +16187,8 @@
           qualityName: "",
           fabricType: "Cotton",
           gsm: "",
-          widths: ["44", "58"],
-          defaultShrinkage: 3,
+          widths: [],
+          defaultShrinkage: "",
           hsnCode: "",
           description: "",
           active: true
@@ -16217,9 +16199,9 @@
         qualityName: "",
         fabricType: "Cotton",
         gsm: "",
-        widths: ["44", "58"],
-        defaultShrinkage: 3.5,
-        hsnCode: "520811",
+        widths: [],
+        defaultShrinkage: "",
+        hsnCode: "",
         description: "",
         active: true
       };
@@ -16233,9 +16215,9 @@
         qualityName: "",
         fabricType: "Cotton",
         gsm: "",
-        widths: ["44", "58"],
-        defaultShrinkage: 3,
-        hsnCode: "520811",
+        widths: [],
+        defaultShrinkage: "",
+        hsnCode: "",
         description: "",
         active: true
       });
@@ -18351,20 +18333,6 @@
       "button",
       {
         type: "button",
-        className: "btn btn-white border d-flex align-items-center gap-2 px-3 py-2 fw-medium fs-13 rounded-3 text-dark shadow-sm",
-        style: {
-          backgroundColor: "#ffffff",
-          borderColor: "#cbd5e1",
-          borderRadius: "8px"
-        },
-        onClick: () => handleSubmit("Draft")
-      },
-      /* @__PURE__ */ import_react20.default.createElement("i", { className: "ti ti-file-text fs-15 text-muted" }),
-      /* @__PURE__ */ import_react20.default.createElement("span", null, "Save as Draft")
-    ), /* @__PURE__ */ import_react20.default.createElement(
-      "button",
-      {
-        type: "button",
         className: "btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-semibold fs-13 rounded-3 text-white shadow-sm",
         style: {
           backgroundColor: "#5b47fb",
@@ -18386,7 +18354,7 @@
           color: "#5b47fb",
           borderRadius: "8px"
         },
-        onClick: () => handleSubmit(isExisting ? formData.status || "Draft" : "Draft")
+        onClick: () => handleSubmit(isExisting && formData.status && formData.status !== "Draft" ? formData.status : "Sent")
       },
       /* @__PURE__ */ import_react20.default.createElement("i", { className: "ti ti-device-floppy fs-15", style: { color: "#5b47fb" } }),
       /* @__PURE__ */ import_react20.default.createElement("span", null, "Save")
@@ -19014,7 +18982,8 @@
     const isQcActioned = Boolean(
       formData.isQcActioned || linkedQC && linkedQC.qcStatus && linkedQC.qcStatus !== "Pending" && linkedQC.qcStatus !== "Awaiting QC" || formData.status === "QC Approved" || formData.status === "QC Rejected" || formData.status === "Pending Admin Approval"
     );
-    const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || purchaseOrders[0] || null;
+    const isLinkedFromPO = Boolean(grn && (grn.linkedPOs && grn.linkedPOs.length > 0 || grn.poId));
+    const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || grn?.linkedPOs && grn.linkedPOs.includes(p.id)) : purchaseOrders[0]) || null;
     const getPoItemLabel = (item) => {
       if (!item) return "Fabric Item";
       const name = item.fabricName || item.fabricQuality || "Fabric";
@@ -19287,7 +19256,15 @@ Do you want to proceed and submit anyway?`
         className: `badge px-2.5 py-1 fs-12 rounded-pill ${formData.status === "Completed" ? "bg-success-subtle text-success border border-success border-opacity-25" : "bg-primary-subtle text-primary border border-primary border-opacity-25"}`
       },
       formData.status
-    )), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary mb-0 fs-13 mt-1" }, "Recording receipt against", " ", /* @__PURE__ */ import_react24.default.createElement("strong", null, "PO-", currentPO ? currentPO.id : formData.poId || "\u2014"), formData.vendorName ? ` (${formData.vendorName})` : "", ". Full or partial quantity is allowed.")))), isQcActioned && /* @__PURE__ */ import_react24.default.createElement("div", { className: "alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-24 text-warning" }), /* @__PURE__ */ import_react24.default.createElement("div", { className: "flex-grow-1" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold fs-14" }, "GRN Locked \u2014 Quality Check Actioned (", linkedQC ? linkedQC.qcStatus : formData.status, ")"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fs-12 text-secondary" }, "Quality Check has already been completed or actioned for this shipment. Bale entries, piece quantities, and inward receipt details cannot be edited.")), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-warning text-dark px-3 py-1.5 rounded-pill fs-12 fw-semibold" }, "Locked (QC Processed)")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-4 pb-2 border-bottom fs-16 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "Receipt details"), isQcActioned && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock me-1 text-warning" }), " Read Only")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-3 mb-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-12 col-md-8" }, /* @__PURE__ */ import_react24.default.createElement("label", { className: "form-label fs-13 fw-semibold text-secondary mb-1" }, "Source document ", /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react24.default.createElement(
+    )), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary mb-0 fs-13 mt-1" }, "Recording receipt against", " ", /* @__PURE__ */ import_react24.default.createElement("strong", null, "PO-", currentPO ? currentPO.id : formData.poId || "\u2014"), formData.vendorName ? ` (${formData.vendorName})` : "", ". Full or partial quantity is allowed.")))), isQcActioned && /* @__PURE__ */ import_react24.default.createElement("div", { className: "alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-24 text-warning" }), /* @__PURE__ */ import_react24.default.createElement("div", { className: "flex-grow-1" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold fs-14" }, "GRN Locked \u2014 Quality Check Actioned (", linkedQC ? linkedQC.qcStatus : formData.status, ")"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fs-12 text-secondary" }, "Quality Check has already been completed or actioned for this shipment. Bale entries, piece quantities, and inward receipt details cannot be edited.")), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-warning text-dark px-3 py-1.5 rounded-pill fs-12 fw-semibold" }, "Locked (QC Processed)")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-4 pb-2 border-bottom fs-16 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "Receipt details"), isQcActioned && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock me-1 text-warning" }), " Read Only")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-3 mb-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-12 col-md-8" }, /* @__PURE__ */ import_react24.default.createElement("label", { className: "form-label fs-13 fw-semibold text-secondary mb-1" }, "Source document ", /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-danger" }, "*")), isLinkedFromPO ? /* @__PURE__ */ import_react24.default.createElement(
+      "div",
+      {
+        className: "form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium",
+        style: { height: "40px", borderColor: "#cbd5e1", borderRadius: "8px", cursor: "default" }
+      },
+      /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2 text-truncate" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-file-description text-primary fs-16" }), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fw-semibold text-dark" }, currentPO ? `${currentPO.id} \u2014 ${getPoVendorName(currentPO) || "Vendor"} (fabric purchase)` : formData.poId ? `${formData.poId} \u2014 ${formData.vendorName || "Vendor"} (fabric purchase)` : "Purchase Order")),
+      /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock me-1 text-muted" }), " Linked PO")
+    ) : /* @__PURE__ */ import_react24.default.createElement(
       "select",
       {
         className: "form-select bg-white fs-13",
@@ -19715,14 +19692,15 @@ Do you want to proceed and submit anyway?`
     if (!grn) {
       return /* @__PURE__ */ import_react25.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-package-off fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react25.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "GRN Record Not Found"), /* @__PURE__ */ import_react25.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The selected Goods Receipt Note could not be loaded."), /* @__PURE__ */ import_react25.default.createElement("div", null, /* @__PURE__ */ import_react25.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to GRN Register")));
     }
-    const linkedPoId2 = grn.linkedPOs?.[0];
-    const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId2);
+    const linkedPoId = grn.linkedPOs?.[0];
+    const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId);
     const transporterObj = transporters.find((t) => t.id === grn.transporterId || t.name === grn.transporterName);
     const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
     const mainQC = qcRecs[0];
     const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === "Pending");
     const bales = grn.bales || [];
     const totalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
+    const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || 1;
     const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
     const expectedFold = mainQC?.expectedFold || linkedPO?.items?.[0]?.fold || "100";
     const handleSaveHeader = (e) => {
@@ -19755,7 +19733,7 @@ Do you want to proceed and submit anyway?`
         className: `badge px-2.5 py-1 fs-11 rounded-pill ${grn.status === "Completed" || grn.status === "QC Approved" ? "bg-success-subtle text-success border border-success border-opacity-25" : grn.status === "QC Rejected" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : "bg-primary-subtle text-primary border border-primary border-opacity-25"}`
       },
       grn.status || "Completed"
-    )), /* @__PURE__ */ import_react25.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, "Against ", /* @__PURE__ */ import_react25.default.createElement("strong", null, linkedPoId2 ? `${linkedPoId2}` : "Direct Inward"), " \xB7 ", grn.vendorName || "Vendor")))), /* @__PURE__ */ import_react25.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-3" }, /* @__PURE__ */ import_react25.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Receipt details"), /* @__PURE__ */ import_react25.default.createElement(
+    )), /* @__PURE__ */ import_react25.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, "Against ", /* @__PURE__ */ import_react25.default.createElement("strong", null, linkedPoId ? `${linkedPoId}` : "Direct Inward"), " \xB7 ", grn.vendorName || "Vendor")))), /* @__PURE__ */ import_react25.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-3" }, /* @__PURE__ */ import_react25.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Receipt details"), /* @__PURE__ */ import_react25.default.createElement(
       "button",
       {
         type: "button",
@@ -19854,14 +19832,14 @@ Do you want to proceed and submit anyway?`
         }
       },
       /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-file-plus fs-14" })
-    ), /* @__PURE__ */ import_react25.default.createElement("div", { className: "card border p-3 rounded-3 shadow-none bg-body-tertiary", style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold" }, "GRN Created Against ", linkedPoId2 || "PO-1001"), /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11" }, grn.id)), /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-clock fs-12 text-primary" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "07 Oct 2026, 11:23 am"))), /* @__PURE__ */ import_react25.default.createElement("p", { className: "text-dark fs-13 mb-3", style: { lineHeight: "1.5" } }, "Generated goods received note from supplier ", /* @__PURE__ */ import_react25.default.createElement("strong", null, grn.vendorName || "M.S. Textiles"), ". Challan #", grn.challanNo || "CH-8821", "."), /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react25.default.createElement(
+    ), /* @__PURE__ */ import_react25.default.createElement("div", { className: "card border p-3 rounded-3 shadow-none bg-body-tertiary", style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold" }, "GRN Created Against ", linkedPoId || "PO-1001"), /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11" }, grn.id)), /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-clock fs-12 text-primary" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "07 Oct 2026, 11:23 am"))), /* @__PURE__ */ import_react25.default.createElement("p", { className: "text-dark fs-13 mb-3", style: { lineHeight: "1.5" } }, "Generated goods received note from supplier ", /* @__PURE__ */ import_react25.default.createElement("strong", null, grn.vendorName || "M.S. Textiles"), ". Challan #", grn.challanNo || "CH-8821", "."), /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react25.default.createElement(
       "div",
       {
         className: "rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11",
         style: { width: "26px", height: "26px", backgroundColor: "#0284c7" }
       },
       "S"
-    ), /* @__PURE__ */ import_react25.default.createElement("div", { className: "fs-12 text-secondary" }, "Created by: ", /* @__PURE__ */ import_react25.default.createElement("strong", { className: "text-dark" }, "Saksham Garg"), " ", /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-muted" }, "(Merchandiser)"))), /* @__PURE__ */ import_react25.default.createElement("div", { className: "text-muted fs-11" }, "PO Reference: ", /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-semibold text-dark" }, linkedPoId2 || "PO-1001"))))))), showEditHeaderModal && /* @__PURE__ */ import_react25.default.createElement(
+    ), /* @__PURE__ */ import_react25.default.createElement("div", { className: "fs-12 text-secondary" }, "Created by: ", /* @__PURE__ */ import_react25.default.createElement("strong", { className: "text-dark" }, "Saksham Garg"), " ", /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-muted" }, "(Merchandiser)"))), /* @__PURE__ */ import_react25.default.createElement("div", { className: "text-muted fs-11" }, "PO Reference: ", /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-semibold text-dark" }, linkedPoId || "PO-1001"))))))), showEditHeaderModal && /* @__PURE__ */ import_react25.default.createElement(
       "div",
       {
         className: "modal fade show d-block",
@@ -20714,6 +20692,9 @@ Do you want to proceed and submit anyway?`
     const expectedFold = qc.expectedFold || "1000%";
     const foldFound = qc.actualFold ? `${qc.actualFold}%` : qc.foldFound ? `${qc.foldFound}%` : "\u2014%";
     const receivedQty = Number(qc.totalReceivedMeters) || Number(qc.receivedQty) || Number(grn?.declaredTotalMeters) || 2e3;
+    const passedQty = Number(qc.passedQty) || (qc.qcStatus === "Reject" ? 0 : Math.max(0, receivedQty - (Number(qc.heldBackQty) || Number(qc.defectQty) || 0)));
+    const rejectedQty = Number(qc.rejectedQty) || (qc.qcStatus === "Reject" ? receivedQty : Number(qc.heldBackQty) || Number(qc.defectQty) || 0);
+    const linkedPoId = poId;
     const effectiveStatus = damagedItem?.status || qc.adminDecision || "Pending Admin Review";
     const itemToResolve = damagedItem || {
       id: `REJ-${qc.id}`,
@@ -22306,11 +22287,11 @@ Do you want to proceed and submit anyway?`
       setGrns(updated);
       api.saveGRN(grnData).catch((e) => console.warn("GRN save sync error:", e));
       if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
-        const linkedPoId2 = grnData.linkedPOs[0];
-        const targetPo = purchaseOrders.find((p) => p.id === linkedPoId2);
+        const linkedPoId = grnData.linkedPOs[0];
+        const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
         if (targetPo) {
           const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-          const allGrnsForPo = updated.filter((g) => g.linkedPOs && g.linkedPOs.includes(linkedPoId2));
+          const allGrnsForPo = updated.filter((g) => g.linkedPOs && g.linkedPOs.includes(linkedPoId));
           const totalReceivedForPo = allGrnsForPo.reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
           let newPoStatus = targetPo.status;
           if (totalReceivedForPo >= poOrderedMeters) {
@@ -22324,7 +22305,7 @@ Do you want to proceed and submit anyway?`
             receivedQty: totalReceivedForPo,
             pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo)
           };
-          setPurchaseOrders((prev) => prev.map((p) => p.id === linkedPoId2 ? updatedPo : p));
+          setPurchaseOrders((prev) => prev.map((p) => p.id === linkedPoId ? updatedPo : p));
           api.savePurchaseOrder(updatedPo).catch((e) => console.warn("PO status sync error:", e));
         }
       }

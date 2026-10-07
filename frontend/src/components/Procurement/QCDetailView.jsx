@@ -53,6 +53,9 @@ export default function QCDetailView({
   const expectedFold = qc.expectedFold || '1000%';
   const foldFound = qc.actualFold ? `${qc.actualFold}%` : (qc.foldFound ? `${qc.foldFound}%` : '—%');
   const receivedQty = Number(qc.totalReceivedMeters) || Number(qc.receivedQty) || Number(grn?.declaredTotalMeters) || 2000;
+  const passedQty = Number(qc.passedQty) || (qc.qcStatus === 'Reject' ? 0 : Math.max(0, receivedQty - (Number(qc.heldBackQty) || Number(qc.defectQty) || 0)));
+  const rejectedQty = Number(qc.rejectedQty) || (qc.qcStatus === 'Reject' ? receivedQty : (Number(qc.heldBackQty) || Number(qc.defectQty) || 0));
+  const linkedPoId = poId;
 
   const effectiveStatus = damagedItem?.status || qc.adminDecision || 'Pending Admin Review';
   const itemToResolve = damagedItem || {

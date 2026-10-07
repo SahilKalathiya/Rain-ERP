@@ -40,8 +40,8 @@ export default function FabricMasterView({
         qualityName: '',
         fabricType: 'Cotton',
         gsm: '',
-        widths: ['44', '58'],
-        defaultShrinkage: 3.0,
+        widths: [],
+        defaultShrinkage: '',
         hsnCode: '',
         description: '',
         active: true
@@ -52,9 +52,9 @@ export default function FabricMasterView({
       qualityName: '',
       fabricType: 'Cotton',
       gsm: '',
-      widths: ['44', '58'],
-      defaultShrinkage: 3.5,
-      hsnCode: '520811',
+      widths: [],
+      defaultShrinkage: '',
+      hsnCode: '',
       description: '',
       active: true
     };
@@ -70,9 +70,9 @@ export default function FabricMasterView({
       qualityName: '',
       fabricType: 'Cotton',
       gsm: '',
-      widths: ['44', '58'],
-      defaultShrinkage: 3.0,
-      hsnCode: '520811',
+      widths: [],
+      defaultShrinkage: '',
+      hsnCode: '',
       description: '',
       active: true
     });

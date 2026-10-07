@@ -41,14 +41,14 @@ export default function VendorMasterView({
       return {
         id: `VEND-${String(vendors.length + 1).padStart(4, '0')}`,
         name: '',
-        type: 'Fabric Supplier',
+        type: '',
         contactPerson: '',
         phone: '',
         alternatePhone: '',
         email: '',
         address: '',
         city: '',
-        state: 'Maharashtra',
+        state: 'Gujarat',
         gstin: '',
         rating: 5,
         bankName: '',
@@ -60,14 +60,14 @@ export default function VendorMasterView({
     return {
       id: '',
       name: '',
-      type: 'Fabric Supplier',
+      type: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
       email: '',
       address: '',
       city: '',
-      state: 'Maharashtra',
+      state: 'Gujarat',
       gstin: '',
       rating: 5,
       bankName: '',
@@ -83,14 +83,14 @@ export default function VendorMasterView({
     setFormData({
       id: `VEND-${String(vendorList.length + 1).padStart(4, '0')}`,
       name: '',
-      type: 'Fabric Supplier',
+      type: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
       email: '',
       address: '',
       city: '',
-      state: 'Maharashtra',
+      state: 'Gujarat',
       gstin: '',
       rating: 5,
       bankName: '',
@@ -126,8 +126,8 @@ export default function VendorMasterView({
   const validateForm = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'Vendor Name is mandatory';
-    if (!formData.phone || formData.phone.length < 10)
-      errors.phone = '10-digit Phone Number is mandatory';
+    if (formData.phone && formData.phone.length < 10)
+      errors.phone = 'Phone Number must be 10 digits';
     if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email))
       errors.email = 'Invalid Email address format';
     if (formData.gstin && formData.gstin.length !== 15)
@@ -441,14 +441,15 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
                         <select
                           className="form-select form-select-sm bg-white"
-                          value={formData.type}
+                          value={formData.type || ''}
                           onChange={(e) => handleTextChange('type', e.target.value)}
                         >
+                          <option value="">Select Type...</option>
                           <option value="Fabric Supplier">Fabric Supplier</option>
                           <option value="Job Worker">Job Worker</option>
                         </select>
                       ) : (
-                        <div className="text-secondary fs-13">{formData.type}</div>
+                        <div className="text-secondary fs-13">{formData.type || '—'}</div>
                       )}
                     </div>
 
@@ -512,12 +513,12 @@ export default function VendorMasterView({
 
                   <div className="row g-2">
                     <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Phone Number *</label>
+                      <label className="form-label fs-12 fw-semibold mb-1">Phone Number</label>
                       {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                         <input
                           type="text"
-                          required
                           maxLength="10"
+                          placeholder="e.g. 9876543210"
                           className="form-control form-control-sm bg-white"
                           value={formData.phone}
                           onChange={(e) => handleTextChange('phone', e.target.value.replace(/\D/g, ''))}
@@ -532,6 +533,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                         <input
                           type="text"
+                          placeholder="e.g. Rajesh Shah"
                           className="form-control form-control-sm bg-white"
                           value={formData.contactPerson}
                           onChange={(e) => handleTextChange('contactPerson', e.target.value, true)}
@@ -546,6 +548,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                         <input
                           type="email"
+                          placeholder="e.g. contact@supplier.com"
                           className="form-control form-control-sm bg-white"
                           value={formData.email}
                           onChange={(e) => handleTextChange('email', e.target.value)}
@@ -560,6 +563,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                         <textarea
                           rows="2"
+                          placeholder="e.g. Plot No. 42, GIDC Industrial Estate"
                           className="form-control form-control-sm bg-white fs-12"
                           value={formData.address}
                           onChange={(e) => handleTextChange('address', e.target.value)}
@@ -574,6 +578,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                         <input
                           type="text"
+                          placeholder="e.g. Surat"
                           className="form-control form-control-sm bg-white"
                           value={formData.city}
                           onChange={(e) => handleTextChange('city', e.target.value, true)}
@@ -591,42 +596,16 @@ export default function VendorMasterView({
                             value={formData.state}
                             onChange={(e) => handleTextChange('state', e.target.value)}
                           >
-                            <option value="Andhra Pradesh">Andhra Pradesh</option>
-                            <option value="Arunachal Pradesh">Arunachal Pradesh</option>
-                            <option value="Assam">Assam</option>
-                            <option value="Bihar">Bihar</option>
-                            <option value="Chhattisgarh">Chhattisgarh</option>
-                            <option value="Goa">Goa</option>
                             <option value="Gujarat">Gujarat</option>
-                            <option value="Haryana">Haryana</option>
-                            <option value="Himachal Pradesh">Himachal Pradesh</option>
-                            <option value="Jharkhand">Jharkhand</option>
-                            <option value="Karnataka">Karnataka</option>
-                            <option value="Kerala">Kerala</option>
-                            <option value="Madhya Pradesh">Madhya Pradesh</option>
                             <option value="Maharashtra">Maharashtra</option>
-                            <option value="Manipur">Manipur</option>
-                            <option value="Meghalaya">Meghalaya</option>
-                            <option value="Mizoram">Mizoram</option>
-                            <option value="Nagaland">Nagaland</option>
-                            <option value="Odisha">Odisha</option>
-                            <option value="Punjab">Punjab</option>
                             <option value="Rajasthan">Rajasthan</option>
-                            <option value="Sikkim">Sikkim</option>
-                            <option value="Tamil Nadu">Tamil Nadu</option>
-                            <option value="Telangana">Telangana</option>
-                            <option value="Tripura">Tripura</option>
-                            <option value="Uttar Pradesh">Uttar Pradesh</option>
-                            <option value="Uttarakhand">Uttarakhand</option>
-                            <option value="West Bengal">West Bengal</option>
-                            <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
-                            <option value="Chandigarh">Chandigarh</option>
-                            <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
                             <option value="Delhi">Delhi</option>
-                            <option value="Jammu and Kashmir">Jammu and Kashmir</option>
-                            <option value="Ladakh">Ladakh</option>
-                            <option value="Lakshadweep">Lakshadweep</option>
-                            <option value="Puducherry">Puducherry</option>
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamil Nadu">Tamil Nadu</option>
+                            <option value="Punjab">Punjab</option>
+                            <option value="West Bengal">West Bengal</option>
+                            <option value="Haryana">Haryana</option>
+                            <option value="Uttar Pradesh">Uttar Pradesh</option>
                           </select>
                         ) : (
                           <div className="text-dark fs-13">{formData.state || '-'}</div>
@@ -662,7 +641,7 @@ export default function VendorMasterView({
                         <input
                           type="text"
                           maxLength="15"
-                          placeholder="e.g. 27AFQPA0986G1ZA"
+                          placeholder="e.g. 24AFQPA0986G1ZA"
                           className={`form-control form-control-sm bg-white font-monospace text-uppercase ${
                             formErrors.gstin ? 'is-invalid' : ''
                           }`}
@@ -681,6 +660,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
                         <input
                           type="text"
+                          placeholder="e.g. HDFC Bank"
                           className="form-control form-control-sm bg-white"
                           value={formData.bankName}
                           onChange={(e) => handleTextChange('bankName', e.target.value, true)}
@@ -695,6 +675,7 @@ export default function VendorMasterView({
                       {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
                         <input
                           type="text"
+                          placeholder="e.g. 50200012345678"
                           className="form-control form-control-sm bg-white font-monospace"
                           value={formData.accountNumber}
                           onChange={(e) => handleTextChange('accountNumber', e.target.value)}
@@ -712,6 +693,7 @@ export default function VendorMasterView({
                         <input
                           type="text"
                           maxLength="11"
+                          placeholder="e.g. HDFC0001234"
                           className="form-control form-control-sm bg-white font-monospace text-uppercase"
                           value={formData.ifscCode}
                           onChange={(e) => handleTextChange('ifscCode', e.target.value.toUpperCase())}

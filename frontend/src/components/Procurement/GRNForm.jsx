@@ -203,8 +203,10 @@ export default function GRNForm({
     formData.status === 'Pending Admin Approval'
   );
 
+  const isLinkedFromPO = Boolean(grn && ((grn.linkedPOs && grn.linkedPOs.length > 0) || grn.poId));
+
   // Current active PO
-  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || purchaseOrders[0] || null;
+  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : purchaseOrders[0]) || null;
 
   // Build PO item options for bales
   const getPoItemLabel = (item) => {
@@ -593,26 +595,45 @@ export default function GRNForm({
             <label className="form-label fs-13 fw-semibold text-secondary mb-1">
               Source document <span className="text-danger">*</span>
             </label>
-            <select
-              className="form-select bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              disabled={isQcActioned}
-              value={formData.poId}
-              onChange={(e) => handlePOChange(e.target.value)}
-            >
-              {eligiblePOs.length === 0 ? (
-                <option value="">No Purchase Orders Available</option>
-              ) : (
-                eligiblePOs.map((po) => {
-                  const vName = getPoVendorName(po);
-                  return (
-                    <option key={po.id} value={po.id}>
-                      {po.id} — {vName || 'Vendor'} (fabric purchase)
-                    </option>
-                  );
-                })
-              )}
-            </select>
+            {isLinkedFromPO ? (
+              <div
+                className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium"
+                style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px', cursor: 'default' }}
+              >
+                <div className="d-flex align-items-center gap-2 text-truncate">
+                  <i className="ti ti-file-description text-primary fs-16"></i>
+                  <span className="fw-semibold text-dark">
+                    {currentPO
+                      ? `${currentPO.id} — ${getPoVendorName(currentPO) || 'Vendor'} (fabric purchase)`
+                      : (formData.poId ? `${formData.poId} — ${formData.vendorName || 'Vendor'} (fabric purchase)` : 'Purchase Order')}
+                  </span>
+                </div>
+                <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium">
+                  <i className="ti ti-lock me-1 text-muted"></i> Linked PO
+                </span>
+              </div>
+            ) : (
+              <select
+                className="form-select bg-white fs-13"
+                style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                disabled={isQcActioned}
+                value={formData.poId}
+                onChange={(e) => handlePOChange(e.target.value)}
+              >
+                {eligiblePOs.length === 0 ? (
+                  <option value="">No Purchase Orders Available</option>
+                ) : (
+                  eligiblePOs.map((po) => {
+                    const vName = getPoVendorName(po);
+                    return (
+                      <option key={po.id} value={po.id}>
+                        {po.id} — {vName || 'Vendor'} (fabric purchase)
+                      </option>
+                    );
+                  })
+                )}
+              </select>
+            )}
           </div>
 
           <div className="col-12 col-md-4">

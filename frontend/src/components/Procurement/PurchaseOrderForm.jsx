@@ -1149,20 +1149,6 @@ export default function PurchaseOrderForm({
             <>
               <button
                 type="button"
-                className="btn btn-white border d-flex align-items-center gap-2 px-3 py-2 fw-medium fs-13 rounded-3 text-dark shadow-sm"
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderColor: '#cbd5e1',
-                  borderRadius: '8px'
-                }}
-                onClick={() => handleSubmit('Draft')}
-              >
-                <i className="ti ti-file-text fs-15 text-muted"></i>
-                <span>Save as Draft</span>
-              </button>
-
-              <button
-                type="button"
                 className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-semibold fs-13 rounded-3 text-white shadow-sm"
                 style={{
                   backgroundColor: '#5b47fb',
@@ -1184,7 +1170,7 @@ export default function PurchaseOrderForm({
                   color: '#5b47fb',
                   borderRadius: '8px'
                 }}
-                onClick={() => handleSubmit(isExisting ? (formData.status || 'Draft') : 'Draft')}
+                onClick={() => handleSubmit(isExisting && formData.status && formData.status !== 'Draft' ? formData.status : 'Sent')}
               >
                 <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
                 <span>Save</span>
