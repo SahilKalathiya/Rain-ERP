@@ -102,6 +102,69 @@ const getTransporters = async (req, res) => {
   }
 };
 
+const getColors = async (req, res) => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS colors (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        hex VARCHAR(20) NOT NULL,
+        pantone VARCHAR(50),
+        category VARCHAR(50) DEFAULT 'General',
+        tag VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const [rows] = await pool.query('SELECT * FROM colors ORDER BY created_at DESC');
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const saveColor = async (req, res) => {
+  try {
+    const c = req.body;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS colors (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        hex VARCHAR(20) NOT NULL,
+        pantone VARCHAR(50),
+        category VARCHAR(50) DEFAULT 'General',
+        tag VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const [existing] = await pool.query('SELECT id FROM colors WHERE id = ?', [c.id]);
+    if (existing.length > 0) {
+      await pool.query(
+        'UPDATE colors SET name=?, hex=?, pantone=?, category=?, tag=? WHERE id=?',
+        [c.name, c.hex, c.pantone || '', c.category || 'General', c.tag || '', c.id]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO colors (id, name, hex, pantone, category, tag) VALUES (?, ?, ?, ?, ?, ?)',
+        [c.id, c.name, c.hex, c.pantone || '', c.category || 'General', c.tag || '']
+      );
+    }
+    res.json({ success: true, message: 'Color saved successfully', data: c });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const deleteColor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM colors WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Color deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 // ==========================================
 // 2. PURCHASE ORDERS (PO)
 // ==========================================
@@ -155,16 +218,20 @@ const savePurchaseOrder = async (req, res) => {
 
     const [existing] = await conn.query('SELECT id FROM purchase_orders WHERE id = ?', [po.id]);
 
+    const expDate = po.expectedDeliveryDate ? po.expectedDeliveryDate : null;
+    const poDate = po.date ? po.date : new Date().toISOString().split('T')[0];
+    const terms = po.discountTerms || po.terms || '';
+
     if (existing.length > 0) {
       await conn.query(
         'UPDATE purchase_orders SET date=?, vendor_id=?, vendor_name=?, expected_delivery_date=?, buffer_allowed=?, buffer_percent=?, terms=?, total_amount=?, status=? WHERE id=?',
-        [po.date, po.vendorId, po.vendorName, po.expectedDeliveryDate, po.bufferAllowed ? 1 : 0, po.bufferPercent || 0, po.terms, po.totalAmount, po.status, po.id]
+        [poDate, po.vendorId, po.vendorName, expDate, po.bufferAllowed ? 1 : 0, po.bufferPercent || 0, terms, po.totalAmount, po.status, po.id]
       );
       await conn.query('DELETE FROM purchase_order_items WHERE po_id = ?', [po.id]);
     } else {
       await conn.query(
         'INSERT INTO purchase_orders (id, date, vendor_id, vendor_name, expected_delivery_date, buffer_allowed, buffer_percent, terms, total_amount, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [po.id, po.date, po.vendorId, po.vendorName, po.expectedDeliveryDate, po.bufferAllowed ? 1 : 0, po.bufferPercent || 0, po.terms, po.totalAmount, po.status || 'Sent']
+        [po.id, poDate, po.vendorId, po.vendorName, expDate, po.bufferAllowed ? 1 : 0, po.bufferPercent || 0, terms, po.totalAmount, po.status || 'Sent']
       );
     }
 
@@ -489,6 +556,9 @@ module.exports = {
   saveFabric,
   getTransporters,
   saveTransporter,
+  getColors,
+  saveColor,
+  deleteColor,
   getPurchaseOrders,
   savePurchaseOrder,
   getGRNs,

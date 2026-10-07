@@ -9,6 +9,9 @@ router.get('/fabrics', pc.getFabrics);
 router.post('/fabrics', pc.saveFabric);
 router.get('/transporters', pc.getTransporters);
 router.post('/transporters', pc.saveTransporter);
+router.get('/colors', pc.getColors);
+router.post('/colors', pc.saveColor);
+router.delete('/colors/:id', pc.deleteColor);
 
 // Purchase Orders (PO)
 router.get('/purchase-orders', pc.getPurchaseOrders);

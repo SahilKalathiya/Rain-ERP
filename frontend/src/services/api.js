@@ -32,6 +32,10 @@ export const api = {
   getTransporters: () => request('/procurement/transporters'),
   saveTransporter: (transporter) => request('/procurement/transporters', { method: 'POST', body: JSON.stringify(transporter) }),
 
+  getColors: () => request('/procurement/colors'),
+  saveColor: (color) => request('/procurement/colors', { method: 'POST', body: JSON.stringify(color) }),
+  deleteColor: (id) => request(`/procurement/colors/${id}`, { method: 'DELETE' }),
+
   // 2. Purchase Orders
   getPurchaseOrders: () => request('/procurement/purchase-orders'),
   savePurchaseOrder: (po) => request('/procurement/purchase-orders', { method: 'POST', body: JSON.stringify(po) }),

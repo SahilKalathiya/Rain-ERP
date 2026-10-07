@@ -16,6 +16,7 @@ export const navigationMenu = [
           { label: 'Purchase Orders', link: '/procurement-pos' },
           { label: 'Goods Receipt (GRN)', link: '/goods-inward' },
           { label: 'Quality Check (QC)', link: '/quality-batches' },
+          { label: 'Stock Pool', link: '/stock-pool' },
           { label: 'Rejected Stock Pool', link: '/rejected-stock' }
         ]
       },
@@ -26,6 +27,7 @@ export const navigationMenu = [
         submenu: [
           { label: 'Vendors Master', link: '/vendors' },
           { label: 'Fabrics Master', link: '/fabrics' },
+          { label: 'Color Master', link: '/colors' },
           { label: 'Transporters Master', link: '/transporters' }
         ]
       }

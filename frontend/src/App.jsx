@@ -82,6 +82,13 @@ export default function App() {
     }
 
     if (
+      currentRoute.startsWith('/stock-pool') ||
+      currentRoute.startsWith('/stock')
+    ) {
+      return <ProcurementDashboard initialSubmodule="stock_pool" onNavigate={setCurrentRoute} />;
+    }
+
+    if (
       currentRoute.startsWith('/rejected-stock') ||
       currentRoute.includes('rejected')
     ) {
@@ -94,6 +101,10 @@ export default function App() {
 
     if (currentRoute.startsWith('/fabrics')) {
       return <ProcurementDashboard initialSubmodule="fabrics" onNavigate={setCurrentRoute} />;
+    }
+
+    if (currentRoute.startsWith('/colors')) {
+      return <ProcurementDashboard initialSubmodule="colors" onNavigate={setCurrentRoute} />;
     }
 
     if (currentRoute.startsWith('/transporters')) {

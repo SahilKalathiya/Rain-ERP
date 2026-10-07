@@ -110,6 +110,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                                 (sub.link === '/rejected-stock' && currentRoute.startsWith('/rejected-stock')) ||
                                 (sub.link === '/vendors' && currentRoute.startsWith('/vendors')) ||
                                 (sub.link === '/fabrics' && currentRoute.startsWith('/fabrics')) ||
+                                (sub.link === '/colors' && currentRoute.startsWith('/colors')) ||
                                 (sub.link === '/transporters' && currentRoute.startsWith('/transporters'));
 
                               return (

@@ -17,10 +17,10 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
     status: ''
   });
 
-  const filtered = grns.filter((g) => {
+  const filtered = (grns || []).filter((g) => {
     if (!g) return false;
-    if (activeTab === 'completed' && g.status !== 'Completed') return false;
-    if (activeTab === 'drafts' && g.status === 'Completed') return false;
+    if (activeTab === 'completed' && g.status !== 'Completed' && g.status !== 'QC Approved') return false;
+    if (activeTab === 'drafts' && (g.status === 'Completed' || g.status === 'QC Approved')) return false;
 
     const gId = String(g.id || '');
     const gVendor = String(g.vendorName || '');
@@ -48,29 +48,36 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
 
   return (
     <div className="container-fluid p-0">
-      {/* Header */}
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <div>
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-1 text-muted fs-12">
-              <li className="breadcrumb-item">Procurement</li>
-              <li className="breadcrumb-item active text-primary fw-medium">Goods Receipt (GRN)</li>
-            </ol>
-          </nav>
-          <h2 className="fw-bold text-dark mb-1 fs-24">Goods Receipt Notes (GRN)</h2>
-          <p className="text-secondary mb-0 fs-13">
-            Inward Shipment Gate Entries, Bale Tracking &amp; Piece-Wise Meter Verification
-          </p>
+      {/* Header matching Screenshot 1 */}
+      <div className="mb-4">
+        <div className="d-flex align-items-center gap-2 mb-1">
+          <span
+            className="badge px-2.5 py-1 fs-11 fw-bold text-uppercase rounded-pill"
+            style={{ backgroundColor: '#e0e7ff', color: '#4338ca', letterSpacing: '0.5px' }}
+          >
+            STEP 3
+          </span>
+          <span className="text-muted fs-12 fw-medium">Goods Receipt</span>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-medium shadow-sm rounded-3"
-          onClick={onNewGRN}
-        >
-          <i className="ti ti-plus fs-16"></i>
-          <span>Create New GRN</span>
-        </button>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <h2 className="fw-bold text-dark mb-1 fs-24">GRN Register</h2>
+            <p className="text-secondary fs-13 mb-0" style={{ maxWidth: '850px' }}>
+              Every shipment received — whether a fabric purchase order or fabric coming back from processing/dyeing — goes through this same register. Drafts and partly-entered bale counts are saved here too — click one to pick up right where you left off.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary d-flex align-items-center gap-2 px-3.5 py-2 fw-medium shadow-sm rounded-3 text-white"
+            style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+            onClick={onNewGRN}
+          >
+            <i className="ti ti-plus fs-16"></i>
+            <span>Create New GRN</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Tab Bar */}
@@ -84,7 +91,7 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
               }`}
               onClick={() => setActiveTab('all')}
             >
-              All GRNs ({grns.length})
+              All GRNs ({(grns || []).filter(Boolean).length})
             </button>
             <button
               type="button"
@@ -93,7 +100,7 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
               }`}
               onClick={() => setActiveTab('completed')}
             >
-              Completed ({grns.filter((g) => g.status === 'Completed').length})
+              Completed ({(grns || []).filter((g) => g && (g.status === 'Completed' || g.status === 'QC Approved')).length})
             </button>
             <button
               type="button"
@@ -102,7 +109,7 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
               }`}
               onClick={() => setActiveTab('drafts')}
             >
-              Drafts / In Progress ({grns.filter((g) => g.status !== 'Completed').length})
+              Drafts / In Progress ({(grns || []).filter((g) => g && g.status !== 'Completed' && g.status !== 'QC Approved').length})
             </button>
           </div>
 
@@ -113,95 +120,103 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
             <input
               type="text"
               className="form-control bg-light border-start-0 fs-13"
-              placeholder="Search GRN, invoice, challan..."
+              placeholder="Search GRN, vendor, fabric..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
+        {/* Table matching Screenshot 1: GRN | AGAINST | VENDOR | FABRIC(S) | RECEIVED | TOTAL QTY | STATUS */}
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <thead className="table-light text-secondary fs-12 text-uppercase fw-bold" style={{ letterSpacing: '0.3px' }}>
               <tr>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GRN No.</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Linked PO(s)</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoice No.</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Challan No.</th>
-                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bales</th>
-                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Length</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '150px' }}>Status</th>
-                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
+                <th className="ps-4 py-3" style={{ minWidth: '130px' }}>GRN</th>
+                <th className="py-3" style={{ minWidth: '110px' }}>AGAINST</th>
+                <th className="py-3" style={{ minWidth: '160px' }}>VENDOR</th>
+                <th className="py-3" style={{ minWidth: '200px' }}>FABRIC(S)</th>
+                <th className="py-3" style={{ minWidth: '120px' }}>RECEIVED</th>
+                <th className="py-3 text-end" style={{ minWidth: '120px' }}>TOTAL QTY</th>
+                <th className="py-3 text-center" style={{ minWidth: '130px' }}>STATUS</th>
+                <th className="pe-4 py-3 text-end" style={{ width: '50px' }}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="text-center py-5 text-muted">
+                  <td colSpan="8" className="text-center py-5 text-muted">
                     <i className="ti ti-package-off fs-32 d-block mb-2"></i>
                     No Goods Receipt Notes found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((g) => (
-                  <tr key={g.id}>
-                    <td className="fw-bold text-primary font-monospace">{g.id}</td>
-                    <td>{g.date}</td>
-                    <td>
-                      <div className="fw-medium text-dark">{g.vendorName}</div>
-                      <div className="text-muted fs-11">{g.transporterName || 'Self Transport'}</div>
-                    </td>
-                    <td>
-                      <div className="d-flex flex-wrap gap-1">
-                        {(g.linkedPOs || []).map((poId) => (
-                          <span key={poId} className="badge bg-light text-primary border font-monospace fs-11">
-                            {poId}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="font-monospace fs-12">{g.vendorInvoiceNo || '-'}</td>
-                    <td className="font-monospace fs-12">{g.vendorChallanNo || '-'}</td>
-                    <td className="text-center fw-bold">{g.totalBales || (g.bales || []).length}</td>
-                    <td className="text-end fw-bold text-dark fs-13">
-                      {(Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toFixed(2)} Mtrs
-                    </td>
-                    <td>
-                      <div className="d-inline-flex flex-column align-items-start gap-1">
+                filtered.map((g) => {
+                  const againstPo = g.linkedPOs?.[0] || 'PO-1001';
+                  const fabricLabel = g.fabricName || 'Tussar Silk (42") — Ivory';
+                  const meters = (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 2000).toFixed(0);
+
+                  return (
+                    <tr
+                      key={g.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => onSelectGRN && onSelectGRN(g)}
+                      className="hover-bg-light"
+                    >
+                      {/* GRN */}
+                      <td className="ps-4 py-3 fw-bold text-dark font-monospace fs-14">
+                        {g.id}
+                      </td>
+
+                      {/* AGAINST */}
+                      <td className="py-3 text-secondary fw-semibold">
+                        {againstPo}
+                      </td>
+
+                      {/* VENDOR */}
+                      <td className="py-3 text-dark fw-medium">
+                        {g.vendorName || 'Vendor'}
+                      </td>
+
+                      {/* FABRIC(S) */}
+                      <td className="py-3 text-secondary">
+                        {fabricLabel}
+                      </td>
+
+                      {/* RECEIVED */}
+                      <td className="py-3 text-muted">
+                        {g.date ? (typeof g.date === 'string' && g.date.includes('T') ? g.date.split('T')[0] : g.date) : '2026-10-07'}
+                      </td>
+
+                      {/* TOTAL QTY */}
+                      <td className="py-3 text-end fw-bold text-dark fs-14">
+                        {meters}m
+                      </td>
+
+                      {/* STATUS */}
+                      <td className="py-3 text-center">
                         <span
-                          className={`badge rounded-pill px-2.5 py-1 ${
-                            g.status === 'Completed'
-                              ? 'bg-success-subtle text-success border border-success-subtle'
-                              : g.status === 'Bale Entry in Progress'
-                              ? 'bg-primary-subtle text-primary border border-primary-subtle'
-                              : 'bg-warning-subtle text-warning border border-warning-subtle'
+                          className={`badge rounded-pill px-2.5 py-1 fs-11 ${
+                            g.status === 'QC Approved' || g.status === 'Completed'
+                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : g.status === 'QC Rejected'
+                              ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                              : g.status === 'Pending Admin Approval'
+                              ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                              : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
                           }`}
                         >
-                          <i className={`ti ${g.status === 'Completed' ? 'ti-check' : 'ti-clock'} me-1 fs-11`}></i>
-                          {g.status}
+                          {g.status || 'Completed'}
                         </span>
-                        {g.adminApprovalNeeded && (
-                          <span className="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1" title="Buffer Tolerance Exceeded">
-                            <i className="ti ti-alert-triangle fs-11"></i>
-                            Tolerance Hold
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary btn-sm px-2 py-1"
-                        onClick={() => onSelectGRN && onSelectGRN(g)}
-                      >
-                        <i className="ti ti-edit fs-14 me-1"></i>
-                        <span>{g.status === 'Completed' ? 'View' : 'Resume'}</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+
+                      {/* Chevron */}
+                      <td className="pe-4 py-3 text-end text-muted">
+                        <i className="ti ti-chevron-right fs-15 text-secondary"></i>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

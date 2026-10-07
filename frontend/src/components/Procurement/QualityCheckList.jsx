@@ -52,14 +52,12 @@ export default function QualityCheckList({
           </p>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-medium shadow-sm rounded-3"
-          onClick={onNewQC}
-        >
-          <i className="ti ti-plus fs-16"></i>
-          <span>Perform QC Inspection</span>
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          <span className="badge bg-light text-secondary border px-3 py-2 fs-12 fw-medium d-inline-flex align-items-center gap-1.5 rounded-3">
+            <i className="ti ti-link fs-14 text-primary"></i>
+            <span>Auto-generated from GRN Inward</span>
+          </span>
+        </div>
       </div>
 
       {/* Table Card */}
@@ -107,7 +105,12 @@ export default function QualityCheckList({
                 </tr>
               ) : (
                 filtered.map((qc) => (
-                  <tr key={qc.id}>
+                  <tr
+                    key={qc.id}
+                    style={{ cursor: 'pointer' }}
+                    className="hover-row align-middle"
+                    onClick={() => onSelectQC && onSelectQC(qc)}
+                  >
                     <td className="fw-bold text-primary font-monospace">{qc.id}</td>
                     <td className="font-monospace fw-semibold">{qc.grnRef}</td>
                     <td>
@@ -140,7 +143,7 @@ export default function QualityCheckList({
                         {qc.qcStatus}
                       </span>
                     </td>
-                    <td className="text-center">
+                    <td className="text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         className="btn btn-outline-primary btn-sm px-2 py-1"

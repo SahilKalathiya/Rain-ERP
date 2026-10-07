@@ -380,3 +380,24 @@ export const initialAuditLogs = [
     remarks: "Short width and oil stains on Piece 07"
   }
 ];
+
+export const initialColors = [
+  { id: 'CLR-0001', name: 'Charcoal', hex: '#36454F', pantone: '19-4104 TCX', category: 'Neutral' },
+  { id: 'CLR-0002', name: 'Green', hex: '#388E3C', pantone: '18-6022 TCX', category: 'Green' },
+  { id: 'CLR-0003', name: 'Ivory', hex: '#FFFFF0', pantone: '11-0604 TCX', category: 'Neutral' },
+  { id: 'CLR-0004', name: 'Jamun', hex: '#2E0854', pantone: '19-3518 TCX', category: 'Blue' },
+  { id: 'CLR-0005', name: 'Lavendar', hex: '#A811DF', pantone: '17-3619 TCX', category: 'Purple' },
+  { id: 'CLR-0006', name: 'Maroon', hex: '#800000', pantone: '19-1528 TCX', category: 'Red' },
+  { id: 'CLR-0007', name: 'Navy Blue', hex: '#001F54', pantone: '19-4029 TCX', category: 'Blue' },
+  { id: 'CLR-0008', name: 'Pastel Red', hex: '#FF6A61', pantone: '16-1543 TCX', category: 'Red' },
+  { id: 'CLR-0009', name: 'Pastel red', hex: '#FF6A61', pantone: '16-1543 TCX', category: 'Red', tag: 'Red' },
+  { id: 'CLR-0010', name: 'Rama Green', hex: '#0EB2B2', pantone: '16-5121 TCX', category: 'Green' },
+  { id: 'CLR-0011', name: 'Red', hex: '#E53935', pantone: '18-1662 TCX', category: 'Red' },
+  { id: 'CLR-0012', name: 'Rust', hex: '#B7410E', pantone: '18-1442 TCX', category: 'Red' },
+  { id: 'CLR-0013', name: 'Rust Light', hex: '#B7410E', pantone: '17-1444 TCX', category: 'Red' },
+  { id: 'CLR-0014', name: 'Sea Green', hex: '#20C58E', pantone: '15-5534 TCX', category: 'Green' },
+  { id: 'CLR-0015', name: 'Teal', hex: '#008080', pantone: '19-4535 TCX', category: 'Blue' },
+  { id: 'CLR-0016', name: 'Black', hex: '#000000', pantone: '19-4008 TCX', category: 'Neutral' },
+  { id: 'CLR-0017', name: 'White', hex: '#FFFFFF', pantone: '11-0601 TCX', category: 'Neutral' },
+  { id: 'CLR-0018', name: 'Royal Blue', hex: '#4169E1', pantone: '19-4052 TCX', category: 'Blue' }
+];
