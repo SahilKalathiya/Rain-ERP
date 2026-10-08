@@ -1,14 +1,41 @@
 import React, { useState } from 'react';
-import { navigationMenu } from './menuConfig';
+
+// Navigation Menu Configuration
+const DEFAULT_NAVIGATION_MENU = [
+  {
+    title: 'Raw Material Procurement',
+    items: [
+      { label: 'Overview Dashboard', link: '/dashboard', icon: 'ti ti-layout-dashboard' },
+      {
+        label: 'Procurement Workflow',
+        icon: 'ti ti-shopping-cart',
+        submenu: [
+          { label: 'Purchase Orders', link: '/procurement-pos' },
+          { label: 'Goods Receipt (GRN)', link: '/goods-inward' },
+          { label: 'Quality Check (QC)', link: '/quality-batches' },
+          { label: 'Stock Pool', link: '/stock-pool' },
+          { label: 'Rejected Stock Pool', link: '/rejected-stock' }
+        ]
+      },
+      {
+        label: 'Master Data',
+        icon: 'ti ti-database',
+        submenu: [
+          { label: 'Vendors Master', link: '/vendors' },
+          { label: 'Fabrics Master', link: '/fabrics' },
+          { label: 'Color Master', link: '/colors' },
+          { label: 'Transporters Master', link: '/transporters' }
+        ]
+      }
+    ]
+  }
+];
 
 /**
  * Sidebar Navigation Component - Matches Authentic Preclinic / Rain Drop ERP Theme
- * - Clean White background with Royal Navy accents
- * - Fully persistent open accordion menus
- * - Smooth active states without collapsing menus
  */
 export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
-  // Submenus are collapsible - user can click to open or close
+  // Submenus are collapsed by default on page refresh and open only upon clicking
   const [openMenus, setOpenMenus] = useState({
     'Procurement Workflow': false,
     'Master Data': false
@@ -30,12 +57,14 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
         height: '100vh',
         position: 'sticky',
         top: 0,
-        zIndex: 1020
+        zIndex: 1020,
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
       {/* Brand Header */}
       <div
-        className="p-3 border-bottom d-flex align-items-center justify-content-between"
+        className="p-3 border-bottom d-flex align-items-center justify-content-between flex-shrink-0"
         style={{ height: '70px' }}
       >
         <div className="d-flex align-items-center gap-2">
@@ -59,8 +88,15 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
       </div>
 
       {/* Nav Menu Items */}
-      <div className="flex-grow-1 overflow-auto p-3 custom-scrollbar">
-        {navigationMenu.map((section, sIdx) => (
+      <div
+        className="flex-grow-1 p-3"
+        style={{
+          overflowY: 'auto',
+          flex: '1 1 auto',
+          display: 'block'
+        }}
+      >
+        {DEFAULT_NAVIGATION_MENU.map((section, sIdx) => (
           <div key={sIdx} className="mb-3">
             <div
               className="text-uppercase fw-bold fs-10 px-2 mb-2 tracking-wider"
@@ -101,7 +137,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
 
                         {isOpen && (
                           <ul className="list-unstyled ms-3 ps-2 border-start mt-1 d-flex flex-column gap-1">
-                            {item.submenu.map((sub, sIdx) => {
+                            {item.submenu.map((sub, subIdx) => {
                               const isSubActive =
                                 sub.link === currentRoute ||
                                 (sub.link === '/procurement-pos' && currentRoute.startsWith('/procurement-pos')) ||
@@ -114,7 +150,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                                 (sub.link === '/transporters' && currentRoute.startsWith('/transporters'));
 
                               return (
-                                <li key={sIdx}>
+                                <li key={subIdx}>
                                   <a
                                     href={sub.link}
                                     className={`sidebar-sub-link d-block px-3 py-2 fs-13 rounded-3 text-decoration-none transition-all ${
@@ -169,9 +205,9 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
         ))}
       </div>
 
-      {/* User Footer */}
+      {/* User Footer - Anchored at the bottom */}
       <div
-        className="p-3 border-top d-flex align-items-center justify-content-between"
+        className="p-3 border-top d-flex align-items-center justify-content-between mt-auto flex-shrink-0"
         style={{ background: '#f8fafc' }}
       >
         <div className="d-flex align-items-center gap-2">
@@ -197,3 +233,4 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
     </aside>
   );
 }
+

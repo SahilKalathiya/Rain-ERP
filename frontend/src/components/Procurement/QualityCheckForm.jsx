@@ -11,7 +11,7 @@ export default function QualityCheckForm({
   grns = [],
   purchaseOrders = [],
   fabrics = [],
-  currentUser = { name: 'Saksham Garg', role: 'Quality Inspector' },
+  currentUser = { name: '', role: 'Quality Inspector' },
   onBack,
   onSaveQC,
   onNavigateToStockPool,
@@ -59,13 +59,13 @@ export default function QualityCheckForm({
     inspectionScope: qc?.inspectionScope || 'Whole Shipment', // Whole Shipment / Bale-Level / Piece-Level
     baleRef: qc?.baleRef || 'Bale 01',
     pieceRef: qc?.pieceRef || 'Piece 01',
-    inspectorName: qc?.inspectorName || currentUser.name,
+    inspectorName: (qc?.inspectorName && qc.inspectorName !== 'Saksham Garg') ? qc.inspectorName : (currentUser.name && currentUser.name !== 'Saksham Garg' ? currentUser.name : ''),
     expectedWidth: qc?.expectedWidth || initialExpected.width,
     actualWidth: qc?.actualWidth !== undefined && qc?.actualWidth !== null ? String(qc.actualWidth) : '',
     expectedFold: qc?.expectedFold || initialExpected.fold,
     actualFold: qc?.actualFold !== undefined && qc?.actualFold !== null ? String(qc.actualFold) : '',
     photos: qc?.photos || [],
-    notes: qc?.notes || '',
+    notes: (qc?.notes && !qc.notes.startsWith('Quality inspection generated')) ? qc.notes : '',
     defectPieces: qc?.defectPieces || '',
     defectQty: qc?.defectQty || '',
     defectReason: qc?.defectReason || '',
@@ -76,6 +76,14 @@ export default function QualityCheckForm({
   });
 
   const [pieceInspections, setPieceInspections] = useState(qc?.pieceInspections || {});
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToastNotification({ message, type });
+    setTimeout(() => {
+      setToastNotification(null);
+    }, 3200);
+  };
 
   React.useEffect(() => {
     if (qc && qc.id) {
@@ -86,13 +94,13 @@ export default function QualityCheckForm({
         inspectionScope: qc.inspectionScope || 'Whole Shipment',
         baleRef: qc.baleRef || 'Bale 01',
         pieceRef: qc.pieceRef || 'Piece 01',
-        inspectorName: qc.inspectorName || currentUser.name,
+        inspectorName: (qc.inspectorName && qc.inspectorName !== 'Saksham Garg') ? qc.inspectorName : '',
         expectedWidth: qc.expectedWidth || exp.width,
         actualWidth: qc.actualWidth !== undefined && qc.actualWidth !== null ? String(qc.actualWidth) : '',
         expectedFold: qc.expectedFold || exp.fold,
         actualFold: qc.actualFold !== undefined && qc.actualFold !== null ? String(qc.actualFold) : '',
         photos: qc.photos || [],
-        notes: qc.notes || '',
+        notes: (qc.notes && !qc.notes.startsWith('Quality inspection generated')) ? qc.notes : '',
         defectPieces: qc.defectPieces || '',
         defectQty: qc.defectQty || '',
         defectReason: qc.defectReason || '',
@@ -199,7 +207,7 @@ export default function QualityCheckForm({
         }
       };
     });
-    alert('Piece snapshot captured and attached!');
+    showToast('Piece snapshot captured and attached!', 'success');
   };
 
   // Handle Photo upload simulation
@@ -227,7 +235,7 @@ export default function QualityCheckForm({
       ...prev,
       photos: [...prev.photos, mockCameraPhoto]
     }));
-    alert('Camera snapshot captured and attached to QC record!');
+    showToast('Camera snapshot captured and attached to QC record!', 'success');
   };
 
   // Calculation of Piece Split & Quality Quantities
@@ -263,7 +271,7 @@ export default function QualityCheckForm({
     const effectiveStatus = (typeof statusOverride === 'string') ? statusOverride : formData.qcStatus;
 
     if (effectiveStatus === 'OK' && flatDefectQty > 0 && !formData.defectReason.trim()) {
-      alert('Please enter a defect reason for the defective quantity in the flat entry box.');
+      showToast('Please enter a defect reason for the defective quantity in the flat entry box.', 'warning');
       return;
     }
 
@@ -820,6 +828,42 @@ export default function QualityCheckForm({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* INLINE TOAST NOTIFICATION */}
+      {toastNotification && (
+        <div
+          className="position-fixed top-0 end-0 p-3"
+          style={{ zIndex: 9999 }}
+        >
+          <div
+            className={`toast show border-0 rounded-3 shadow-lg px-3 py-2.5 d-flex align-items-center gap-2.5 text-white ${
+              toastNotification.type === 'danger'
+                ? 'bg-danger'
+                : toastNotification.type === 'warning'
+                ? 'bg-warning text-dark'
+                : 'bg-dark'
+            }`}
+            style={{ minWidth: '280px', animation: 'fadeIn 0.2s ease-in-out' }}
+          >
+            <i
+              className={`fs-16 ${
+                toastNotification.type === 'danger'
+                  ? 'ti ti-alert-circle text-white'
+                  : toastNotification.type === 'warning'
+                  ? 'ti ti-alert-triangle text-dark'
+                  : 'ti ti-circle-check text-success'
+              }`}
+            ></i>
+            <span className="fs-13 fw-medium flex-grow-1">{toastNotification.message}</span>
+            <button
+              type="button"
+              className="btn-close btn-close-white ms-auto"
+              style={{ fontSize: '10px' }}
+              onClick={() => setToastNotification(null)}
+            ></button>
           </div>
         </div>
       )}

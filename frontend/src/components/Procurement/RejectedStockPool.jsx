@@ -17,26 +17,34 @@ export default function RejectedStockPool({
   const [items, setItems] = useState(rejectedItems);
   const [selectedIds, setSelectedIds] = useState([]);
   const [activeActionModal, setActiveActionModal] = useState(null); // 'rtv', 'scrap', 'transfer'
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToastNotification({ message, type });
+    setTimeout(() => {
+      setToastNotification(null);
+    }, 3200);
+  };
 
   // Modal form states
   const [rtvFormData, setRtvFormData] = useState({
     challanNo: `RTV-CH-${Math.floor(1000 + Math.random() * 9000)}`,
     date: new Date().toISOString().split('T')[0],
-    transporter: 'Keshav Freight Carriers',
-    remarks: 'Defective fabric returned due to selvedge cut and oil stains.'
+    transporter: '',
+    remarks: ''
   });
 
   const [scrapFormData, setScrapFormData] = useState({
     saleId: `SCRAP-${Math.floor(1000 + Math.random() * 9000)}`,
     status: 'To Be Sold', // 'To Be Sold' (save-in-progress) or 'Sold'
-    buyerDetails: 'Local Textile Recycler (Jaipur)',
+    buyerDetails: '',
     settlementAmount: '',
     saleDate: new Date().toISOString().split('T')[0]
   });
 
   const [transferFormData, setTransferFormData] = useState({
-    targetGrade: 'B-Grade / Seconds Stock Pool',
-    remarks: 'Approved by Production Head for inner pocketing and lining usage.'
+    targetGrade: '',
+    remarks: ''
   });
 
   // Toggle selection
@@ -75,13 +83,13 @@ export default function RejectedStockPool({
 
     if (onUpdateItemStatus) onUpdateItemStatus(updated);
     if (onRTVChallanGenerated) onRTVChallanGenerated(challan);
-    alert(`Return Delivery Challan ${challan.challanNo} generated for ${totalSelectedQty} Mtrs!`);
+    showToast(`Return Delivery Challan ${challan.challanNo} generated for ${totalSelectedQty} Mtrs!`, 'success');
   };
 
   // 2. Process Scrap Sale
   const handleProcessScrap = () => {
     if (scrapFormData.status === 'Sold' && (!scrapFormData.settlementAmount || Number(scrapFormData.settlementAmount) <= 0)) {
-      alert('Settlement Amount is mandatory when status is Sold.');
+      showToast('Settlement Amount is mandatory when status is Sold.', 'warning');
       return;
     }
 
@@ -107,15 +115,21 @@ export default function RejectedStockPool({
 
     if (onUpdateItemStatus) onUpdateItemStatus(updated);
     if (onScrapSaleCompleted) onScrapSaleCompleted(saleRecord);
-    alert(
+    showToast(
       scrapFormData.status === 'Sold'
         ? `Scrap Sale closed with settlement of ₹${scrapFormData.settlementAmount}!`
-        : 'Stock marked as "To Be Sold" (liquidation in progress).'
+        : 'Stock marked as "To Be Sold" (liquidation in progress).',
+      'success'
     );
   };
 
   // 3. Process Transfer to Stock Pool
   const handleProcessTransfer = () => {
+    if (!transferFormData.targetGrade) {
+      showToast('Please select a Target Inventory Grade.', 'warning');
+      return;
+    }
+
     const transferRecord = {
       targetGrade: transferFormData.targetGrade,
       remarks: transferFormData.remarks,
@@ -136,7 +150,7 @@ export default function RejectedStockPool({
 
     if (onUpdateItemStatus) onUpdateItemStatus(updated);
     if (onTransferToStock) onTransferToStock(transferRecord);
-    alert(`${totalSelectedQty} Mtrs successfully transferred into ${transferFormData.targetGrade}!`);
+    showToast(`${totalSelectedQty} Mtrs successfully transferred into ${transferFormData.targetGrade}!`, 'success');
   };
 
   return (
@@ -191,89 +205,179 @@ export default function RejectedStockPool({
       </div>
 
       {/* Main Table */}
-      <div className="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4">
-        <div className="d-flex align-items-center justify-content-between mb-3">
+      <div className="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div className="d-flex align-items-center gap-2">
-            <span className="badge bg-danger rounded-pill px-2 py-1 fs-11">Pool Active</span>
+            <span className="badge bg-danger rounded-pill px-2.5 py-1.5 fs-11">Pool Active</span>
             <h5 className="fw-bold text-dark mb-0 fs-16">Defective Inward Pieces</h5>
           </div>
 
-          <div className="text-muted fs-13">
-            Selected: <strong className="text-primary">{selectedIds.length} Pieces</strong> (
-            <strong>{totalSelectedQty.toFixed(2)} Mtrs</strong>)
+          <div className="d-flex align-items-center gap-3">
+            <div className="text-muted fs-13">
+              Selected: <strong className="text-primary">{selectedIds.length} Pieces</strong> (
+              <strong>{totalSelectedQty.toFixed(2)} Mtrs</strong>)
+            </div>
           </div>
         </div>
 
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary">
+            <thead
+              className="text-secondary"
+              style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}
+            >
               <tr>
-                <th style={{ width: '40px' }}></th>
-                <th>Rejected ID</th>
-                <th>Source QC</th>
-                <th>PO / Vendor</th>
-                <th>Container</th>
-                <th>Fabric Quality</th>
-                <th className="text-end">Defective Qty</th>
-                <th>Defect Reason</th>
-                <th>Current Status</th>
+                <th style={{ width: '52px', padding: '12px 14px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      cursor: 'pointer',
+                      accentColor: '#5b47fb',
+                      borderRadius: '4px',
+                      verticalAlign: 'middle'
+                    }}
+                    checked={items.length > 0 && items.every((it) => selectedIds.includes(it.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(items.map((it) => it.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Select / Deselect All Available"
+                  />
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '120px' }}>
+                  REJECTED ID
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '110px' }}>
+                  SOURCE QC
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '170px' }}>
+                  PO / VENDOR
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '240px' }}>
+                  CONTAINER
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '160px' }}>
+                  FABRIC QUALITY
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '130px', textAlign: 'right' }}>
+                  DEFECTIVE QTY
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '240px' }}>
+                  DEFECT REASON
+                </th>
+                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '160px' }}>
+                  CURRENT STATUS
+                </th>
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => {
-                const isSelected = selectedIds.includes(it.id);
-                // 8.5 Rule: If action already initiated, cannot be simultaneously selected for another action
-                const isLocked = it.status !== 'In Pool' && it.status !== 'To Be Sold';
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="text-center py-5 text-muted">
+                    <i className="ti ti-check-circle fs-32 d-block mb-2 text-success opacity-50"></i>
+                    No defective inward pieces in pool.
+                  </td>
+                </tr>
+              ) : (
+                items.map((it) => {
+                  const isSelected = selectedIds.includes(it.id);
 
-                return (
-                  <tr key={it.id} className={isSelected ? 'table-danger' : ''}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        disabled={isLocked}
-                        checked={isSelected}
-                        onChange={() => handleToggleSelect(it.id)}
-                      />
-                    </td>
-                    <td className="fw-bold text-danger font-monospace">{it.id}</td>
-                    <td className="font-monospace fw-semibold">{it.sourceQcRef}</td>
-                    <td>
-                      <div className="fw-semibold text-dark">{it.vendorName}</div>
-                      <div className="text-muted fs-11">{it.poRef}</div>
-                    </td>
-                    <td>
-                      <span className="badge bg-light text-dark border">
-                        {it.baleRef} → {it.pieceRef}
-                      </span>
-                    </td>
-                    <td>{it.fabricName}</td>
-                    <td className="text-end fw-bold text-danger fs-14">
-                      {Number(it.quantity).toFixed(2)} Mtrs
-                    </td>
-                    <td>
-                      <span className="text-muted fs-12">{it.reason}</span>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge px-2 py-1 ${
-                          it.status === 'In Pool'
-                            ? 'bg-danger-subtle text-danger'
-                            : it.status === 'RTV Initiated'
-                            ? 'bg-primary-subtle text-primary'
-                            : it.status === 'To Be Sold'
-                            ? 'bg-warning-subtle text-warning'
-                            : it.status === 'Sold'
-                            ? 'bg-secondary-subtle text-secondary'
-                            : 'bg-success-subtle text-success'
-                        }`}
-                      >
-                        {it.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr
+                      key={it.id}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? 'rgba(91, 71, 251, 0.08)' : undefined,
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      className={isSelected ? 'table-active' : ''}
+                      onClick={() => handleToggleSelect(it.id)}
+                    >
+                      <td style={{ textAlign: 'center', width: '52px' }}>
+                        <input
+                          type="checkbox"
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            cursor: 'pointer',
+                            accentColor: '#5b47fb',
+                            borderRadius: '4px',
+                            verticalAlign: 'middle'
+                          }}
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleToggleSelect(it.id);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        />
+                      </td>
+                      <td className="fw-bold font-monospace fs-13" style={{ color: '#5b47fb' }}>
+                        {it.id}
+                      </td>
+                      <td className="font-monospace fw-semibold text-secondary fs-13">
+                        {it.sourceQcRef || 'QC-9056'}
+                      </td>
+                      <td>
+                        <div className="fw-semibold text-dark fs-13">{it.vendorName || 'Surat Rayon & Silk Mills'}</div>
+                        <div className="text-muted fs-11 font-monospace">{it.poRef || 'PO-1001'}</div>
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-dark border px-2.5 py-1.5 fs-12 fw-normal d-inline-flex align-items-center gap-1">
+                          <i className="ti ti-box text-secondary fs-12"></i>
+                          <span>{it.baleRef || 'Bale 01'} &rarr; {it.pieceRef || 'Piece 1'}</span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="fw-medium text-dark fs-13">{it.fabricName || 'Modal Satin Premium'}</span>
+                      </td>
+                      <td className="text-end fw-bold fs-14 text-dark">
+                        {Number(it.quantity).toFixed(2)} <span className="fs-12 fw-medium text-secondary">Mtrs</span>
+                      </td>
+                      <td>
+                        <div
+                          className="text-secondary fs-12"
+                          style={{ maxWidth: '300px', lineHeight: '1.4' }}
+                          title={it.reason}
+                        >
+                          {it.reason || 'Quality inspection generated for inward shipment.'}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge px-2.5 py-1 fs-11 rounded-pill ${
+                            it.status === 'In Pool'
+                              ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                              : it.status === 'RTV Initiated'
+                              ? 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                              : it.status === 'To Be Sold'
+                              ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                              : it.status === 'Sold'
+                              ? 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
+                              : it.status === 'Transferred to Stock'
+                              ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                              : it.status === 'Pending Admin Review'
+                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : it.status === 'Reversed (treated as good)'
+                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : 'bg-light text-secondary border'
+                          }`}
+                        >
+                          {it.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -323,6 +427,7 @@ export default function RejectedStockPool({
                   <label className="form-label fs-12 fw-semibold">Logistics / Transporter</label>
                   <input
                     type="text"
+                    placeholder="e.g. Keshav Freight Carriers"
                     className="form-control form-control-sm bg-light"
                     value={rtvFormData.transporter}
                     onChange={(e) =>
@@ -335,6 +440,7 @@ export default function RejectedStockPool({
                   <label className="form-label fs-12 fw-semibold">Return Remarks / Note</label>
                   <textarea
                     rows="2"
+                    placeholder="Enter return remarks or reason..."
                     className="form-control form-control-sm bg-light fs-12"
                     value={rtvFormData.remarks}
                     onChange={(e) =>
@@ -503,6 +609,7 @@ export default function RejectedStockPool({
                     setTransferFormData({ ...transferFormData, targetGrade: e.target.value })
                   }
                 >
+                  <option value="">Select target inventory grade...</option>
                   <option value="B-Grade / Seconds Stock Pool">B-Grade / Seconds Stock Pool</option>
                   <option value="Main Raw Material Stock Pool (Concession)">
                     Main Raw Material Stock Pool (Concession)
@@ -515,6 +622,7 @@ export default function RejectedStockPool({
                 <label className="form-label fs-12 fw-semibold">Approval Remarks</label>
                 <textarea
                   rows="2"
+                  placeholder="Enter approval remarks or note for stock transfer..."
                   className="form-control form-control-sm bg-light fs-12"
                   value={transferFormData.remarks}
                   onChange={(e) =>
@@ -540,6 +648,42 @@ export default function RejectedStockPool({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* INLINE TOAST NOTIFICATION */}
+      {toastNotification && (
+        <div
+          className="position-fixed top-0 end-0 p-3"
+          style={{ zIndex: 9999 }}
+        >
+          <div
+            className={`toast show border-0 rounded-3 shadow-lg px-3 py-2.5 d-flex align-items-center gap-2.5 text-white ${
+              toastNotification.type === 'danger'
+                ? 'bg-danger'
+                : toastNotification.type === 'warning'
+                ? 'bg-warning text-dark'
+                : 'bg-dark'
+            }`}
+            style={{ minWidth: '280px', animation: 'fadeIn 0.2s ease-in-out' }}
+          >
+            <i
+              className={`fs-16 ${
+                toastNotification.type === 'danger'
+                  ? 'ti ti-alert-circle text-white'
+                  : toastNotification.type === 'warning'
+                  ? 'ti ti-alert-triangle text-dark'
+                  : 'ti ti-circle-check text-success'
+              }`}
+            ></i>
+            <span className="fs-13 fw-medium flex-grow-1">{toastNotification.message}</span>
+            <button
+              type="button"
+              className="btn-close btn-close-white ms-auto"
+              style={{ fontSize: '10px' }}
+              onClick={() => setToastNotification(null)}
+            ></button>
           </div>
         </div>
       )}

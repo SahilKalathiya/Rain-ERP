@@ -227,7 +227,15 @@ export default function QCDetailView({
                 type="button"
                 className="btn btn-sm btn-link text-decoration-none fw-semibold p-0 text-primary"
                 style={{ color: '#5b47fb' }}
-                onClick={() => onViewStockPool && onViewStockPool(entry)}
+                onClick={() => onViewStockPool && onViewStockPool({
+                  ...entry,
+                  grnId: grnId,
+                  qcId: qc.id,
+                  poId: poId,
+                  fabricName: grn?.fabricName || purchaseOrder?.items?.[0]?.fabricName || fabricName,
+                  width: expectedWidth || grn?.pannaWidth || widthFound,
+                  colorName: grn?.colorName || purchaseOrder?.items?.[0]?.colorName || (fabricName.includes('—') ? fabricName.split('—')[1].trim() : '')
+                })}
               >
                 View
               </button>
@@ -237,13 +245,23 @@ export default function QCDetailView({
           <>
             <div className="d-flex align-items-center justify-content-between py-2 border-bottom border-light fs-13">
               <div>
-                Added <strong>1900m</strong> to stock on 2026-10-07 (QC approved).
+                Added <strong>{passedQty > 0 ? `${passedQty.toFixed(1)}m` : '1900.0m'}</strong> to stock on {qc.dateTime ? qc.dateTime.split(' ')[0] : '2026-10-07'} (QC approved).
               </div>
               <button
                 type="button"
                 className="btn btn-sm btn-link text-decoration-none fw-semibold p-0 text-primary"
                 style={{ color: '#5b47fb' }}
-                onClick={() => onViewStockPool && onViewStockPool()}
+                onClick={() => onViewStockPool && onViewStockPool({
+                  grnId: grnId,
+                  qcId: qc.id,
+                  poId: poId,
+                  qty: passedQty > 0 ? passedQty : 1900,
+                  fabricName: grn?.fabricName || purchaseOrder?.items?.[0]?.fabricName || fabricName,
+                  width: expectedWidth || grn?.pannaWidth || widthFound,
+                  colorName: grn?.colorName || purchaseOrder?.items?.[0]?.colorName || (fabricName.includes('—') ? fabricName.split('—')[1].trim() : ''),
+                  source: 'QC approved',
+                  decidedAt: qc.dateTime ? qc.dateTime.split(' ')[0] : '2026-10-07'
+                })}
               >
                 View
               </button>
@@ -252,13 +270,23 @@ export default function QCDetailView({
             {damagedItem?.status === 'Reversed (treated as good)' && (
               <div className="d-flex align-items-center justify-content-between py-2 border-bottom border-light fs-13">
                 <div>
-                  Added <strong>100m</strong> to stock on 2026-10-07 (Reversed — defect overturned on review).
+                  Added <strong>{Number(damagedItem.quantity || 100).toFixed(1)}m</strong> to stock on {damagedItem.resolvedDate || '2026-10-07'} (Reversed — defect overturned on review).
                 </div>
                 <button
                   type="button"
                   className="btn btn-sm btn-link text-decoration-none fw-semibold p-0 text-primary"
                   style={{ color: '#5b47fb' }}
-                  onClick={() => onViewStockPool && onViewStockPool()}
+                  onClick={() => onViewStockPool && onViewStockPool({
+                    grnId: grnId,
+                    qcId: qc.id,
+                    poId: poId,
+                    qty: Number(damagedItem.quantity || 100),
+                    fabricName: grn?.fabricName || purchaseOrder?.items?.[0]?.fabricName || fabricName,
+                    width: expectedWidth || grn?.pannaWidth || widthFound,
+                    colorName: grn?.colorName || purchaseOrder?.items?.[0]?.colorName || (fabricName.includes('—') ? fabricName.split('—')[1].trim() : ''),
+                    source: 'Reversed — defect overturned on review',
+                    decidedAt: damagedItem.resolvedDate || '2026-10-07'
+                  })}
                 >
                   View
                 </button>

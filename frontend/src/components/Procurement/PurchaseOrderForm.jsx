@@ -1,8 +1,287 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import VendorMasterView from './VendorMasterView';
 import FabricMasterView from './FabricMasterView';
 import AddColorModal from './AddColorModal';
 import { initialColors } from '../../data/procurementData';
+
+/**
+ * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
+ * Uses a floating React Portal (fixed coordinates) to ensure the dropdown menu
+ * is never clipped by table, card, or modal boundaries and stays completely visible.
+ */
+function SearchableColorInput({
+  value = '',
+  onChange,
+  onAddNew,
+  colors = []
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(value || '');
+  const [isFocused, setIsFocused] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 240 });
+  const wrapperRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setSearchTerm(value || '');
+  }, [value]);
+
+  // Dynamically position the dropdown relative to the viewport
+  const updatePosition = () => {
+    if (wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const dropdownHeight = 250;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+
+      setCoords({
+        top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 240)
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const clickedInsideWrapper = wrapperRef.current && wrapperRef.current.contains(event.target);
+      const clickedInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+      if (!clickedInsideWrapper && !clickedInsideDropdown) {
+        setIsOpen(false);
+        setIsFocused(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const matchedColor = colors.find(
+    (c) =>
+      c.name.toLowerCase() === (value || '').toLowerCase() ||
+      c.hex.toLowerCase() === (value || '').toLowerCase()
+  );
+  const swatchHex = matchedColor
+    ? matchedColor.hex
+    : (value?.startsWith('#') ? value : '#cbd5e1');
+
+  const filteredColors = colors.filter((c) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return c.name.toLowerCase().includes(term) || c.hex.toLowerCase().includes(term);
+  });
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="position-relative"
+      style={{ minWidth: '150px' }}
+    >
+      {/* Unified Seamless Container */}
+      <div
+        className="d-flex align-items-center bg-white rounded-2"
+        style={{
+          border: (isOpen || isFocused) ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+          boxShadow: (isOpen || isFocused) ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
+          padding: '2px 8px 2px 8px',
+          height: '31px',
+          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          cursor: 'text'
+        }}
+        onClick={() => {
+          updatePosition();
+          setIsOpen(true);
+        }}
+      >
+        {/* Color Swatch */}
+        <span
+          style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '4px',
+            backgroundColor: swatchHex,
+            border: swatchHex?.toLowerCase() === '#ffffff' || swatchHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.15)',
+            display: 'inline-block',
+            flexShrink: 0,
+            marginRight: '6px',
+            cursor: 'pointer'
+          }}
+          title="Pick or edit color"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onAddNew) onAddNew();
+          }}
+        />
+
+        {/* Text Input with NO individual inner border or outline */}
+        <input
+          type="text"
+          style={{
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
+            backgroundColor: 'transparent',
+            fontSize: '13px',
+            color: '#1e293b',
+            width: '100%',
+            minWidth: 0,
+            padding: 0
+          }}
+          placeholder="Color name..."
+          value={searchTerm}
+          onFocus={() => {
+            updatePosition();
+            setIsFocused(true);
+            setIsOpen(true);
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+          }}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            onChange(e.target.value);
+            updatePosition();
+            setIsOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsOpen(false);
+          }}
+        />
+
+        {/* Integrated Chevron Icon inside the box on the right */}
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            paddingLeft: '4px',
+            color: '#64748b',
+            flexShrink: 0
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            updatePosition();
+            setIsOpen((prev) => !prev);
+          }}
+          title="Toggle color list"
+        >
+          <i
+            className={`ti ti-chevron-${isOpen ? 'up' : 'down'} fs-12`}
+            style={{ transition: 'transform 0.15s ease' }}
+          ></i>
+        </span>
+      </div>
+
+      {/* Floating Theme Dropdown Menu Portaled to Document Body */}
+      {isOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="bg-white rounded-3 border overflow-hidden"
+            style={{
+              position: 'fixed',
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              zIndex: 999999,
+              borderColor: '#e2e8f0',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)'
+            }}
+          >
+            <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="py-1">
+              {filteredColors.length > 0 ? (
+                filteredColors.map((col) => {
+                  const isSelected = (value || '').toLowerCase() === col.name.toLowerCase();
+                  return (
+                    <div
+                      key={col.id || col.name}
+                      className="d-flex align-items-center justify-content-between px-3 py-2 fs-13"
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? '#f3f0ff' : 'transparent',
+                        color: isSelected ? '#5b47fb' : '#1e293b',
+                        fontWeight: isSelected ? 600 : 400,
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => {
+                        onChange(col.name);
+                        setSearchTerm(col.name);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <span
+                          className="rounded-circle shadow-sm"
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            backgroundColor: col.hex,
+                            border:
+                              col.hex?.toLowerCase() === '#ffffff' ||
+                              col.hex?.toLowerCase() === '#fffff0'
+                                ? '1px solid #cbd5e1'
+                                : '1px solid rgba(0,0,0,0.1)',
+                            display: 'inline-block',
+                            flexShrink: 0
+                          }}
+                        />
+                        <span>{col.name}</span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="text-muted fs-11 font-monospace">{col.hex}</span>
+                        {isSelected && <i className="ti ti-check fs-14 text-primary"></i>}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="px-3 py-2.5 text-muted fs-12 text-center">
+                  No matching color found
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Action: + Add New Color */}
+            <div className="border-top p-1.5 bg-light d-flex align-items-center justify-content-between">
+              <button
+                type="button"
+                className="btn btn-sm btn-link text-decoration-none w-100 text-start px-2 py-1 fs-12 fw-semibold d-flex align-items-center gap-1.5"
+                style={{ color: '#5b47fb' }}
+                onClick={() => {
+                  setIsOpen(false);
+                  if (onAddNew) onAddNew();
+                }}
+              >
+                <i className="ti ti-plus fs-13"></i>
+                <span>Add &quot;{searchTerm || 'New Color'}&quot; to Master...</span>
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
 
 /**
  * PurchaseOrderForm - Purchase Order (PO) Creation, View & Edit Mode
@@ -80,29 +359,29 @@ export default function PurchaseOrderForm({
     bufferPercent: po?.bufferPercent || 0,
     items: (po?.items && po.items.length > 0)
       ? po.items.map((it, idx) => ({
-          id: it.id || `item-${idx + 1}`,
-          fabricId: it.fabricId || '',
-          fabricName: it.fabricName || it.fabricQuality || '',
-          colorName: it.colorName || it.color || '',
-          width: it.width || '',
-          quantity: it.quantity || '',
-          rate: it.rate || '',
-          fold: (it.fold !== undefined && it.fold !== null && it.fold !== '') ? it.fold : '',
-          amount: it.amount || (Number(it.quantity || 0) * Number(it.rate || 0)) || 0
-        }))
+        id: it.id || `item-${idx + 1}`,
+        fabricId: it.fabricId || '',
+        fabricName: it.fabricName || it.fabricQuality || '',
+        colorName: it.colorName || it.color || '',
+        width: it.width || '',
+        quantity: it.quantity || '',
+        rate: it.rate || '',
+        fold: (it.fold !== undefined && it.fold !== null && it.fold !== '') ? it.fold : '',
+        amount: it.amount || (Number(it.quantity || 0) * Number(it.rate || 0)) || 0
+      }))
       : [
-          {
-            id: `item-${Date.now()}`,
-            fabricId: '',
-            fabricName: '',
-            colorName: '',
-            width: '',
-            quantity: '',
-            rate: '',
-            fold: '',
-            amount: 0
-          }
-        ]
+        {
+          id: `item-${Date.now()}`,
+          fabricId: '',
+          fabricName: '',
+          colorName: '',
+          width: '',
+          quantity: '',
+          rate: '',
+          fold: '',
+          amount: 0
+        }
+      ]
   }));
 
   // Sync state whenever selected `po` changes
@@ -123,29 +402,29 @@ export default function PurchaseOrderForm({
         bufferPercent: po.bufferPercent || 0,
         items: (po.items && po.items.length > 0)
           ? po.items.map((it, idx) => ({
-              id: it.id || `item-${idx + 1}`,
-              fabricId: it.fabricId || '',
-              fabricName: it.fabricName || it.fabricQuality || '',
-              colorName: it.colorName || it.color || '',
-              width: it.width || '',
-              quantity: it.quantity || '',
-              rate: it.rate || '',
-              fold: (it.fold !== undefined && it.fold !== null && it.fold !== '') ? it.fold : '',
-              amount: it.amount || (Number(it.quantity || 0) * Number(it.rate || 0)) || 0
-            }))
+            id: it.id || `item-${idx + 1}`,
+            fabricId: it.fabricId || '',
+            fabricName: it.fabricName || it.fabricQuality || '',
+            colorName: it.colorName || it.color || '',
+            width: it.width || '',
+            quantity: it.quantity || '',
+            rate: it.rate || '',
+            fold: (it.fold !== undefined && it.fold !== null && it.fold !== '') ? it.fold : '',
+            amount: it.amount || (Number(it.quantity || 0) * Number(it.rate || 0)) || 0
+          }))
           : [
-              {
-                id: `item-${Date.now()}`,
-                fabricId: '',
-                fabricName: '',
-                colorName: '',
-                width: '',
-                quantity: '',
-                rate: '',
-                fold: '',
-                amount: 0
-              }
-            ]
+            {
+              id: `item-${Date.now()}`,
+              fabricId: '',
+              fabricName: '',
+              colorName: '',
+              width: '',
+              quantity: '',
+              rate: '',
+              fold: '',
+              amount: 0
+            }
+          ]
       });
       setIsEditing(false); // start in read-only view mode for existing PO
     } else {
@@ -440,23 +719,22 @@ export default function PurchaseOrderForm({
               </h4>
               {isExisting && (
                 <span
-                  className={`badge px-2 py-1 rounded-pill fs-12 fw-semibold ${
-                    formData.status === 'Sent'
+                  className={`badge px-2 py-1 rounded-pill fs-12 fw-semibold ${formData.status === 'Sent'
                       ? 'bg-primary text-white'
                       : formData.status === 'Completed'
-                      ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                      : formData.status === 'Partially Received'
-                      ? 'bg-info-subtle text-info border border-info border-opacity-25'
-                      : formData.status === 'Cancelled'
-                      ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                      : 'bg-secondary-subtle text-secondary border'
-                  }`}
+                        ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                        : formData.status === 'Partially Received'
+                          ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                          : formData.status === 'Cancelled'
+                            ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                            : 'bg-secondary-subtle text-secondary border'
+                    }`}
                 >
                   {formData.status === 'Sent'
                     ? 'Sent to Vendor'
                     : formData.status === 'Cancelled'
-                    ? 'Cancelled'
-                    : formData.status}
+                      ? 'Cancelled'
+                      : formData.status}
                 </span>
               )}
             </div>
@@ -739,17 +1017,18 @@ export default function PurchaseOrderForm({
             <div className="d-flex align-items-center gap-2">
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm px-2 py-1 fs-12"
-                onClick={() => handleOpenNewFabricModal(null)}
+                className="btn btn-outline-secondary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12 bg-white"
+                onClick={() => handleOpenNewFabricModal()}
               >
-                + New Fabric
+                <i className="ti ti-plus fs-13"></i>
+                <span>New Fabric</span>
               </button>
               <button
                 type="button"
                 className="btn btn-outline-primary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12"
                 onClick={handleAddItem}
               >
-                <i className="ti ti-plus fs-14"></i>
+                <i className="ti ti-plus fs-13"></i>
                 <span>Add Line</span>
               </button>
             </div>
@@ -757,7 +1036,7 @@ export default function PurchaseOrderForm({
         </div>
 
         {/* FULL BORDERED TABLE WITH LINES (table-bordered) */}
-        <div className="table-responsive" style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="table-responsive" style={{ overflow: 'visible', minHeight: '300px', paddingBottom: '100px', marginBottom: '-100px' }}>
           <table
             className="table table-bordered align-middle mb-0 fs-13"
             style={{
@@ -769,26 +1048,25 @@ export default function PurchaseOrderForm({
           >
             <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
               <tr style={{ color: '#475569', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                <th style={{ width: '23%', minWidth: '160px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                  <div className="d-flex align-items-center justify-content-between gap-2" style={{ whiteSpace: 'nowrap' }}>
-                    <span style={{ whiteSpace: 'nowrap' }}>FABRIC QUALITY *</span>
+                <th style={{ width: '23%', minWidth: '170px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <span>FABRIC QUALITY *</span>
                     {isEditing && (
                       <button
                         type="button"
-                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
-                        style={{ color: '#5b47fb', whiteSpace: 'nowrap' }}
-                        onClick={() => handleOpenNewFabricModal(null)}
-                        title="Add New Fabric"
+                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-medium"
+                        onClick={() => handleOpenNewFabricModal()}
+                        title="Add new fabric to master"
                       >
                         + New Fabric
                       </button>
                     )}
                   </div>
                 </th>
-                <th style={{ width: '18%', minWidth: '130px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                <th style={{ width: '18%', minWidth: '160px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                   COLOR NAME
                 </th>
-                <th style={{ width: '11%', minWidth: '85px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-start">
+                <th style={{ width: '13%', minWidth: '115px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-start">
                   WIDTH (PANNA) *
                 </th>
                 <th style={{ width: '12%', minWidth: '95px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
@@ -797,7 +1075,7 @@ export default function PurchaseOrderForm({
                 <th style={{ width: '11%', minWidth: '90px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
                   RATE / MTR (₹) *
                 </th>
-                <th style={{ width: '9%', minWidth: '70px', padding: '10px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                <th style={{ width: '10%', minWidth: '90px', padding: '10px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
                   FOLD %
                 </th>
                 <th style={{ width: '12%', minWidth: '100px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-end">
@@ -845,71 +1123,29 @@ export default function PurchaseOrderForm({
                       )}
                     </td>
 
-                    {/* Color Name (Color Master integration) */}
+                    {/* Color Name (Custom Searchable Combobox with Theme Styling) */}
                     <td style={{ border: '1px solid #dee2e6', padding: '6px 8px' }}>
-                      {(() => {
-                        const matchedColor = masterColorList.find(
-                          (c) =>
-                            c.name.toLowerCase() === (row.colorName || '').toLowerCase() ||
-                            c.hex.toLowerCase() === (row.colorName || '').toLowerCase()
-                        );
-                        const swatchHex = matchedColor
-                          ? matchedColor.hex
-                          : row.colorName?.startsWith('#')
-                          ? row.colorName
-                          : '#cbd5e1';
-
-                        return isEditing ? (
-                          <div className="d-flex align-items-center gap-1.5">
-                            {/* Color Swatch Dot/Square */}
-                            <div
-                              style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '4px',
-                                backgroundColor: swatchHex,
-                                border: '1px solid #cbd5e1',
-                                flexShrink: 0,
-                                cursor: 'pointer'
-                              }}
-                              title="Click to pick or add color"
-                              onClick={() => handleOpenNewColorModal(row.id)}
-                            />
-
-                            {/* Dropdown with all Color Master options */}
-                            <select
-                              className="form-select form-select-sm bg-light fs-13 flex-grow-1"
-                              style={{ borderColor: '#cbd5e1' }}
-                              value={row.colorName || ''}
-                              onChange={(e) => {
-                                if (e.target.value === '__NEW_COLOR__') {
-                                  handleOpenNewColorModal(row.id);
-                                } else {
-                                  handleItemChange(row.id, 'colorName', e.target.value);
-                                }
-                              }}
-                            >
-                              <option value="">Select color...</option>
-                              {masterColorList.map((col) => (
-                                <option key={col.id || col.name} value={col.name}>
-                                  {col.name} ({col.hex})
-                                </option>
-                              ))}
-                              {row.colorName &&
-                                !masterColorList.some((c) => c.name === row.colorName) && (
-                                  <option value={row.colorName}>{row.colorName}</option>
-                                )}
-                              <option
-                                value="__NEW_COLOR__"
-                                style={{ color: '#5b47fb', fontWeight: 'bold' }}
-                              >
-                                + Add New Color...
-                              </option>
-                            </select>
-                          </div>
-                        ) : (
-                          <div className="d-flex align-items-center gap-2">
-                            {row.colorName && (
+                      {isEditing ? (
+                        <SearchableColorInput
+                          value={row.colorName || ''}
+                          colors={masterColorList}
+                          onChange={(newColorName) => handleItemChange(row.id, 'colorName', newColorName)}
+                          onAddNew={() => handleOpenNewColorModal(row.id)}
+                        />
+                      ) : (
+                        <div className="d-flex align-items-center gap-2">
+                          {row.colorName && (() => {
+                            const matchedColor = masterColorList.find(
+                              (c) =>
+                                c.name.toLowerCase() === (row.colorName || '').toLowerCase() ||
+                                c.hex.toLowerCase() === (row.colorName || '').toLowerCase()
+                            );
+                            const swatchHex = matchedColor
+                              ? matchedColor.hex
+                              : row.colorName?.startsWith('#')
+                                ? row.colorName
+                                : '#cbd5e1';
+                            return (
                               <span
                                 className="d-inline-block rounded-circle"
                                 style={{
@@ -920,11 +1156,11 @@ export default function PurchaseOrderForm({
                                   flexShrink: 0
                                 }}
                               />
-                            )}
-                            <span className="text-dark fw-medium">{row.colorName || '—'}</span>
-                          </div>
-                        );
-                      })()}
+                            );
+                          })()}
+                          <span className="text-dark fw-medium">{row.colorName || '—'}</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Width (Panna) - Left-aligned text & variables */}
@@ -933,11 +1169,11 @@ export default function PurchaseOrderForm({
                         allowedWidths.length > 1 ? (
                           <select
                             className="form-select form-select-sm bg-light fs-13 text-start"
-                            style={{ borderColor: '#cbd5e1' }}
+                            style={{ borderColor: '#cbd5e1', paddingRight: '22px' }}
                             value={row.width || ''}
                             onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
                           >
-                            <option value="">Select width...</option>
+                            <option value="">Select...</option>
                             {allowedWidths.map((w) => (
                               <option key={w} value={w}>
                                 {w}"
@@ -949,7 +1185,7 @@ export default function PurchaseOrderForm({
                             type="text"
                             className="form-control form-control-sm bg-light fs-13 text-start"
                             style={{ borderColor: '#cbd5e1' }}
-                            placeholder="e.g. 44"
+                            placeholder="44"
                             value={row.width || ''}
                             onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
                           />
@@ -1005,7 +1241,7 @@ export default function PurchaseOrderForm({
                           step="any"
                           className="form-control form-control-sm bg-light fs-13 text-center no-spinner"
                           style={{ borderColor: '#cbd5e1' }}
-                          placeholder="e.g. 100"
+                          placeholder="100%"
                           value={row.fold ?? ''}
                           onChange={(e) => handleItemChange(row.id, 'fold', e.target.value)}
                         />

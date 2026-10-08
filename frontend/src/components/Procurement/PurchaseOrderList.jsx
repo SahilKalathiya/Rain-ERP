@@ -28,6 +28,41 @@ export default function PurchaseOrderList({
     return found ? found.name : (po.vendorId || 'Unknown Vendor');
   };
 
+function parseDateForSort(d, id) {
+  if (!d) {
+    if (id) {
+      const match = String(id).match(/\d+/g);
+      if (match) return Number(match.join(''));
+    }
+    return 0;
+  }
+  if (typeof d === 'number') return d;
+  const str = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const time = new Date(str).getTime();
+    if (!isNaN(time)) return time;
+  }
+  const parts = str.split(/[\/\- :]/);
+  if (parts.length >= 3) {
+    let day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
+    let year = parseInt(parts[2], 10);
+    if (parts[0].length === 4) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2], 10);
+    } else if (year < 100) {
+      year += 2000;
+    }
+    const hour = parts[3] ? parseInt(parts[3], 10) : 0;
+    const min = parts[4] ? parseInt(parts[4], 10) : 0;
+    const dt = new Date(year, month, day, hour, min);
+    if (!isNaN(dt.getTime())) return dt.getTime();
+  }
+  const timestamp = Date.parse(str);
+  return isNaN(timestamp) ? 0 : timestamp;
+}
+
   const filtered = purchaseOrders.filter((po) => {
     if (!po) return false;
     const vName = getVendorName(po);
@@ -52,6 +87,13 @@ export default function PurchaseOrderList({
       (!colFilters.status || po.status === colFilters.status);
 
     return matchesSearch && matchesCol;
+  });
+
+  const sortedList = [...filtered].sort((a, b) => {
+    const timeA = parseDateForSort(a.date || a.createdDate, a.id);
+    const timeB = parseDateForSort(b.date || b.createdDate, b.id);
+    if (timeB !== timeA) return timeB - timeA;
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
   });
 
   return (
@@ -84,13 +126,24 @@ export default function PurchaseOrderList({
       {/* Table Card */}
       <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-          <div className="input-group" style={{ maxWidth: '360px' }}>
-            <span className="input-group-text bg-light border-end-0 text-muted">
-              <i className="ti ti-search fs-15"></i>
-            </span>
+          <div className="position-relative" style={{ maxWidth: '360px', width: '100%' }}>
+            <i
+              className="ti ti-search position-absolute text-muted fs-15"
+              style={{
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}
+            ></i>
             <input
               type="text"
-              className="form-control bg-light border-start-0 fs-13"
+              className="form-control bg-light fs-13 search-input-integrated"
+              style={{
+                borderRadius: '8px',
+                borderColor: '#e2e8f0'
+              }}
               placeholder="Search PO number, vendor, fabric..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -120,7 +173,7 @@ export default function PurchaseOrderList({
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {sortedList.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="text-center py-5 text-muted">
                     <i className="ti ti-file-off fs-32 d-block mb-2"></i>
@@ -128,8 +181,13 @@ export default function PurchaseOrderList({
                   </td>
                 </tr>
               ) : (
-                filtered.map((po) => (
-                  <tr key={po.id}>
+                sortedList.map((po) => (
+                  <tr
+                    key={po.id}
+                    style={{ cursor: 'pointer' }}
+                    className="hover-bg-light"
+                    onClick={() => onSelectPO && onSelectPO(po)}
+                  >
                     <td className="fw-bold text-primary font-monospace">{po.id}</td>
                     <td>{po.date ? (typeof po.date === 'string' && po.date.includes('T') ? po.date.split('T')[0] : String(po.date)) : '-'}</td>
                     <td>
@@ -195,7 +253,10 @@ export default function PurchaseOrderList({
                               whiteSpace: 'nowrap'
                             }}
                             title="Create Inward Delivery GRN for this PO"
-                            onClick={() => onInwardGRN && onInwardGRN(po)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onInwardGRN) onInwardGRN(po);
+                            }}
                           >
                             <i className="ti ti-package fs-13"></i>
                             <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
@@ -206,7 +267,10 @@ export default function PurchaseOrderList({
                           className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
                           style={{ width: '32px', height: '32px' }}
                           title="View / Edit PO Details"
-                          onClick={() => onSelectPO && onSelectPO(po)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onSelectPO) onSelectPO(po);
+                          }}
                         >
                           <i className="ti ti-eye fs-15"></i>
                         </button>
@@ -215,7 +279,10 @@ export default function PurchaseOrderList({
                           className="btn btn-outline-secondary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
                           style={{ width: '32px', height: '32px' }}
                           title="Print PO Invoice"
-                          onClick={() => onPrintPO && onPrintPO(po)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPrintPO) onPrintPO(po);
+                          }}
                         >
                           <i className="ti ti-printer fs-15"></i>
                         </button>

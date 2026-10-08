@@ -102,13 +102,25 @@ export default function ActivityHistoryModal({ logs = [], onClose }) {
 
           {/* Search & Module Filters */}
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 bg-light p-2.5 rounded-3 border">
-            <div className="input-group" style={{ maxWidth: '340px' }}>
-              <span className="input-group-text bg-white border-end-0 text-muted">
-                <i className="ti ti-search fs-14"></i>
-              </span>
+            <div className="position-relative" style={{ maxWidth: '340px', width: '100%' }}>
+              <i
+                className="ti ti-search position-absolute text-muted fs-14"
+                style={{
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  zIndex: 2
+                }}
+              ></i>
               <input
                 type="text"
-                className="form-control form-control-sm bg-white border-start-0 fs-12"
+                className="form-control form-control-sm bg-white fs-12"
+                style={{
+                  paddingLeft: '36px',
+                  borderRadius: '6px',
+                  borderColor: '#cbd5e1'
+                }}
                 placeholder="Search user, record number, field..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

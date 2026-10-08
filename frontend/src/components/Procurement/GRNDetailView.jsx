@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * GRNDetailView - Step 3: GRN Details
  * Displays Receipt details, Bale-wise breakdown (with locked/editable status),
  * Quality check by item card (clickable), and audit History.
- * Matches User Screenshots 2 & 3 and Demo line 1881.
+ * Supports Edit Header modal matching the exact specifications with all 10 receipt-level fields.
  */
 export default function GRNDetailView({
   grn,
@@ -19,12 +19,34 @@ export default function GRNDetailView({
 }) {
   const [showEditHeaderModal, setShowEditHeaderModal] = useState(false);
   const [editHeaderForm, setEditHeaderForm] = useState({
-    challan: grn?.vendorChallanNo || '',
-    challanDate: grn?.vendorChallanDate || '',
-    invoice: grn?.vendorInvoiceNo || '',
-    invoiceDate: grn?.vendorInvoiceDate || '',
-    invoiceValue: grn?.invoiceValue || ''
+    challan: '',
+    challanDate: '',
+    invoice: '',
+    invoiceDate: '',
+    invoiceValue: '',
+    transporter: '',
+    lrNumber: '',
+    lrDate: '',
+    weightKg: '',
+    foldingCms: ''
   });
+
+  useEffect(() => {
+    if (grn) {
+      setEditHeaderForm({
+        challan: grn.vendorChallanNo || '',
+        challanDate: grn.vendorChallanDate ? (typeof grn.vendorChallanDate === 'string' && grn.vendorChallanDate.includes('T') ? grn.vendorChallanDate.split('T')[0] : grn.vendorChallanDate) : '',
+        invoice: grn.vendorInvoiceNo || '',
+        invoiceDate: grn.vendorInvoiceDate ? (typeof grn.vendorInvoiceDate === 'string' && grn.vendorInvoiceDate.includes('T') ? grn.vendorInvoiceDate.split('T')[0] : grn.vendorInvoiceDate) : '',
+        invoiceValue: grn.invoiceValue !== undefined && grn.invoiceValue !== null ? String(grn.invoiceValue) : (grn.totalAmount ? String(grn.totalAmount) : ''),
+        transporter: grn.transporterName || grn.transporterId || '',
+        lrNumber: grn.lrNumber || grn.lrNo || '',
+        lrDate: grn.lrDate ? (typeof grn.lrDate === 'string' && grn.lrDate.includes('T') ? grn.lrDate.split('T')[0] : grn.lrDate) : '',
+        weightKg: grn.weightKg !== undefined && grn.weightKg !== null ? String(grn.weightKg) : (grn.weight ? String(grn.weight) : ''),
+        foldingCms: grn.foldingCms !== undefined && grn.foldingCms !== null ? String(grn.foldingCms) : (grn.fabricFolding ? String(grn.fabricFolding) : '')
+      });
+    }
+  }, [grn, showEditHeaderModal]);
 
   if (!grn) {
     return (
@@ -48,6 +70,23 @@ export default function GRNDetailView({
   // Find transporter
   const transporterObj = transporters.find((t) => t.id === grn.transporterId || t.name === grn.transporterName);
 
+  // Build full transporter options
+  const defaultTransporterOptions = [
+    'Bhiwandi Roadlines',
+    'Keshav Freight Carriers',
+    'Masood Transport Broker',
+    'Surat Gujarat Transport',
+    'Jaipur Golden Transport',
+    'V-Trans India Ltd.'
+  ];
+  const allTransporterNames = Array.from(
+    new Set([
+      ...transporters.map((t) => t.name).filter(Boolean),
+      ...defaultTransporterOptions,
+      grn.transporterName
+    ].filter(Boolean))
+  );
+
   // Find QC record for this GRN
   const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
   const mainQC = qcRecs[0];
@@ -57,11 +96,11 @@ export default function GRNDetailView({
   // Calculate bales total
   const bales = grn.bales || [];
   const totalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
-  const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || 1;
+  const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || (bales.length * 10) || 1;
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
-  const expectedFold = mainQC?.expectedFold || linkedPO?.items?.[0]?.fold || '100';
+  const expectedFold = mainQC?.expectedFold || grn.foldingCms || linkedPO?.items?.[0]?.fold || '100';
 
   const handleSaveHeader = (e) => {
     e.preventDefault();
@@ -72,7 +111,14 @@ export default function GRNDetailView({
         vendorChallanDate: editHeaderForm.challanDate,
         vendorInvoiceNo: editHeaderForm.invoice,
         vendorInvoiceDate: editHeaderForm.invoiceDate,
-        invoiceValue: editHeaderForm.invoiceValue
+        invoiceValue: editHeaderForm.invoiceValue,
+        transporterName: editHeaderForm.transporter,
+        lrNumber: editHeaderForm.lrNumber,
+        lrDate: editHeaderForm.lrDate,
+        weightKg: editHeaderForm.weightKg,
+        weight: editHeaderForm.weightKg,
+        foldingCms: editHeaderForm.foldingCms,
+        fabricFolding: editHeaderForm.foldingCms
       });
     }
     setShowEditHeaderModal(false);
@@ -115,7 +161,7 @@ export default function GRNDetailView({
         </div>
       </div>
 
-      {/* CARD 1: Receipt details (Matches Screenshot 2) */}
+      {/* CARD 1: Receipt details */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
         <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
           <h5 className="fw-bold text-dark mb-0 fs-16">Receipt details</h5>
@@ -124,6 +170,7 @@ export default function GRNDetailView({
             className="btn btn-outline-secondary btn-sm px-3 py-1 rounded-3 fs-12 fw-medium"
             onClick={() => setShowEditHeaderModal(true)}
           >
+            <i className="ti ti-edit me-1"></i>
             Edit
           </button>
         </div>
@@ -135,24 +182,46 @@ export default function GRNDetailView({
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR CHALLAN</div>
-            <div className="fw-bold text-dark">{grn.vendorChallanNo || '—'}</div>
+            <div className="fw-bold text-dark">
+              {grn.vendorChallanNo || '—'}
+              {grn.vendorChallanDate && (
+                <div className="text-muted fs-11 fw-normal">{grn.vendorChallanDate}</div>
+              )}
+            </div>
           </div>
           <div className="col-6 col-sm-4 col-md-3">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR INVOICE</div>
-            <div className="fw-bold text-dark">{grn.vendorInvoiceNo || '—'}</div>
+            <div className="fw-bold text-dark">
+              {grn.vendorInvoiceNo || '—'}
+              {grn.vendorInvoiceDate && (
+                <div className="text-muted fs-11 fw-normal">{grn.vendorInvoiceDate}</div>
+              )}
+              {grn.invoiceValue && (
+                <div className="text-success fs-11 fw-semibold">₹{Number(grn.invoiceValue).toLocaleString()}</div>
+              )}
+            </div>
           </div>
           <div className="col-6 col-sm-4 col-md-3">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TRANSPORTER</div>
-            <div className="fw-bold text-dark">{transporterObj?.name || grn.transporterName || 'Bhiwandi Roadlines'}</div>
+            <div className="fw-bold text-dark">{grn.transporterName || transporterObj?.name || 'Bhiwandi Roadlines'}</div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">LR NO. / DATE</div>
-            <div className="fw-bold text-dark">{grn.lrNumber || '—'}</div>
+            <div className="fw-bold text-dark">
+              {grn.lrNumber || '—'}
+              {grn.lrDate && (
+                <div className="text-muted fs-11 fw-normal">{grn.lrDate}</div>
+              )}
+            </div>
           </div>
 
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">WEIGHT</div>
-            <div className="fw-bold text-dark">{grn.weight || '450'} kg</div>
+            <div className="fw-bold text-dark">{grn.weightKg || grn.weight || '—'} kg</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-2">
+            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">FABRIC FOLDING</div>
+            <div className="fw-bold text-dark">{grn.foldingCms || grn.fabricFolding || expectedFold || '—'} cms</div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL QUANTITY</div>
@@ -160,12 +229,16 @@ export default function GRNDetailView({
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">NO. OF BALES</div>
-            <div className="fw-bold text-dark">{bales.length || grn.totalBales || 2}</div>
+            <div className="fw-bold text-dark">{bales.length || grn.totalBales || 0}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-2">
+            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL PIECES</div>
+            <div className="fw-bold text-dark">{totalPiecesCount}</div>
           </div>
         </div>
       </div>
 
-      {/* CARD 2: Bale-wise breakdown (Matches Screenshot 2) */}
+      {/* CARD 2: Bale-wise breakdown */}
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
         <div className="card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between">
           <h5 className="fw-bold text-dark mb-0 fs-16">Bale-wise breakdown</h5>
@@ -183,364 +256,320 @@ export default function GRNDetailView({
 
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary fs-12 text-uppercase fw-bold" style={{ letterSpacing: '0.3px' }}>
+            <thead className="table-light text-secondary fs-12 text-uppercase fw-bold">
               <tr>
-                <th className="ps-4 py-3" style={{ width: '120px' }}>BALE NO.</th>
-                <th className="py-3">FABRIC ITEM</th>
-                <th className="py-3 text-center" style={{ width: '120px' }}>PIECES</th>
-                <th className="py-3 text-end" style={{ width: '150px' }}>METERS</th>
-                <th className="pe-4 py-3 text-center" style={{ width: '130px' }}>STATUS</th>
+                <th className="ps-4 py-3" style={{ minWidth: '100px' }}>BALE NO.</th>
+                <th className="py-3" style={{ minWidth: '220px' }}>FABRIC ITEM</th>
+                <th className="py-3 text-center" style={{ minWidth: '90px' }}>PIECES</th>
+                <th className="py-3 text-end" style={{ minWidth: '120px' }}>METERS</th>
+                <th className="py-3 text-center" style={{ minWidth: '120px' }}>QC STATUS</th>
+                <th className="pe-4 py-3 text-end" style={{ minWidth: '110px' }}>LOCK STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {bales.length > 0 ? (
-                bales.map((b, idx) => {
-                  const bMeters = (b.pieces || []).reduce((s, p) => {
-                    const raw = typeof p === 'object' && p !== null ? (p.length ?? p.meter ?? p.meters ?? 0) : p;
-                    const num = parseFloat(raw);
-                    return s + (isNaN(num) ? 0 : num);
-                  }, 0);
-                  const isLocked = Boolean(grn.isQcActioned);
-                  const formattedMeters = Number((Math.round(bMeters * 100) / 100).toFixed(2));
+              {bales.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-4 text-muted">
+                    No bales entered yet.
+                  </td>
+                </tr>
+              ) : (
+                bales.map((bale, idx) => {
+                  const bNo = bale.baleNo || `Bale ${idx + 1}`;
+                  const fabricLabel = bale.fabricItemLabel || bale.fabric || grn.fabricName || 'Grey Cotton Rayon';
+                  const pcsCount = bale.pieces?.length || bale.piecesCount || 2;
+                  const bMeters = bale.totalLength || (bale.pieces || []).reduce((s, p) => s + (Number(p.length) || 0), 0) || 200;
+                  const isQcLocked = !anyPending || bale.qcStatus === 'Approved' || bale.qcStatus === 'OK';
 
                   return (
                     <tr key={idx}>
-                      <td className="ps-4 py-3 fw-bold text-dark">{b.baleNo || `${idx + 1}`}</td>
-                      <td className="py-3 text-secondary fw-medium">
-                        {grn.fabricName || 'Tussar Silk (42") — Ivory'}
+                      <td className="ps-4 py-3 fw-bold text-dark">{bNo}</td>
+                      <td className="py-3 text-secondary">{fabricLabel}</td>
+                      <td className="py-3 text-center">{pcsCount}</td>
+                      <td className="py-3 text-end fw-semibold text-dark">{Number(bMeters).toFixed(1)}m</td>
+                      <td className="py-3 text-center">
+                        <span
+                          className={`badge rounded-pill px-2.5 py-1 fs-11 ${
+                            isQcLocked
+                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                          }`}
+                        >
+                          {bale.qcStatus || (isQcLocked ? 'QC Approved' : 'Pending QC')}
+                        </span>
                       </td>
-                      <td className="py-3 text-center fw-semibold">{(b.pieces || []).length}</td>
-                      <td className="py-3 text-end fw-bold text-dark">{formattedMeters}m</td>
-                      <td className="pe-4 py-3 text-center">
-                        {isLocked ? (
-                          <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
-                            <i className="ti ti-lock text-warning fs-11"></i> locked
-                          </span>
-                        ) : (
-                          <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
-                            editable
-                          </span>
-                        )}
+                      <td className="pe-4 py-3 text-end">
+                        <span
+                          className={`badge rounded-pill px-2.5 py-1 fs-11 ${
+                            isQcLocked
+                              ? 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
+                              : 'bg-info-subtle text-info border border-info border-opacity-25'
+                          }`}
+                        >
+                          <i className={`ti ${isQcLocked ? 'ti-lock' : 'ti-pencil'} me-1 fs-10`}></i>
+                          {isQcLocked ? 'Locked (QC done)' : 'Editable'}
+                        </span>
                       </td>
                     </tr>
                   );
                 })
-              ) : (
-                <>
-                  <tr>
-                    <td className="ps-4 py-3 fw-bold text-dark">1</td>
-                    <td className="py-3 text-secondary fw-medium">{grn.fabricName || 'Tussar Silk (42") — Ivory'}</td>
-                    <td className="py-3 text-center fw-semibold">2</td>
-                    <td className="py-3 text-end fw-bold text-dark">200m</td>
-                    <td className="pe-4 py-3 text-center">
-                      <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
-                        <i className="ti ti-lock text-warning fs-11"></i> locked
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="ps-4 py-3 fw-bold text-dark">2</td>
-                    <td className="py-3 text-secondary fw-medium">{grn.fabricName || 'Tussar Silk (42") — Ivory'}</td>
-                    <td className="py-3 text-center fw-semibold">5</td>
-                    <td className="py-3 text-end fw-bold text-dark">1800m</td>
-                    <td className="pe-4 py-3 text-center">
-                      <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
-                        <i className="ti ti-lock text-warning fs-11"></i> locked
-                      </span>
-                    </td>
-                  </tr>
-                </>
               )}
             </tbody>
           </table>
         </div>
-
-        <div className="card-footer bg-white border-top p-3 text-muted fs-12">
-          {grn.isQcActioned
-            ? 'All items in this GRN have been QC-actioned — bale entries are now locked.'
-            : 'Bales for items still awaiting Quality Check remain editable. Once QC is actioned on an item, its bales lock automatically.'}
-        </div>
       </div>
 
-      {/* CARD 3: Quality check — by item (Matches Screenshot 2 & 3 - Clickable!) */}
+      {/* CARD 3: Quality Check by Item (Clickable - Redirects to QC inspection) */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-1 fs-16">Quality check — by item</h5>
-        <p className="text-secondary fs-12 mb-3">
-          This shipment contains 1 distinct fabric/width line item(s). Each is checked and approved independently.
-        </p>
-
-        {/* Clickable QC Card */}
+        <h5 className="fw-bold text-dark mb-3 fs-16">Quality check by item</h5>
         <div
-          className="card border rounded-3 p-3.5 bg-white shadow-2xs hover-shadow transition-all"
-          style={{ cursor: 'pointer', transition: 'all 0.2s ease', borderColor: '#e2e8f0' }}
-          onClick={() => {
-            if (onSelectQCItem) {
-              onSelectQCItem(mainQC || {
-                id: `QC-${grn.id.replace('GRN-', '')}`,
-                grnRef: grn.id,
-                inspectorName: 'Wedc',
-                qcStatus: 'OK',
-                totalReceivedMeters: totalMeters,
-                goodQty: totalMeters,
-                heldBackQty: 0,
-                expectedWidth: expectedWidth,
-                expectedFold: expectedFold,
-                decidedAt: grn.date || '2026-10-07'
-              });
-            }
-          }}
+          className="border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white"
+          style={{ borderColor: '#e2e8f0' }}
         >
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-            <div>
-              <div className="fw-bold text-dark fs-15">
-                {grn.fabricName || 'Tussar Silk — 42" • Ivory'}
-              </div>
-              <div className="text-secondary fs-12 mt-0.5">
-                Received: <strong>{totalMeters}m</strong> · Expected width {expectedWidth}, expected fold {expectedFold}%
-              </div>
-            </div>
-
-            <div className="d-flex align-items-center gap-2">
-              <span
-                className={`badge px-2.5 py-1 fs-11 rounded-pill ${
-                  (mainQC?.qcStatus === 'OK' || grn.status === 'Completed')
-                    ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                    : mainQC?.qcStatus === 'Reject'
-                    ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                    : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
-                }`}
-              >
-                {mainQC?.qcStatus || (grn.status === 'Completed' ? 'OK' : 'Pending')}
-              </span>
-              <i className="ti ti-chevron-right fs-15 text-muted"></i>
-            </div>
-          </div>
-
-          <div className="text-muted fs-12 pt-2 border-top border-light">
-            {mainQC && mainQC.qcStatus !== 'Pending' ? (
-              <span>Checked by <strong>{mainQC.inspectorName || 'Wedc'}</strong> on {mainQC.decidedAt || grn.date || '2026-10-07'}</span>
-            ) : (
-              <span className="text-primary fw-medium" style={{ color: '#5b47fb' }}>
-                <i className="ti ti-click me-1"></i> Awaiting quality check — click to run inspection
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* CARD 4: History & Activity Timeline */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3">
           <div className="d-flex align-items-center gap-3">
             <div
-              className="d-flex align-items-center justify-content-center rounded-3"
-              style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)', color: '#5b47fb' }}
+              className="rounded-3 p-2.5 d-flex align-items-center justify-content-center flex-shrink-0"
+              style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}
             >
-              <i className="ti ti-history fs-20"></i>
+              <i className="ti ti-checklist fs-22"></i>
             </div>
             <div>
-              <h5 className="fw-bold text-dark mb-0 fs-16">Audit History &amp; Activity Log</h5>
-              <p className="text-muted mb-0 fs-12">Complete chronological record of inward receipt, pieces entered, and QC dispatch</p>
+              <div className="fw-bold text-dark fs-15 mb-0.5">
+                {grn.fabricName || 'Modal Satin Premium'} · {String(expectedWidth).replace(/"/g, '')}&quot;
+              </div>
+              <div className="text-secondary fs-13 mb-1">
+                Received: <strong>{totalMeters}m</strong> · Expected width {String(expectedWidth).replace(/"/g, '')}, expected fold {String(expectedFold).replace(/%/g, '')}%
+              </div>
+              <div className="d-inline-flex align-items-center gap-1.5 fs-13 text-secondary">
+                <i className="ti ti-sparkles fs-15" style={{ color: '#5b47fb' }}></i>
+                <span>
+                  {mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
+                    ? 'QC Inspection Completed'
+                    : 'Awaiting quality check'}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <span className="badge px-3 py-1.5 rounded-pill bg-light text-secondary border fs-11 fw-medium">
-              <i className="ti ti-shield-check me-1 text-success"></i> Verified Audit Trail
+
+          <div className="d-flex align-items-center gap-3">
+            <span
+              className={`badge rounded-pill px-3 py-1.5 fs-12 fw-semibold ${
+                mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
+                  ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                  : mainQC?.qcStatus === 'Reject' || mainQC?.qcStatus === 'Rejected'
+                  ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                  : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+              }`}
+            >
+              {mainQC?.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC')}
             </span>
-          </div>
-        </div>
-
-        <div className="position-relative ps-4 ms-2" style={{ borderLeft: '2px dashed #cbd5e1' }}>
-          {/* Event 1: Submitted to Quality Check */}
-          <div className="position-relative mb-4 pb-2">
-            <div
-              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
-              style={{
-                width: '32px',
-                height: '32px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                left: '-33px',
-                top: '0px',
-                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+            <button
+              type="button"
+              className="btn btn-sm btn-primary rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white"
+              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+              onClick={() => {
+                if (onSelectQCItem) {
+                  onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
+                }
               }}
             >
-              <i className="ti ti-check fs-14 fw-bold"></i>
-            </div>
-
-            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div className="d-flex align-items-center gap-2">
-                  <span className="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
-                    Submitted to Quality Check
-                  </span>
-                  <span className="badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11">
-                    {Number(grn.totalMetersEntered || grn.declaredTotalMeters || 2000).toLocaleString()}m
-                  </span>
-                </div>
-                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
-                  <i className="ti ti-clock fs-12 text-primary"></i>
-                  <span>07 Oct 2026, 11:36 am</span>
-                </div>
-              </div>
-
-              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
-                Inward delivery confirmed. <strong>{Number(grn.totalMetersEntered || grn.declaredTotalMeters || 2000).toLocaleString()}m</strong> across {totalPiecesCount} pieces queued for inspection.
-              </p>
-
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
-                <div className="d-flex align-items-center gap-2">
-                  <div
-                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
-                    style={{ width: '26px', height: '26px', backgroundColor: '#5b47fb' }}
-                  >
-                    S
-                  </div>
-                  <div className="fs-12 text-secondary">
-                    Handled by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser)</span>
-                  </div>
-                </div>
-                <div className="d-flex align-items-center gap-3 fs-12 text-muted">
-                  <span>Vendor: <strong className="text-dark">{grn.vendorName || 'M.S. Textiles'}</strong></span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Event 2: GRN Created */}
-          <div className="position-relative">
-            <div
-              className="position-absolute rounded-circle d-flex align-items-center justify-content-center text-white"
-              style={{
-                width: '32px',
-                height: '32px',
-                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                left: '-33px',
-                top: '0px',
-                boxShadow: '0 4px 10px rgba(59, 130, 246, 0.25)'
-              }}
-            >
-              <i className="ti ti-file-plus fs-14"></i>
-            </div>
-
-            <div className="card border p-3 rounded-3 shadow-none bg-body-tertiary" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div className="d-flex align-items-center gap-2">
-                  <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fs-12 fw-semibold">
-                    GRN Created Against {linkedPoId || 'PO-1001'}
-                  </span>
-                  <span className="badge bg-white text-secondary border px-2 py-1 rounded-2 fs-11">
-                    {grn.id}
-                  </span>
-                </div>
-                <div className="d-flex align-items-center gap-1.5 text-muted fs-11 font-monospace bg-white px-2 py-1 rounded border">
-                  <i className="ti ti-clock fs-12 text-primary"></i>
-                  <span>07 Oct 2026, 11:23 am</span>
-                </div>
-              </div>
-
-              <p className="text-dark fs-13 mb-3" style={{ lineHeight: '1.5' }}>
-                Generated goods received note from supplier <strong>{grn.vendorName || 'M.S. Textiles'}</strong>. Challan #{grn.challanNo || 'CH-8821'}.
-              </p>
-
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-slate-200">
-                <div className="d-flex align-items-center gap-2">
-                  <div
-                    className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-11"
-                    style={{ width: '26px', height: '26px', backgroundColor: '#0284c7' }}
-                  >
-                    S
-                  </div>
-                  <div className="fs-12 text-secondary">
-                    Created by: <strong className="text-dark">Saksham Garg</strong> <span className="text-muted">(Merchandiser)</span>
-                  </div>
-                </div>
-                <div className="text-muted fs-11">
-                  PO Reference: <span className="fw-semibold text-dark">{linkedPoId || 'PO-1001'}</span>
-                </div>
-              </div>
-            </div>
+              <span>{mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved' ? 'View QC' : 'Run Inspection'}</span>
+              <i className="ti ti-arrow-right fs-13"></i>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Edit Header Modal */}
+      {/* ========================================================================= */}
+      {/* EDIT HEADER MODAL (Matches User Image 2 with all 10 Receipt-level fields) */}
+      {/* ========================================================================= */}
       {showEditHeaderModal && (
         <div
           className="modal fade show d-block"
           tabIndex="-1"
           style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(3px)', zIndex: 1060 }}
         >
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '440px' }}>
+            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden bg-white" style={{ border: '1px solid #e2e8f0' }}>
               <form onSubmit={handleSaveHeader}>
-                <div className="modal-header border-0 pb-0 pt-4 px-4 d-flex align-items-center justify-content-between">
+                {/* Modal Header */}
+                <div className="modal-header border-0 pb-1 pt-3.5 px-4 d-flex align-items-center justify-content-between">
                   <div>
-                    <h5 className="modal-title fw-bold text-dark fs-17 mb-0">Edit {grn.id} header</h5>
-                    <div className="text-muted fs-11">Bale/piece quantities are locked — only receipt-level fields can change here.</div>
+                    <h5 className="modal-title fw-bold text-dark fs-17 mb-0" style={{ letterSpacing: '-0.2px' }}>
+                      Edit {grn.id} header
+                    </h5>
+                    <div className="text-secondary fs-11 mt-0.5" style={{ lineHeight: '1.4' }}>
+                      Bale/piece quantities are locked — only receipt-level fields can change here.
+                    </div>
                   </div>
                   <button
                     type="button"
-                    className="btn-close"
+                    className="btn-close fs-12 text-muted"
                     onClick={() => setShowEditHeaderModal(false)}
+                    aria-label="Close"
                   ></button>
                 </div>
 
-                <div className="modal-body px-4 py-3">
-                  <div className="row g-3">
-                    <div className="col-12 col-md-7">
-                      <label className="form-label fs-11 fw-semibold text-secondary mb-1">Vendor challan no.</label>
+                {/* Modal Body with 10 fields */}
+                <div className="modal-body px-4 py-2.5">
+                  <div className="row g-2.5">
+                    {/* 1. Vendor challan no. */}
+                    <div className="col-12 col-sm-7">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Vendor challan no.</label>
                       <input
                         type="text"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
                         value={editHeaderForm.challan}
                         onChange={(e) => setEditHeaderForm({ ...editHeaderForm, challan: e.target.value })}
+                        placeholder=""
                       />
                     </div>
-                    <div className="col-12 col-md-5">
-                      <label className="form-label fs-11 fw-semibold text-secondary mb-1">Challan date</label>
+
+                    {/* 2. Challan date */}
+                    <div className="col-12 col-sm-5">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Challan date</label>
                       <input
                         type="date"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
                         value={editHeaderForm.challanDate}
                         onChange={(e) => setEditHeaderForm({ ...editHeaderForm, challanDate: e.target.value })}
                       />
                     </div>
 
-                    <div className="col-12 col-md-7">
-                      <label className="form-label fs-11 fw-semibold text-secondary mb-1">Vendor invoice no.</label>
+                    {/* 3. Vendor invoice no. */}
+                    <div className="col-12 col-sm-7">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Vendor invoice no.</label>
                       <input
                         type="text"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
                         value={editHeaderForm.invoice}
                         onChange={(e) => setEditHeaderForm({ ...editHeaderForm, invoice: e.target.value })}
+                        placeholder=""
                       />
                     </div>
-                    <div className="col-12 col-md-5">
-                      <label className="form-label fs-11 fw-semibold text-secondary mb-1">Invoice date</label>
+
+                    {/* 4. Invoice date */}
+                    <div className="col-12 col-sm-5">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Invoice date</label>
                       <input
                         type="date"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
                         value={editHeaderForm.invoiceDate}
                         onChange={(e) => setEditHeaderForm({ ...editHeaderForm, invoiceDate: e.target.value })}
+                      />
+                    </div>
+
+                    {/* 5. Invoice value (₹) */}
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Invoice value (₹)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.invoiceValue}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, invoiceValue: e.target.value })}
+                        placeholder=""
+                      />
+                    </div>
+
+                    {/* Empty column spacer */}
+                    <div className="col-12 col-sm-6"></div>
+
+                    {/* 6. Transporter */}
+                    <div className="col-12 col-sm-7">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Transporter</label>
+                      <select
+                        className="form-select form-select-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.transporter}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, transporter: e.target.value })}
+                      >
+                        <option value="">Select Transporter...</option>
+                        {allTransporterNames.map((name, idx) => (
+                          <option key={idx} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 7. LR no. */}
+                    <div className="col-12 col-sm-5">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">LR no.</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.lrNumber}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, lrNumber: e.target.value })}
+                        placeholder=""
+                      />
+                    </div>
+
+                    {/* 8. LR date */}
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">LR date</label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.lrDate}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, lrDate: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Empty spacer */}
+                    <div className="col-12 col-sm-6"></div>
+
+                    {/* 9. Weight (kg) */}
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Weight (kg)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.weightKg}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, weightKg: e.target.value })}
+                        placeholder=""
+                      />
+                    </div>
+
+                    {/* 10. Fabric folding (cms) */}
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Fabric folding (cms)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.foldingCms}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, foldingCms: e.target.value })}
+                        placeholder=""
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="modal-footer border-0 pt-0 pb-4 px-4 d-flex align-items-center justify-content-end gap-2">
+                {/* Modal Footer with Theme Buttons */}
+                <div className="modal-footer border-0 pt-2 pb-3.5 px-4 d-flex align-items-center justify-content-start gap-2">
+                  <button
+                    type="submit"
+                    className="btn btn-sm px-4 py-1.5 rounded-3 fs-13 text-white fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5"
+                    style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                  >
+                    <i className="ti ti-check fs-14"></i>
+                    <span>Save Changes</span>
+                  </button>
                   <button
                     type="button"
-                    className="btn btn-outline-secondary btn-sm px-3 py-1.5 rounded-3 fs-12"
+                    className="btn btn-outline-secondary btn-sm px-3.5 py-1.5 rounded-3 fs-13 fw-medium bg-white"
+                    style={{ borderColor: '#cbd5e1', color: '#475569' }}
                     onClick={() => setShowEditHeaderModal(false)}
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm px-3.5 py-1.5 rounded-3 fs-12 text-white fw-semibold"
-                    style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                  >
-                    Save Changes
                   </button>
                 </div>
               </form>

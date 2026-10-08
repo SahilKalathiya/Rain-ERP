@@ -67,13 +67,24 @@ export default function StitchingJobsList({
         <div className="card-body p-3">
           <div className="row g-2 align-items-center">
             <div className="col-12 col-md-8">
-              <div className="input-group">
-                <span className="input-group-text bg-light border-end-0 text-muted">
-                  <i className="ti ti-search fs-16"></i>
-                </span>
+              <div className="position-relative w-100">
+                <i
+                  className="ti ti-search position-absolute text-muted fs-15"
+                  style={{
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    zIndex: 2
+                  }}
+                ></i>
                 <input
                   type="text"
-                  className="form-control bg-light border-start-0 fs-13"
+                  className="form-control bg-light fs-13 search-input-integrated"
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#e2e8f0'
+                  }}
                   placeholder="Search job number, vendor..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}

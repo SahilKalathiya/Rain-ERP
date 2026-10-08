@@ -97,7 +97,12 @@ function createServer(port) {
     if (localFile && fs.existsSync(localFile) && fs.statSync(localFile).isFile()) {
       const ext = path.extname(localFile).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       return fs.createReadStream(localFile).pipe(res);
     }
 

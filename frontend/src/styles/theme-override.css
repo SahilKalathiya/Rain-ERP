@@ -171,6 +171,11 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
   padding: 8px 12px !important;
 }
 
+.search-input-integrated {
+  padding-left: 42px !important;
+  padding-right: 14px !important;
+}
+
 .form-control:focus, .form-select:focus {
   border-color: #6366f1 !important;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
@@ -373,6 +378,56 @@ header.navbar {
 [style*="color: rgb(0, 188, 212)"],
 [style*="color: rgb(6, 182, 212)"] {
   color: #5b47fb !important;
+}
+
+/* =========================================================================
+   UNIVERSAL SCROLLBAR / SLIDERBAR REMOVAL ACROSS ALL BROWSERS & MODULES
+   ========================================================================= */
+
+/* WebKit (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-track {
+  display: none !important;
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
+}
+
+/* Firefox, IE and Standard Compliant Browsers */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html, body, #root, .table-responsive, div, main, aside, section, article, table {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.table-responsive {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.table-responsive::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
 }
 
 

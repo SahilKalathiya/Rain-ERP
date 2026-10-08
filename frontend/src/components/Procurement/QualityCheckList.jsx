@@ -26,21 +26,68 @@ export default function QualityCheckList({
       (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.length > 0
         ? matchedGrn.linkedPOs[0]
         : matchedGrn?.poId || 'PO-1001');
-    const fabricName = qc.fabricName || matchedGrn?.fabricName || 'Grey Cotton Fabrics (100*100)';
-    const color = qc.colorName || matchedGrn?.colorName || 'Ivory';
-    const width = qc.actualWidth || qc.expectedWidth || matchedGrn?.pannaWidth || '44';
+
+    const linkedPO = purchaseOrders.find(
+      (p) => p && (p.id === againstRef || (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.includes(p.id)))
+    );
+
+    const firstBale = matchedGrn?.bales?.[0];
+    const rawFabricLabel =
+      qc.fabricName ||
+      matchedGrn?.fabricName ||
+      firstBale?.fabricItemLabel ||
+      firstBale?.fabric ||
+      linkedPO?.items?.[0]?.fabricName ||
+      'Grey Cotton Fabrics (100*100)';
+
+    let parsedFabric = rawFabricLabel;
+    let extractedColor = '';
+
+    if (rawFabricLabel.includes('—')) {
+      const parts = rawFabricLabel.split('—');
+      parsedFabric = parts[0].trim();
+      extractedColor = parts[1].trim();
+    } else if (rawFabricLabel.includes(' - ')) {
+      const parts = rawFabricLabel.split(' - ');
+      parsedFabric = parts[0].trim();
+      extractedColor = parts[1].trim();
+    }
+
+    const poItem =
+      linkedPO?.items?.find((it) => it.fabricName === parsedFabric || it.fabricQuality === parsedFabric) ||
+      linkedPO?.items?.[0];
+
+    const color =
+      qc.colorName ||
+      qc.color ||
+      extractedColor ||
+      matchedGrn?.colorName ||
+      matchedGrn?.color ||
+      poItem?.color ||
+      poItem?.colorName ||
+      poItem?.shade ||
+      (parsedFabric.toLowerCase().includes('grey') ? 'Grey / Natural' : 'White');
+
+    const width =
+      qc.actualWidth ||
+      qc.expectedWidth ||
+      poItem?.width ||
+      matchedGrn?.pannaWidth ||
+      '44';
+
     const qty =
       Number(qc.totalReceivedMeters) ||
       Number(qc.receivedQty) ||
       Number(matchedGrn?.declaredTotalMeters) ||
       Number(matchedGrn?.totalMetersEntered) ||
-      2000;
+      (poItem?.quantity ? Number(poItem.quantity) : 2000);
+
     const status = qc.qcStatus || 'Pending';
 
     return {
       matchedGrn,
       againstRef,
-      fabricName,
+      fabricName: parsedFabric,
       color,
       width,
       qty,
@@ -75,6 +122,41 @@ export default function QualityCheckList({
         qc.qcStatus === 'Reject' ||
         (qc.issuePieces && qc.issuePieces.length > 0)
     ).length;
+
+function parseDateForSort(d, id) {
+  if (!d) {
+    if (id) {
+      const match = String(id).match(/\d+/g);
+      if (match) return Number(match.join(''));
+    }
+    return 0;
+  }
+  if (typeof d === 'number') return d;
+  const str = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const time = new Date(str).getTime();
+    if (!isNaN(time)) return time;
+  }
+  const parts = str.split(/[\/\- :]/);
+  if (parts.length >= 3) {
+    let day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
+    let year = parseInt(parts[2], 10);
+    if (parts[0].length === 4) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2], 10);
+    } else if (year < 100) {
+      year += 2000;
+    }
+    const hour = parts[3] ? parseInt(parts[3], 10) : 0;
+    const min = parts[4] ? parseInt(parts[4], 10) : 0;
+    const dt = new Date(year, month, day, hour, min);
+    if (!isNaN(dt.getTime())) return dt.getTime();
+  }
+  const timestamp = Date.parse(str);
+  return isNaN(timestamp) ? 0 : timestamp;
+}
 
   // Filter records by tab and search term
   const filtered = qcRecords.filter((qc) => {
@@ -118,6 +200,13 @@ export default function QualityCheckList({
     );
   });
 
+  const sortedList = [...filtered].sort((a, b) => {
+    const timeA = parseDateForSort(a.dateTime || a.date || a.createdDate, a.id);
+    const timeB = parseDateForSort(b.dateTime || b.date || b.createdDate, b.id);
+    if (timeB !== timeA) return timeB - timeA;
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+  });
+
   return (
     <div className="container-fluid p-0">
       {/* STEP 4 Header matching Screenshot 1 */}
@@ -134,33 +223,60 @@ export default function QualityCheckList({
         </p>
       </div>
 
-      {/* Tabs Filter Bar (Matches Screenshot 2) */}
-      <div className="d-flex align-items-center gap-3 border-bottom mb-4 overflow-x-auto pb-1">
+      {/* Tabs Filter Bar */}
+      <div className="d-flex align-items-center gap-2 border-bottom mb-4 overflow-x-auto pb-0">
         {[
-          { key: 'all', label: `All (${allCount})` },
-          { key: 'pending', label: `Pending (${pendingCount})` },
-          { key: 'admin', label: `Admin Approval (${adminCount})` },
-          { key: 'completed', label: `Completed (${completedCount})` },
-          { key: 'damaged', label: `Damaged / Rejected Pieces (${damagedCount})` }
+          { key: 'all', label: 'All', count: allCount },
+          { key: 'pending', label: 'Pending', count: pendingCount },
+          { key: 'admin', label: 'Admin Approval', count: adminCount },
+          { key: 'completed', label: 'Completed', count: completedCount },
+          { key: 'damaged', label: 'Damaged / Rejected Pieces', count: damagedCount }
         ].map((tab) => {
           const isActive = activeTabFilter === tab.key;
           return (
             <button
               key={tab.key}
               type="button"
-              className={`btn btn-link text-decoration-none px-2 py-2 fs-13 position-relative text-nowrap ${
-                isActive ? 'fw-bold text-dark' : 'fw-medium text-secondary'
-              }`}
+              className="btn btn-sm px-3 py-2 fs-13 position-relative text-nowrap d-flex align-items-center gap-2"
               style={{
-                color: isActive ? '#1e293b' : '#64748b',
-                borderBottom: isActive ? '2px solid #5b47fb' : '2px solid transparent',
-                marginBottom: '-2px',
-                borderRadius: 0,
+                color: isActive ? '#5b47fb' : '#64748b',
+                fontWeight: isActive ? '600' : '500',
+                border: 'none',
+                borderBottom: isActive ? '3px solid #5b47fb' : '3px solid transparent',
+                borderRadius: '6px 6px 0 0',
+                backgroundColor: isActive ? 'rgba(91, 71, 251, 0.05)' : 'transparent',
+                outline: 'none',
+                boxShadow: 'none',
+                marginBottom: '-1px',
                 transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.color = '#1e293b';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#64748b';
+                }
               }}
               onClick={() => setActiveTabFilter(tab.key)}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span
+                className="badge rounded-pill fs-11"
+                style={{
+                  backgroundColor: isActive ? '#5b47fb' : '#e2e8f0',
+                  color: isActive ? '#ffffff' : '#475569',
+                  padding: '2px 7px',
+                  fontWeight: '600',
+                  lineHeight: '1.2'
+                }}
+              >
+                {tab.count}
+              </span>
             </button>
           );
         })}
@@ -170,13 +286,24 @@ export default function QualityCheckList({
       <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
         {/* Search & Meta */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-          <div className="input-group" style={{ maxWidth: '320px' }}>
-            <span className="input-group-text bg-light border-end-0 text-muted">
-              <i className="ti ti-search fs-15"></i>
-            </span>
+          <div className="position-relative" style={{ maxWidth: '340px', width: '100%' }}>
+            <i
+              className="ti ti-search position-absolute text-muted fs-15"
+              style={{
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}
+            ></i>
             <input
               type="text"
-              className="form-control bg-light border-start-0 fs-13"
+              className="form-control bg-light fs-13 search-input-integrated"
+              style={{
+                borderRadius: '8px',
+                borderColor: '#e2e8f0'
+              }}
               placeholder="Search GRN, PO, fabric..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -196,34 +323,34 @@ export default function QualityCheckList({
               style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}
             >
               <tr>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '120px' }}>
                   GRN
                 </th>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '130px' }}>
                   AGAINST
                 </th>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '220px' }}>
                   FABRIC
                 </th>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '180px' }}>
                   WIDTH / COLOUR
                 </th>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '110px' }}>
                   QTY
                 </th>
-                <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                <th style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '140px' }}>
                   STATUS
                 </th>
                 <th
                   className="text-center"
-                  style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}
+                  style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '110px' }}
                 >
                   ACTION
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {sortedList.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center py-5 text-muted">
                     <i className="ti ti-package-off fs-32 d-block mb-2 text-muted opacity-50"></i>
@@ -231,7 +358,7 @@ export default function QualityCheckList({
                   </td>
                 </tr>
               ) : (
-                filtered.map((qc) => {
+                sortedList.map((qc) => {
                   const d = getRecordDetails(qc);
                   const isPending = d.status === 'Pending' || !qc.qcStatus;
 

@@ -17,6 +17,41 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
     status: ''
   });
 
+function parseDateForSort(d, id) {
+  if (!d) {
+    if (id) {
+      const match = String(id).match(/\d+/g);
+      if (match) return Number(match.join(''));
+    }
+    return 0;
+  }
+  if (typeof d === 'number') return d;
+  const str = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const time = new Date(str).getTime();
+    if (!isNaN(time)) return time;
+  }
+  const parts = str.split(/[\/\- :]/);
+  if (parts.length >= 3) {
+    let day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
+    let year = parseInt(parts[2], 10);
+    if (parts[0].length === 4) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2], 10);
+    } else if (year < 100) {
+      year += 2000;
+    }
+    const hour = parts[3] ? parseInt(parts[3], 10) : 0;
+    const min = parts[4] ? parseInt(parts[4], 10) : 0;
+    const dt = new Date(year, month, day, hour, min);
+    if (!isNaN(dt.getTime())) return dt.getTime();
+  }
+  const timestamp = Date.parse(str);
+  return isNaN(timestamp) ? 0 : timestamp;
+}
+
   const filtered = (grns || []).filter((g) => {
     if (!g) return false;
     if (activeTab === 'completed' && g.status !== 'Completed' && g.status !== 'QC Approved') return false;
@@ -44,6 +79,13 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
       (!colFilters.status || g.status === colFilters.status);
 
     return matchesSearch && matchesCol;
+  });
+
+  const sortedList = [...filtered].sort((a, b) => {
+    const timeA = parseDateForSort(a.date || a.receivedDate || a.createdDate, a.id);
+    const timeB = parseDateForSort(b.date || b.receivedDate || b.createdDate, b.id);
+    if (timeB !== timeA) return timeB - timeA;
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
   });
 
   return (
@@ -113,13 +155,24 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
             </button>
           </div>
 
-          <div className="input-group" style={{ maxWidth: '320px' }}>
-            <span className="input-group-text bg-light border-end-0 text-muted">
-              <i className="ti ti-search fs-15"></i>
-            </span>
+          <div className="position-relative" style={{ maxWidth: '340px', width: '100%' }}>
+            <i
+              className="ti ti-search position-absolute text-muted fs-15"
+              style={{
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}
+            ></i>
             <input
               type="text"
-              className="form-control bg-light border-start-0 fs-13"
+              className="form-control bg-light fs-13 search-input-integrated"
+              style={{
+                borderRadius: '8px',
+                borderColor: '#e2e8f0'
+              }}
               placeholder="Search GRN, vendor, fabric..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -143,7 +196,7 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {sortedList.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="text-center py-5 text-muted">
                     <i className="ti ti-package-off fs-32 d-block mb-2"></i>
@@ -151,7 +204,7 @@ export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((g) => {
+                sortedList.map((g) => {
                   const againstPo = g.linkedPOs?.[0] || 'PO-1001';
                   const fabricLabel = g.fabricName || 'Tussar Silk (42") — Ivory';
                   const meters = (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 2000).toFixed(0);

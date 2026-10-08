@@ -365,7 +365,7 @@ export default function VendorMasterView({
                 </div>
 
                 <div className="d-flex align-items-center gap-2">
-                  {!isEditing ? (
+                  {!isEditing && (
                     <button
                       type="button"
                       className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1"
@@ -376,15 +376,6 @@ export default function VendorMasterView({
                     >
                       <i className="ti ti-edit fs-14"></i>
                       <span>Edit All</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-success btn-sm px-3 d-flex align-items-center gap-1"
-                      onClick={handleSave}
-                    >
-                      <i className="ti ti-check fs-14"></i>
-                      <span>Save Record</span>
                     </button>
                   )}
                   {isInline && (

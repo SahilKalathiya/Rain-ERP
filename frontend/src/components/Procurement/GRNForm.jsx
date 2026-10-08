@@ -49,19 +49,16 @@ export default function GRNForm({
 
   // Initialize form state
   const [formData, setFormData] = useState(() => {
-    const defaultPO = grn?.poId
-      ? eligiblePOs.find((p) => p.id === grn.poId)
-      : grn?.linkedPOs?.[0]
-        ? eligiblePOs.find((p) => p.id === grn.linkedPOs[0])
-        : eligiblePOs[0] || null;
+    const isFromPO = Boolean(grn?.poId || (grn?.linkedPOs && grn.linkedPOs.length > 0));
+    const defaultPO = isFromPO
+      ? eligiblePOs.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)))
+      : null;
 
     const resolvedPoId = defaultPO ? defaultPO.id : (grn?.poId || grn?.linkedPOs?.[0] || '');
     const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || '');
     const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : '');
 
-    const defaultDeclared = grn?.declaredTotalMeters || grn?.totalQty || (
-      defaultPO?.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0
-    );
+    const defaultDeclared = grn?.declaredTotalMeters || grn?.totalQty || '';
 
     const cleanDate = (d) => {
       if (!d) return new Date().toISOString().split('T')[0];
@@ -100,8 +97,6 @@ export default function GRNForm({
       });
     }
 
-    const defaultTransporter = transporters[0];
-
     return {
       id: grn?.id || `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
       poId: resolvedPoId,
@@ -113,8 +108,8 @@ export default function GRNForm({
       vendorChallanDate: grn?.vendorChallanDate ? cleanDate(grn.vendorChallanDate) : '',
       vendorInvoiceNo: grn?.vendorInvoiceNo || grn?.invoice || '',
       vendorInvoiceDate: grn?.vendorInvoiceDate ? cleanDate(grn.vendorInvoiceDate) : '',
-      transporterId: grn?.transporterId || (defaultTransporter ? defaultTransporter.id : ''),
-      transporterName: grn?.transporterName || (defaultTransporter ? defaultTransporter.name : ''),
+      transporterId: grn?.transporterId || '',
+      transporterName: grn?.transporterName || '',
       lrNo: grn?.lrNo || '',
       lrDate: grn?.lrDate ? cleanDate(grn.lrDate) : '',
       weight: grn?.weight !== undefined ? grn.weight : '',
@@ -127,6 +122,14 @@ export default function GRNForm({
   });
 
   const [showInlineTransporterModal, setShowInlineTransporterModal] = useState(false);
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToastNotification({ message, type });
+    setTimeout(() => {
+      setToastNotification(null);
+    }, 3200);
+  };
 
   // Sync if grn prop changes
   useEffect(() => {
@@ -244,6 +247,19 @@ export default function GRNForm({
 
   // When PO is changed in Source document dropdown
   const handlePOChange = (newPoId) => {
+    if (!newPoId) {
+      setFormData((prev) => ({
+        ...prev,
+        poId: '',
+        linkedPOs: [],
+        vendorId: '',
+        vendorName: '',
+        totalQty: '',
+        declaredTotalMeters: 0
+      }));
+      return;
+    }
+
     const selectedPO = purchaseOrders.find((p) => p.id === newPoId);
     if (!selectedPO) return;
 
@@ -267,8 +283,8 @@ export default function GRNForm({
         linkedPOs: [newPoId],
         vendorId: selectedPO.vendorId,
         vendorName: vName,
-        totalQty: prev.totalQty || (poTotalMeters ? String(poTotalMeters) : ''),
-        declaredTotalMeters: prev.declaredTotalMeters || poTotalMeters,
+        totalQty: prev.totalQty || '',
+        declaredTotalMeters: Number(prev.totalQty || prev.declaredTotalMeters || 0),
         bales: updatedBales
       };
     });
@@ -278,7 +294,7 @@ export default function GRNForm({
   const handleGenerateBales = () => {
     const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
     if (count <= 0) {
-      alert('Please enter a valid number of bales (greater than 0).');
+      showToast('Please enter a valid number of bales (greater than 0).', 'warning');
       return;
     }
 
@@ -289,10 +305,11 @@ export default function GRNForm({
       if (currentBales[i]) {
         newBales.push(currentBales[i]);
       } else {
+        const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
         newBales.push({
           baleNo: String(i + 1),
-          itemIdx: 0,
-          fabricItemLabel: defaultFabricLabel,
+          itemIdx: i % (poItemLabels.length || 1),
+          fabricItemLabel: assignedLabel,
           piecesCount: '',
           pieces: [],
           totalLength: 0
@@ -451,40 +468,95 @@ export default function GRNForm({
   // Save Header Only (add bales later)
   const handleSaveHeaderOnly = () => {
     if (!formData.poId) {
-      alert('Please select a Source document (Purchase Order).');
+      showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
     }
+
+    const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
+    const firstPoItem = selectedPO?.items?.[0];
+    const fabricItem = firstPoItem
+      ? firstPoItem.fabricName || firstPoItem.fabricQuality
+      : (formData.fabricName || '');
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
+    const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
+    const widthVal = firstPoItem?.width || formData.width || '';
 
     const payload = {
       ...formData,
       status: 'Header Saved',
       date: formData.receivedDate,
+      fabricName: fabricItem,
+      fabricId: fabricIdVal,
+      colorName: colorVal,
+      colorHex: colorHexVal,
+      width: widthVal,
       declaredTotalMeters: declaredTotal,
       totalMetersEntered
     };
 
     if (onSaveGRN) {
       onSaveGRN(payload, false);
-      alert('GRN Header saved successfully! Bale & piece entry can be resumed anytime.');
+      showToast('GRN Header saved successfully! Bale & piece entry can be resumed anytime.', 'success');
+    }
+  };
+
+  // Save specific individual bale draft progress
+  const handleSaveSingleBale = (baleIdx) => {
+    if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
+      showToast('Please select a Source document (Purchase Order) before saving.', 'warning');
+      return;
+    }
+
+    const currentBale = formData.bales?.[baleIdx];
+    const baleNo = currentBale?.baleNo || (baleIdx + 1);
+    const baleMeters = (currentBale?.totalLength || 0).toFixed(2).replace(/\.00$/, '');
+
+    const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
+    const firstPoItem = selectedPO?.items?.[0];
+    const fabricItem = firstPoItem
+      ? firstPoItem.fabricName || firstPoItem.fabricQuality
+      : (formData.fabricName || '');
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
+    const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
+    const widthVal = firstPoItem?.width || formData.width || '';
+
+    const payload = {
+      ...formData,
+      status: 'Bale Entry in Progress',
+      date: formData.receivedDate,
+      fabricName: fabricItem,
+      fabricId: fabricIdVal,
+      colorName: colorVal,
+      colorHex: colorHexVal,
+      width: widthVal,
+      declaredTotalMeters: declaredTotal,
+      totalMetersEntered
+    };
+
+    if (onSaveGRN) {
+      onSaveGRN(payload, false);
+      showToast(`Bale ${baleNo} (${baleMeters}m) saved successfully!`, 'success');
     }
   };
 
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
     if (!formData.poId) {
-      alert('Please select a Source document (Purchase Order).');
+      showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
     }
     if (!formData.receivedDate) {
-      alert('Please enter Received date.');
+      showToast('Please enter Received date.', 'warning');
       return;
     }
     if (!declaredTotal || declaredTotal <= 0) {
-      alert('Please enter Total quantity (m).');
+      showToast('Please enter Total quantity (m).', 'warning');
       return;
     }
     if (!formData.bales || formData.bales.length === 0) {
-      alert('Please generate at least one bale and enter piece meters before submitting.');
+      showToast('Please generate at least one bale and enter piece meters before submitting.', 'warning');
       return;
     }
 
@@ -496,22 +568,31 @@ export default function GRNForm({
     }
 
     const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
-    const fabricItem = selectedPO?.items?.[0]
-      ? selectedPO.items[0].fabricName || selectedPO.items[0].fabricQuality
-      : '';
+    const firstPoItem = selectedPO?.items?.[0];
+    const fabricItem = firstPoItem
+      ? firstPoItem.fabricName || firstPoItem.fabricQuality
+      : (formData.fabricName || '');
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
+    const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
+    const widthVal = firstPoItem?.width || formData.width || '';
 
     const payload = {
       ...formData,
       status: 'Completed',
       date: formData.receivedDate,
       fabricName: fabricItem,
+      fabricId: fabricIdVal,
+      colorName: colorVal,
+      colorHex: colorHexVal,
+      width: widthVal,
       declaredTotalMeters: declaredTotal,
       totalMetersEntered
     };
 
     if (onSaveGRN) {
       onSaveGRN(payload, true);
-      alert(`GRN ${formData.id} submitted successfully and sent to Quality Check (QC)!`);
+      showToast(`GRN ${formData.id} submitted successfully and sent to Quality Check (QC)!`, 'success');
     }
   };
 
@@ -617,21 +698,18 @@ export default function GRNForm({
                 className="form-select bg-white fs-13"
                 style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
                 disabled={isQcActioned}
-                value={formData.poId}
+                value={formData.poId || ''}
                 onChange={(e) => handlePOChange(e.target.value)}
               >
-                {eligiblePOs.length === 0 ? (
-                  <option value="">No Purchase Orders Available</option>
-                ) : (
-                  eligiblePOs.map((po) => {
-                    const vName = getPoVendorName(po);
-                    return (
-                      <option key={po.id} value={po.id}>
-                        {po.id} — {vName || 'Vendor'} (fabric purchase)
-                      </option>
-                    );
-                  })
-                )}
+                <option value="">Select Source Document (PO)...</option>
+                {eligiblePOs.map((po) => {
+                  const vName = getPoVendorName(po);
+                  return (
+                    <option key={po.id} value={po.id}>
+                      {po.id} — {vName || 'Vendor'} (fabric purchase)
+                    </option>
+                  );
+                })}
               </select>
             )}
           </div>
@@ -724,7 +802,7 @@ export default function GRNForm({
             <select
               className="form-select bg-white fs-13"
               style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.transporterId}
+              value={formData.transporterId || ''}
               onChange={(e) => {
                 const trn = transporters.find((t) => t.id === e.target.value);
                 setFormData({
@@ -734,15 +812,12 @@ export default function GRNForm({
                 });
               }}
             >
-              {transporters.length === 0 ? (
-                <option value="">No Transporters Available</option>
-              ) : (
-                transporters.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))
-              )}
+              <option value="">Select Transporter...</option>
+              {transporters.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -867,12 +942,18 @@ export default function GRNForm({
 
       {/* SECTION 2: BALE-WISE INWARD ENTRY */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <div className="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
-          <h5 className="fw-bold text-dark mb-0 fs-16">
-            Bale-wise inward entry
-          </h5>
+        <div className="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+          <div>
+            <h5 className="fw-bold text-dark mb-1 fs-16 d-flex align-items-center gap-2">
+              <i className="ti ti-packages text-primary fs-18"></i>
+              <span>Bale-wise Inward Entry</span>
+            </h5>
+            <p className="text-secondary fs-12 mb-0">
+              Enter individual piece lengths (in meters) for each container bale
+            </p>
+          </div>
           {formData.bales.length > 0 && (
-            <span className="badge bg-light text-secondary border px-2.5 py-1 fs-12 rounded-pill">
+            <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold">
               {formData.bales.length} Bale{formData.bales.length > 1 ? 's' : ''} Generated
             </span>
           )}
@@ -883,12 +964,14 @@ export default function GRNForm({
           <div
             className="p-5 text-center rounded-3 text-muted fs-13 my-2"
             style={{
-              border: '2px dashed #e2e8f0',
-              backgroundColor: '#fafbfc'
+              border: '2px dashed #cbd5e1',
+              backgroundColor: '#f8fafc'
             }}
           >
-            <i className="ti ti-package-off fs-32 d-block mb-2 text-secondary opacity-40"></i>
-            Enter &quot;No. of bales&quot; above, then press Enter or click Generate Bales to create the bale entry blocks
+            <i className="ti ti-package-off fs-36 d-block mb-2 text-secondary opacity-50"></i>
+            <span className="fw-medium text-secondary">
+              Enter &quot;No. of bales&quot; in Receipt Details above, then click &quot;Generate Bales&quot; to begin entry.
+            </span>
           </div>
         ) : (
           <div className="d-flex flex-column gap-3">
@@ -901,157 +984,254 @@ export default function GRNForm({
               return (
                 <div
                   key={bIdx}
-                  className="card border rounded-3 p-3.5 bg-white"
+                  className="card border rounded-4 bg-white overflow-hidden shadow-sm mb-3"
                   style={{
-                    borderColor: '#e5e7eb',
-                    borderRadius: '10px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    borderColor: '#e2e8f0',
+                    borderRadius: '14px'
                   }}
                 >
                   {/* Bale Header Bar */}
-                  <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <div className="d-flex align-items-center gap-2">
-                      <span className="fw-bold text-dark fs-15">
-                        Bale {bale.baleNo || bIdx + 1}
-                      </span>
-                      <span className="badge bg-light text-secondary border px-2 py-0.5 fs-11 rounded-pill">
+                  <div
+                    className="d-flex align-items-center justify-content-between px-4 px-md-4 py-3 border-bottom"
+                    style={{ backgroundColor: '#f8fafc' }}
+                  >
+                    <div className="d-flex align-items-center flex-wrap gap-2">
+                      <div className="d-flex align-items-center gap-2 me-2">
+                        <i className="ti ti-package text-primary fs-16"></i>
+                        <span className="fw-bold text-dark fs-15 lh-1">
+                          Bale {bale.baleNo || bIdx + 1}
+                        </span>
+                      </div>
+                      <span
+                        className="badge bg-white text-secondary border px-3 py-1.5 fs-11 rounded-pill fw-medium me-1"
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                      >
                         Container #{bIdx + 1}
                       </span>
                       <span
-                        className={`badge px-2 py-0.5 fs-11 rounded-pill ${
+                        className={`badge px-3 py-1.5 fs-11 rounded-pill fw-medium ${
                           isQcActioned
                             ? 'bg-secondary-subtle text-secondary border'
-                            : 'bg-success-subtle text-success border'
+                            : 'bg-success-subtle text-success border border-success border-opacity-25'
                         }`}
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
                       >
-                        {isQcActioned ? 'Locked (QC Actioned)' : 'editable'}
+                        {isQcActioned ? 'Locked (QC Actioned)' : 'Editable'}
                       </span>
                     </div>
+
                     {!isQcActioned && (
                       <button
                         type="button"
-                        className="btn btn-link text-danger p-0 fs-13 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
+                        className="btn btn-sm btn-link text-danger p-0 fs-13 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5"
                         onClick={() => handleRemoveBale(bIdx)}
                       >
-                        <i className="ti ti-trash fs-13"></i>
-                        <span>Remove</span>
+                        <i className="ti ti-trash fs-14"></i>
+                        <span>Remove Bale</span>
                       </button>
                     )}
                   </div>
 
-                  {/* Bale Top Row: Bale no., PO fabric item (all fabrics visible), No. of pieces */}
-                  <div className="row g-3 align-items-end mb-3">
-                    <div className="col-4 col-sm-2 col-md-2" style={{ minWidth: '105px', maxWidth: '130px' }}>
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">Bale no.</label>
-                      <input
-                        type="text"
-                        className="form-control bg-white text-center fs-13 fw-semibold"
-                        style={{ height: '38px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                        value={bale.baleNo || ''}
-                        disabled={isQcActioned}
-                        onChange={(e) => handleBaleNoChange(bIdx, e.target.value)}
-                      />
-                    </div>
-
-                    <div className="col-12 col-sm-7 col-md-7 flex-grow-1">
-                      <div className="d-flex align-items-center justify-content-between mb-1">
-                        <label className="form-label fs-12 fw-semibold text-secondary mb-0">PO fabric item</label>
-                        <span className="text-muted fs-11">Choose from PO or any master fabric</span>
+                  <div className="px-4 px-md-4 py-3.5">
+                    {/* Bale Fields: Bale No, Fabric Item, No. of pieces */}
+                    <div className="row g-3 gx-4 align-items-start mb-3">
+                      {/* Bale No */}
+                      <div className="col-12 col-sm-3 col-md-2" style={{ minWidth: '110px' }}>
+                        <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                          Bale No. <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control bg-white text-center fs-13 fw-semibold"
+                          style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                          value={bale.baleNo || ''}
+                          disabled={isQcActioned}
+                          onChange={(e) => handleBaleNoChange(bIdx, e.target.value)}
+                        />
                       </div>
-                      <select
-                        className="form-select bg-white fs-13"
-                        style={{ height: '38px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                        value={bale.fabricItemLabel || currentFabricLabel}
-                        disabled={isQcActioned}
-                        onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
-                      >
-                        {poItemLabels.length > 0 && (
-                          <optgroup label={`From ${currentPO ? currentPO.id : 'Selected PO'} Items`}>
-                            {poItemLabels.map((lbl, oIdx) => (
-                              <option key={`po-${oIdx}`} value={lbl}>
-                                {lbl}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label="All Master Fabrics (Cotton, Rayon, Silk, etc.)">
-                          {masterFabricLabels.map((lbl, fIdx) => (
-                            <option key={`mf-${fIdx}`} value={lbl}>
-                              {lbl}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    </div>
 
-                    <div className="col-8 col-sm-3 col-md-3" style={{ minWidth: '120px', maxWidth: '160px' }}>
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">No. of pieces</label>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="e.g. 2"
-                        className="form-control bg-white text-center fs-13 fw-semibold"
-                        style={{ height: '38px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                        value={bale.piecesCount || (bale.pieces && bale.pieces.length ? bale.pieces.length : '')}
-                        disabled={isQcActioned}
-                        onChange={(e) => handleSetPieceCount(bIdx, e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Pieces Area */}
-                  {!bale.pieces || bale.pieces.length === 0 ? (
-                    <div
-                      className="py-2.5 px-3 text-center rounded-2 text-muted fs-12 my-2"
-                      style={{
-                        border: '1px dashed #cbd5e1',
-                        backgroundColor: '#fafbfc'
-                      }}
-                    >
-                      <i className="ti ti-info-circle me-1 text-secondary opacity-75"></i>
-                      Set number of pieces above to generate piece meter fields
-                    </div>
-                  ) : (
-                    <div className="d-flex flex-wrap gap-2.5 my-2.5 pt-1">
-                      {bale.pieces.map((piece, pIdx) => {
-                        const len = piece.length !== undefined ? piece.length : piece;
-                        return (
-                          <div
-                            key={pIdx}
-                            style={{ width: '96px' }}
-                          >
-                            <span className="d-block fs-11 fw-semibold text-secondary text-center mb-1">
-                              Pc {pIdx + 1} (m)
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              className="form-control bg-white text-center fw-semibold fs-13"
-                              style={{ height: '36px', borderColor: '#cbd5e1', borderRadius: '6px' }}
-                              value={len === 0 ? '0' : (len || '')}
+                      {/* Fabric Item */}
+                      <div className="col-12 col-sm-6 col-md-7 flex-grow-1">
+                        <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                          Fabric Item / Quality <span className="text-danger">*</span>
+                        </label>
+                        {isLinkedFromPO ? (
+                          poItemLabels.length <= 1 ? (
+                            <div
+                              className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium px-3"
+                              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px', cursor: 'default' }}
+                            >
+                              <div className="d-flex align-items-center gap-2 text-truncate">
+                                <i className="ti ti-fabric text-primary fs-15"></i>
+                                <span className="fw-semibold text-dark text-truncate">
+                                  {bale.fabricItemLabel || poItemLabels[0] || 'Fabric Item'}
+                                </span>
+                              </div>
+                              <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium flex-shrink-0">
+                                From PO
+                              </span>
+                            </div>
+                          ) : (
+                            <select
+                              className="form-select bg-white fs-13 px-3"
+                              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                              value={bale.fabricItemLabel || poItemLabels[bIdx % poItemLabels.length] || poItemLabels[0]}
                               disabled={isQcActioned}
-                              onChange={(e) => handlePieceMeterChange(bIdx, pIdx, e.target.value)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                              onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
+                            >
+                              {poItemLabels.map((lbl, oIdx) => (
+                                <option key={`po-${oIdx}`} value={lbl}>
+                                  {lbl}
+                                </option>
+                              ))}
+                            </select>
+                          )
+                        ) : (
+                          <select
+                            className="form-select bg-white fs-13 px-3"
+                            style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                            value={bale.fabricItemLabel || defaultFabricLabel}
+                            disabled={isQcActioned}
+                            onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
+                          >
+                            {poItemLabels.length > 0 && (
+                              <optgroup label={`From ${currentPO ? currentPO.id : 'Selected PO'} Items`}>
+                                {poItemLabels.map((lbl, oIdx) => (
+                                  <option key={`po-${oIdx}`} value={lbl}>
+                                    {lbl}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            <optgroup label="All Master Fabrics">
+                              {masterFabricLabels.map((lbl, fIdx) => (
+                                <option key={`mf-${fIdx}`} value={lbl}>
+                                  {lbl}
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        )}
+                      </div>
 
-                  {/* Bale Summary Footer */}
-                  <div className="d-flex align-items-center justify-content-between pt-2.5 mt-2 border-top text-secondary fs-12">
-                    <div>
-                      <span className="badge bg-light text-dark border px-2 py-0.5 me-2 fw-medium">
-                        {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
-                      </span>
-                      <span>
-                        Assigned to <strong className="text-dark">{bale.fabricItemLabel || currentFabricLabel}</strong>
-                      </span>
+                      {/* No. of pieces */}
+                      <div className="col-12 col-sm-3 col-md-3" style={{ minWidth: '120px', maxWidth: '170px' }}>
+                        <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                          No. of Pieces <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 1"
+                          className="form-control bg-white text-center fs-13 fw-semibold"
+                          style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                          value={bale.piecesCount || (bale.pieces && bale.pieces.length ? bale.pieces.length : '')}
+                          disabled={isQcActioned}
+                          onChange={(e) => handleSetPieceCount(bIdx, e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="fs-13 fw-bold text-dark font-monospace">
-                      {(bale.totalLength || 0).toFixed(2).replace(/\.00$/, '')} m
+
+                    {/* Pieces Inward Entry Grid */}
+                    <div
+                      className="rounded-3 p-3.5 my-3"
+                      style={{ backgroundColor: '#f8fafc', border: '1px solid #eef2f6' }}
+                    >
+                      <div className="d-flex align-items-center justify-content-between mb-2.5">
+                        <span className="fs-12 fw-semibold text-dark text-uppercase" style={{ letterSpacing: '0.04em' }}>
+                          Piece-Wise Length (Meters)
+                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="fs-11 text-muted fw-medium">
+                            {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured
+                          </span>
+                          {!isQcActioned && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-white border shadow-sm d-inline-flex align-items-center gap-1.5 px-3 py-1 fs-12 fw-semibold text-primary rounded-2"
+                              style={{ borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}
+                              onClick={() => handleSaveSingleBale(bIdx)}
+                              title={`Save progress for Bale ${bale.baleNo || bIdx + 1}`}
+                            >
+                              <i className="ti ti-device-floppy fs-14" style={{ color: '#5b47fb' }}></i>
+                              <span>Save Bale {bale.baleNo || bIdx + 1}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!bale.pieces || bale.pieces.length === 0 ? (
+                        <div className="py-3 px-3 text-center text-muted fs-12 bg-white rounded-2 border border-dashed">
+                          <i className="ti ti-info-circle me-1.5 text-primary"></i>
+                          Enter number of pieces above to generate piece length inputs.
+                        </div>
+                      ) : (
+                        <div className="d-flex flex-wrap align-items-end gap-3 pt-1">
+                          {bale.pieces.map((piece, pIdx) => {
+                            const len = piece.length !== undefined ? piece.length : piece;
+                            return (
+                              <div
+                                key={pIdx}
+                                className="bg-white p-2.5 rounded-2 border shadow-none"
+                                style={{ width: '115px', borderColor: '#e2e8f0' }}
+                              >
+                                <label className="d-block fs-11 fw-semibold text-secondary text-center mb-1">
+                                  Pc {pIdx + 1} (m)
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  className="form-control bg-white text-center fw-semibold fs-13 px-1"
+                                  style={{ height: '36px', borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                  value={len === 0 ? '0' : (len || '')}
+                                  disabled={isQcActioned}
+                                  onChange={(e) => handlePieceMeterChange(bIdx, pIdx, e.target.value)}
+                                />
+                              </div>
+                            );
+                          })}
+
+                          {!isQcActioned && (
+                            <div className="d-flex align-items-center" style={{ height: '62px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm d-inline-flex align-items-center gap-1.5 px-3 py-2 fs-12 fw-semibold rounded-2 shadow-sm"
+                                style={{
+                                  height: '36px',
+                                  borderColor: '#5b47fb',
+                                  backgroundColor: '#5b47fb',
+                                  color: '#ffffff'
+                                }}
+                                onClick={() => handleSaveSingleBale(bIdx)}
+                                title={`Save Bale ${bale.baleNo || bIdx + 1}`}
+                              >
+                                <i className="ti ti-device-floppy fs-14"></i>
+                                <span>Save Bale</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bale Summary Footer */}
+                    <div className="d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top text-secondary fs-12 gap-2">
+                      <div className="d-flex align-items-center gap-2 text-truncate">
+                        <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold">
+                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-secondary text-truncate">
+                          Assigned: <strong className="text-dark">{bale.fabricItemLabel || currentFabricLabel}</strong>
+                        </span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="text-secondary fs-12 fw-medium">Bale Total:</span>
+                        <span className="fs-14 fw-bold text-dark font-monospace px-2.5 py-0.5 rounded bg-light border">
+                          {(bale.totalLength || 0).toFixed(2).replace(/\.00$/, '')} m
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1222,6 +1402,42 @@ export default function GRNForm({
                 }}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* INLINE TOAST NOTIFICATION */}
+      {toastNotification && (
+        <div
+          className="position-fixed top-0 end-0 p-3"
+          style={{ zIndex: 9999 }}
+        >
+          <div
+            className={`toast show border-0 rounded-3 shadow-lg px-3 py-2.5 d-flex align-items-center gap-2.5 text-white ${
+              toastNotification.type === 'danger'
+                ? 'bg-danger'
+                : toastNotification.type === 'warning'
+                ? 'bg-warning text-dark'
+                : 'bg-dark'
+            }`}
+            style={{ minWidth: '280px', animation: 'fadeIn 0.2s ease-in-out' }}
+          >
+            <i
+              className={`fs-16 ${
+                toastNotification.type === 'danger'
+                  ? 'ti ti-alert-circle text-white'
+                  : toastNotification.type === 'warning'
+                  ? 'ti ti-alert-triangle text-dark'
+                  : 'ti ti-circle-check text-success'
+              }`}
+            ></i>
+            <span className="fs-13 fw-medium flex-grow-1">{toastNotification.message}</span>
+            <button
+              type="button"
+              className="btn-close btn-close-white ms-auto"
+              style={{ fontSize: '10px' }}
+              onClick={() => setToastNotification(null)}
+            ></button>
           </div>
         </div>
       )}

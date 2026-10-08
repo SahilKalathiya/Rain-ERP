@@ -38,7 +38,7 @@ export default function FabricMasterView({
       return {
         id: `FAB-${String(fabrics.length + 1).padStart(4, '0')}`,
         qualityName: '',
-        fabricType: 'Cotton',
+        fabricType: '',
         gsm: '',
         widths: [],
         defaultShrinkage: '',
@@ -50,7 +50,7 @@ export default function FabricMasterView({
     return {
       id: '',
       qualityName: '',
-      fabricType: 'Cotton',
+      fabricType: '',
       gsm: '',
       widths: [],
       defaultShrinkage: '',
@@ -63,12 +63,19 @@ export default function FabricMasterView({
   const [widthInput, setWidthInput] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
+  const isGreige = Boolean(
+    formData.fabricType &&
+    (formData.fabricType.toLowerCase().includes('greige') ||
+     formData.fabricType.toLowerCase().includes('grey') ||
+     formData.fabricType.toLowerCase().includes('undyed'))
+  );
+
   const handleOpenNew = () => {
     const nextNum = Math.floor(1000 + Math.random() * 9000);
     setFormData({
       id: `FAB-${nextNum}`,
       qualityName: '',
-      fabricType: 'Cotton',
+      fabricType: '',
       gsm: '',
       widths: [],
       defaultShrinkage: '',
@@ -95,7 +102,7 @@ export default function FabricMasterView({
     setFormData({
       ...f,
       qualityName: f.qualityName || f.quality_name || '',
-      fabricType: f.fabricType || f.fabric_type || 'Cotton',
+      fabricType: f.fabricType || f.fabric_type || '',
       widths: parsedWidths,
       hsnCode: f.hsnCode || f.hsn_code || '520811'
     });
@@ -138,6 +145,7 @@ export default function FabricMasterView({
   const validate = () => {
     const errors = {};
     if (!formData.qualityName.trim()) errors.qualityName = 'Fabric Quality Name is mandatory';
+    if (!formData.fabricType || !formData.fabricType.trim()) errors.fabricType = 'Fabric Type is mandatory';
     if (!formData.widths || formData.widths.length === 0)
       errors.widths = 'At least one width must be added';
     setFormErrors(errors);
@@ -151,7 +159,7 @@ export default function FabricMasterView({
     const updatedFabric = {
       ...formData,
       gsm: Number(formData.gsm) || null,
-      defaultShrinkage: Number(formData.defaultShrinkage) || 0
+      defaultShrinkage: isGreige ? (Number(formData.defaultShrinkage) || 0) : 0
     };
 
     let updatedList;
@@ -246,63 +254,77 @@ export default function FabricMasterView({
               </button>
             </div>
 
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0 fs-13">
+            {/* Clean Top Search & Filter Bar */}
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-3 pb-2 border-bottom">
+              <div className="position-relative flex-grow-1" style={{ minWidth: '180px' }}>
+                <i
+                  className="ti ti-search position-absolute text-muted fs-14"
+                  style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                ></i>
+                <input
+                  type="text"
+                  placeholder="Search by ID, Quality Name, or GSM..."
+                  className="form-control form-control-sm bg-light fs-12 search-input-integrated"
+                  style={{ borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}
+                  value={colFilters.name}
+                  onChange={(e) => setColFilters({ ...colFilters, name: e.target.value })}
+                />
+              </div>
+
+              <select
+                className="form-select form-select-sm bg-light fs-12"
+                style={{ width: '160px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                value={colFilters.type}
+                onChange={(e) => setColFilters({ ...colFilters, type: e.target.value })}
+              >
+                <option value="">All Fabric Types</option>
+                <option value="Greige / Undyed">Greige / Undyed</option>
+                <option value="Cotton">Cotton (Processed)</option>
+                <option value="Rayon">Rayon</option>
+                <option value="Modal">Modal</option>
+                <option value="Silk">Silk</option>
+                <option value="Georgette">Georgette</option>
+                <option value="Linen">Linen</option>
+                <option value="Polyester">Polyester</option>
+                <option value="Viscose">Viscose</option>
+                <option value="Blended">Blended</option>
+              </select>
+
+              <select
+                className="form-select form-select-sm bg-light fs-12"
+                style={{ width: '120px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                value={colFilters.status}
+                onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
+              >
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
+              {(colFilters.name || colFilters.type || colFilters.status) && (
+                <button
+                  type="button"
+                  className="btn btn-light btn-sm text-secondary px-2.5 py-1 fs-12 d-flex align-items-center gap-1 border"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => setColFilters({ id: '', name: '', type: '', gsm: '', hsn: '', status: '' })}
+                  title="Clear all filters"
+                >
+                  <i className="ti ti-x fs-13"></i>
+                  <span>Reset</span>
+                </button>
+              )}
+            </div>
+
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table className="table table-hover align-middle mb-0 fs-13" style={{ width: '100%' }}>
                 <thead className="table-light text-secondary">
-                  {/* Column Filters */}
-                  <tr className="bg-light">
-                    <th>
-                      <input
-                        type="text"
-                        placeholder="Filter ID"
-                        className="form-control form-control-sm fs-11"
-                        value={colFilters.id}
-                        onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                      />
-                    </th>
-                    <th>
-                      <input
-                        type="text"
-                        placeholder="Filter Quality"
-                        className="form-control form-control-sm fs-11"
-                        value={colFilters.name}
-                        onChange={(e) => setColFilters({ ...colFilters, name: e.target.value })}
-                      />
-                    </th>
-                    <th>
-                      <select
-                        className="form-select form-select-sm fs-11"
-                        value={colFilters.type}
-                        onChange={(e) => setColFilters({ ...colFilters, type: e.target.value })}
-                      >
-                        <option value="">All Types</option>
-                        <option value="Cotton">Cotton</option>
-                        <option value="Rayon">Rayon</option>
-                        <option value="Polyester">Polyester</option>
-                        <option value="Silk">Silk</option>
-                      </select>
-                    </th>
-                    <th>
-                      <input
-                        type="text"
-                        placeholder="GSM"
-                        className="form-control form-control-sm fs-11"
-                        value={colFilters.gsm}
-                        onChange={(e) => setColFilters({ ...colFilters, gsm: e.target.value })}
-                      />
-                    </th>
-                    <th>Allowed Widths</th>
-                    <th>HSN</th>
-                    <th>Status</th>
-                  </tr>
-                  <tr>
-                    <th>Fabric ID</th>
-                    <th>Quality Name</th>
-                    <th>Fabric Type</th>
-                    <th>GSM</th>
-                    <th>Saved Widths (Panna)</th>
-                    <th>HSN</th>
-                    <th>Status</th>
+                  <tr style={{ fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    <th style={{ width: '16%' }}>FABRIC ID</th>
+                    <th style={{ width: '28%' }}>QUALITY NAME</th>
+                    <th style={{ width: '20%' }}>FABRIC TYPE</th>
+                    <th style={{ width: '12%' }}>GSM</th>
+                    <th style={{ width: '14%' }}>WIDTHS</th>
+                    <th style={{ width: '10%' }} className="text-end">STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -333,8 +355,7 @@ export default function FabricMasterView({
                             ))}
                           </div>
                         </td>
-                        <td className="font-monospace fs-12">{f.hsnCode || '-'}</td>
-                        <td>
+                        <td className="text-end">
                           <span
                             className={`badge px-2 py-1 ${
                               f.active
@@ -369,7 +390,7 @@ export default function FabricMasterView({
                 </div>
 
                 <div className="d-flex align-items-center gap-2">
-                  {!isEditing ? (
+                  {!isEditing && (
                     <button
                       type="button"
                       className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1"
@@ -377,15 +398,6 @@ export default function FabricMasterView({
                     >
                       <i className="ti ti-edit fs-14"></i>
                       <span>Edit Fabric</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-success btn-sm px-3 d-flex align-items-center gap-1"
-                      onClick={handleSave}
-                    >
-                      <i className="ti ti-check fs-14"></i>
-                      <span>Save Record</span>
                     </button>
                   )}
                   {isInline && (
@@ -425,19 +437,48 @@ export default function FabricMasterView({
                     <div className="col-6">
                       <label className="form-label fs-12 fw-semibold mb-1">Fabric Type *</label>
                       {isEditing ? (
-                        <select
-                          className="form-select form-select-sm bg-white"
-                          value={formData.fabricType}
-                          onChange={(e) => setFormData({ ...formData, fabricType: e.target.value })}
-                        >
-                          <option value="Cotton">Cotton</option>
-                          <option value="Rayon">Rayon</option>
-                          <option value="Polyester">Polyester</option>
-                          <option value="Silk">Silk</option>
-                          <option value="Linen">Linen</option>
-                        </select>
+                        <>
+                          <select
+                            className={`form-select form-select-sm bg-white ${
+                              formErrors.fabricType ? 'is-invalid' : ''
+                            }`}
+                            value={formData.fabricType}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+                              const isNewGreige = Boolean(
+                                newType &&
+                                (newType.toLowerCase().includes('greige') ||
+                                 newType.toLowerCase().includes('grey') ||
+                                 newType.toLowerCase().includes('undyed'))
+                              );
+                              setFormData({
+                                ...formData,
+                                fabricType: newType,
+                                defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
+                              });
+                              if (formErrors.fabricType) {
+                                setFormErrors((prev) => ({ ...prev, fabricType: null }));
+                              }
+                            }}
+                          >
+                            <option value="">Select fabric type...</option>
+                            <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
+                            <option value="Cotton">Cotton (Processed)</option>
+                            <option value="Rayon">Rayon</option>
+                            <option value="Modal">Modal</option>
+                            <option value="Silk">Silk</option>
+                            <option value="Georgette">Georgette</option>
+                            <option value="Linen">Linen</option>
+                            <option value="Polyester">Polyester</option>
+                            <option value="Viscose">Viscose</option>
+                            <option value="Blended">Blended</option>
+                          </select>
+                          {formErrors.fabricType && (
+                            <div className="invalid-feedback fs-11">{formErrors.fabricType}</div>
+                          )}
+                        </>
                       ) : (
-                        <div className="text-secondary fs-13">{formData.fabricType}</div>
+                        <div className="text-dark fs-13 fw-semibold">{formData.fabricType || '-'}</div>
                       )}
                     </div>
 
@@ -515,20 +556,57 @@ export default function FabricMasterView({
                 <div className="mb-3 p-3 bg-light rounded-3">
                   <div className="row g-2">
                     <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Default Shrinkage %</label>
+                      <div className="d-flex align-items-center justify-content-between mb-1">
+                        <label className="form-label fs-12 fw-semibold mb-0">Default Shrinkage %</label>
+                        {formData.fabricType ? (
+                          isGreige ? (
+                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Greige Only</span>
+                          ) : (
+                            <span className="badge bg-secondary-subtle text-secondary border fs-10 px-1.5 py-0.5">Processed (0%)</span>
+                          )
+                        ) : null}
+                      </div>
                       {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.1"
-                          placeholder="e.g. 3.5"
-                          className="form-control form-control-sm bg-white no-spinner"
-                          value={formData.defaultShrinkage}
-                          onChange={(e) =>
-                            setFormData({ ...formData, defaultShrinkage: e.target.value })
-                          }
-                        />
+                        <>
+                          <div className="input-group input-group-sm">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="30"
+                              placeholder={isGreige ? "e.g. 3.5" : ""}
+                              disabled={!isGreige}
+                              className={`form-control form-control-sm no-spinner ${
+                                !isGreige ? 'bg-light text-muted cursor-not-allowed' : 'bg-white'
+                              }`}
+                              value={formData.defaultShrinkage || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, defaultShrinkage: e.target.value })
+                              }
+                            />
+                            <span className="input-group-text bg-light text-muted fs-12">%</span>
+                          </div>
+                          <div className="form-text fs-11 mt-1">
+                            {isGreige ? (
+                              <span className="text-success">
+                                <i className="ti ti-check me-1"></i>Shrinkage allowed for greige fabric (shrinks after processing).
+                              </span>
+                            ) : (
+                              <span className="text-muted">
+                                <i className="ti ti-info-circle me-1"></i>Shrinkage allowed is only for greige fabrics. For processed fabric, allowance is 0%.
+                              </span>
+                            )}
+                          </div>
+                        </>
                       ) : (
-                        <div className="text-dark fs-13">{formData.defaultShrinkage}%</div>
+                        <div>
+                          <div className="text-dark fs-13 fw-semibold">
+                            {isGreige ? `${formData.defaultShrinkage || 0}%` : '0% (N/A - Processed)'}
+                          </div>
+                          <div className="fs-11 text-muted">
+                            {isGreige ? 'Processing shrinkage allowance active' : 'No shrinkage for processed fabric'}
+                          </div>
+                        </div>
                       )}
                     </div>
 

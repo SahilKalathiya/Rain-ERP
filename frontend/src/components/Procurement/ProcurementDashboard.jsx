@@ -84,6 +84,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         setActiveQcView('list');
         setSelectedQC(null);
       }
+      if (initialSubmodule === 'stock_pool') {
+        setSelectedStockGroupKey(null);
+      }
     }
   }, [sidebarClickCount]);
 
@@ -97,6 +100,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   const [activeQcView, setActiveQcView] = useState('list'); // 'list', 'form', 'detail', 'damaged'
   const [selectedQC, setSelectedQC] = useState(null);
   const [selectedDamagedItem, setSelectedDamagedItem] = useState(null);
+  const [selectedStockGroupKey, setSelectedStockGroupKey] = useState(null);
 
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -406,7 +410,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       vendorName: resolvedVendorName,
       fabricName: fabricItem,
       status: 'Bale Entry in Progress',
-      totalBales: 2,
+      totalBales: '',
       totalQty: String(remainingMeters),
       declaredTotalMeters: remainingMeters,
       bales: []
@@ -484,13 +488,13 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         inspectionScope: 'Whole Shipment',
         baleRef: '',
         pieceRef: '',
-        inspectorName: 'Saksham Garg',
+        inspectorName: '',
         expectedWidth: expWidth,
         actualWidth: '',
         expectedFold: expFold,
         actualFold: '',
         photos: [],
-        notes: `Quality inspection generated for inward shipment ${grnData.id}. Awaiting physical check.`,
+        notes: '',
         qcStatus: 'Pending',
         adminDecision: '',
         adminRemarks: '',
@@ -544,28 +548,58 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     // 1. ADD APPROVED PORTION DIRECTLY TO STOCK POOL
     const goodMeters = Number(qcData.goodQty) || 0;
     if (goodMeters > 0) {
-      const fabricName = linkedGrn?.fabricName || 'Fabric Quality';
-      const widthVal = qcData.actualWidth ? `${qcData.actualWidth}"` : (qcData.expectedWidth ? `${qcData.expectedWidth}"` : '44"');
-      const colorVal = linkedGrn?.colorName || 'Ivory';
+      const linkedPO = purchaseOrders.find((p) => p.id === linkedGrn?.poId || (linkedGrn?.linkedPOs && linkedGrn.linkedPOs.includes(p.id)));
+      const poItem = linkedPO?.items?.find((it) => it.fabricName === linkedGrn?.fabricName || it.fabricQuality === linkedGrn?.fabricName) || linkedPO?.items?.[0];
+
+      let fabricName = linkedGrn?.fabricName || poItem?.fabricName || poItem?.fabricQuality || 'Fabric Quality';
+      const widthVal = qcData.actualWidth ? `${qcData.actualWidth}"` : (qcData.expectedWidth ? `${qcData.expectedWidth}"` : (poItem?.width ? `${poItem.width}"` : '44"'));
+
+      // Check bale label for color if present
+      let baleColor = '';
+      if (linkedGrn?.bales && Array.isArray(linkedGrn.bales)) {
+        for (const b of linkedGrn.bales) {
+          const lbl = b.fabricItemLabel || b.fabric || '';
+          if (lbl.includes('—')) {
+            baleColor = lbl.split('—')[1].trim();
+            break;
+          } else if (lbl.includes(' - ')) {
+            baleColor = lbl.split(' - ')[1].trim();
+            break;
+          }
+        }
+      }
+
+      let colorVal = qcData.colorName || linkedGrn?.colorName || baleColor || poItem?.colorName || poItem?.color || 'White';
+      if (colorVal === 'Ivory' && (baleColor || poItem?.colorName)) {
+        colorVal = baleColor || poItem?.colorName;
+      }
+
+      const matchedFabric = fabrics.find((f) => (f.qualityName || f.name)?.toLowerCase() === fabricName.toLowerCase());
+      const resolvedFabricId = linkedGrn?.fabricId || matchedFabric?.id || poItem?.fabricId || 'FAB-0001';
+
+      // Match hex
+      const lowerCol = (colorVal || '').toLowerCase();
+      const matchedColor = colors.find((c) => c.name?.toLowerCase() === lowerCol || c.hex?.toLowerCase() === lowerCol);
+      const colorHexVal = matchedColor?.hex || linkedGrn?.colorHex || poItem?.colorHex || (lowerCol === 'white' ? '#FFFFFF' : (lowerCol === 'ivory' ? '#FFFFF0' : '#C86D51'));
 
       const newStockLot = {
         id: `SP-${Date.now()}`,
-        fabricId: linkedGrn?.fabricId || 'FAB-001',
+        fabricId: resolvedFabricId,
         fabricName: fabricName,
         width: widthVal,
-        colorId: linkedGrn?.colorId || null,
+        colorId: matchedColor?.id || linkedGrn?.colorId || null,
         colorName: colorVal,
-        colorHex: linkedGrn?.colorHex || '#FFFFF0',
+        colorHex: colorHexVal,
         qty: goodMeters,
         source: 'QC approved',
         sourceType: 'GRN',
-        poId: linkedGrn?.linkedPOs?.[0] || 'PO-1001',
+        poId: linkedGrn?.linkedPOs?.[0] || linkedPO?.id || 'PO-1001',
         grnId: qcData.grnRef,
         decidedAt: new Date().toLocaleDateString('en-GB')
       };
 
       setStockPool((prev) => [newStockLot, ...prev]);
-      addAuditLog('Inward', 'Stock Pool', newStockLot.id, 'Approved Stock Inward', 'None', `${goodMeters}m (${fabricName})`);
+      addAuditLog('Inward', 'Stock Pool', newStockLot.id, 'Approved Stock Inward', 'None', `${goodMeters}m (${fabricName} - ${colorVal})`);
     }
 
     // 2. DEFECT / FLAGGED PIECES HELD BACK FOR ADMIN REVIEW OR REJECTION
@@ -885,7 +919,27 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setGrns((prev) => (prev || []).map((g) => (g && g.id === updatedGrn.id ? updatedGrn : g)));
                 setSelectedGRN(updatedGrn);
                 api.saveGRN(updatedGrn).catch((e) => console.warn('GRN header save sync error:', e));
-                addAuditLog('Update', 'GRN', updatedGrn.id, 'GRN Header Details', 'Previous', 'Updated Receipt Details');
+
+                // Synchronize linked Quality Checks
+                setQualityChecks((prev) =>
+                  (prev || []).map((q) => {
+                    if (q && q.grnRef === updatedGrn.id) {
+                      const updatedQC = {
+                        ...q,
+                        vendorChallanNo: updatedGrn.vendorChallanNo,
+                        vendorInvoiceNo: updatedGrn.vendorInvoiceNo,
+                        transporterName: updatedGrn.transporterName,
+                        lrNumber: updatedGrn.lrNumber,
+                        expectedFold: updatedGrn.foldingCms || updatedGrn.expectedFold || q.expectedFold
+                      };
+                      api.saveQualityCheck(updatedQC).catch((err) => console.warn('QC sync error:', err));
+                      return updatedQC;
+                    }
+                    return q;
+                  })
+                );
+
+                addAuditLog('Update', 'GRN', updatedGrn.id, 'GRN Header Details', 'Previous', `Updated Receipt Details (${updatedGrn.vendorChallanNo || updatedGrn.vendorInvoiceNo || updatedGrn.id})`);
               }}
               onEditBales={(g) => {
                 setSelectedGRN(g);
@@ -913,11 +967,21 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               fabrics={fabrics}
               transporters={transporters}
               qualityChecks={qualityChecks}
-              onBack={() => setActiveGrnView(selectedGRN ? 'detail' : 'list')}
+              onBack={() => {
+                const existsInGrns = selectedGRN && (grns || []).some((g) => g && g.id === selectedGRN.id);
+                if (existsInGrns) {
+                  setActiveGrnView('detail');
+                } else {
+                  setSelectedGRN(null);
+                  setActiveGrnView('list');
+                }
+              }}
               onSaveGRN={(grnData, isCompleted) => {
                 handleSaveGRN(grnData, isCompleted);
                 setSelectedGRN(grnData);
-                setActiveGrnView('detail');
+                if (isCompleted) {
+                  setActiveGrnView('detail');
+                }
               }}
               onSaveTransporter={(t) => {
                 setTransporters((prev) => {
@@ -989,7 +1053,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setSelectedDamagedItem(dItem);
                 setActiveQcView('damaged');
               }}
-              onViewStockPool={() => {
+              onViewStockPool={(stockTarget) => {
+                setSelectedStockGroupKey(stockTarget || null);
                 setActiveTab('stock_pool');
                 if (onNavigate) onNavigate('/stock-pool');
               }}
@@ -1015,7 +1080,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 handleSaveQC(savedQC);
                 setSelectedQC(savedQC);
               }}
-              onNavigateToStockPool={() => {
+              onNavigateToStockPool={(stockTarget) => {
+                setSelectedStockGroupKey(stockTarget || null);
                 setActiveTab('stock_pool');
                 if (onNavigate) onNavigate('/stock-pool');
               }}
@@ -1035,10 +1101,43 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       {activeTab === 'stock_pool' && (
         <StockPoolView
           stockPool={stockPool}
-          onNavigateToGRN={(grnId) => {
-            const targetGrn = grns.find((g) => g.id === grnId);
+          grns={grns}
+          purchaseOrders={purchaseOrders}
+          qualityChecks={qualityChecks}
+          colors={colors}
+          fabrics={fabrics}
+          selectedGroupKey={selectedStockGroupKey}
+          onSelectGroupKey={(k) => setSelectedStockGroupKey(k)}
+          onNavigateToGRN={(grnIdOrLot) => {
+            const rawId = typeof grnIdOrLot === 'string' ? grnIdOrLot : (grnIdOrLot?.grnId || grnIdOrLot?.grnRef || grnIdOrLot?.id);
+            const cleanId = String(rawId || '').replace('GRN-', '').trim();
+
+            let targetGrn = grns.find((g) => g && (
+              g.id === rawId ||
+              g.id === `GRN-${cleanId}` ||
+              (cleanId && g.id.includes(cleanId))
+            ));
+
+            if (!targetGrn && grnIdOrLot) {
+              const poRef = typeof grnIdOrLot === 'object' ? (grnIdOrLot.poId || 'PO-1001') : 'PO-1001';
+              const fabName = typeof grnIdOrLot === 'object' ? (grnIdOrLot.fabricName || 'Modal Satin Premium') : 'Modal Satin Premium';
+              const vendor = typeof grnIdOrLot === 'object' ? (grnIdOrLot.vendorName || 'M.S. Textiles') : 'M.S. Textiles';
+              targetGrn = {
+                id: rawId?.startsWith('GRN-') ? rawId : `GRN-${rawId || '9237'}`,
+                poId: poRef,
+                linkedPOs: [poRef],
+                vendorName: vendor,
+                fabricName: fabName,
+                date: '2026-10-07',
+                status: 'QC Approved',
+                totalMetersEntered: typeof grnIdOrLot === 'object' ? (Number(grnIdOrLot.qty) || 2000) : 2000,
+                declaredTotalMeters: typeof grnIdOrLot === 'object' ? (Number(grnIdOrLot.qty) || 2000) : 2000,
+                bales: []
+              };
+            }
+
             if (targetGrn) setSelectedGRN(targetGrn);
-            setActiveGrnView('list');
+            setActiveGrnView('detail');
             setActiveTab('grn');
             if (onNavigate) onNavigate('/goods-inward');
           }}

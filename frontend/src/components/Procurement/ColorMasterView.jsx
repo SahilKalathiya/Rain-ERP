@@ -260,14 +260,20 @@ export default function ColorMasterView({
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         {/* Search bar */}
         <div className="flex-grow-1" style={{ maxWidth: '720px' }}>
-          <div className="position-relative">
+          <div className="position-relative w-100">
             <i
-              className="ti ti-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted fs-15"
-              style={{ pointerEvents: 'none' }}
+              className="ti ti-search position-absolute text-muted fs-15"
+              style={{
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}
             ></i>
             <input
               type="text"
-              className="form-control form-control-sm ps-5 py-2 fs-13 bg-white"
+              className="form-control form-control-sm py-2 fs-13 bg-white search-input-integrated"
               style={{
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
