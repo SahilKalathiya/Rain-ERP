@@ -17702,12 +17702,14 @@
   }) {
     const [isOpen, setIsOpen] = (0, import_react20.useState)(false);
     const [searchTerm, setSearchTerm] = (0, import_react20.useState)(value || "");
+    const [isTyping, setIsTyping] = (0, import_react20.useState)(false);
     const [isFocused, setIsFocused] = (0, import_react20.useState)(false);
     const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 220, openUp: false, maxHeight: 220 });
     const wrapperRef = (0, import_react20.useRef)(null);
     const dropdownRef = (0, import_react20.useRef)(null);
     (0, import_react20.useEffect)(() => {
       setSearchTerm(value || "");
+      setIsTyping(false);
     }, [value]);
     const updatePosition = () => {
       if (wrapperRef.current) {
@@ -17743,17 +17745,19 @@
         if (!clickedInsideWrapper && !clickedInsideDropdown) {
           setIsOpen(false);
           setIsFocused(false);
+          setIsTyping(false);
+          setSearchTerm(value || "");
         }
       }
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [value]);
     const matchedColor = colors.find(
       (c) => c.name.toLowerCase() === (value || "").toLowerCase() || c.hex.toLowerCase() === (value || "").toLowerCase()
     );
     const swatchHex = matchedColor ? matchedColor.hex : value?.startsWith("#") ? value : "#cbd5e1";
     const filteredColors = colors.filter((c) => {
-      if (!searchTerm) return true;
+      if (!isTyping || !searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return c.name.toLowerCase().includes(term) || c.hex.toLowerCase().includes(term);
     });
@@ -17777,6 +17781,7 @@
             cursor: "text"
           },
           onClick: () => {
+            setIsTyping(false);
             updatePosition();
             setIsOpen(true);
           }
@@ -17819,7 +17824,9 @@
             },
             placeholder: "Color name...",
             value: searchTerm,
-            onFocus: () => {
+            onFocus: (e) => {
+              e.target.select();
+              setIsTyping(false);
               updatePosition();
               setIsFocused(true);
               setIsOpen(true);
@@ -17828,13 +17835,18 @@
               setIsFocused(false);
             },
             onChange: (e) => {
+              setIsTyping(true);
               setSearchTerm(e.target.value);
               onChange(e.target.value);
               updatePosition();
               setIsOpen(true);
             },
             onKeyDown: (e) => {
-              if (e.key === "Escape") setIsOpen(false);
+              if (e.key === "Escape") {
+                setIsOpen(false);
+                setIsTyping(false);
+                setSearchTerm(value || "");
+              }
             }
           }
         ),
@@ -17852,6 +17864,7 @@
             },
             onClick: (e) => {
               e.stopPropagation();
+              setIsTyping(false);
               updatePosition();
               setIsOpen((prev) => !prev);
             },
@@ -17906,6 +17919,7 @@
                 onClick: () => {
                   onChange(col.name);
                   setSearchTerm(col.name);
+                  setIsTyping(false);
                   setIsOpen(false);
                 }
               },
@@ -17934,6 +17948,7 @@
               style: { color: "#5b47fb" },
               onClick: () => {
                 setIsOpen(false);
+                setIsTyping(false);
                 if (onAddNew) onAddNew();
               }
             },
@@ -17954,6 +17969,7 @@
     const [isOpen, setIsOpen] = (0, import_react20.useState)(false);
     const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
     const [searchTerm, setSearchTerm] = (0, import_react20.useState)(selectedFabric ? selectedFabric.qualityName : value || "");
+    const [isTyping, setIsTyping] = (0, import_react20.useState)(false);
     const [isFocused, setIsFocused] = (0, import_react20.useState)(false);
     const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 260, openUp: false, maxHeight: 220 });
     const wrapperRef = (0, import_react20.useRef)(null);
@@ -17961,6 +17977,7 @@
     (0, import_react20.useEffect)(() => {
       const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
       setSearchTerm(matched ? matched.qualityName : value || "");
+      setIsTyping(false);
     }, [value, fabrics]);
     const updatePosition = () => {
       if (wrapperRef.current) {
@@ -17996,13 +18013,16 @@
         if (!clickedInsideWrapper && !clickedInsideDropdown) {
           setIsOpen(false);
           setIsFocused(false);
+          setIsTyping(false);
+          const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
+          setSearchTerm(matched ? matched.qualityName : value || "");
         }
       }
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [value, fabrics]);
     const filteredFabrics = fabrics.filter((f) => {
-      if (!searchTerm) return true;
+      if (!isTyping || !searchTerm) return true;
       const term = searchTerm.toLowerCase();
       const name = (f.qualityName || "").toLowerCase();
       const code = (f.code || f.fabricCode || "").toLowerCase();
@@ -18029,6 +18049,7 @@
             cursor: "text"
           },
           onClick: () => {
+            setIsTyping(false);
             updatePosition();
             setIsOpen(true);
           }
@@ -18050,7 +18071,9 @@
             },
             placeholder: "Select fabric...",
             value: searchTerm,
-            onFocus: () => {
+            onFocus: (e) => {
+              e.target.select();
+              setIsTyping(false);
               updatePosition();
               setIsFocused(true);
               setIsOpen(true);
@@ -18060,6 +18083,7 @@
             },
             onChange: (e) => {
               const val = e.target.value;
+              setIsTyping(true);
               setSearchTerm(val);
               updatePosition();
               setIsOpen(true);
@@ -18073,11 +18097,17 @@
               }
             },
             onKeyDown: (e) => {
-              if (e.key === "Escape") setIsOpen(false);
+              if (e.key === "Escape") {
+                setIsOpen(false);
+                setIsTyping(false);
+                const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
+                setSearchTerm(matched ? matched.qualityName : value || "");
+              }
               if (e.key === "Enter" && filteredFabrics.length > 0) {
                 const top = filteredFabrics[0];
                 onChange(top.id);
                 setSearchTerm(top.qualityName);
+                setIsTyping(false);
                 setIsOpen(false);
               }
             }
@@ -18097,6 +18127,7 @@
             },
             onClick: (e) => {
               e.stopPropagation();
+              setIsTyping(false);
               updatePosition();
               setIsOpen((prev) => !prev);
             },
@@ -18151,6 +18182,7 @@
                 onClick: () => {
                   onChange(fab.id);
                   setSearchTerm(fab.qualityName);
+                  setIsTyping(false);
                   setIsOpen(false);
                 }
               },
@@ -18166,6 +18198,7 @@
               style: { color: "#5b47fb" },
               onClick: () => {
                 setIsOpen(false);
+                setIsTyping(false);
                 if (onAddNew) onAddNew();
               }
             },

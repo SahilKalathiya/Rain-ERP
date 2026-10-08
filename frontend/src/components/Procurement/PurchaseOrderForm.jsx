@@ -17,6 +17,7 @@ function SearchableColorInput({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value || '');
+  const [isTyping, setIsTyping] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 220, openUp: false, maxHeight: 220 });
   const wrapperRef = useRef(null);
@@ -24,6 +25,7 @@ function SearchableColorInput({
 
   useEffect(() => {
     setSearchTerm(value || '');
+    setIsTyping(false);
   }, [value]);
 
   const updatePosition = () => {
@@ -63,11 +65,13 @@ function SearchableColorInput({
       if (!clickedInsideWrapper && !clickedInsideDropdown) {
         setIsOpen(false);
         setIsFocused(false);
+        setIsTyping(false);
+        setSearchTerm(value || '');
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [value]);
 
   const matchedColor = colors.find(
     (c) =>
@@ -78,8 +82,9 @@ function SearchableColorInput({
     ? matchedColor.hex
     : (value?.startsWith('#') ? value : '#cbd5e1');
 
+  // Show all colors when opening or if not actively typing a filter
   const filteredColors = colors.filter((c) => {
-    if (!searchTerm) return true;
+    if (!isTyping || !searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return c.name.toLowerCase().includes(term) || c.hex.toLowerCase().includes(term);
   });
@@ -102,6 +107,7 @@ function SearchableColorInput({
           cursor: 'text'
         }}
         onClick={() => {
+          setIsTyping(false);
           updatePosition();
           setIsOpen(true);
         }}
@@ -142,7 +148,9 @@ function SearchableColorInput({
           }}
           placeholder="Color name..."
           value={searchTerm}
-          onFocus={() => {
+          onFocus={(e) => {
+            e.target.select();
+            setIsTyping(false);
             updatePosition();
             setIsFocused(true);
             setIsOpen(true);
@@ -151,13 +159,18 @@ function SearchableColorInput({
             setIsFocused(false);
           }}
           onChange={(e) => {
+            setIsTyping(true);
             setSearchTerm(e.target.value);
             onChange(e.target.value);
             updatePosition();
             setIsOpen(true);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+              setIsTyping(false);
+              setSearchTerm(value || '');
+            }
           }}
         />
 
@@ -174,6 +187,7 @@ function SearchableColorInput({
           }}
           onClick={(e) => {
             e.stopPropagation();
+            setIsTyping(false);
             updatePosition();
             setIsOpen((prev) => !prev);
           }}
@@ -228,6 +242,7 @@ function SearchableColorInput({
                       onClick={() => {
                         onChange(col.name);
                         setSearchTerm(col.name);
+                        setIsTyping(false);
                         setIsOpen(false);
                       }}
                     >
@@ -271,6 +286,7 @@ function SearchableColorInput({
                 style={{ color: '#5b47fb' }}
                 onClick={() => {
                   setIsOpen(false);
+                  setIsTyping(false);
                   if (onAddNew) onAddNew();
                 }}
               >
@@ -298,6 +314,7 @@ function SearchableFabricInput({
   const [isOpen, setIsOpen] = useState(false);
   const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
   const [searchTerm, setSearchTerm] = useState(selectedFabric ? selectedFabric.qualityName : (value || ''));
+  const [isTyping, setIsTyping] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 260, openUp: false, maxHeight: 220 });
   const wrapperRef = useRef(null);
@@ -306,6 +323,7 @@ function SearchableFabricInput({
   useEffect(() => {
     const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
     setSearchTerm(matched ? matched.qualityName : (value || ''));
+    setIsTyping(false);
   }, [value, fabrics]);
 
   const updatePosition = () => {
@@ -345,14 +363,17 @@ function SearchableFabricInput({
       if (!clickedInsideWrapper && !clickedInsideDropdown) {
         setIsOpen(false);
         setIsFocused(false);
+        setIsTyping(false);
+        const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
+        setSearchTerm(matched ? matched.qualityName : (value || ''));
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [value, fabrics]);
 
   const filteredFabrics = fabrics.filter((f) => {
-    if (!searchTerm) return true;
+    if (!isTyping || !searchTerm) return true;
     const term = searchTerm.toLowerCase();
     const name = (f.qualityName || '').toLowerCase();
     const code = (f.code || f.fabricCode || '').toLowerCase();
@@ -378,6 +399,7 @@ function SearchableFabricInput({
           cursor: 'text'
         }}
         onClick={() => {
+          setIsTyping(false);
           updatePosition();
           setIsOpen(true);
         }}
@@ -398,7 +420,9 @@ function SearchableFabricInput({
           }}
           placeholder="Select fabric..."
           value={searchTerm}
-          onFocus={() => {
+          onFocus={(e) => {
+            e.target.select();
+            setIsTyping(false);
             updatePosition();
             setIsFocused(true);
             setIsOpen(true);
@@ -408,6 +432,7 @@ function SearchableFabricInput({
           }}
           onChange={(e) => {
             const val = e.target.value;
+            setIsTyping(true);
             setSearchTerm(val);
             updatePosition();
             setIsOpen(true);
@@ -421,11 +446,17 @@ function SearchableFabricInput({
             }
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+              setIsTyping(false);
+              const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
+              setSearchTerm(matched ? matched.qualityName : (value || ''));
+            }
             if (e.key === 'Enter' && filteredFabrics.length > 0) {
               const top = filteredFabrics[0];
               onChange(top.id);
               setSearchTerm(top.qualityName);
+              setIsTyping(false);
               setIsOpen(false);
             }
           }}
@@ -444,6 +475,7 @@ function SearchableFabricInput({
           }}
           onClick={(e) => {
             e.stopPropagation();
+            setIsTyping(false);
             updatePosition();
             setIsOpen((prev) => !prev);
           }}
@@ -498,6 +530,7 @@ function SearchableFabricInput({
                       onClick={() => {
                         onChange(fab.id);
                         setSearchTerm(fab.qualityName);
+                        setIsTyping(false);
                         setIsOpen(false);
                       }}
                     >
@@ -530,6 +563,7 @@ function SearchableFabricInput({
                 style={{ color: '#5b47fb' }}
                 onClick={() => {
                   setIsOpen(false);
+                  setIsTyping(false);
                   if (onAddNew) onAddNew();
                 }}
               >
