@@ -380,15 +380,21 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   // Handlers
   const handleSavePO = (poData) => {
     const isEdit = purchaseOrders.some((p) => p.id === poData.id);
+    const now = Date.now();
+    const enrichedPO = {
+      ...poData,
+      createdAt: poData.createdAt || (isEdit ? purchaseOrders.find((p) => p.id === poData.id)?.createdAt : null) || now,
+      updatedAt: now
+    };
     if (isEdit) {
-      setPurchaseOrders((prev) => prev.map((p) => (p.id === poData.id ? poData : p)));
-      addAuditLog('Update', 'Purchase Order', poData.id, 'PO Details', 'Previous State', 'Updated State');
+      setPurchaseOrders((prev) => prev.map((p) => (p.id === enrichedPO.id ? enrichedPO : p)));
+      addAuditLog('Update', 'Purchase Order', enrichedPO.id, 'PO Details', 'Previous State', 'Updated State');
     } else {
-      setPurchaseOrders((prev) => [poData, ...prev]);
-      addAuditLog('Create', 'Purchase Order', poData.id, 'PO Creation', 'None', `${poData.id} (${poData.totalAmount})`);
+      setPurchaseOrders((prev) => [enrichedPO, ...prev]);
+      addAuditLog('Create', 'Purchase Order', enrichedPO.id, 'PO Creation', 'None', `${enrichedPO.id} (${enrichedPO.totalAmount})`);
     }
-    api.savePurchaseOrder(poData).catch((e) => console.warn('PO save sync error:', e));
-    setSelectedPO(poData);
+    api.savePurchaseOrder(enrichedPO).catch((e) => console.warn('PO save sync error:', e));
+    setSelectedPO(enrichedPO);
     setActivePoView('list');
   };
 
@@ -401,10 +407,13 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : '';
     const vMatch = vendors.find((v) => v.id === po.vendorId);
     const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : (po.vendorId || ''));
+    const now = Date.now();
 
     const newGrn = {
       id: `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
       date: new Date().toISOString().split('T')[0],
+      createdAt: now,
+      updatedAt: now,
       linkedPOs: [po.id],
       vendorId: po.vendorId,
       vendorName: resolvedVendorName,
@@ -423,20 +432,26 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
   const handleSaveGRN = (grnData, isCompleted = true) => {
     const isEdit = grns.some((g) => g.id === grnData.id);
+    const now = Date.now();
+    const enrichedGRN = {
+      ...grnData,
+      createdAt: grnData.createdAt || (isEdit ? grns.find((g) => g.id === grnData.id)?.createdAt : null) || now,
+      updatedAt: now
+    };
     let updated;
     if (isEdit) {
-      updated = grns.map((g) => (g.id === grnData.id ? grnData : g));
-      addAuditLog('Update', 'GRN', grnData.id, 'GRN Progress', 'Draft', grnData.status);
+      updated = grns.map((g) => (g.id === enrichedGRN.id ? enrichedGRN : g));
+      addAuditLog('Update', 'GRN', enrichedGRN.id, 'GRN Progress', 'Draft', enrichedGRN.status);
     } else {
-      updated = [grnData, ...grns];
-      addAuditLog('Create', 'GRN', grnData.id, 'Inward Delivery', 'None', `${grnData.id} (${grnData.totalMetersEntered}m)`);
+      updated = [enrichedGRN, ...grns];
+      addAuditLog('Create', 'GRN', enrichedGRN.id, 'Inward Delivery', 'None', `${enrichedGRN.id} (${enrichedGRN.totalMetersEntered}m)`);
     }
     setGrns(updated);
-    api.saveGRN(grnData).catch((e) => console.warn('GRN save sync error:', e));
+    api.saveGRN(enrichedGRN).catch((e) => console.warn('GRN save sync error:', e));
 
     // Update Linked PO Status (Partial Delivery vs Full Delivery)
-    if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
-      const linkedPoId = grnData.linkedPOs[0];
+    if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
+      const linkedPoId = enrichedGRN.linkedPOs[0];
       const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
       if (targetPo) {
         const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
@@ -462,12 +477,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     }
 
     // If completed, automatically generate QC record
-    if (isCompleted && grnData.status === 'Completed') {
+    if (isCompleted && enrichedGRN.status === 'Completed') {
       let expFold = '3';
       let expWidth = '42';
 
-      if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
-        const linkedPO = purchaseOrders.find((p) => grnData.linkedPOs.includes(p.id));
+      if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
+        const linkedPO = purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id));
         if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
           const item = linkedPO.items[0];
           if (item.fold) expFold = String(item.fold);
@@ -475,35 +490,57 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         }
       }
 
-      if (!expWidth && grnData.fabricName) {
-        const matchingFabric = fabrics.find((f) => f.qualityName === grnData.fabricName);
+      if (!expWidth && enrichedGRN.fabricName) {
+        const matchingFabric = fabrics.find((f) => f.qualityName === enrichedGRN.fabricName);
         if (matchingFabric && matchingFabric.pannaWidth) {
           expWidth = String(matchingFabric.pannaWidth);
         }
       }
 
-      const newQC = {
-        id: `QC-${String(Math.floor(1000 + Math.random() * 9000))}`,
-        grnRef: grnData.id,
-        inspectionScope: 'Whole Shipment',
-        baleRef: '',
-        pieceRef: '',
-        inspectorName: '',
-        expectedWidth: expWidth,
-        actualWidth: '',
-        expectedFold: expFold,
-        actualFold: '',
-        photos: [],
-        notes: '',
-        qcStatus: 'Pending',
-        adminDecision: '',
-        adminRemarks: '',
-        dateTime: new Date().toLocaleString('en-GB'),
-        createdBy: 'System QC Agent'
-      };
-      setQualityChecks((prev) => [newQC, ...prev]);
-      api.saveQualityCheck(newQC).catch((e) => console.warn('Auto QC save sync error:', e));
-      addAuditLog('Create', 'Quality Check', newQC.id, 'Auto QC Record', 'None', `Generated from ${grnData.id} (Awaiting QC)`);
+      const existingQC = qualityChecks.find((q) => q.grnRef === enrichedGRN.id);
+      let targetQC;
+      if (existingQC) {
+        targetQC = {
+          ...existingQC,
+          expectedWidth: expWidth,
+          expectedFold: expFold,
+          qcStatus: 'Pending',
+          updatedAt: now
+        };
+        setQualityChecks((prev) => prev.map((q) => (q.id === existingQC.id ? targetQC : q)));
+      } else {
+        targetQC = {
+          id: `QC-${String(Math.floor(1000 + Math.random() * 9000))}`,
+          grnRef: enrichedGRN.id,
+          inspectionScope: 'Whole Shipment',
+          baleRef: '',
+          pieceRef: '',
+          inspectorName: '',
+          expectedWidth: expWidth,
+          actualWidth: '',
+          expectedFold: expFold,
+          actualFold: '',
+          photos: [],
+          notes: '',
+          qcStatus: 'Pending',
+          adminDecision: '',
+          adminRemarks: '',
+          createdAt: now,
+          updatedAt: now,
+          dateTime: new Date().toLocaleString('en-GB'),
+          createdBy: 'System QC Agent'
+        };
+        setQualityChecks((prev) => [targetQC, ...prev]);
+      }
+      api.saveQualityCheck(targetQC).catch((e) => console.warn('Auto QC save sync error:', e));
+      addAuditLog('Create', 'Quality Check', targetQC.id, 'Auto QC Record', 'None', `Generated from ${enrichedGRN.id} (Awaiting QC)`);
+
+      // Open GRN Detail View with full QC status and inspection section
+      setSelectedGRN(enrichedGRN);
+      setSelectedQC(targetQC);
+      setActiveTab('grn');
+      setActiveGrnView('detail');
+      return;
     }
 
     setActiveGrnView('list');
@@ -511,13 +548,19 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
   const handleSaveQC = (qcData) => {
     const isEdit = qualityChecks.some((q) => q.id === qcData.id);
+    const now = Date.now();
+    const enrichedQC = {
+      ...qcData,
+      createdAt: qcData.createdAt || (isEdit ? qualityChecks.find((q) => q.id === qcData.id)?.createdAt : null) || now,
+      updatedAt: now
+    };
     if (isEdit) {
-      setQualityChecks((prev) => prev.map((q) => (q.id === qcData.id ? qcData : q)));
+      setQualityChecks((prev) => prev.map((q) => (q.id === enrichedQC.id ? enrichedQC : q)));
     } else {
-      setQualityChecks((prev) => [qcData, ...prev]);
+      setQualityChecks((prev) => [enrichedQC, ...prev]);
     }
 
-    api.saveQualityCheck(qcData).catch((e) => console.warn('QC save sync error:', e));
+    api.saveQualityCheck(enrichedQC).catch((e) => console.warn('QC save sync error:', e));
     addAuditLog('Update', 'Quality Check', qcData.id, 'QC Status', 'Pending', qcData.qcStatus);
 
     // Lock the linked GRN once QC is actioned (OK, Partial OK, Reject, Send for Admin Approval)
@@ -653,18 +696,30 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     // 1. Remove previous entry tied to this damaged item from stockPool if any to prevent double-counting
     let updatedStockPool = stockPool.filter((s) => s.damagedItemId !== targetId && s.damagedItemId !== damagedItem.id);
 
-    // 2. If decision is 'Reversed (treated as good)', add to stockPool
-    if (decision === 'Reversed (treated as good)') {
+    // 2. Check if decision is an approval / transfer to stock pool
+    const isApprovalDecision =
+      decision === 'Reversed (treated as good)' ||
+      decision === 'Approve' ||
+      decision === 'Approved' ||
+      decision === 'Accept' ||
+      decision === 'Accepted' ||
+      decision === 'Transfer to Main Stock Pool' ||
+      decision === 'Approve — Add to Stock Pool' ||
+      String(decision).toLowerCase().includes('stock pool') ||
+      String(decision).toLowerCase().includes('good') ||
+      String(decision).toLowerCase().includes('approve');
+
+    if (isApprovalDecision) {
       const newLot = {
         id: `SP-${Date.now()}`,
-        fabricId: damagedItem.fabricId || 'FAB-001',
+        fabricId: damagedItem.fabricId || selectedGRN?.fabricId || 'FAB-001',
         fabricName: fabricName,
-        width: damagedItem.width || '42"',
-        colorId: damagedItem.colorId || null,
-        colorName: damagedItem.colorName || 'Ivory',
-        colorHex: '#FFFFF0',
+        width: damagedItem.width || selectedGRN?.width || '42"',
+        colorId: damagedItem.colorId || selectedGRN?.colorId || null,
+        colorName: damagedItem.colorName || selectedGRN?.colorName || 'Ivory',
+        colorHex: damagedItem.colorHex || selectedGRN?.colorHex || '#FFFFF0',
         qty: lotQty,
-        source: 'Reversed — defect overturned on review',
+        source: 'Admin Approved — Added to Stock Pool',
         sourceType: 'Damaged Reversal',
         poId: poRef,
         grnId: grnRef,
@@ -736,7 +791,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             ...q,
             adminDecision: decision,
             adminRemarks: note || `Admin resolution: ${decision}`,
-            qcStatus: decision === 'Reversed (treated as good)' ? 'OK' : q.qcStatus
+            qcStatus: isApprovalDecision ? 'OK' : q.qcStatus
           };
           api.saveQualityCheck(nextQc).catch((e) => console.warn('QC save sync error:', e));
           if (selectedQC && (selectedQC.id === q.id || selectedQC.grnRef === grnRef)) {
@@ -759,8 +814,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           if (g.id === grnRef) {
             const nextG = {
               ...g,
-              status: decision === 'Reversed (treated as good)' ? 'QC Approved' : g.status,
-              qcStatus: decision === 'Reversed (treated as good)' ? 'OK' : g.qcStatus,
+              status: isApprovalDecision ? 'QC Approved' : g.status,
+              qcStatus: isApprovalDecision ? 'OK' : g.qcStatus,
               isQcActioned: true
             };
             api.saveGRN(nextG).catch((e) => console.warn('GRN sync error:', e));
@@ -979,9 +1034,6 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               onSaveGRN={(grnData, isCompleted) => {
                 handleSaveGRN(grnData, isCompleted);
                 setSelectedGRN(grnData);
-                if (isCompleted) {
-                  setActiveGrnView('detail');
-                }
               }}
               onSaveTransporter={(t) => {
                 setTransporters((prev) => {
@@ -1162,9 +1214,28 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           onScrapSaleCompleted={(sale) =>
             addAuditLog('Create', 'Scrap Sale', sale.saleId, 'Scrap Liquidation', 'To Be Sold', `Sold (₹${sale.settlementAmount})`)
           }
-          onTransferToStock={(tr) =>
-            addAuditLog('Update', 'Stock Ledger', 'Stock Pool', 'Transfer from Rejected', 'Defective', tr.targetGrade)
-          }
+          onTransferToStock={(tr) => {
+            const itemsToAdd = (tr.itemsIncluded || []).map((it, idx) => ({
+              id: `SP-TR-${Date.now()}-${idx}`,
+              fabricId: it.fabricId || 'FAB-001',
+              fabricName: it.fabricName || 'Transferred Fabric',
+              width: it.width || '42"',
+              colorId: it.colorId || null,
+              colorName: it.colorName || 'Greige',
+              colorHex: it.colorHex || '#CBD5E1',
+              qty: Number(it.quantity) || 0,
+              source: `Transferred from Rejected (${tr.targetGrade || 'Stock'})`,
+              sourceType: 'Stock Transfer',
+              poId: it.poRef || 'PO-0001',
+              grnId: it.grnRef || 'GRN-0001',
+              decidedAt: new Date().toLocaleDateString('en-GB')
+            }));
+
+            if (itemsToAdd.length > 0) {
+              setStockPool((prev) => [...itemsToAdd, ...prev]);
+            }
+            addAuditLog('Update', 'Stock Ledger', 'Stock Pool', 'Transfer from Rejected', 'Defective', tr.targetGrade);
+          }}
         />
       )}
 

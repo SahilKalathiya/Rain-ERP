@@ -93,10 +93,20 @@ export default function GRNDetailView({
 
   const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === 'Pending');
 
-  // Calculate bales total - only include genuinely entered/configured bales
-  const bales = (grn.bales || []).filter(
-    (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-  );
+  const declaredBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
+  const rawBales = grn.bales || [];
+  let bales = [...rawBales];
+  if (declaredBaleCount > bales.length) {
+    for (let i = bales.length; i < declaredBaleCount; i++) {
+      bales.push({
+        baleNo: String(i + 1),
+        fabricItemLabel: grn.fabricName || 'Fabric Item',
+        piecesCount: 0,
+        totalLength: 0,
+        pieces: []
+      });
+    }
+  }
   const totalMeters = Number(grn.totalMetersEntered) || (bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0)) || Number(grn.declaredTotalMeters) || 0;
   const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
 
@@ -330,7 +340,27 @@ export default function GRNDetailView({
         <h5 className="fw-bold text-dark mb-3 fs-16">Quality check by item</h5>
         <div
           className="border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white"
-          style={{ borderColor: '#e2e8f0' }}
+          style={{
+            borderColor: '#e2e8f0',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease-in-out'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#5b47fb';
+            e.currentTarget.style.backgroundColor = '#faf9ff';
+            e.currentTarget.style.boxShadow = '0 4px 14px rgba(91, 71, 251, 0.08)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#e2e8f0';
+            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          onClick={() => {
+            if (onSelectQCItem) {
+              onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
+            }
+          }}
+          title="Click anywhere on this card to run quality check inspection"
         >
           <div className="d-flex align-items-center gap-3">
             <div
@@ -373,7 +403,8 @@ export default function GRNDetailView({
               type="button"
               className="btn btn-sm btn-primary rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white"
               style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (onSelectQCItem) {
                   onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
                 }

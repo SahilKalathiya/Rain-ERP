@@ -82,10 +82,22 @@ function parseDateForSort(d, id) {
   });
 
   const sortedList = [...filtered].sort((a, b) => {
-    const timeA = parseDateForSort(a.date || a.receivedDate || a.createdDate, a.id);
-    const timeB = parseDateForSort(b.date || b.receivedDate || b.createdDate, b.id);
-    if (timeB !== timeA) return timeB - timeA;
-    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+    // 1. First priority: exact entry/update timestamp (newest entry / updated entry on top)
+    const stampA = a.updatedAt || a.createdAt || a.timestamp || 0;
+    const stampB = b.updatedAt || b.createdAt || b.timestamp || 0;
+    if (stampA && stampB && stampA !== stampB) {
+      return stampB - stampA;
+    }
+    if (stampB && !stampA) return 1;
+    if (stampA && !stampB) return -1;
+
+    // 2. Second priority: received / entry date
+    const timeA = parseDateForSort(a.date || a.receivedDate || a.createdDate);
+    const timeB = parseDateForSort(b.date || b.receivedDate || b.createdDate);
+    if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+
+    // 3. Third priority: maintain natural entry / list insertion order (newest on top)
+    return grns.indexOf(a) - grns.indexOf(b);
   });
 
   return (

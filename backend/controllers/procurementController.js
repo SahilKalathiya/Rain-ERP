@@ -417,17 +417,21 @@ const saveGRN = async (req, res) => {
 
     if (g.bales && g.bales.length > 0) {
       for (const bale of g.bales) {
+        const pCount = parseInt(bale.piecesCount, 10) || (bale.pieces ? bale.pieces.length : 0);
+        const tLen = parseFloat(bale.totalLength) || 0;
         const [baleRes] = await conn.query(
           'INSERT INTO grn_bales (grn_id, bale_no, pieces_count, total_length) VALUES (?, ?, ?, ?)',
-          [g.id, bale.baleNo, bale.piecesCount, bale.totalLength]
+          [g.id, String(bale.baleNo || '1'), pCount, tLen]
         );
         const baleId = baleRes.insertId;
 
         if (bale.pieces && bale.pieces.length > 0) {
           for (const piece of bale.pieces) {
+            const pLen = parseFloat(piece.length) || 0;
+            const pFabric = piece.fabric || piece.fabricName || bale.fabricItemLabel || g.fabricName || 'Fabric';
             await conn.query(
               'INSERT INTO grn_pieces (bale_id, grn_id, piece_no, fabric_name, length, remarks) VALUES (?, ?, ?, ?, ?, ?)',
-              [baleId, g.id, piece.pieceNo, piece.fabric, piece.length, piece.remarks || '']
+              [baleId, g.id, String(piece.pieceNo || 'Pc 1'), pFabric, pLen, piece.remarks || '']
             );
           }
         }

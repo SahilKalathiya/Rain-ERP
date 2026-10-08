@@ -7,8 +7,7 @@ import { initialColors } from '../../data/procurementData';
 
 /**
  * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
- * Uses a floating React Portal (fixed coordinates) to ensure the dropdown menu
- * is never clipped by table, card, or modal boundaries and stays completely visible.
+ * Uses non-clipping portal positioned directly below the box for 100% precision.
  */
 function SearchableColorInput({
   value = '',
@@ -19,7 +18,7 @@ function SearchableColorInput({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value || '');
   const [isFocused, setIsFocused] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 240 });
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 220, openUp: false, maxHeight: 220 });
   const wrapperRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -27,18 +26,20 @@ function SearchableColorInput({
     setSearchTerm(value || '');
   }, [value]);
 
-  // Dynamically position the dropdown relative to the viewport
   const updatePosition = () => {
     if (wrapperRef.current) {
       const rect = wrapperRef.current.getBoundingClientRect();
-      const dropdownHeight = 250;
       const spaceBelow = window.innerHeight - rect.bottom;
-      const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+      const openUp = spaceBelow < 130 && rect.top > spaceBelow;
+      const maxHeight = openUp ? Math.min(220, Math.max(120, rect.top - 16)) : Math.min(220, Math.max(120, spaceBelow - 16));
 
       setCoords({
-        top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+        openUp,
+        top: rect.bottom + 3,
+        bottom: window.innerHeight - rect.top + 3,
         left: rect.left,
-        width: Math.max(rect.width, 240)
+        width: Math.max(rect.width, 220),
+        maxHeight
       });
     }
   };
@@ -87,7 +88,7 @@ function SearchableColorInput({
     <div
       ref={wrapperRef}
       className="position-relative"
-      style={{ minWidth: '150px' }}
+      style={{ width: '100%', minWidth: '130px' }}
     >
       {/* Unified Seamless Container */}
       <div
@@ -185,24 +186,25 @@ function SearchableColorInput({
         </span>
       </div>
 
-      {/* Floating Theme Dropdown Menu Portaled to Document Body */}
+      {/* Floating Theme Dropdown Menu Portaled to Document Body (Never Clipped) */}
       {isOpen &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
             ref={dropdownRef}
-            className="bg-white rounded-3 border overflow-hidden"
+            className="bg-white rounded-3 border overflow-hidden shadow-lg"
             style={{
               position: 'fixed',
-              top: `${coords.top}px`,
+              top: coords.openUp ? 'auto' : `${coords.top}px`,
+              bottom: coords.openUp ? `${coords.bottom}px` : 'auto',
               left: `${coords.left}px`,
               width: `${coords.width}px`,
               zIndex: 999999,
-              borderColor: '#e2e8f0',
-              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)'
+              borderColor: '#cbd5e1',
+              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12)'
             }}
           >
-            <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="py-1">
+            <div style={{ maxHeight: `${coords.maxHeight}px`, overflowY: 'auto' }} className="py-1">
               {filteredColors.length > 0 ? (
                 filteredColors.map((col) => {
                   const isSelected = (value || '').toLowerCase() === col.name.toLowerCase();
@@ -285,9 +287,7 @@ function SearchableColorInput({
 
 /**
  * SearchableFabricInput - Custom Theme-styled Searchable Fabric Dropdown / Combobox
- * Matches SearchableColorInput: Direct typing inside the input box to search & filter fabrics.
- * Uses a floating React Portal (fixed coordinates) to ensure the dropdown menu
- * is never clipped by table, card, or modal boundaries and stays completely visible.
+ * Uses non-clipping portal positioned directly below the box for 100% precision.
  */
 function SearchableFabricInput({
   value = '',
@@ -299,7 +299,7 @@ function SearchableFabricInput({
   const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
   const [searchTerm, setSearchTerm] = useState(selectedFabric ? selectedFabric.qualityName : (value || ''));
   const [isFocused, setIsFocused] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 280 });
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 260, openUp: false, maxHeight: 220 });
   const wrapperRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -308,18 +308,20 @@ function SearchableFabricInput({
     setSearchTerm(matched ? matched.qualityName : (value || ''));
   }, [value, fabrics]);
 
-  // Dynamically position the dropdown relative to the viewport
   const updatePosition = () => {
     if (wrapperRef.current) {
       const rect = wrapperRef.current.getBoundingClientRect();
-      const dropdownHeight = 250;
       const spaceBelow = window.innerHeight - rect.bottom;
-      const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+      const openUp = spaceBelow < 130 && rect.top > spaceBelow;
+      const maxHeight = openUp ? Math.min(220, Math.max(120, rect.top - 16)) : Math.min(220, Math.max(120, spaceBelow - 16));
 
       setCoords({
-        top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+        openUp,
+        top: rect.bottom + 3,
+        bottom: window.innerHeight - rect.top + 3,
         left: rect.left,
-        width: Math.max(rect.width, 280)
+        width: Math.max(rect.width, 260),
+        maxHeight
       });
     }
   };
@@ -362,7 +364,7 @@ function SearchableFabricInput({
     <div
       ref={wrapperRef}
       className="position-relative"
-      style={{ minWidth: '150px' }}
+      style={{ width: '100%', minWidth: '150px' }}
     >
       {/* Unified Seamless Container */}
       <div
@@ -380,7 +382,7 @@ function SearchableFabricInput({
           setIsOpen(true);
         }}
       >
-        {/* Text Input with NO individual inner border or outline */}
+        {/* Text Input directly inside the box */}
         <input
           type="text"
           style={{
@@ -454,24 +456,25 @@ function SearchableFabricInput({
         </span>
       </div>
 
-      {/* Floating Theme Dropdown Menu Portaled to Document Body */}
+      {/* Floating Theme Dropdown Menu Portaled to Document Body (Never Clipped) */}
       {isOpen &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
             ref={dropdownRef}
-            className="bg-white rounded-3 border overflow-hidden"
+            className="bg-white rounded-3 border overflow-hidden shadow-lg"
             style={{
               position: 'fixed',
-              top: `${coords.top}px`,
+              top: coords.openUp ? 'auto' : `${coords.top}px`,
+              bottom: coords.openUp ? `${coords.bottom}px` : 'auto',
               left: `${coords.left}px`,
               width: `${coords.width}px`,
               zIndex: 999999,
-              borderColor: '#e2e8f0',
-              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)'
+              borderColor: '#cbd5e1',
+              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12)'
             }}
           >
-            <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="py-1">
+            <div style={{ maxHeight: `${coords.maxHeight}px`, overflowY: 'auto' }} className="py-1">
               {filteredFabrics.length > 0 ? (
                 filteredFabrics.map((fab) => {
                   const isSelected = fab.id === value || fab.qualityName.toLowerCase() === (searchTerm || '').toLowerCase();

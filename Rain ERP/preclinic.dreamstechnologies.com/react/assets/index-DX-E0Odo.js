@@ -15651,10 +15651,17 @@
       return matchesSearch && matchesCol;
     });
     const sortedList = [...filtered].sort((a, b) => {
-      const timeA = parseDateForSort(a.date || a.createdDate, a.id);
-      const timeB = parseDateForSort(b.date || b.createdDate, b.id);
-      if (timeB !== timeA) return timeB - timeA;
-      return String(b.id || "").localeCompare(String(a.id || ""), void 0, { numeric: true });
+      const stampA = a.updatedAt || a.createdAt || a.timestamp || 0;
+      const stampB = b.updatedAt || b.createdAt || b.timestamp || 0;
+      if (stampA && stampB && stampA !== stampB) {
+        return stampB - stampA;
+      }
+      if (stampB && !stampA) return 1;
+      if (stampA && !stampB) return -1;
+      const timeA = parseDateForSort(a.date || a.createdDate);
+      const timeB = parseDateForSort(b.date || b.createdDate);
+      if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+      return purchaseOrders.indexOf(a) - purchaseOrders.indexOf(b);
     });
     return /* @__PURE__ */ import_react16.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4" }, /* @__PURE__ */ import_react16.default.createElement("div", null, /* @__PURE__ */ import_react16.default.createElement("nav", { "aria-label": "breadcrumb" }, /* @__PURE__ */ import_react16.default.createElement("ol", { className: "breadcrumb mb-1 text-muted fs-12" }, /* @__PURE__ */ import_react16.default.createElement("li", { className: "breadcrumb-item" }, "Procurement"), /* @__PURE__ */ import_react16.default.createElement("li", { className: "breadcrumb-item active text-primary fw-medium" }, "Purchase Orders"))), /* @__PURE__ */ import_react16.default.createElement("h2", { className: "fw-bold text-dark mb-1 fs-24" }, "Purchase Orders (PO)"), /* @__PURE__ */ import_react16.default.createElement("p", { className: "text-secondary mb-0 fs-13" }, "Raw Material Procurement Orders & Vendor Buffer Management")), /* @__PURE__ */ import_react16.default.createElement(
       "button",
@@ -17696,7 +17703,7 @@
     const [isOpen, setIsOpen] = (0, import_react20.useState)(false);
     const [searchTerm, setSearchTerm] = (0, import_react20.useState)(value || "");
     const [isFocused, setIsFocused] = (0, import_react20.useState)(false);
-    const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 240 });
+    const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 220, openUp: false, maxHeight: 220 });
     const wrapperRef = (0, import_react20.useRef)(null);
     const dropdownRef = (0, import_react20.useRef)(null);
     (0, import_react20.useEffect)(() => {
@@ -17705,13 +17712,16 @@
     const updatePosition = () => {
       if (wrapperRef.current) {
         const rect = wrapperRef.current.getBoundingClientRect();
-        const dropdownHeight = 250;
         const spaceBelow = window.innerHeight - rect.bottom;
-        const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+        const openUp = spaceBelow < 130 && rect.top > spaceBelow;
+        const maxHeight = openUp ? Math.min(220, Math.max(120, rect.top - 16)) : Math.min(220, Math.max(120, spaceBelow - 16));
         setCoords({
-          top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+          openUp,
+          top: rect.bottom + 3,
+          bottom: window.innerHeight - rect.top + 3,
           left: rect.left,
-          width: Math.max(rect.width, 240)
+          width: Math.max(rect.width, 220),
+          maxHeight
         });
       }
     };
@@ -17752,7 +17762,7 @@
       {
         ref: wrapperRef,
         className: "position-relative",
-        style: { minWidth: "150px" }
+        style: { width: "100%", minWidth: "130px" }
       },
       /* @__PURE__ */ import_react20.default.createElement(
         "div",
@@ -17861,18 +17871,19 @@
           "div",
           {
             ref: dropdownRef,
-            className: "bg-white rounded-3 border overflow-hidden",
+            className: "bg-white rounded-3 border overflow-hidden shadow-lg",
             style: {
               position: "fixed",
-              top: `${coords.top}px`,
+              top: coords.openUp ? "auto" : `${coords.top}px`,
+              bottom: coords.openUp ? `${coords.bottom}px` : "auto",
               left: `${coords.left}px`,
               width: `${coords.width}px`,
               zIndex: 999999,
-              borderColor: "#e2e8f0",
-              boxShadow: "0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)"
+              borderColor: "#cbd5e1",
+              boxShadow: "0 12px 28px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12)"
             }
           },
-          /* @__PURE__ */ import_react20.default.createElement("div", { style: { maxHeight: "220px", overflowY: "auto" }, className: "py-1" }, filteredColors.length > 0 ? filteredColors.map((col) => {
+          /* @__PURE__ */ import_react20.default.createElement("div", { style: { maxHeight: `${coords.maxHeight}px`, overflowY: "auto" }, className: "py-1" }, filteredColors.length > 0 ? filteredColors.map((col) => {
             const isSelected = (value || "").toLowerCase() === col.name.toLowerCase();
             return /* @__PURE__ */ import_react20.default.createElement(
               "div",
@@ -17944,7 +17955,7 @@
     const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
     const [searchTerm, setSearchTerm] = (0, import_react20.useState)(selectedFabric ? selectedFabric.qualityName : value || "");
     const [isFocused, setIsFocused] = (0, import_react20.useState)(false);
-    const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 280 });
+    const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 260, openUp: false, maxHeight: 220 });
     const wrapperRef = (0, import_react20.useRef)(null);
     const dropdownRef = (0, import_react20.useRef)(null);
     (0, import_react20.useEffect)(() => {
@@ -17954,13 +17965,16 @@
     const updatePosition = () => {
       if (wrapperRef.current) {
         const rect = wrapperRef.current.getBoundingClientRect();
-        const dropdownHeight = 250;
         const spaceBelow = window.innerHeight - rect.bottom;
-        const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+        const openUp = spaceBelow < 130 && rect.top > spaceBelow;
+        const maxHeight = openUp ? Math.min(220, Math.max(120, rect.top - 16)) : Math.min(220, Math.max(120, spaceBelow - 16));
         setCoords({
-          top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+          openUp,
+          top: rect.bottom + 3,
+          bottom: window.innerHeight - rect.top + 3,
           left: rect.left,
-          width: Math.max(rect.width, 280)
+          width: Math.max(rect.width, 260),
+          maxHeight
         });
       }
     };
@@ -18000,7 +18014,7 @@
       {
         ref: wrapperRef,
         className: "position-relative",
-        style: { minWidth: "150px" }
+        style: { width: "100%", minWidth: "150px" }
       },
       /* @__PURE__ */ import_react20.default.createElement(
         "div",
@@ -18102,18 +18116,19 @@
           "div",
           {
             ref: dropdownRef,
-            className: "bg-white rounded-3 border overflow-hidden",
+            className: "bg-white rounded-3 border overflow-hidden shadow-lg",
             style: {
               position: "fixed",
-              top: `${coords.top}px`,
+              top: coords.openUp ? "auto" : `${coords.top}px`,
+              bottom: coords.openUp ? `${coords.bottom}px` : "auto",
               left: `${coords.left}px`,
               width: `${coords.width}px`,
               zIndex: 999999,
-              borderColor: "#e2e8f0",
-              boxShadow: "0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)"
+              borderColor: "#cbd5e1",
+              boxShadow: "0 12px 28px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12)"
             }
           },
-          /* @__PURE__ */ import_react20.default.createElement("div", { style: { maxHeight: "220px", overflowY: "auto" }, className: "py-1" }, filteredFabrics.length > 0 ? filteredFabrics.map((fab) => {
+          /* @__PURE__ */ import_react20.default.createElement("div", { style: { maxHeight: `${coords.maxHeight}px`, overflowY: "auto" }, className: "py-1" }, filteredFabrics.length > 0 ? filteredFabrics.map((fab) => {
             const isSelected = fab.id === value || fab.qualityName.toLowerCase() === (searchTerm || "").toLowerCase();
             return /* @__PURE__ */ import_react20.default.createElement(
               "div",
@@ -19085,10 +19100,17 @@
       return matchesSearch && matchesCol;
     });
     const sortedList = [...filtered].sort((a, b) => {
-      const timeA = parseDateForSort(a.date || a.receivedDate || a.createdDate, a.id);
-      const timeB = parseDateForSort(b.date || b.receivedDate || b.createdDate, b.id);
-      if (timeB !== timeA) return timeB - timeA;
-      return String(b.id || "").localeCompare(String(a.id || ""), void 0, { numeric: true });
+      const stampA = a.updatedAt || a.createdAt || a.timestamp || 0;
+      const stampB = b.updatedAt || b.createdAt || b.timestamp || 0;
+      if (stampA && stampB && stampA !== stampB) {
+        return stampB - stampA;
+      }
+      if (stampB && !stampA) return 1;
+      if (stampA && !stampB) return -1;
+      const timeA = parseDateForSort(a.date || a.receivedDate || a.createdDate);
+      const timeB = parseDateForSort(b.date || b.receivedDate || b.createdDate);
+      if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+      return grns.indexOf(a) - grns.indexOf(b);
     });
     return /* @__PURE__ */ import_react22.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react22.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react22.default.createElement("div", { className: "d-flex align-items-center gap-2 mb-1" }, /* @__PURE__ */ import_react22.default.createElement(
       "span",
@@ -19454,6 +19476,7 @@
         if (!d) return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         return typeof d === "string" && d.includes("T") ? d.split("T")[0] : String(d);
       };
+      const targetBaleCount = Math.max(0, parseInt(grn?.totalBales || grn?.numBales || 0, 10));
       let initialBales = [];
       if (grn?.bales && grn.bales.length > 0) {
         initialBales = grn.bales.map((b, idx) => {
@@ -19470,17 +19493,29 @@
               length: p !== void 0 && p !== null ? p : ""
             };
           });
-          const piecesCount = Number(b.piecesCount) || normPieces.length || 0;
+          const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
           const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
           return {
             baleNo: b.baleNo !== void 0 ? String(b.baleNo) : String(idx + 1),
             itemIdx: b.itemIdx !== void 0 ? Number(b.itemIdx) : 0,
-            fabricItemLabel: b.fabricItemLabel || b.fabric || "",
+            fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || "",
             piecesCount,
             totalLength,
             pieces: normPieces
           };
         });
+      }
+      if (targetBaleCount > initialBales.length) {
+        for (let i = initialBales.length; i < targetBaleCount; i++) {
+          initialBales.push({
+            baleNo: String(i + 1),
+            itemIdx: 0,
+            fabricItemLabel: "",
+            piecesCount: "",
+            pieces: [],
+            totalLength: 0
+          });
+        }
       }
       return {
         id: grn?.id || `GRN-${String(Math.floor(1e3 + Math.random() * 9e3))}`,
@@ -19500,7 +19535,7 @@
         weight: grn?.weight !== void 0 ? grn.weight : "",
         totalQty: defaultDeclared ? String(defaultDeclared) : "",
         declaredTotalMeters: defaultDeclared ? Number(defaultDeclared) : 0,
-        totalBales: grn?.totalBales || grn?.numBales || (initialBales.length > 0 ? initialBales.length : ""),
+        totalBales: grn?.totalBales || grn?.numBales || (initialBales.length > 0 ? String(initialBales.length) : ""),
         status: grn?.status || "Bale Entry in Progress",
         bales: initialBales
       };
@@ -19521,6 +19556,7 @@
           if (!d) return "";
           return typeof d === "string" && d.includes("T") ? d.split("T")[0] : String(d);
         };
+        const targetBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
         let initialBales = [];
         if (grn.bales && grn.bales.length > 0) {
           initialBales = grn.bales.map((b, idx) => {
@@ -19537,15 +19573,29 @@
                 length: p !== void 0 && p !== null ? p : ""
               };
             });
+            const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
+            const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
             return {
               baleNo: b.baleNo !== void 0 ? String(b.baleNo) : String(idx + 1),
               itemIdx: b.itemIdx !== void 0 ? Number(b.itemIdx) : 0,
-              fabricItemLabel: b.fabricItemLabel || b.fabric || "",
-              piecesCount: Number(b.piecesCount) || normPieces.length || 0,
-              totalLength: Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0),
+              fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || "",
+              piecesCount,
+              totalLength,
               pieces: normPieces
             };
           });
+        }
+        if (targetBaleCount > initialBales.length) {
+          for (let i = initialBales.length; i < targetBaleCount; i++) {
+            initialBales.push({
+              baleNo: String(i + 1),
+              itemIdx: 0,
+              fabricItemLabel: "",
+              piecesCount: "",
+              pieces: [],
+              totalLength: 0
+            });
+          }
         }
         setFormData((prev) => ({
           ...prev,
@@ -19566,7 +19616,7 @@
           weight: grn.weight !== void 0 ? grn.weight : prev.weight,
           totalQty: grn.totalQty !== void 0 ? String(grn.totalQty) : String(grn.declaredTotalMeters || prev.totalQty),
           declaredTotalMeters: Number(grn.totalQty || grn.declaredTotalMeters || prev.declaredTotalMeters || 0),
-          totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? initialBales.length : prev.totalBales),
+          totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
           status: grn.status || prev.status,
           bales: initialBales.length > 0 ? initialBales : prev.bales
         }));
@@ -19644,6 +19694,38 @@
         };
       });
     };
+    const handleBaleCountChange = (val) => {
+      const count = parseInt(val, 10);
+      if (!isNaN(count) && count >= 0) {
+        const currentBales = formData.bales || [];
+        const newBales = [];
+        for (let i = 0; i < count; i++) {
+          if (currentBales[i]) {
+            newBales.push(currentBales[i]);
+          } else {
+            const assignedLabel = poItemLabels.length > 0 ? poItemLabels[i % poItemLabels.length] || poItemLabels[0] : defaultFabricLabel;
+            newBales.push({
+              baleNo: String(i + 1),
+              itemIdx: i % (poItemLabels.length || 1),
+              fabricItemLabel: assignedLabel,
+              piecesCount: "",
+              pieces: [],
+              totalLength: 0
+            });
+          }
+        }
+        setFormData((prev) => ({
+          ...prev,
+          totalBales: val,
+          bales: newBales
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          totalBales: val
+        }));
+      }
+    };
     const handleGenerateBales = () => {
       const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
       if (count <= 0) {
@@ -19669,7 +19751,7 @@
       }
       setFormData((prev) => ({
         ...prev,
-        totalBales: count,
+        totalBales: String(count),
         bales: newBales
       }));
     };
@@ -19678,7 +19760,7 @@
         const updated = prev.bales.filter((_, idx) => idx !== baleIdx);
         return {
           ...prev,
-          totalBales: updated.length,
+          totalBales: String(updated.length),
           bales: updated
         };
       });
@@ -19817,14 +19899,11 @@
         showToast("GRN Header saved successfully! Bale & piece entry can be resumed anytime.", "success");
       }
     };
-    const handleSaveSingleBale = (baleIdx) => {
+    const handleSaveAllBales = (specificBaleIdx = null) => {
       if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
         showToast("Please select a Source document (Purchase Order) before saving.", "warning");
         return;
       }
-      const currentBale = formData.bales?.[baleIdx];
-      const baleNo = currentBale?.baleNo || baleIdx + 1;
-      const baleMeters = (currentBale?.totalLength || 0).toFixed(2).replace(/\.00$/, "");
       const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
       const firstPoItem = selectedPO?.items?.[0];
       const fabricItem = firstPoItem ? firstPoItem.fabricName || firstPoItem.fabricQuality : formData.fabricName || "";
@@ -19832,12 +19911,8 @@
       const colorHexVal = firstPoItem?.colorHex || formData.colorHex || "";
       const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
       const widthVal = firstPoItem?.width || formData.width || "";
-      const configuredBales = (formData.bales || []).filter(
-        (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-      );
       const payload = {
         ...formData,
-        bales: configuredBales.length > 0 ? configuredBales : formData.bales || [],
         status: "Bale Entry in Progress",
         date: formData.receivedDate,
         fabricName: fabricItem,
@@ -19850,11 +19925,14 @@
       };
       if (onSaveGRN) {
         onSaveGRN(payload, false);
-        showToast(`Bale ${baleNo} (${baleMeters}m) saved successfully!`, "success");
+        const totalCount = (formData.bales || []).length;
+        const configuredCount = (formData.bales || []).filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
+        showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${totalMetersEntered}m entered)`, "success");
       }
     };
+    const handleSaveSingleBale = handleSaveAllBales;
     const handleCompleteGRN = () => {
-      if (!formData.poId) {
+      if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
         showToast("Please select a Source document (Purchase Order).", "warning");
         return;
       }
@@ -19863,22 +19941,27 @@
         return;
       }
       if (!declaredTotal || declaredTotal <= 0) {
-        showToast("Please enter Total quantity (m).", "warning");
+        showToast("Please enter Total quantity (m) in Receipt Details before submitting.", "warning");
         return;
       }
       if (!formData.bales || formData.bales.length === 0) {
         showToast("Please generate at least one bale and enter piece meters before submitting.", "warning");
         return;
       }
-      if (!isMatch) {
-        const proceed = window.confirm(
-          `Piece-wise length total (${totalMetersEntered}m) does not match declared total (${declaredTotal}m).
-
-Variance: ${Math.round((totalMetersEntered - declaredTotal) * 100) / 100}m.
-
-Do you want to proceed and submit anyway?`
-        );
-        if (!proceed) return;
+      if (Math.abs(totalMetersEntered - declaredTotal) >= 0.01) {
+        const diff = Math.round((declaredTotal - totalMetersEntered) * 100) / 100;
+        if (diff > 0) {
+          showToast(
+            `Cannot submit to QC! Piece-wise total (${totalMetersEntered}m) is less than declared quantity (${declaredTotal}m). Remaining ${diff}m needs to be entered in bales first.`,
+            "danger"
+          );
+        } else {
+          showToast(
+            `Cannot submit to QC! Piece-wise total (${totalMetersEntered}m) exceeds declared quantity (${declaredTotal}m) by ${Math.abs(diff)}m. Please correct bale measurements.`,
+            "danger"
+          );
+        }
+        return;
       }
       const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
       const firstPoItem = selectedPO?.items?.[0];
@@ -19887,12 +19970,8 @@ Do you want to proceed and submit anyway?`
       const colorHexVal = firstPoItem?.colorHex || formData.colorHex || "";
       const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
       const widthVal = firstPoItem?.width || formData.width || "";
-      const configuredBales = (formData.bales || []).filter(
-        (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-      );
       const payload = {
         ...formData,
-        bales: configuredBales.length > 0 ? configuredBales : formData.bales || [],
         status: "Completed",
         date: formData.receivedDate,
         fabricName: fabricItem,
@@ -19905,7 +19984,7 @@ Do you want to proceed and submit anyway?`
       };
       if (onSaveGRN) {
         onSaveGRN(payload, true);
-        showToast(`GRN ${formData.id} submitted successfully and sent to Quality Check (QC)!`, "success");
+        showToast(`GRN ${formData.id} (${totalMetersEntered}m) submitted successfully and sent to Quality Check (QC)!`, "success");
       }
     };
     return /* @__PURE__ */ import_react24.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react24.default.createElement(
@@ -20076,7 +20155,7 @@ Do you want to proceed and submit anyway?`
         className: "form-control bg-white fs-13",
         style: { height: "40px", borderColor: "#cbd5e1", borderRadius: "8px" },
         value: formData.totalBales,
-        onChange: (e) => setFormData({ ...formData, totalBales: e.target.value }),
+        onChange: (e) => handleBaleCountChange(e.target.value),
         onKeyDown: (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
@@ -20115,7 +20194,18 @@ Do you want to proceed and submit anyway?`
       },
       /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-device-floppy fs-15", style: { color: "#5b47fb" } }),
       /* @__PURE__ */ import_react24.default.createElement("span", null, "Save This Section")
-    )), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-muted fs-12 mt-2 mb-0" }, 'Press Enter in "No. of bales" to generate immediately, or use the buttons above.')), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom" }, /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-1 fs-16 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-packages text-primary fs-18" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Bale-wise Inward Entry")), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary fs-12 mb-0" }, "Enter individual piece lengths (in meters) for each container bale")), formData.bales.length > 0 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold" }, formData.bales.length, " Bale", formData.bales.length > 1 ? "s" : "", " Generated")), formData.bales.length === 0 ? /* @__PURE__ */ import_react24.default.createElement(
+    )), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-muted fs-12 mt-2 mb-0" }, 'Press Enter in "No. of bales" to generate immediately, or use the buttons above.')), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom" }, /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-1 fs-16 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-packages text-primary fs-18" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Bale-wise Inward Entry")), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary fs-12 mb-0" }, "Enter individual piece lengths (in meters) for each container bale")), formData.bales.length > 0 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold" }, formData.bales.length, " Bale", formData.bales.length > 1 ? "s" : "", " Generated"), !isQcActioned && /* @__PURE__ */ import_react24.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fs-12 fw-semibold rounded-3 text-white shadow-sm",
+        style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
+        onClick: () => handleSaveAllBales(),
+        title: "Save all generated bales and entered pieces"
+      },
+      /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-device-floppy fs-14" }),
+      /* @__PURE__ */ import_react24.default.createElement("span", null, "Save All Bales")
+    ))), formData.bales.length === 0 ? /* @__PURE__ */ import_react24.default.createElement(
       "div",
       {
         className: "p-5 text-center rounded-3 text-muted fs-13 my-2",
@@ -20490,9 +20580,20 @@ Do you want to proceed and submit anyway?`
     const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
     const mainQC = qcRecs[0];
     const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === "Pending");
-    const bales = (grn.bales || []).filter(
-      (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-    );
+    const declaredBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
+    const rawBales = grn.bales || [];
+    let bales = [...rawBales];
+    if (declaredBaleCount > bales.length) {
+      for (let i = bales.length; i < declaredBaleCount; i++) {
+        bales.push({
+          baleNo: String(i + 1),
+          fabricItemLabel: grn.fabricName || "Fabric Item",
+          piecesCount: 0,
+          totalLength: 0,
+          pieces: []
+        });
+      }
+    }
     const totalMeters = Number(grn.totalMetersEntered) || bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0) || Number(grn.declaredTotalMeters) || 0;
     const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
     const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
@@ -20577,7 +20678,27 @@ Do you want to proceed and submit anyway?`
       "div",
       {
         className: "border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white",
-        style: { borderColor: "#e2e8f0" }
+        style: {
+          borderColor: "#e2e8f0",
+          cursor: "pointer",
+          transition: "all 0.15s ease-in-out"
+        },
+        onMouseEnter: (e) => {
+          e.currentTarget.style.borderColor = "#5b47fb";
+          e.currentTarget.style.backgroundColor = "#faf9ff";
+          e.currentTarget.style.boxShadow = "0 4px 14px rgba(91, 71, 251, 0.08)";
+        },
+        onMouseLeave: (e) => {
+          e.currentTarget.style.borderColor = "#e2e8f0";
+          e.currentTarget.style.backgroundColor = "#ffffff";
+          e.currentTarget.style.boxShadow = "none";
+        },
+        onClick: () => {
+          if (onSelectQCItem) {
+            onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === "QC Approved" ? "Approved" : "Pending" });
+          }
+        },
+        title: "Click anywhere on this card to run quality check inspection"
       },
       /* @__PURE__ */ import_react25.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react25.default.createElement(
         "div",
@@ -20599,7 +20720,8 @@ Do you want to proceed and submit anyway?`
           type: "button",
           className: "btn btn-sm btn-primary rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white",
           style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
-          onClick: () => {
+          onClick: (e) => {
+            e.stopPropagation();
             if (onSelectQCItem) {
               onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === "QC Approved" ? "Approved" : "Pending" });
             }
@@ -20854,10 +20976,17 @@ Do you want to proceed and submit anyway?`
       return qc.id && qc.id.toLowerCase().includes(term) || qc.grnRef && qc.grnRef.toLowerCase().includes(term) || details.againstRef && details.againstRef.toLowerCase().includes(term) || details.fabricName && details.fabricName.toLowerCase().includes(term) || qc.inspectorName && qc.inspectorName.toLowerCase().includes(term);
     });
     const sortedList = [...filtered].sort((a, b) => {
-      const timeA = parseDateForSort(a.dateTime || a.date || a.createdDate, a.id);
-      const timeB = parseDateForSort(b.dateTime || b.date || b.createdDate, b.id);
-      if (timeB !== timeA) return timeB - timeA;
-      return String(b.id || "").localeCompare(String(a.id || ""), void 0, { numeric: true });
+      const stampA = a.updatedAt || a.createdAt || a.timestamp || 0;
+      const stampB = b.updatedAt || b.createdAt || b.timestamp || 0;
+      if (stampA && stampB && stampA !== stampB) {
+        return stampB - stampA;
+      }
+      if (stampB && !stampA) return 1;
+      if (stampA && !stampB) return -1;
+      const timeA = parseDateForSort(a.dateTime || a.date || a.createdDate);
+      const timeB = parseDateForSort(b.dateTime || b.date || b.createdDate);
+      if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+      return qcRecords.indexOf(a) - qcRecords.indexOf(b);
     });
     return /* @__PURE__ */ import_react26.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react26.default.createElement(
       "div",
@@ -21872,16 +22001,16 @@ Do you want to proceed and submit anyway?`
       return /* @__PURE__ */ import_react29.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react29.default.createElement("i", { className: "ti ti-alert-circle fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react29.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Damaged Item Details Not Found"), /* @__PURE__ */ import_react29.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The flagged item record could not be loaded."), /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to Quality Check")));
     }
     const currentStatus = damagedItem.status || damagedItem.adminDecision || "Pending Admin Review";
-    const isCurrentlyInStock = currentStatus === "Reversed (treated as good)";
+    const isCurrentlyInStock = currentStatus === "Reversed (treated as good)" || currentStatus === "Approve" || currentStatus === "Approved" || currentStatus === "Approve \u2014 Add to Stock Pool" || currentStatus.toLowerCase().includes("stock pool") || currentStatus.toLowerCase().includes("good") || currentStatus.toLowerCase().includes("approve");
     const qty = Number(damagedItem.quantity) || Number(damagedItem.defectiveQty) || 100;
     const piecesCount = damagedItem.defectivePieces || 1;
     const grnRef = damagedItem.grnRef || "GRN-1002";
     const fabricName = damagedItem.fabricName || 'Tussar Silk (42") \u2014 Ivory';
     const dateStr = damagedItem.dateFlagged || damagedItem.reportedAt || "2026-10-07";
     const resolutions = [
-      { key: "Write Off (scrap)", label: "Write Off (scrap)", btnClass: "btn-outline-danger" },
-      { key: "Return to Vendor", label: "Return to Vendor", btnClass: "btn-outline-warning text-dark" },
-      { key: "Reversed (treated as good)", label: "Reverse \u2014 Add to Stock After All", btnClass: "btn-outline-success" }
+      { key: "Reversed (treated as good)", label: "Approve \u2014 Add to Stock Pool", btnClass: "btn-outline-success" },
+      { key: "Return to Vendor", label: "Return to Vendor (RTV)", btnClass: "btn-outline-warning text-dark" },
+      { key: "Write Off (scrap)", label: "Write Off (scrap)", btnClass: "btn-outline-danger" }
     ];
     const handleApplyResolution = (decisionKey) => {
       if (onResolveDecision) {
@@ -23649,15 +23778,21 @@ Do you want to proceed and submit anyway?`
     };
     const handleSavePO = (poData) => {
       const isEdit = purchaseOrders.some((p) => p.id === poData.id);
+      const now = Date.now();
+      const enrichedPO = {
+        ...poData,
+        createdAt: poData.createdAt || (isEdit ? purchaseOrders.find((p) => p.id === poData.id)?.createdAt : null) || now,
+        updatedAt: now
+      };
       if (isEdit) {
-        setPurchaseOrders((prev) => prev.map((p) => p.id === poData.id ? poData : p));
-        addAuditLog("Update", "Purchase Order", poData.id, "PO Details", "Previous State", "Updated State");
+        setPurchaseOrders((prev) => prev.map((p) => p.id === enrichedPO.id ? enrichedPO : p));
+        addAuditLog("Update", "Purchase Order", enrichedPO.id, "PO Details", "Previous State", "Updated State");
       } else {
-        setPurchaseOrders((prev) => [poData, ...prev]);
-        addAuditLog("Create", "Purchase Order", poData.id, "PO Creation", "None", `${poData.id} (${poData.totalAmount})`);
+        setPurchaseOrders((prev) => [enrichedPO, ...prev]);
+        addAuditLog("Create", "Purchase Order", enrichedPO.id, "PO Creation", "None", `${enrichedPO.id} (${enrichedPO.totalAmount})`);
       }
-      api.savePurchaseOrder(poData).catch((e) => console.warn("PO save sync error:", e));
-      setSelectedPO(poData);
+      api.savePurchaseOrder(enrichedPO).catch((e) => console.warn("PO save sync error:", e));
+      setSelectedPO(enrichedPO);
       setActivePoView("list");
     };
     const handleInwardFromPO = (po) => {
@@ -23668,9 +23803,12 @@ Do you want to proceed and submit anyway?`
       const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : "";
       const vMatch = vendors.find((v) => v.id === po.vendorId);
       const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : po.vendorId || "");
+      const now = Date.now();
       const newGrn = {
         id: `GRN-${String(Math.floor(1e3 + Math.random() * 9e3))}`,
         date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        createdAt: now,
+        updatedAt: now,
         linkedPOs: [po.id],
         vendorId: po.vendorId,
         vendorName: resolvedVendorName,
@@ -23688,18 +23826,24 @@ Do you want to proceed and submit anyway?`
     };
     const handleSaveGRN = (grnData, isCompleted = true) => {
       const isEdit = grns.some((g) => g.id === grnData.id);
+      const now = Date.now();
+      const enrichedGRN = {
+        ...grnData,
+        createdAt: grnData.createdAt || (isEdit ? grns.find((g) => g.id === grnData.id)?.createdAt : null) || now,
+        updatedAt: now
+      };
       let updated;
       if (isEdit) {
-        updated = grns.map((g) => g.id === grnData.id ? grnData : g);
-        addAuditLog("Update", "GRN", grnData.id, "GRN Progress", "Draft", grnData.status);
+        updated = grns.map((g) => g.id === enrichedGRN.id ? enrichedGRN : g);
+        addAuditLog("Update", "GRN", enrichedGRN.id, "GRN Progress", "Draft", enrichedGRN.status);
       } else {
-        updated = [grnData, ...grns];
-        addAuditLog("Create", "GRN", grnData.id, "Inward Delivery", "None", `${grnData.id} (${grnData.totalMetersEntered}m)`);
+        updated = [enrichedGRN, ...grns];
+        addAuditLog("Create", "GRN", enrichedGRN.id, "Inward Delivery", "None", `${enrichedGRN.id} (${enrichedGRN.totalMetersEntered}m)`);
       }
       setGrns(updated);
-      api.saveGRN(grnData).catch((e) => console.warn("GRN save sync error:", e));
-      if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
-        const linkedPoId = grnData.linkedPOs[0];
+      api.saveGRN(enrichedGRN).catch((e) => console.warn("GRN save sync error:", e));
+      if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
+        const linkedPoId = enrichedGRN.linkedPOs[0];
         const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
         if (targetPo) {
           const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
@@ -23721,56 +23865,82 @@ Do you want to proceed and submit anyway?`
           api.savePurchaseOrder(updatedPo).catch((e) => console.warn("PO status sync error:", e));
         }
       }
-      if (isCompleted && grnData.status === "Completed") {
+      if (isCompleted && enrichedGRN.status === "Completed") {
         let expFold = "3";
         let expWidth = "42";
-        if (grnData.linkedPOs && grnData.linkedPOs.length > 0) {
-          const linkedPO = purchaseOrders.find((p) => grnData.linkedPOs.includes(p.id));
+        if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
+          const linkedPO = purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id));
           if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
             const item = linkedPO.items[0];
             if (item.fold) expFold = String(item.fold);
             if (item.width) expWidth = String(item.width);
           }
         }
-        if (!expWidth && grnData.fabricName) {
-          const matchingFabric = fabrics.find((f) => f.qualityName === grnData.fabricName);
+        if (!expWidth && enrichedGRN.fabricName) {
+          const matchingFabric = fabrics.find((f) => f.qualityName === enrichedGRN.fabricName);
           if (matchingFabric && matchingFabric.pannaWidth) {
             expWidth = String(matchingFabric.pannaWidth);
           }
         }
-        const newQC = {
-          id: `QC-${String(Math.floor(1e3 + Math.random() * 9e3))}`,
-          grnRef: grnData.id,
-          inspectionScope: "Whole Shipment",
-          baleRef: "",
-          pieceRef: "",
-          inspectorName: "",
-          expectedWidth: expWidth,
-          actualWidth: "",
-          expectedFold: expFold,
-          actualFold: "",
-          photos: [],
-          notes: "",
-          qcStatus: "Pending",
-          adminDecision: "",
-          adminRemarks: "",
-          dateTime: (/* @__PURE__ */ new Date()).toLocaleString("en-GB"),
-          createdBy: "System QC Agent"
-        };
-        setQualityChecks((prev) => [newQC, ...prev]);
-        api.saveQualityCheck(newQC).catch((e) => console.warn("Auto QC save sync error:", e));
-        addAuditLog("Create", "Quality Check", newQC.id, "Auto QC Record", "None", `Generated from ${grnData.id} (Awaiting QC)`);
+        const existingQC = qualityChecks.find((q) => q.grnRef === enrichedGRN.id);
+        let targetQC;
+        if (existingQC) {
+          targetQC = {
+            ...existingQC,
+            expectedWidth: expWidth,
+            expectedFold: expFold,
+            qcStatus: "Pending",
+            updatedAt: now
+          };
+          setQualityChecks((prev) => prev.map((q) => q.id === existingQC.id ? targetQC : q));
+        } else {
+          targetQC = {
+            id: `QC-${String(Math.floor(1e3 + Math.random() * 9e3))}`,
+            grnRef: enrichedGRN.id,
+            inspectionScope: "Whole Shipment",
+            baleRef: "",
+            pieceRef: "",
+            inspectorName: "",
+            expectedWidth: expWidth,
+            actualWidth: "",
+            expectedFold: expFold,
+            actualFold: "",
+            photos: [],
+            notes: "",
+            qcStatus: "Pending",
+            adminDecision: "",
+            adminRemarks: "",
+            createdAt: now,
+            updatedAt: now,
+            dateTime: (/* @__PURE__ */ new Date()).toLocaleString("en-GB"),
+            createdBy: "System QC Agent"
+          };
+          setQualityChecks((prev) => [targetQC, ...prev]);
+        }
+        api.saveQualityCheck(targetQC).catch((e) => console.warn("Auto QC save sync error:", e));
+        addAuditLog("Create", "Quality Check", targetQC.id, "Auto QC Record", "None", `Generated from ${enrichedGRN.id} (Awaiting QC)`);
+        setSelectedGRN(enrichedGRN);
+        setSelectedQC(targetQC);
+        setActiveTab("grn");
+        setActiveGrnView("detail");
+        return;
       }
       setActiveGrnView("list");
     };
     const handleSaveQC = (qcData) => {
       const isEdit = qualityChecks.some((q) => q.id === qcData.id);
+      const now = Date.now();
+      const enrichedQC = {
+        ...qcData,
+        createdAt: qcData.createdAt || (isEdit ? qualityChecks.find((q) => q.id === qcData.id)?.createdAt : null) || now,
+        updatedAt: now
+      };
       if (isEdit) {
-        setQualityChecks((prev) => prev.map((q) => q.id === qcData.id ? qcData : q));
+        setQualityChecks((prev) => prev.map((q) => q.id === enrichedQC.id ? enrichedQC : q));
       } else {
-        setQualityChecks((prev) => [qcData, ...prev]);
+        setQualityChecks((prev) => [enrichedQC, ...prev]);
       }
-      api.saveQualityCheck(qcData).catch((e) => console.warn("QC save sync error:", e));
+      api.saveQualityCheck(enrichedQC).catch((e) => console.warn("QC save sync error:", e));
       addAuditLog("Update", "Quality Check", qcData.id, "QC Status", "Pending", qcData.qcStatus);
       const linkedGrn = grns.find((g) => g.id === qcData.grnRef);
       if (linkedGrn) {
@@ -23877,17 +24047,18 @@ Do you want to proceed and submit anyway?`
       const vendorName = damagedItem.vendorName || selectedGRN?.vendorName || "M.S. Textiles";
       const lotQty = Number(damagedItem.quantity) || Number(damagedItem.defectiveQty) || Number(damagedItem.heldBackQty) || 100;
       let updatedStockPool = stockPool.filter((s) => s.damagedItemId !== targetId && s.damagedItemId !== damagedItem.id);
-      if (decision === "Reversed (treated as good)") {
+      const isApprovalDecision = decision === "Reversed (treated as good)" || decision === "Approve" || decision === "Approved" || decision === "Accept" || decision === "Accepted" || decision === "Transfer to Main Stock Pool" || decision === "Approve \u2014 Add to Stock Pool" || String(decision).toLowerCase().includes("stock pool") || String(decision).toLowerCase().includes("good") || String(decision).toLowerCase().includes("approve");
+      if (isApprovalDecision) {
         const newLot = {
           id: `SP-${Date.now()}`,
-          fabricId: damagedItem.fabricId || "FAB-001",
+          fabricId: damagedItem.fabricId || selectedGRN?.fabricId || "FAB-001",
           fabricName,
-          width: damagedItem.width || '42"',
-          colorId: damagedItem.colorId || null,
-          colorName: damagedItem.colorName || "Ivory",
-          colorHex: "#FFFFF0",
+          width: damagedItem.width || selectedGRN?.width || '42"',
+          colorId: damagedItem.colorId || selectedGRN?.colorId || null,
+          colorName: damagedItem.colorName || selectedGRN?.colorName || "Ivory",
+          colorHex: damagedItem.colorHex || selectedGRN?.colorHex || "#FFFFF0",
           qty: lotQty,
-          source: "Reversed \u2014 defect overturned on review",
+          source: "Admin Approved \u2014 Added to Stock Pool",
           sourceType: "Damaged Reversal",
           poId: poRef,
           grnId: grnRef,
@@ -23950,7 +24121,7 @@ Do you want to proceed and submit anyway?`
               ...q,
               adminDecision: decision,
               adminRemarks: note || `Admin resolution: ${decision}`,
-              qcStatus: decision === "Reversed (treated as good)" ? "OK" : q.qcStatus
+              qcStatus: isApprovalDecision ? "OK" : q.qcStatus
             };
             api.saveQualityCheck(nextQc).catch((e) => console.warn("QC save sync error:", e));
             if (selectedQC && (selectedQC.id === q.id || selectedQC.grnRef === grnRef)) {
@@ -23972,8 +24143,8 @@ Do you want to proceed and submit anyway?`
             if (g.id === grnRef) {
               const nextG = {
                 ...g,
-                status: decision === "Reversed (treated as good)" ? "QC Approved" : g.status,
-                qcStatus: decision === "Reversed (treated as good)" ? "OK" : g.qcStatus,
+                status: isApprovalDecision ? "QC Approved" : g.status,
+                qcStatus: isApprovalDecision ? "OK" : g.qcStatus,
                 isQcActioned: true
               };
               api.saveGRN(nextG).catch((e) => console.warn("GRN sync error:", e));
@@ -24166,9 +24337,6 @@ Do you want to proceed and submit anyway?`
         onSaveGRN: (grnData, isCompleted) => {
           handleSaveGRN(grnData, isCompleted);
           setSelectedGRN(grnData);
-          if (isCompleted) {
-            setActiveGrnView("detail");
-          }
         },
         onSaveTransporter: (t) => {
           setTransporters((prev) => {
@@ -24322,7 +24490,27 @@ Do you want to proceed and submit anyway?`
         onUpdateItemStatus: (updatedItems) => setRejectedStock(updatedItems),
         onRTVChallanGenerated: (ch) => addAuditLog("Create", "RTV Challan", ch.challanNo, "Return to Vendor", "In Pool", "Dispatched"),
         onScrapSaleCompleted: (sale) => addAuditLog("Create", "Scrap Sale", sale.saleId, "Scrap Liquidation", "To Be Sold", `Sold (\u20B9${sale.settlementAmount})`),
-        onTransferToStock: (tr) => addAuditLog("Update", "Stock Ledger", "Stock Pool", "Transfer from Rejected", "Defective", tr.targetGrade)
+        onTransferToStock: (tr) => {
+          const itemsToAdd = (tr.itemsIncluded || []).map((it, idx) => ({
+            id: `SP-TR-${Date.now()}-${idx}`,
+            fabricId: it.fabricId || "FAB-001",
+            fabricName: it.fabricName || "Transferred Fabric",
+            width: it.width || '42"',
+            colorId: it.colorId || null,
+            colorName: it.colorName || "Greige",
+            colorHex: it.colorHex || "#CBD5E1",
+            qty: Number(it.quantity) || 0,
+            source: `Transferred from Rejected (${tr.targetGrade || "Stock"})`,
+            sourceType: "Stock Transfer",
+            poId: it.poRef || "PO-0001",
+            grnId: it.grnRef || "GRN-0001",
+            decidedAt: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB")
+          }));
+          if (itemsToAdd.length > 0) {
+            setStockPool((prev) => [...itemsToAdd, ...prev]);
+          }
+          addAuditLog("Update", "Stock Ledger", "Stock Pool", "Transfer from Rejected", "Defective", tr.targetGrade);
+        }
       }
     ), activeTab === "vendors" && /* @__PURE__ */ import_react34.default.createElement(
       VendorMasterView,

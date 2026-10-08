@@ -65,7 +65,8 @@ export default function GRNForm({
       return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : String(d);
     };
 
-    // Load existing bales if available
+    // Helper to normalize and auto-fill bales up to target count
+    const targetBaleCount = Math.max(0, parseInt(grn?.totalBales || grn?.numBales || 0, 10));
     let initialBales = [];
     if (grn?.bales && grn.bales.length > 0) {
       initialBales = grn.bales.map((b, idx) => {
@@ -83,18 +84,34 @@ export default function GRNForm({
           };
         });
 
-        const piecesCount = Number(b.piecesCount) || normPieces.length || 0;
+        const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
+          ? String(b.piecesCount)
+          : (normPieces.length > 0 ? String(normPieces.length) : '');
         const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
 
         return {
           baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
           itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
-          fabricItemLabel: b.fabricItemLabel || b.fabric || '',
+          fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
           piecesCount,
           totalLength,
           pieces: normPieces
         };
       });
+    }
+
+    // Auto-fill remaining bales up to targetBaleCount
+    if (targetBaleCount > initialBales.length) {
+      for (let i = initialBales.length; i < targetBaleCount; i++) {
+        initialBales.push({
+          baleNo: String(i + 1),
+          itemIdx: 0,
+          fabricItemLabel: '',
+          piecesCount: '',
+          pieces: [],
+          totalLength: 0
+        });
+      }
     }
 
     return {
@@ -115,7 +132,7 @@ export default function GRNForm({
       weight: grn?.weight !== undefined ? grn.weight : '',
       totalQty: defaultDeclared ? String(defaultDeclared) : '',
       declaredTotalMeters: defaultDeclared ? Number(defaultDeclared) : 0,
-      totalBales: grn?.totalBales || grn?.numBales || (initialBales.length > 0 ? initialBales.length : ''),
+      totalBales: grn?.totalBales || grn?.numBales || (initialBales.length > 0 ? String(initialBales.length) : ''),
       status: grn?.status || 'Bale Entry in Progress',
       bales: initialBales
     };
@@ -142,6 +159,7 @@ export default function GRNForm({
         return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : String(d);
       };
 
+      const targetBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
       let initialBales = [];
       if (grn.bales && grn.bales.length > 0) {
         initialBales = grn.bales.map((b, idx) => {
@@ -159,15 +177,34 @@ export default function GRNForm({
             };
           });
 
+          const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
+            ? String(b.piecesCount)
+            : (normPieces.length > 0 ? String(normPieces.length) : '');
+          const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+
           return {
             baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
             itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
-            fabricItemLabel: b.fabricItemLabel || b.fabric || '',
-            piecesCount: Number(b.piecesCount) || normPieces.length || 0,
-            totalLength: Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0),
+            fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
+            piecesCount,
+            totalLength,
             pieces: normPieces
           };
         });
+      }
+
+      // Auto-fill remaining bales up to targetBaleCount
+      if (targetBaleCount > initialBales.length) {
+        for (let i = initialBales.length; i < targetBaleCount; i++) {
+          initialBales.push({
+            baleNo: String(i + 1),
+            itemIdx: 0,
+            fabricItemLabel: '',
+            piecesCount: '',
+            pieces: [],
+            totalLength: 0
+          });
+        }
       }
 
       setFormData((prev) => ({
@@ -189,7 +226,7 @@ export default function GRNForm({
         weight: grn.weight !== undefined ? grn.weight : prev.weight,
         totalQty: grn.totalQty !== undefined ? String(grn.totalQty) : String(grn.declaredTotalMeters || prev.totalQty),
         declaredTotalMeters: Number(grn.totalQty || grn.declaredTotalMeters || prev.declaredTotalMeters || 0),
-        totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? initialBales.length : prev.totalBales),
+        totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
         status: grn.status || prev.status,
         bales: initialBales.length > 0 ? initialBales : prev.bales
       }));
@@ -290,6 +327,40 @@ export default function GRNForm({
     });
   };
 
+  // Live Bale Count Input change (auto-generates / auto-adjusts bales immediately)
+  const handleBaleCountChange = (val) => {
+    const count = parseInt(val, 10);
+    if (!isNaN(count) && count >= 0) {
+      const currentBales = formData.bales || [];
+      const newBales = [];
+      for (let i = 0; i < count; i++) {
+        if (currentBales[i]) {
+          newBales.push(currentBales[i]);
+        } else {
+          const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
+          newBales.push({
+            baleNo: String(i + 1),
+            itemIdx: i % (poItemLabels.length || 1),
+            fabricItemLabel: assignedLabel,
+            piecesCount: '',
+            pieces: [],
+            totalLength: 0
+          });
+        }
+      }
+      setFormData((prev) => ({
+        ...prev,
+        totalBales: val,
+        bales: newBales
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        totalBales: val
+      }));
+    }
+  };
+
   // Generate Bales action
   const handleGenerateBales = () => {
     const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
@@ -319,7 +390,7 @@ export default function GRNForm({
 
     setFormData((prev) => ({
       ...prev,
-      totalBales: count,
+      totalBales: String(count),
       bales: newBales
     }));
   };
@@ -330,7 +401,7 @@ export default function GRNForm({
       const updated = prev.bales.filter((_, idx) => idx !== baleIdx);
       return {
         ...prev,
-        totalBales: updated.length,
+        totalBales: String(updated.length),
         bales: updated
       };
     });
@@ -501,16 +572,12 @@ export default function GRNForm({
     }
   };
 
-  // Save specific individual bale draft progress
-  const handleSaveSingleBale = (baleIdx) => {
+  // Save all bales draft progress (including any individual bale saves)
+  const handleSaveAllBales = (specificBaleIdx = null) => {
     if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
       showToast('Please select a Source document (Purchase Order) before saving.', 'warning');
       return;
     }
-
-    const currentBale = formData.bales?.[baleIdx];
-    const baleNo = currentBale?.baleNo || (baleIdx + 1);
-    const baleMeters = (currentBale?.totalLength || 0).toFixed(2).replace(/\.00$/, '');
 
     const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
     const firstPoItem = selectedPO?.items?.[0];
@@ -522,14 +589,8 @@ export default function GRNForm({
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
     const widthVal = firstPoItem?.width || formData.width || '';
 
-    // Filter only bales that have entered piece lengths or non-zero count
-    const configuredBales = (formData.bales || []).filter(
-      (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-    );
-
     const payload = {
       ...formData,
-      bales: configuredBales.length > 0 ? configuredBales : (formData.bales || []),
       status: 'Bale Entry in Progress',
       date: formData.receivedDate,
       fabricName: fabricItem,
@@ -543,13 +604,18 @@ export default function GRNForm({
 
     if (onSaveGRN) {
       onSaveGRN(payload, false);
-      showToast(`Bale ${baleNo} (${baleMeters}m) saved successfully!`, 'success');
+      const totalCount = (formData.bales || []).length;
+      const configuredCount = (formData.bales || []).filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
+      showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${totalMetersEntered}m entered)`, 'success');
     }
   };
 
+  // Keep alias for backward-compatible call sites
+  const handleSaveSingleBale = handleSaveAllBales;
+
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
-    if (!formData.poId) {
+    if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
       showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
     }
@@ -558,7 +624,7 @@ export default function GRNForm({
       return;
     }
     if (!declaredTotal || declaredTotal <= 0) {
-      showToast('Please enter Total quantity (m).', 'warning');
+      showToast('Please enter Total quantity (m) in Receipt Details before submitting.', 'warning');
       return;
     }
     if (!formData.bales || formData.bales.length === 0) {
@@ -566,11 +632,21 @@ export default function GRNForm({
       return;
     }
 
-    if (!isMatch) {
-      const proceed = window.confirm(
-        `Piece-wise length total (${totalMetersEntered}m) does not match declared total (${declaredTotal}m).\n\nVariance: ${Math.round((totalMetersEntered - declaredTotal) * 100) / 100}m.\n\nDo you want to proceed and submit anyway?`
-      );
-      if (!proceed) return;
+    // STRICT VALIDATION: Entered piece length total MUST match declared quantity exactly!
+    if (Math.abs(totalMetersEntered - declaredTotal) >= 0.01) {
+      const diff = Math.round((declaredTotal - totalMetersEntered) * 100) / 100;
+      if (diff > 0) {
+        showToast(
+          `Cannot submit to QC! Piece-wise total (${totalMetersEntered}m) is less than declared quantity (${declaredTotal}m). Remaining ${diff}m needs to be entered in bales first.`,
+          'danger'
+        );
+      } else {
+        showToast(
+          `Cannot submit to QC! Piece-wise total (${totalMetersEntered}m) exceeds declared quantity (${declaredTotal}m) by ${Math.abs(diff)}m. Please correct bale measurements.`,
+          'danger'
+        );
+      }
+      return;
     }
 
     const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
@@ -583,13 +659,8 @@ export default function GRNForm({
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
     const widthVal = firstPoItem?.width || formData.width || '';
 
-    const configuredBales = (formData.bales || []).filter(
-      (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
-    );
-
     const payload = {
       ...formData,
-      bales: configuredBales.length > 0 ? configuredBales : (formData.bales || []),
       status: 'Completed',
       date: formData.receivedDate,
       fabricName: fabricItem,
@@ -603,7 +674,7 @@ export default function GRNForm({
 
     if (onSaveGRN) {
       onSaveGRN(payload, true);
-      showToast(`GRN ${formData.id} submitted successfully and sent to Quality Check (QC)!`, 'success');
+      showToast(`GRN ${formData.id} (${totalMetersEntered}m) submitted successfully and sent to Quality Check (QC)!`, 'success');
     }
   };
 
@@ -904,7 +975,7 @@ export default function GRNForm({
               className="form-control bg-white fs-13"
               style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
               value={formData.totalBales}
-              onChange={(e) => setFormData({ ...formData, totalBales: e.target.value })}
+              onChange={(e) => handleBaleCountChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -964,9 +1035,23 @@ export default function GRNForm({
             </p>
           </div>
           {formData.bales.length > 0 && (
-            <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold">
-              {formData.bales.length} Bale{formData.bales.length > 1 ? 's' : ''} Generated
-            </span>
+            <div className="d-flex align-items-center gap-2">
+              <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold">
+                {formData.bales.length} Bale{formData.bales.length > 1 ? 's' : ''} Generated
+              </span>
+              {!isQcActioned && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fs-12 fw-semibold rounded-3 text-white shadow-sm"
+                  style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                  onClick={() => handleSaveAllBales()}
+                  title="Save all generated bales and entered pieces"
+                >
+                  <i className="ti ti-device-floppy fs-14"></i>
+                  <span>Save All Bales</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -1358,6 +1443,7 @@ export default function GRNForm({
             <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
             <span>Save Header (add bales later)</span>
           </button>
+
 
           <button
             type="button"

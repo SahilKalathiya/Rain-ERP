@@ -32,7 +32,14 @@ export default function DamagedItemDetailView({
   }
 
   const currentStatus = damagedItem.status || damagedItem.adminDecision || 'Pending Admin Review';
-  const isCurrentlyInStock = currentStatus === 'Reversed (treated as good)';
+  const isCurrentlyInStock =
+    currentStatus === 'Reversed (treated as good)' ||
+    currentStatus === 'Approve' ||
+    currentStatus === 'Approved' ||
+    currentStatus === 'Approve — Add to Stock Pool' ||
+    currentStatus.toLowerCase().includes('stock pool') ||
+    currentStatus.toLowerCase().includes('good') ||
+    currentStatus.toLowerCase().includes('approve');
   const qty = Number(damagedItem.quantity) || Number(damagedItem.defectiveQty) || 100;
   const piecesCount = damagedItem.defectivePieces || 1;
   const grnRef = damagedItem.grnRef || 'GRN-1002';
@@ -40,9 +47,9 @@ export default function DamagedItemDetailView({
   const dateStr = damagedItem.dateFlagged || damagedItem.reportedAt || '2026-10-07';
 
   const resolutions = [
-    { key: 'Write Off (scrap)', label: 'Write Off (scrap)', btnClass: 'btn-outline-danger' },
-    { key: 'Return to Vendor', label: 'Return to Vendor', btnClass: 'btn-outline-warning text-dark' },
-    { key: 'Reversed (treated as good)', label: 'Reverse — Add to Stock After All', btnClass: 'btn-outline-success' }
+    { key: 'Reversed (treated as good)', label: 'Approve — Add to Stock Pool', btnClass: 'btn-outline-success' },
+    { key: 'Return to Vendor', label: 'Return to Vendor (RTV)', btnClass: 'btn-outline-warning text-dark' },
+    { key: 'Write Off (scrap)', label: 'Write Off (scrap)', btnClass: 'btn-outline-danger' }
   ];
 
   const handleApplyResolution = (decisionKey) => {
