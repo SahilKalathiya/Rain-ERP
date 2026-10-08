@@ -522,8 +522,14 @@ export default function GRNForm({
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
     const widthVal = firstPoItem?.width || formData.width || '';
 
+    // Filter only bales that have entered piece lengths or non-zero count
+    const configuredBales = (formData.bales || []).filter(
+      (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+    );
+
     const payload = {
       ...formData,
+      bales: configuredBales.length > 0 ? configuredBales : (formData.bales || []),
       status: 'Bale Entry in Progress',
       date: formData.receivedDate,
       fabricName: fabricItem,
@@ -577,8 +583,13 @@ export default function GRNForm({
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
     const widthVal = firstPoItem?.width || formData.width || '';
 
+    const configuredBales = (formData.bales || []).filter(
+      (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+    );
+
     const payload = {
       ...formData,
+      bales: configuredBales.length > 0 ? configuredBales : (formData.bales || []),
       status: 'Completed',
       date: formData.receivedDate,
       fabricName: fabricItem,

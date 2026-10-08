@@ -93,10 +93,12 @@ export default function GRNDetailView({
 
   const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === 'Pending');
 
-  // Calculate bales total
-  const bales = grn.bales || [];
-  const totalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
-  const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || (bales.length * 10) || 1;
+  // Calculate bales total - only include genuinely entered/configured bales
+  const bales = (grn.bales || []).filter(
+    (b) => (b.pieces && b.pieces.length > 0) || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+  );
+  const totalMeters = Number(grn.totalMetersEntered) || (bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0)) || Number(grn.declaredTotalMeters) || 0;
+  const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
@@ -277,8 +279,12 @@ export default function GRNDetailView({
                 bales.map((bale, idx) => {
                   const bNo = bale.baleNo || `Bale ${idx + 1}`;
                   const fabricLabel = bale.fabricItemLabel || bale.fabric || grn.fabricName || 'Grey Cotton Rayon';
-                  const pcsCount = bale.pieces?.length || bale.piecesCount || 2;
-                  const bMeters = bale.totalLength || (bale.pieces || []).reduce((s, p) => s + (Number(p.length) || 0), 0) || 200;
+                  const pcsCount = (bale.pieces && bale.pieces.length > 0)
+                    ? bale.pieces.length
+                    : (Number(bale.piecesCount) || 0);
+                  const bMeters = (bale.pieces && bale.pieces.length > 0)
+                    ? bale.pieces.reduce((s, p) => s + (Number(p.length) || 0), 0)
+                    : (Number(bale.totalLength) || 0);
                   const isQcLocked = !anyPending || bale.qcStatus === 'Approved' || bale.qcStatus === 'OK';
 
                   return (

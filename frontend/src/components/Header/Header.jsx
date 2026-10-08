@@ -15,11 +15,8 @@ export default function Header({
   onLogout
 }) {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const profileDropdownRef = useRef(null);
-  const notifDropdownRef = useRef(null);
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -27,27 +24,10 @@ export default function Header({
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
         setShowProfileDropdown(false);
       }
-      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target)) {
-        setShowNotificationDropdown(false);
-      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
-
-  const notificationsList = [
-    { id: 1, title: 'PO-TEST-01 Delivered', time: '10 mins ago', icon: 'ti-truck', bg: 'bg-primary-subtle text-primary' },
-    { id: 2, title: 'QC Inspection Batch #204 Passed', time: '1 hour ago', icon: 'ti-check', bg: 'bg-success-subtle text-success' },
-    { id: 3, title: 'New Vendor Surat Rayon Added', time: 'Yesterday', icon: 'ti-building', bg: 'bg-info-subtle text-info' }
-  ];
 
   return (
     <header className="navbar navbar-expand bg-white border-bottom px-4 py-2 sticky-top shadow-none" style={{ zIndex: 1040 }}>
@@ -87,93 +67,6 @@ export default function Header({
             <span>AI Assistance</span>
           </button>
 
-          {/* Theme Switcher */}
-          <button
-            type="button"
-            className="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border"
-            style={{ width: '36px', height: '36px', color: '#64748b' }}
-            title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            onClick={() => setIsDarkMode(!isDarkMode)}
-          >
-            <i className={`ti ti-${isDarkMode ? 'sun' : 'moon'} fs-16`}></i>
-          </button>
-
-          {/* Fullscreen Toggle */}
-          <button
-            type="button"
-            className="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border"
-            style={{ width: '36px', height: '36px', color: '#64748b' }}
-            title="Toggle Fullscreen"
-            onClick={toggleFullscreen}
-          >
-            <i className="ti ti-maximize fs-16"></i>
-          </button>
-
-          {/* Notifications Dropdown */}
-          <div className="position-relative" ref={notifDropdownRef}>
-            <button
-              type="button"
-              className="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border position-relative"
-              style={{ width: '36px', height: '36px', color: '#64748b' }}
-              title="Notifications"
-              onClick={() => {
-                setShowNotificationDropdown(!showNotificationDropdown);
-                setShowProfileDropdown(false);
-              }}
-            >
-              <i className="ti ti-bell fs-16"></i>
-              <span
-                className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-white"
-                style={{ fontSize: '9px', padding: '3px 5px', transform: 'translate(-30%, 15%)' }}
-              >
-                3
-              </span>
-            </button>
-
-            {showNotificationDropdown && (
-              <div
-                className="position-absolute end-0 mt-2 bg-white rounded-4 shadow-xl border overflow-hidden transition-all"
-                style={{
-                  width: '320px',
-                  zIndex: 1050,
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
-                  borderColor: '#e2e8f0'
-                }}
-              >
-                <div className="p-3 border-bottom d-flex align-items-center justify-content-between bg-light">
-                  <div className="fw-bold text-dark fs-14">Notifications</div>
-                  <span className="badge bg-primary-subtle text-primary fw-semibold">3 New</span>
-                </div>
-                <div className="p-2 d-flex flex-column gap-1" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                  {notificationsList.map((n) => (
-                    <div
-                      key={n.id}
-                      className="d-flex align-items-start gap-2.5 p-2 rounded-3 hover-bg-light cursor-pointer transition-all"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className={`rounded-circle p-2 d-flex align-items-center justify-content-center ${n.bg}`} style={{ width: '32px', height: '32px' }}>
-                        <i className={`ti ${n.icon} fs-14`}></i>
-                      </div>
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                        <div className="fs-13 fw-semibold text-dark text-truncate">{n.title}</div>
-                        <div className="fs-11 text-muted">{n.time}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-2 border-top text-center bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm text-primary p-0 fs-12 text-decoration-none fw-semibold"
-                    onClick={() => setShowNotificationDropdown(false)}
-                  >
-                    Mark all as read
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* User Profile Trigger & Dropdown Menu */}
           <div className="position-relative ms-1" ref={profileDropdownRef}>
             <div
@@ -181,7 +74,6 @@ export default function Header({
               style={{ cursor: 'pointer' }}
               onClick={() => {
                 setShowProfileDropdown(!showProfileDropdown);
-                setShowNotificationDropdown(false);
               }}
             >
               <img

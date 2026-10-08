@@ -14739,37 +14739,17 @@
     onLogout
   }) {
     const [showProfileDropdown, setShowProfileDropdown] = (0, import_react2.useState)(false);
-    const [showNotificationDropdown, setShowNotificationDropdown] = (0, import_react2.useState)(false);
     const [notificationsEnabled, setNotificationsEnabled] = (0, import_react2.useState)(true);
-    const [isDarkMode, setIsDarkMode] = (0, import_react2.useState)(false);
     const profileDropdownRef = (0, import_react2.useRef)(null);
-    const notifDropdownRef = (0, import_react2.useRef)(null);
     (0, import_react2.useEffect)(() => {
       function handleClickOutside(event) {
         if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
           setShowProfileDropdown(false);
         }
-        if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target)) {
-          setShowNotificationDropdown(false);
-        }
       }
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-    const toggleFullscreen = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {
-        });
-      } else {
-        document.exitFullscreen().catch(() => {
-        });
-      }
-    };
-    const notificationsList = [
-      { id: 1, title: "PO-TEST-01 Delivered", time: "10 mins ago", icon: "ti-truck", bg: "bg-primary-subtle text-primary" },
-      { id: 2, title: "QC Inspection Batch #204 Passed", time: "1 hour ago", icon: "ti-check", bg: "bg-success-subtle text-success" },
-      { id: 3, title: "New Vendor Surat Rayon Added", time: "Yesterday", icon: "ti-building", bg: "bg-info-subtle text-info" }
-    ];
     return /* @__PURE__ */ import_react2.default.createElement("header", { className: "navbar navbar-expand bg-white border-bottom px-4 py-2 sticky-top shadow-none", style: { zIndex: 1040 } }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "container-fluid p-0 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative", style: { width: "380px" } }, /* @__PURE__ */ import_react2.default.createElement(
       "i",
       {
@@ -14802,86 +14782,13 @@
       },
       /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-sparkles fs-13" }),
       /* @__PURE__ */ import_react2.default.createElement("span", null, "AI Assistance")
-    ), /* @__PURE__ */ import_react2.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border",
-        style: { width: "36px", height: "36px", color: "#64748b" },
-        title: isDarkMode ? "Light Mode" : "Dark Mode",
-        onClick: () => setIsDarkMode(!isDarkMode)
-      },
-      /* @__PURE__ */ import_react2.default.createElement("i", { className: `ti ti-${isDarkMode ? "sun" : "moon"} fs-16` })
-    ), /* @__PURE__ */ import_react2.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border",
-        style: { width: "36px", height: "36px", color: "#64748b" },
-        title: "Toggle Fullscreen",
-        onClick: toggleFullscreen
-      },
-      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-maximize fs-16" })
-    ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative", ref: notifDropdownRef }, /* @__PURE__ */ import_react2.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center border position-relative",
-        style: { width: "36px", height: "36px", color: "#64748b" },
-        title: "Notifications",
-        onClick: () => {
-          setShowNotificationDropdown(!showNotificationDropdown);
-          setShowProfileDropdown(false);
-        }
-      },
-      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-bell fs-16" }),
-      /* @__PURE__ */ import_react2.default.createElement(
-        "span",
-        {
-          className: "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-white",
-          style: { fontSize: "9px", padding: "3px 5px", transform: "translate(-30%, 15%)" }
-        },
-        "3"
-      )
-    ), showNotificationDropdown && /* @__PURE__ */ import_react2.default.createElement(
-      "div",
-      {
-        className: "position-absolute end-0 mt-2 bg-white rounded-4 shadow-xl border overflow-hidden transition-all",
-        style: {
-          width: "320px",
-          zIndex: 1050,
-          boxShadow: "0 12px 32px rgba(15, 23, 42, 0.18)",
-          borderColor: "#e2e8f0"
-        }
-      },
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "p-3 border-bottom d-flex align-items-center justify-content-between bg-light" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "Notifications"), /* @__PURE__ */ import_react2.default.createElement("span", { className: "badge bg-primary-subtle text-primary fw-semibold" }, "3 New")),
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "p-2 d-flex flex-column gap-1", style: { maxHeight: "280px", overflowY: "auto" } }, notificationsList.map((n) => /* @__PURE__ */ import_react2.default.createElement(
-        "div",
-        {
-          key: n.id,
-          className: "d-flex align-items-start gap-2.5 p-2 rounded-3 hover-bg-light cursor-pointer transition-all",
-          style: { cursor: "pointer" }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("div", { className: `rounded-circle p-2 d-flex align-items-center justify-content-center ${n.bg}`, style: { width: "32px", height: "32px" } }, /* @__PURE__ */ import_react2.default.createElement("i", { className: `ti ${n.icon} fs-14` })),
-        /* @__PURE__ */ import_react2.default.createElement("div", { className: "flex-grow-1", style: { minWidth: 0 } }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "fs-13 fw-semibold text-dark text-truncate" }, n.title), /* @__PURE__ */ import_react2.default.createElement("div", { className: "fs-11 text-muted" }, n.time))
-      ))),
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "p-2 border-top text-center bg-light" }, /* @__PURE__ */ import_react2.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link btn-sm text-primary p-0 fs-12 text-decoration-none fw-semibold",
-          onClick: () => setShowNotificationDropdown(false)
-        },
-        "Mark all as read"
-      ))
-    )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative ms-1", ref: profileDropdownRef }, /* @__PURE__ */ import_react2.default.createElement(
+    ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative ms-1", ref: profileDropdownRef }, /* @__PURE__ */ import_react2.default.createElement(
       "div",
       {
         className: "d-flex align-items-center gap-2 cursor-pointer p-1 rounded-pill hover-bg-light transition-all",
         style: { cursor: "pointer" },
         onClick: () => {
           setShowProfileDropdown(!showProfileDropdown);
-          setShowNotificationDropdown(false);
         }
       },
       /* @__PURE__ */ import_react2.default.createElement(
@@ -18027,6 +17934,234 @@
       )
     );
   }
+  function SearchableFabricInput({
+    value = "",
+    onChange,
+    onAddNew,
+    fabrics = []
+  }) {
+    const [isOpen, setIsOpen] = (0, import_react20.useState)(false);
+    const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
+    const [searchTerm, setSearchTerm] = (0, import_react20.useState)(selectedFabric ? selectedFabric.qualityName : value || "");
+    const [isFocused, setIsFocused] = (0, import_react20.useState)(false);
+    const [coords, setCoords] = (0, import_react20.useState)({ top: 0, left: 0, width: 280 });
+    const wrapperRef = (0, import_react20.useRef)(null);
+    const dropdownRef = (0, import_react20.useRef)(null);
+    (0, import_react20.useEffect)(() => {
+      const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || "").toLowerCase());
+      setSearchTerm(matched ? matched.qualityName : value || "");
+    }, [value, fabrics]);
+    const updatePosition = () => {
+      if (wrapperRef.current) {
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const dropdownHeight = 250;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+        setCoords({
+          top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+          left: rect.left,
+          width: Math.max(rect.width, 280)
+        });
+      }
+    };
+    (0, import_react20.useEffect)(() => {
+      if (isOpen) {
+        updatePosition();
+        window.addEventListener("scroll", updatePosition, true);
+        window.addEventListener("resize", updatePosition);
+        return () => {
+          window.removeEventListener("scroll", updatePosition, true);
+          window.removeEventListener("resize", updatePosition);
+        };
+      }
+    }, [isOpen]);
+    (0, import_react20.useEffect)(() => {
+      function handleClickOutside(event) {
+        const clickedInsideWrapper = wrapperRef.current && wrapperRef.current.contains(event.target);
+        const clickedInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+        if (!clickedInsideWrapper && !clickedInsideDropdown) {
+          setIsOpen(false);
+          setIsFocused(false);
+        }
+      }
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+    const filteredFabrics = fabrics.filter((f) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      const name = (f.qualityName || "").toLowerCase();
+      const code = (f.code || f.fabricCode || "").toLowerCase();
+      const type = (f.fabricType || f.type || "").toLowerCase();
+      return name.includes(term) || code.includes(term) || type.includes(term);
+    });
+    return /* @__PURE__ */ import_react20.default.createElement(
+      "div",
+      {
+        ref: wrapperRef,
+        className: "position-relative",
+        style: { minWidth: "150px" }
+      },
+      /* @__PURE__ */ import_react20.default.createElement(
+        "div",
+        {
+          className: "d-flex align-items-center bg-white rounded-2",
+          style: {
+            border: isOpen || isFocused ? "1.5px solid #6366f1" : "1px solid #cbd5e1",
+            boxShadow: isOpen || isFocused ? "0 0 0 3px rgba(99, 102, 241, 0.15)" : "none",
+            padding: "2px 8px 2px 8px",
+            height: "31px",
+            transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+            cursor: "text"
+          },
+          onClick: () => {
+            updatePosition();
+            setIsOpen(true);
+          }
+        },
+        /* @__PURE__ */ import_react20.default.createElement(
+          "input",
+          {
+            type: "text",
+            style: {
+              border: "none",
+              outline: "none",
+              boxShadow: "none",
+              backgroundColor: "transparent",
+              fontSize: "13px",
+              color: "#1e293b",
+              width: "100%",
+              minWidth: 0,
+              padding: 0
+            },
+            placeholder: "Select fabric...",
+            value: searchTerm,
+            onFocus: () => {
+              updatePosition();
+              setIsFocused(true);
+              setIsOpen(true);
+            },
+            onBlur: () => {
+              setIsFocused(false);
+            },
+            onChange: (e) => {
+              const val = e.target.value;
+              setSearchTerm(val);
+              updatePosition();
+              setIsOpen(true);
+              const matched = fabrics.find(
+                (f) => f.qualityName.toLowerCase() === val.toLowerCase() || f.id === val
+              );
+              if (matched) {
+                onChange(matched.id);
+              } else if (!val) {
+                onChange("");
+              }
+            },
+            onKeyDown: (e) => {
+              if (e.key === "Escape") setIsOpen(false);
+              if (e.key === "Enter" && filteredFabrics.length > 0) {
+                const top = filteredFabrics[0];
+                onChange(top.id);
+                setSearchTerm(top.qualityName);
+                setIsOpen(false);
+              }
+            }
+          }
+        ),
+        /* @__PURE__ */ import_react20.default.createElement(
+          "span",
+          {
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              paddingLeft: "4px",
+              color: "#64748b",
+              flexShrink: 0
+            },
+            onClick: (e) => {
+              e.stopPropagation();
+              updatePosition();
+              setIsOpen((prev) => !prev);
+            },
+            title: "Toggle fabric list"
+          },
+          /* @__PURE__ */ import_react20.default.createElement(
+            "i",
+            {
+              className: `ti ti-chevron-${isOpen ? "up" : "down"} fs-12`,
+              style: { transition: "transform 0.15s ease" }
+            }
+          )
+        )
+      ),
+      isOpen && typeof document !== "undefined" && (0, import_react_dom.createPortal)(
+        /* @__PURE__ */ import_react20.default.createElement(
+          "div",
+          {
+            ref: dropdownRef,
+            className: "bg-white rounded-3 border overflow-hidden",
+            style: {
+              position: "fixed",
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              zIndex: 999999,
+              borderColor: "#e2e8f0",
+              boxShadow: "0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)"
+            }
+          },
+          /* @__PURE__ */ import_react20.default.createElement("div", { style: { maxHeight: "220px", overflowY: "auto" }, className: "py-1" }, filteredFabrics.length > 0 ? filteredFabrics.map((fab) => {
+            const isSelected = fab.id === value || fab.qualityName.toLowerCase() === (searchTerm || "").toLowerCase();
+            return /* @__PURE__ */ import_react20.default.createElement(
+              "div",
+              {
+                key: fab.id,
+                className: "d-flex align-items-center justify-content-between px-3 py-2 fs-13",
+                style: {
+                  cursor: "pointer",
+                  backgroundColor: isSelected ? "#f3f0ff" : "transparent",
+                  color: isSelected ? "#5b47fb" : "#1e293b",
+                  fontWeight: isSelected ? 600 : 400,
+                  transition: "background-color 0.15s ease"
+                },
+                onMouseEnter: (e) => {
+                  if (!isSelected) e.currentTarget.style.backgroundColor = "#f8fafc";
+                },
+                onMouseLeave: (e) => {
+                  if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
+                },
+                onClick: () => {
+                  onChange(fab.id);
+                  setSearchTerm(fab.qualityName);
+                  setIsOpen(false);
+                }
+              },
+              /* @__PURE__ */ import_react20.default.createElement("div", { className: "d-flex flex-column text-truncate me-2", style: { minWidth: 0 } }, /* @__PURE__ */ import_react20.default.createElement("span", { className: "text-truncate" }, fab.qualityName), (fab.code || fab.pannaWidth) && /* @__PURE__ */ import_react20.default.createElement("span", { className: "text-muted fs-11" }, fab.code ? `Code: ${fab.code}` : "", fab.code && fab.pannaWidth ? " \u2022 " : "", fab.pannaWidth ? `Width: ${fab.pannaWidth}"` : "")),
+              isSelected && /* @__PURE__ */ import_react20.default.createElement("i", { className: "ti ti-check fs-14 text-primary flex-shrink-0" })
+            );
+          }) : /* @__PURE__ */ import_react20.default.createElement("div", { className: "px-3 py-2.5 text-muted fs-12 text-center" }, "No matching fabric found")),
+          /* @__PURE__ */ import_react20.default.createElement("div", { className: "border-top p-1.5 bg-light d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react20.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-sm btn-link text-decoration-none w-100 text-start px-2 py-1 fs-12 fw-semibold d-flex align-items-center gap-1.5",
+              style: { color: "#5b47fb" },
+              onClick: () => {
+                setIsOpen(false);
+                if (onAddNew) onAddNew();
+              }
+            },
+            /* @__PURE__ */ import_react20.default.createElement("i", { className: "ti ti-plus fs-13" }),
+            /* @__PURE__ */ import_react20.default.createElement("span", null, 'Add "', searchTerm || "New Fabric", '" to Master...')
+          ))
+        ),
+        document.body
+      )
+    );
+  }
   function PurchaseOrderForm({
     po,
     vendors = [],
@@ -18567,22 +18702,13 @@
         const currentFabric = fabrics.find((f) => f.id === row.fabricId);
         const allowedWidths = currentFabric?.widths || (currentFabric?.pannaWidth ? [String(currentFabric.pannaWidth)] : ["44", "48", "58"]);
         return /* @__PURE__ */ import_react20.default.createElement("tr", { key: row.id, style: { borderBottom: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react20.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react20.default.createElement(
-          "select",
+          SearchableFabricInput,
           {
-            className: "form-select form-select-sm bg-light fs-13",
-            style: { borderColor: "#cbd5e1" },
-            value: row.fabricId,
-            onChange: (e) => {
-              if (e.target.value === "__NEW_FABRIC__") {
-                handleOpenNewFabricModal(row.id);
-              } else {
-                handleItemChange(row.id, "fabricId", e.target.value);
-              }
-            }
-          },
-          /* @__PURE__ */ import_react20.default.createElement("option", { value: "" }, "Select fabric..."),
-          fabrics.map((f) => /* @__PURE__ */ import_react20.default.createElement("option", { key: f.id, value: f.id }, f.qualityName)),
-          /* @__PURE__ */ import_react20.default.createElement("option", { value: "__NEW_FABRIC__", style: { color: "#5b47fb", fontWeight: "bold" } }, "+ Add New Fabric...")
+            value: row.fabricId || "",
+            fabrics,
+            onChange: (newFabricId) => handleItemChange(row.id, "fabricId", newFabricId),
+            onAddNew: () => handleOpenNewFabricModal(row.id)
+          }
         ) : /* @__PURE__ */ import_react20.default.createElement("div", { className: "fw-medium text-dark" }, row.fabricName || "Fabric")), /* @__PURE__ */ import_react20.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react20.default.createElement(
           SearchableColorInput,
           {
@@ -19706,8 +19832,12 @@
       const colorHexVal = firstPoItem?.colorHex || formData.colorHex || "";
       const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
       const widthVal = firstPoItem?.width || formData.width || "";
+      const configuredBales = (formData.bales || []).filter(
+        (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+      );
       const payload = {
         ...formData,
+        bales: configuredBales.length > 0 ? configuredBales : formData.bales || [],
         status: "Bale Entry in Progress",
         date: formData.receivedDate,
         fabricName: fabricItem,
@@ -19757,8 +19887,12 @@ Do you want to proceed and submit anyway?`
       const colorHexVal = firstPoItem?.colorHex || formData.colorHex || "";
       const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
       const widthVal = firstPoItem?.width || formData.width || "";
+      const configuredBales = (formData.bales || []).filter(
+        (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+      );
       const payload = {
         ...formData,
+        bales: configuredBales.length > 0 ? configuredBales : formData.bales || [],
         status: "Completed",
         date: formData.receivedDate,
         fabricName: fabricItem,
@@ -20356,9 +20490,11 @@ Do you want to proceed and submit anyway?`
     const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
     const mainQC = qcRecs[0];
     const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === "Pending");
-    const bales = grn.bales || [];
-    const totalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
-    const totalPiecesCount = grn.totalPieces || grn.bales?.reduce((sum, b) => sum + (b.pieces?.length || 0), 0) || bales.length * 10 || 1;
+    const bales = (grn.bales || []).filter(
+      (b) => b.pieces && b.pieces.length > 0 || Number(b.totalLength) > 0 || Number(b.piecesCount) > 0
+    );
+    const totalMeters = Number(grn.totalMetersEntered) || bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0) || Number(grn.declaredTotalMeters) || 0;
+    const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
     const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
     const expectedFold = mainQC?.expectedFold || grn.foldingCms || linkedPO?.items?.[0]?.fold || "100";
     const handleSaveHeader = (e) => {
@@ -20420,8 +20556,8 @@ Do you want to proceed and submit anyway?`
     )), /* @__PURE__ */ import_react25.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react25.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13" }, /* @__PURE__ */ import_react25.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react25.default.createElement("tr", null, /* @__PURE__ */ import_react25.default.createElement("th", { className: "ps-4 py-3", style: { minWidth: "100px" } }, "BALE NO."), /* @__PURE__ */ import_react25.default.createElement("th", { className: "py-3", style: { minWidth: "220px" } }, "FABRIC ITEM"), /* @__PURE__ */ import_react25.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "90px" } }, "PIECES"), /* @__PURE__ */ import_react25.default.createElement("th", { className: "py-3 text-end", style: { minWidth: "120px" } }, "METERS"), /* @__PURE__ */ import_react25.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "120px" } }, "QC STATUS"), /* @__PURE__ */ import_react25.default.createElement("th", { className: "pe-4 py-3 text-end", style: { minWidth: "110px" } }, "LOCK STATUS"))), /* @__PURE__ */ import_react25.default.createElement("tbody", null, bales.length === 0 ? /* @__PURE__ */ import_react25.default.createElement("tr", null, /* @__PURE__ */ import_react25.default.createElement("td", { colSpan: "6", className: "text-center py-4 text-muted" }, "No bales entered yet.")) : bales.map((bale, idx) => {
       const bNo = bale.baleNo || `Bale ${idx + 1}`;
       const fabricLabel = bale.fabricItemLabel || bale.fabric || grn.fabricName || "Grey Cotton Rayon";
-      const pcsCount = bale.pieces?.length || bale.piecesCount || 2;
-      const bMeters = bale.totalLength || (bale.pieces || []).reduce((s, p) => s + (Number(p.length) || 0), 0) || 200;
+      const pcsCount = bale.pieces && bale.pieces.length > 0 ? bale.pieces.length : Number(bale.piecesCount) || 0;
+      const bMeters = bale.pieces && bale.pieces.length > 0 ? bale.pieces.reduce((s, p) => s + (Number(p.length) || 0), 0) : Number(bale.totalLength) || 0;
       const isQcLocked = !anyPending || bale.qcStatus === "Approved" || bale.qcStatus === "OK";
       return /* @__PURE__ */ import_react25.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react25.default.createElement("td", { className: "ps-4 py-3 fw-bold text-dark" }, bNo), /* @__PURE__ */ import_react25.default.createElement("td", { className: "py-3 text-secondary" }, fabricLabel), /* @__PURE__ */ import_react25.default.createElement("td", { className: "py-3 text-center" }, pcsCount), /* @__PURE__ */ import_react25.default.createElement("td", { className: "py-3 text-end fw-semibold text-dark" }, Number(bMeters).toFixed(1), "m"), /* @__PURE__ */ import_react25.default.createElement("td", { className: "py-3 text-center" }, /* @__PURE__ */ import_react25.default.createElement(
         "span",

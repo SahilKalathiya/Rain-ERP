@@ -284,6 +284,264 @@ function SearchableColorInput({
 }
 
 /**
+ * SearchableFabricInput - Custom Theme-styled Searchable Fabric Dropdown / Combobox
+ * Matches SearchableColorInput: Direct typing inside the input box to search & filter fabrics.
+ * Uses a floating React Portal (fixed coordinates) to ensure the dropdown menu
+ * is never clipped by table, card, or modal boundaries and stays completely visible.
+ */
+function SearchableFabricInput({
+  value = '',
+  onChange,
+  onAddNew,
+  fabrics = []
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedFabric = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
+  const [searchTerm, setSearchTerm] = useState(selectedFabric ? selectedFabric.qualityName : (value || ''));
+  const [isFocused, setIsFocused] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 280 });
+  const wrapperRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const matched = fabrics.find((f) => f.id === value || f.qualityName?.toLowerCase() === (value || '').toLowerCase());
+    setSearchTerm(matched ? matched.qualityName : (value || ''));
+  }, [value, fabrics]);
+
+  // Dynamically position the dropdown relative to the viewport
+  const updatePosition = () => {
+    if (wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const dropdownHeight = 250;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const shouldOpenUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+
+      setCoords({
+        top: shouldOpenUpwards ? Math.max(8, rect.top - dropdownHeight - 4) : rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 280)
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const clickedInsideWrapper = wrapperRef.current && wrapperRef.current.contains(event.target);
+      const clickedInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+      if (!clickedInsideWrapper && !clickedInsideDropdown) {
+        setIsOpen(false);
+        setIsFocused(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredFabrics = fabrics.filter((f) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const name = (f.qualityName || '').toLowerCase();
+    const code = (f.code || f.fabricCode || '').toLowerCase();
+    const type = (f.fabricType || f.type || '').toLowerCase();
+    return name.includes(term) || code.includes(term) || type.includes(term);
+  });
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="position-relative"
+      style={{ minWidth: '150px' }}
+    >
+      {/* Unified Seamless Container */}
+      <div
+        className="d-flex align-items-center bg-white rounded-2"
+        style={{
+          border: (isOpen || isFocused) ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+          boxShadow: (isOpen || isFocused) ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
+          padding: '2px 8px 2px 8px',
+          height: '31px',
+          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          cursor: 'text'
+        }}
+        onClick={() => {
+          updatePosition();
+          setIsOpen(true);
+        }}
+      >
+        {/* Text Input with NO individual inner border or outline */}
+        <input
+          type="text"
+          style={{
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
+            backgroundColor: 'transparent',
+            fontSize: '13px',
+            color: '#1e293b',
+            width: '100%',
+            minWidth: 0,
+            padding: 0
+          }}
+          placeholder="Select fabric..."
+          value={searchTerm}
+          onFocus={() => {
+            updatePosition();
+            setIsFocused(true);
+            setIsOpen(true);
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+          }}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSearchTerm(val);
+            updatePosition();
+            setIsOpen(true);
+            const matched = fabrics.find(
+              (f) => f.qualityName.toLowerCase() === val.toLowerCase() || f.id === val
+            );
+            if (matched) {
+              onChange(matched.id);
+            } else if (!val) {
+              onChange('');
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key === 'Enter' && filteredFabrics.length > 0) {
+              const top = filteredFabrics[0];
+              onChange(top.id);
+              setSearchTerm(top.qualityName);
+              setIsOpen(false);
+            }
+          }}
+        />
+
+        {/* Integrated Chevron Icon inside the box on the right */}
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            paddingLeft: '4px',
+            color: '#64748b',
+            flexShrink: 0
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            updatePosition();
+            setIsOpen((prev) => !prev);
+          }}
+          title="Toggle fabric list"
+        >
+          <i
+            className={`ti ti-chevron-${isOpen ? 'up' : 'down'} fs-12`}
+            style={{ transition: 'transform 0.15s ease' }}
+          ></i>
+        </span>
+      </div>
+
+      {/* Floating Theme Dropdown Menu Portaled to Document Body */}
+      {isOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="bg-white rounded-3 border overflow-hidden"
+            style={{
+              position: 'fixed',
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              zIndex: 999999,
+              borderColor: '#e2e8f0',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(0, 0, 0, 0.12)'
+            }}
+          >
+            <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="py-1">
+              {filteredFabrics.length > 0 ? (
+                filteredFabrics.map((fab) => {
+                  const isSelected = fab.id === value || fab.qualityName.toLowerCase() === (searchTerm || '').toLowerCase();
+                  return (
+                    <div
+                      key={fab.id}
+                      className="d-flex align-items-center justify-content-between px-3 py-2 fs-13"
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? '#f3f0ff' : 'transparent',
+                        color: isSelected ? '#5b47fb' : '#1e293b',
+                        fontWeight: isSelected ? 600 : 400,
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => {
+                        onChange(fab.id);
+                        setSearchTerm(fab.qualityName);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <div className="d-flex flex-column text-truncate me-2" style={{ minWidth: 0 }}>
+                        <span className="text-truncate">{fab.qualityName}</span>
+                        {(fab.code || fab.pannaWidth) && (
+                          <span className="text-muted fs-11">
+                            {fab.code ? `Code: ${fab.code}` : ''}
+                            {fab.code && fab.pannaWidth ? ' • ' : ''}
+                            {fab.pannaWidth ? `Width: ${fab.pannaWidth}"` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {isSelected && <i className="ti ti-check fs-14 text-primary flex-shrink-0"></i>}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="px-3 py-2.5 text-muted fs-12 text-center">
+                  No matching fabric found
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Action: + Add New Fabric */}
+            <div className="border-top p-1.5 bg-light d-flex align-items-center justify-content-between">
+              <button
+                type="button"
+                className="btn btn-sm btn-link text-decoration-none w-100 text-start px-2 py-1 fs-12 fw-semibold d-flex align-items-center gap-1.5"
+                style={{ color: '#5b47fb' }}
+                onClick={() => {
+                  setIsOpen(false);
+                  if (onAddNew) onAddNew();
+                }}
+              >
+                <i className="ti ti-plus fs-13"></i>
+                <span>Add &quot;{searchTerm || 'New Fabric'}&quot; to Master...</span>
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+/**
  * PurchaseOrderForm - Purchase Order (PO) Creation, View & Edit Mode
  * Matches the required design with:
  * - 1. Header & Vendor Information section with clean divider lines & Buffer % toggle
@@ -1096,28 +1354,12 @@ export default function PurchaseOrderForm({
                     {/* Fabric Quality */}
                     <td style={{ border: '1px solid #dee2e6', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <select
-                          className="form-select form-select-sm bg-light fs-13"
-                          style={{ borderColor: '#cbd5e1' }}
-                          value={row.fabricId}
-                          onChange={(e) => {
-                            if (e.target.value === '__NEW_FABRIC__') {
-                              handleOpenNewFabricModal(row.id);
-                            } else {
-                              handleItemChange(row.id, 'fabricId', e.target.value);
-                            }
-                          }}
-                        >
-                          <option value="">Select fabric...</option>
-                          {fabrics.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.qualityName}
-                            </option>
-                          ))}
-                          <option value="__NEW_FABRIC__" style={{ color: '#5b47fb', fontWeight: 'bold' }}>
-                            + Add New Fabric...
-                          </option>
-                        </select>
+                        <SearchableFabricInput
+                          value={row.fabricId || ''}
+                          fabrics={fabrics}
+                          onChange={(newFabricId) => handleItemChange(row.id, 'fabricId', newFabricId)}
+                          onAddNew={() => handleOpenNewFabricModal(row.id)}
+                        />
                       ) : (
                         <div className="fw-medium text-dark">{row.fabricName || 'Fabric'}</div>
                       )}
