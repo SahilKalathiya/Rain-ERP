@@ -1,78 +1,247 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import OrdersListView from './OrdersListView';
+import OrderDetailView from './OrderDetailView';
+import OrderCreationWizard from './OrderCreationWizard';
+import { initialSalesOrders, getStoredData, setStoredData } from '../../data/salesOrderData';
 
-export default function OrdersModule() {
-  const [orders] = useState([
-    {
-      id: 'ORD-2026-001',
-      customer: 'Zara India',
-      article: 'Summer Kurti 2026',
-      totalQty: '2,500 pcs',
-      deliveryDate: '25/10/2026',
-      status: 'Production'
-    },
-    {
-      id: 'ORD-2026-002',
-      customer: 'FabIndia Retail',
-      article: 'Designer Anarkali Gown',
-      totalQty: '1,200 pcs',
-      deliveryDate: '15/11/2026',
-      status: 'Cutting'
-    },
-    {
-      id: 'ORD-2026-003',
-      customer: 'Westside Styles',
-      article: 'Festive Silk Kurta Set',
-      totalQty: '3,000 pcs',
-      deliveryDate: '30/11/2026',
-      status: 'Procurement'
+import ProcurementModal from './ProcurementModal';
+
+export default function OrdersModule({ currentRoute, onNavigateToProcurement }) {
+  const [orders, setOrders] = useState(() => getStoredData('erp_sales_orders_v1', initialSalesOrders));
+  const [procurementModal, setProcurementModal] = useState({ isOpen: false });
+
+  const [selectedOrder, setSelectedOrder] = useState(() => {
+    const routeToCheck = currentRoute || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const match = routeToCheck.match(/\/orders\/([^/]+)/);
+    if (match && match[1] && match[1] !== 'new') {
+      const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
+      return stored.find((o) => o.id === match[1]) || stored.find((o) => o.id === 'RD-2610-0002') || stored[0] || null;
     }
-  ]);
+    return null;
+  });
+
+  const [viewMode, setViewMode] = useState(() => {
+    const routeToCheck = currentRoute || (typeof window !== 'undefined' ? window.location.pathname : '');
+    if (routeToCheck.includes('/new') || routeToCheck.includes('/create')) return 'create';
+    const match = routeToCheck.match(/\/orders\/([^/]+)/);
+    if (match && match[1] && match[1] !== 'new') return 'detail';
+    return 'list';
+  });
+
+  // Sync state whenever currentRoute prop changes (e.g. from Dashboard or Sidebar)
+  useEffect(() => {
+    if (currentRoute) {
+      if (currentRoute.includes('/new') || currentRoute.includes('/create')) {
+        setSelectedOrder(null);
+        setViewMode('create');
+      } else {
+        const match = currentRoute.match(/\/orders\/([^/]+)/);
+        if (match && match[1] && match[1] !== 'new') {
+          const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
+          const found = stored.find((o) => o.id === match[1]) || stored[0];
+          if (found) {
+            setSelectedOrder(found);
+            setViewMode('detail');
+          }
+        } else if (currentRoute === '/orders' || currentRoute === '/orders/' || currentRoute === '/sales') {
+          setViewMode('list');
+        }
+      }
+    }
+  }, [currentRoute]);
+
+  // Listen to cross-module storage updates
+  useEffect(() => {
+    const handleSync = () => {
+      const updated = getStoredData('erp_sales_orders_v1', initialSalesOrders);
+      setOrders(updated);
+      setSelectedOrder((prev) => {
+        if (!prev) return prev;
+        return updated.find((o) => o.id === prev.id) || prev;
+      });
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('erp_sales_order_updated', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('erp_sales_order_updated', handleSync);
+    };
+  }, []);
+
+  const handleNewOrder = () => {
+    setSelectedOrder(null);
+    setViewMode('create');
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState(null, '', '/react/orders/new');
+    }
+  };
+
+  const handleViewOrder = (order) => {
+    setSelectedOrder(order);
+    setViewMode('detail');
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState(null, '', `/react/orders/${order.id}`);
+    }
+  };
+
+  const handleEditOrder = (order) => {
+    setSelectedOrder(order);
+    setViewMode('create');
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState(null, '', '/react/orders/new');
+    }
+  };
+
+  const handleSaveOrder = (newOrder, action, shouldScroll = false) => {
+    const updated = [newOrder, ...orders.filter((o) => o.id !== newOrder.id)];
+    setOrders(updated);
+    setStoredData('erp_sales_orders_v1', updated);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updated }));
+    }
+
+    if (action === 'Create PO' && onNavigateToProcurement) {
+      onNavigateToProcurement('/procurement-pos', newOrder);
+    } else {
+      setSelectedOrder(newOrder);
+      setViewMode('detail');
+      if (typeof window !== 'undefined') {
+        if (shouldScroll) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        if (window.history?.pushState) {
+          window.history.pushState(null, '', `/react/orders/${newOrder.id}`);
+        }
+      }
+    }
+  };
+
+  const handleUpdateOrder = (updatedOrder) => {
+    const updated = [updatedOrder, ...orders.filter((o) => o.id !== updatedOrder.id)];
+    setOrders(updated);
+    setStoredData('erp_sales_orders_v1', updated);
+    setSelectedOrder(updatedOrder);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
+    }
+  };
+
+  const handleTriggerProcurement = (actionType, order) => {
+    let title = 'Material Request & Accessories Order';
+    let message = `Material Request & Accessories Order generated for ${order?.styleName || 'Kurta Style'} (${order?.id || ''})!`;
+    let icon = '📦';
+    let badgeText = 'Requisition Queued';
+    let details = [
+      { label: 'Order ID', value: `#${order?.id || ''}` },
+      { label: 'Style Name', value: order?.styleName || 'Kurta Style' },
+      { label: 'Greige Fabric', value: `${order?.totalFabricGreige || 0}m` },
+      { label: 'Total Garments', value: `${order?.totalGarments || 100} pcs` },
+      { label: 'Accessories BOM', value: 'Requisition Sent to Stores' }
+    ];
+
+    if (actionType === 'Create PO') {
+      title = 'Purchase Order Auto-Populated';
+      message = `Auto-populating PO for Order #${order?.id} with ${order?.totalFabricGreige || 0}m Greige Fabric!`;
+      icon = '🚀';
+      badgeText = 'Procurement PO Generated';
+    } else if (actionType === 'QC Batch') {
+      title = 'Quality Check (QC) Batch';
+      message = `Opening Quality Inspection module for Order #${order?.id} (${order?.styleName})!`;
+      icon = '🛡️';
+      badgeText = 'QC Module Ready';
+    } else if (actionType === 'Send to Process') {
+      title = 'Fabric Sent to Dyeing Process';
+      message = `Sending ${order?.totalFabricGreige || 0}m Greige Fabric to Dyeing Process for ${order?.styleName}!`;
+      icon = '🎨';
+      badgeText = 'Dyeing Job Work';
+    } else if (actionType === 'Order Material') {
+      title = 'Material Requisition Queued';
+      message = `Material procurement requisition queued for Order #${order?.id} (${order?.styleName})!`;
+      icon = '📦';
+      badgeText = 'Material Indent';
+    } else if (actionType === 'Button PO') {
+      title = 'Accessories PO — Buttons';
+      message = `Button accessories purchase requisition created for Order #${order?.id} (${order?.styleName})!`;
+      icon = '🔘';
+      badgeText = 'Button PO Queued';
+    } else if (actionType === 'Lace PO') {
+      title = 'Accessories PO — Lace';
+      message = `Lace accessories purchase requisition created for Order #${order?.id} (${order?.styleName})!`;
+      icon = '✂️';
+      badgeText = 'Lace PO Queued';
+    }
+
+    setProcurementModal({
+      isOpen: true,
+      actionType,
+      order,
+      title,
+      message,
+      icon,
+      badgeText,
+      details
+    });
+  };
 
   return (
-    <div className="p-4" style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <div>
-          <h2 className="fw-bold text-dark mb-1 fs-24">Garment Orders</h2>
-          <p className="text-secondary mb-0 fs-13">Customer Sales Orders &amp; Production Scheduling</p>
-        </div>
-        <button className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-medium rounded-3">
-          <i className="ti ti-plus fs-16"></i>
-          <span>New Sales Order</span>
-        </button>
-      </div>
+    <>
+      {viewMode === 'create' && (
+        <OrderCreationWizard
+          onSaveOrder={(newOrder, action) => handleSaveOrder(newOrder, action, true)}
+          onCancel={() => {
+            setViewMode(selectedOrder ? 'detail' : 'list');
+            if (typeof window !== 'undefined' && window.history?.pushState) {
+              window.history.pushState(null, '', selectedOrder ? `/react/orders/${selectedOrder.id}` : '/react/orders');
+            }
+          }}
+        />
+      )}
 
-      <div className="card border-0 shadow-sm rounded-4 p-3">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0 fs-13">
-            <thead className="table-light text-secondary">
-              <tr>
-                <th>Order ID</th>
-                <th>Client / Buyer</th>
-                <th>Garment Article</th>
-                <th>Total Order Qty</th>
-                <th>Target Delivery</th>
-                <th>Current Stage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((ord) => (
-                <tr key={ord.id}>
-                  <td className="fw-bold text-primary">{ord.id}</td>
-                  <td className="fw-medium">{ord.customer}</td>
-                  <td>{ord.article}</td>
-                  <td>{ord.totalQty}</td>
-                  <td>{ord.deliveryDate}</td>
-                  <td>
-                    <span className="badge bg-primary-subtle text-primary px-2 py-1">
-                      {ord.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      {viewMode === 'detail' && selectedOrder && (
+        <OrderDetailView
+          order={selectedOrder}
+          onBack={() => {
+            setViewMode('list');
+            if (typeof window !== 'undefined' && window.history?.pushState) {
+              window.history.pushState(null, '', '/react/orders');
+            }
+          }}
+          onEditSection={(section) => {
+            setViewMode('create');
+          }}
+          onTriggerProcurement={handleTriggerProcurement}
+          onNavigateToProcurement={onNavigateToProcurement}
+          onUpdateOrder={handleUpdateOrder}
+        />
+      )}
+
+      {(viewMode === 'list' || (viewMode === 'detail' && !selectedOrder)) && (
+        <OrdersListView
+          orders={orders}
+          onNewOrder={handleNewOrder}
+          onViewOrder={handleViewOrder}
+          onEditOrder={handleEditOrder}
+        />
+      )}
+
+      {/* Modern Custom Procurement & Action Modal */}
+      {procurementModal.isOpen && (
+        <ProcurementModal
+          data={procurementModal}
+          onClose={() => setProcurementModal(prev => ({ ...prev, isOpen: false }))}
+          onNavigate={() => {
+            if (procurementModal.actionType === 'Create PO' && onNavigateToProcurement) {
+              onNavigateToProcurement('/procurement-pos', procurementModal.order);
+            } else if (procurementModal.actionType === 'QC Batch' && onNavigateToProcurement) {
+              onNavigateToProcurement('/quality-batches', procurementModal.order);
+            }
+          }}
+        />
+      )}
+    </>
   );
 }

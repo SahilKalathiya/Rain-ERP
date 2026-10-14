@@ -1,44 +1,15 @@
 import React, { useState } from 'react';
-
-// Navigation Menu Configuration
-const DEFAULT_NAVIGATION_MENU = [
-  {
-    title: 'Raw Material Procurement',
-    items: [
-      { label: 'Overview Dashboard', link: '/dashboard', icon: 'ti ti-layout-dashboard' },
-      {
-        label: 'Procurement Workflow',
-        icon: 'ti ti-shopping-cart',
-        submenu: [
-          { label: 'Purchase Orders', link: '/procurement-pos' },
-          { label: 'Goods Receipt (GRN)', link: '/goods-inward' },
-          { label: 'Quality Check (QC)', link: '/quality-batches' },
-          { label: 'Stock Pool', link: '/stock-pool' },
-          { label: 'Rejected Stock Pool', link: '/rejected-stock' }
-        ]
-      },
-      {
-        label: 'Master Data',
-        icon: 'ti ti-database',
-        submenu: [
-          { label: 'Vendors Master', link: '/vendors' },
-          { label: 'Fabrics Master', link: '/fabrics' },
-          { label: 'Color Master', link: '/colors' },
-          { label: 'Transporters Master', link: '/transporters' }
-        ]
-      }
-    ]
-  }
-];
+import { navigationMenu } from './menuConfig';
 
 /**
  * Sidebar Navigation Component - Matches Authentic Preclinic / Rain Drop ERP Theme
  */
-export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
-  // Submenus are collapsed by default on page refresh and open only upon clicking
+export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
+  // Submenus state: open Sales Order Masters by default
   const [openMenus, setOpenMenus] = useState({
-    'Procurement Workflow': false,
-    'Master Data': false
+    'Sales Order Masters': true,
+    'Procurement Workflow': true,
+    'Procurement Masters': false
   });
 
   const toggleSubmenu = (label) => {
@@ -96,7 +67,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
           display: 'block'
         }}
       >
-        {DEFAULT_NAVIGATION_MENU.map((section, sIdx) => (
+        {navigationMenu.map((section, sIdx) => (
           <div key={sIdx} className="mb-3">
             <div
               className="text-uppercase fw-bold fs-10 px-2 mb-2 tracking-wider"
@@ -140,13 +111,18 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
                             {item.submenu.map((sub, subIdx) => {
                               const isSubActive =
                                 sub.link === currentRoute ||
+                                (sub.link === '/orders' && currentRoute.startsWith('/orders')) ||
+                                (sub.link === '/customers' && currentRoute.startsWith('/customers')) ||
+                                (sub.link === '/articles' && currentRoute.startsWith('/articles')) ||
+                                (sub.link === '/colors' && currentRoute.startsWith('/colors')) ||
+                                (sub.link === '/sizes' && currentRoute.startsWith('/sizes')) ||
+                                (sub.link === '/accessories' && currentRoute.startsWith('/accessories')) ||
                                 (sub.link === '/procurement-pos' && currentRoute.startsWith('/procurement-pos')) ||
                                 (sub.link === '/goods-inward' && currentRoute.startsWith('/goods-inward')) ||
                                 (sub.link === '/quality-batches' && currentRoute.startsWith('/quality-batches')) ||
                                 (sub.link === '/rejected-stock' && currentRoute.startsWith('/rejected-stock')) ||
                                 (sub.link === '/vendors' && currentRoute.startsWith('/vendors')) ||
                                 (sub.link === '/fabrics' && currentRoute.startsWith('/fabrics')) ||
-                                (sub.link === '/colors' && currentRoute.startsWith('/colors')) ||
                                 (sub.link === '/transporters' && currentRoute.startsWith('/transporters'));
 
                               return (
@@ -219,7 +195,7 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
           </div>
           <div>
             <div className="fw-semibold text-dark fs-12">Raindrop Admin</div>
-            <div className="text-muted fs-11">Procurement Head</div>
+            <div className="text-muted fs-11">Sales & Procurement</div>
           </div>
         </div>
         <button
@@ -233,4 +209,3 @@ export default function Sidebar({ currentRoute = '/dashboard', onNavigate }) {
     </aside>
   );
 }
-

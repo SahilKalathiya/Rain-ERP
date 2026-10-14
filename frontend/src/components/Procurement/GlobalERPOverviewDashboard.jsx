@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
 
 /**
  * GlobalERPOverviewDashboard
  * Clean, modern, responsive Garment ERP Executive Analytics Dashboard.
  * Connected directly with live data state:
- * - Dynamic Live KPIs (PO Count, Total Value, Inward Deliveries, QC Pass %, Rejected Pool)
+ * - Real-Time Garment Sales Orders (Live Style, Pieces, Fabric Demand)
+ * - Dynamic Live KPIs (Sales Orders, PO Count, Inward Deliveries, QC Pass %)
  * - Dynamic 12-Month Bar + Spline Curve Chart driven by live PO & GRN creation
- * - Interactive Fabric Allocation Donut Chart (live fabrics & PO items)
+ * - Interactive Fabric Allocation Donut Chart (live fabrics, PO items & Sales Order demand)
  * - Vendor Spend & Quality Performance Radar / Horizontal Progress Bars
  * - Live Orders Status Pipeline (Draft -> Sent -> Inward -> QC -> In Stock)
  * - Interactive center hover tooltips and instant real-time synchronization
@@ -27,6 +29,64 @@ export default function GlobalERPOverviewDashboard({
   const [chartMode, setChartMode] = useState('Monthly');
   const [hoveredDonut, setHoveredDonut] = useState(null);
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
+
+  // 0. LIVE SALES ORDERS STATE & CROSS-COMPONENT REAL-TIME SYNCHRONIZATION
+  const [salesOrders, setSalesOrders] = useState(() =>
+    getStoredData('erp_sales_orders_v1', initialSalesOrders)
+  );
+
+  useEffect(() => {
+    const handleSync = () => {
+      setSalesOrders(getStoredData('erp_sales_orders_v1', initialSalesOrders));
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('erp_sales_order_updated', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('erp_sales_order_updated', handleSync);
+    };
+  }, []);
+
+  // Live Sales Order Aggregations
+  const totalSalesOrdersCount = salesOrders.length;
+  const totalGarmentsBooked = salesOrders.reduce(
+    (acc, o) => acc + (Number(o.totalGarments) || Number(o.totalPieces) || 0),
+    0
+  );
+
+  const totalSalesGreigeFabric = salesOrders.reduce((acc, o) => {
+    if (Array.isArray(o.fabricConsumptions) && o.fabricConsumptions.length > 0) {
+      const sum = o.fabricConsumptions.reduce((s, r) => {
+        const dyedRate = parseFloat(r.dyedRate) || 0;
+        const shrink = parseFloat(r.shrinkPct) || 0;
+        const greigeRate = shrink < 100 ? dyedRate / (1 - shrink / 100) : dyedRate;
+        const pcs = parseInt(r.pcs) || 0;
+        return s + (greigeRate * pcs);
+      }, 0);
+      return acc + sum;
+    }
+    return acc + (Number(o.totalFabricGreige) || 0);
+  }, 0);
+
+  const totalSalesDyedFabric = salesOrders.reduce((acc, o) => {
+    if (Array.isArray(o.fabricConsumptions) && o.fabricConsumptions.length > 0) {
+      const sum = o.fabricConsumptions.reduce((s, r) => {
+        const dyedRate = parseFloat(r.dyedRate) || 0;
+        const pcs = parseInt(r.pcs) || 0;
+        return s + (dyedRate * pcs);
+      }, 0);
+      return acc + sum;
+    }
+    return acc + (Number(o.totalFabricDyed) || 0);
+  }, 0);
+
+  const confirmedSalesOrdersCount = salesOrders.filter(
+    (o) => o.stage === 'Confirmed' || o.status === 'Confirmed'
+  ).length;
+
+  const activeSalesOrder = salesOrders[0] || null;
 
   // 1. LIVE KPI CALCULATIONS FROM STATE
   const totalPOValue = purchaseOrders.reduce((acc, po) => acc + (Number(po.totalAmount) || 0), 0);
@@ -123,13 +183,36 @@ export default function GlobalERPOverviewDashboard({
   const dynamicAreaPath = `${dynamicSplinePath} L ${splineCoords[splineCoords.length - 1].x} 250 L ${splineCoords[0].x} 250 Z`;
 
   // 3. LIVE FABRIC TYPE DISTRIBUTION DONUT
-  // Aggregate real fabrics and PO items
+  // Aggregate real fabrics, PO items, and Sales Order fabric requirements
   const fabricMap = {};
   purchaseOrders.forEach((po) => {
     (po.items || []).forEach((it) => {
       const name = it.fabricQuality || 'Cotton Poplin';
       fabricMap[name] = (fabricMap[name] || 0) + (Number(it.quantity) || 1000);
     });
+  });
+
+  salesOrders.forEach((so) => {
+    if (Array.isArray(so.fabricConsumptions) && so.fabricConsumptions.length > 0) {
+      so.fabricConsumptions.forEach((fc) => {
+        const fab = fc.fabricQuality || fc.fabricName;
+        if (fab && fab !== '—') {
+          const dyedRate = parseFloat(fc.dyedRate) || 0;
+          const shrink = parseFloat(fc.shrinkPct) || 0;
+          const greigeRate = shrink < 100 ? dyedRate / (1 - shrink / 100) : dyedRate;
+          const pcs = parseInt(fc.pcs) || 0;
+          const meters = Math.round(greigeRate * pcs);
+          fabricMap[fab] = (fabricMap[fab] || 0) + (meters > 0 ? meters : 150);
+        }
+      });
+    } else if (Array.isArray(so.articles)) {
+      so.articles.forEach((art) => {
+        const fab = art.fabricQuality;
+        if (fab && fab !== '—') {
+          fabricMap[fab] = (fabricMap[fab] || 0) + (Number(art.totalPieces) || 100);
+        }
+      });
+    }
   });
 
   const totalFabricVolume = Object.values(fabricMap).reduce((a, b) => a + b, 0) || totalPOMeters || 10000;
@@ -215,22 +298,88 @@ export default function GlobalERPOverviewDashboard({
 
   return (
     <div className="container-fluid p-0 pb-4" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      {/* 2. Top 3 Minimal KPI Stat Cards with Mini Sparkline Bars (Garment ERP Live Connected) */}
-      <div className="row g-4 mb-4">
-        {/* Card 1: Total Purchase Orders */}
-        <div className="col-12 col-md-4">
+      {/* 2. Top 4 Executive KPI Stat Cards (Garment Sales Orders + Mill POs + Inward GRN + QC) */}
+      <div className="row g-3 mb-4">
+        {/* Card 1: Garment Sales Orders (LIVE CONNECTED) */}
+        <div className="col-12 col-sm-6 col-xl-3">
           <div
-            className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            style={{ border: '1px solid #e2e8f0' }}
+            onClick={() => onNavigateTab('orders')}
+          >
+            <div className="d-flex align-items-start justify-content-between mb-2">
+              <div>
+                <span className="text-secondary fw-medium fs-12 d-block mb-1">Garment Sales Orders</span>
+                <div className="d-flex align-items-center gap-1.5">
+                  <span className="fs-24 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
+                    {totalSalesOrdersCount} Orders
+                  </span>
+                  <span
+                    className="badge rounded-pill px-2 py-0.5 fs-10 fw-semibold"
+                    style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe' }}
+                  >
+                    {confirmedSalesOrdersCount} Confirmed
+                  </span>
+                </div>
+              </div>
+
+              {/* Icon Outline Badge (Theme Indigo #2e37a4) */}
+              <div
+                className="d-flex align-items-center justify-content-center rounded-3 border"
+                style={{ width: '38px', height: '38px', borderColor: '#c7d2fe', color: '#2e37a4', backgroundColor: '#eef2ff' }}
+              >
+                <i className="ti ti-shirt fs-18"></i>
+              </div>
+            </div>
+
+            {/* Sparkline & Trend */}
+            <div className="d-flex align-items-end justify-content-between mt-2 pt-2 border-top">
+              <div className="d-flex align-items-end gap-1" style={{ height: '30px' }}>
+                {salesOrders.slice(0, 7).map((so, i) => {
+                  const pcs = Number(so.totalGarments || so.totalPieces || 100);
+                  const h = Math.min(28, Math.max(8, Math.round((pcs / 300) * 28)));
+                  return (
+                    <div
+                      key={i}
+                      title={`${so.id}: ${pcs} Pcs`}
+                      style={{
+                        width: '4px',
+                        height: `${h}px`,
+                        backgroundColor: '#2e37a4',
+                        borderRadius: '2px'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="text-end">
+                <span className="fw-bold text-dark fs-12 d-block font-monospace">
+                  {totalGarmentsBooked.toLocaleString()} Pcs
+                </span>
+                <span className="text-muted fs-11">
+                  {totalSalesGreigeFabric.toFixed(0)}m Greige Demand
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Total Purchase Orders */}
+        <div className="col-12 col-sm-6 col-xl-3">
+          <div
+            className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            style={{ border: '1px solid #e2e8f0' }}
             onClick={() => onNavigateTab('pos')}
           >
-            <div className="d-flex align-items-start justify-content-between mb-3">
+            <div className="d-flex align-items-start justify-content-between mb-2">
               <div>
-                <span className="text-secondary fw-medium fs-13 d-block mb-1">Total Fabric Orders</span>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fs-28 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
-                    {purchaseOrders.length > 0 ? purchaseOrders.length : '0'}
+                <span className="text-secondary fw-medium fs-12 d-block mb-1">Fabric Mill Orders</span>
+                <div className="d-flex align-items-center gap-1.5">
+                  <span className="fs-24 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
+                    {purchaseOrders.length > 0 ? purchaseOrders.length : '0'} POs
                   </span>
-                  <span className="badge rounded-pill px-2 py-1 fs-11 fw-semibold text-success bg-success-subtle">
+                  <span className="badge rounded-pill px-2 py-0.5 fs-10 fw-semibold text-success bg-success-subtle">
                     +95%
                   </span>
                 </div>
@@ -239,16 +388,15 @@ export default function GlobalERPOverviewDashboard({
               {/* Icon Outline Badge */}
               <div
                 className="d-flex align-items-center justify-content-center rounded-3 border"
-                style={{ width: '42px', height: '42px', borderColor: '#c7d2fe', color: '#3730a3', backgroundColor: '#eef2ff' }}
+                style={{ width: '38px', height: '38px', borderColor: '#c7d2fe', color: '#3730a3', backgroundColor: '#eef2ff' }}
               >
-                <i className="ti ti-file-invoice fs-20"></i>
+                <i className="ti ti-file-invoice fs-18"></i>
               </div>
             </div>
 
             {/* Sparkline & Trend */}
             <div className="d-flex align-items-end justify-content-between mt-2 pt-2 border-top">
-              {/* Mini SVG Bars */}
-              <div className="d-flex align-items-end gap-1" style={{ height: '36px' }}>
+              <div className="d-flex align-items-end gap-1" style={{ height: '30px' }}>
                 {(() => {
                   const now = new Date();
                   const days = Array.from({ length: 7 }, (_, i) => {
@@ -260,7 +408,7 @@ export default function GlobalERPOverviewDashboard({
                   });
                   const maxDay = Math.max(...days, 1);
                   return days.map((cnt, i) => {
-                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(36, Math.round((cnt / maxDay) * 32)));
+                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(28, Math.round((cnt / maxDay) * 26)));
                     return (
                       <div
                         key={i}
@@ -278,28 +426,33 @@ export default function GlobalERPOverviewDashboard({
                 })()}
               </div>
 
-              <div className="d-flex align-items-center text-success fs-12 fw-medium">
-                <span className="me-1">{purchaseOrders.length > 0 ? `+${Math.min(100, purchaseOrders.length * 12)}% ↑` : '0%'}</span>
-                <span className="text-muted">in last 7 Days</span>
+              <div className="text-end">
+                <span className="fw-bold text-dark fs-12 d-block font-monospace">
+                  {totalPOMeters.toLocaleString()} Mtrs
+                </span>
+                <span className="text-muted fs-11">
+                  ₹{(totalPOValue / 100000).toFixed(1)}L Total
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Inward Goods (GRN) */}
-        <div className="col-12 col-md-4">
+        {/* Card 3: Inward Goods (GRN) */}
+        <div className="col-12 col-sm-6 col-xl-3">
           <div
-            className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            style={{ border: '1px solid #e2e8f0' }}
             onClick={() => onNavigateTab('grn')}
           >
-            <div className="d-flex align-items-start justify-content-between mb-3">
+            <div className="d-flex align-items-start justify-content-between mb-2">
               <div>
-                <span className="text-secondary fw-medium fs-13 d-block mb-1">Inward Deliveries (GRN)</span>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fs-28 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
-                    {grns.length > 0 ? grns.length : '0'}
+                <span className="text-secondary fw-medium fs-12 d-block mb-1">Inward Deliveries (GRN)</span>
+                <div className="d-flex align-items-center gap-1.5">
+                  <span className="fs-24 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
+                    {grns.length > 0 ? grns.length : '0'} Inward
                   </span>
-                  <span className="badge rounded-pill px-2 py-1 fs-11 fw-semibold text-primary bg-primary-subtle">
+                  <span className="badge rounded-pill px-2 py-0.5 fs-10 fw-semibold text-primary bg-primary-subtle">
                     {grns.length > 0 ? `${grns.length} Active` : '0 Active'}
                   </span>
                 </div>
@@ -308,16 +461,15 @@ export default function GlobalERPOverviewDashboard({
               {/* Icon Outline Badge */}
               <div
                 className="d-flex align-items-center justify-content-center rounded-3 border"
-                style={{ width: '42px', height: '42px', borderColor: '#fecdd3', color: '#e11d48', backgroundColor: '#fff1f2' }}
+                style={{ width: '38px', height: '38px', borderColor: '#fecdd3', color: '#e11d48', backgroundColor: '#fff1f2' }}
               >
-                <i className="ti ti-truck-delivery fs-20"></i>
+                <i className="ti ti-truck-delivery fs-18"></i>
               </div>
             </div>
 
             {/* Sparkline & Trend */}
             <div className="d-flex align-items-end justify-content-between mt-2 pt-2 border-top">
-              {/* Mini SVG Bars */}
-              <div className="d-flex align-items-end gap-1" style={{ height: '36px' }}>
+              <div className="d-flex align-items-end gap-1" style={{ height: '30px' }}>
                 {(() => {
                   const now = new Date();
                   const days = Array.from({ length: 7 }, (_, i) => {
@@ -329,7 +481,7 @@ export default function GlobalERPOverviewDashboard({
                   });
                   const maxDay = Math.max(...days, 1);
                   return days.map((cnt, i) => {
-                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(36, Math.round((cnt / maxDay) * 32)));
+                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(28, Math.round((cnt / maxDay) * 26)));
                     return (
                       <div
                         key={i}
@@ -347,28 +499,33 @@ export default function GlobalERPOverviewDashboard({
                 })()}
               </div>
 
-              <div className="d-flex align-items-center text-primary fs-12 fw-medium">
-                <span className="me-1">{grns.length > 0 ? `+${Math.min(100, grns.length * 15)}% ↑` : '0%'}</span>
-                <span className="text-muted">in last 7 Days</span>
+              <div className="text-end">
+                <span className="fw-bold text-dark fs-12 d-block font-monospace">
+                  {totalDeliveredMeters.toLocaleString()} Mtrs
+                </span>
+                <span className="text-muted fs-11">
+                  {totalBales || grns.length * 6} Bales Inward
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Quality Check Rate */}
-        <div className="col-12 col-md-4">
+        {/* Card 4: Quality Check Rate */}
+        <div className="col-12 col-sm-6 col-xl-3">
           <div
-            className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 position-relative cursor-pointer transition-all hover-shadow"
+            style={{ border: '1px solid #e2e8f0' }}
             onClick={() => onNavigateTab('qc')}
           >
-            <div className="d-flex align-items-start justify-content-between mb-3">
+            <div className="d-flex align-items-start justify-content-between mb-2">
               <div>
-                <span className="text-secondary fw-medium fs-13 d-block mb-1">Quality Inspection &amp; Pass</span>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fs-28 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
-                    {qcOkCount > 0 ? qcOkCount : qualityChecks.length > 0 ? qualityChecks.length : '0'}
+                <span className="text-secondary fw-medium fs-12 d-block mb-1">Quality Inspection</span>
+                <div className="d-flex align-items-center gap-1.5">
+                  <span className="fs-24 fw-bold text-dark" style={{ letterSpacing: '-0.5px' }}>
+                    {qcOkCount > 0 ? qcOkCount : qualityChecks.length > 0 ? qualityChecks.length : '0'} OK
                   </span>
-                  <span className="badge rounded-pill px-2 py-1 fs-11 fw-semibold text-success bg-success-subtle">
+                  <span className="badge rounded-pill px-2 py-0.5 fs-10 fw-semibold text-success bg-success-subtle">
                     {qualityChecks.length > 0 ? `${qcPassPercent}% Pass` : '100% Pass'}
                   </span>
                 </div>
@@ -377,16 +534,15 @@ export default function GlobalERPOverviewDashboard({
               {/* Icon Outline Badge */}
               <div
                 className="d-flex align-items-center justify-content-center rounded-3 border"
-                style={{ width: '42px', height: '42px', borderColor: '#a7f3d0', color: '#059669', backgroundColor: '#ecfdf5' }}
+                style={{ width: '38px', height: '38px', borderColor: '#a7f3d0', color: '#059669', backgroundColor: '#ecfdf5' }}
               >
-                <i className="ti ti-shield-check fs-20"></i>
+                <i className="ti ti-shield-check fs-18"></i>
               </div>
             </div>
 
             {/* Sparkline & Trend */}
             <div className="d-flex align-items-end justify-content-between mt-2 pt-2 border-top">
-              {/* Mini SVG Bars */}
-              <div className="d-flex align-items-end gap-1" style={{ height: '36px' }}>
+              <div className="d-flex align-items-end gap-1" style={{ height: '30px' }}>
                 {(() => {
                   const now = new Date();
                   const days = Array.from({ length: 7 }, (_, i) => {
@@ -398,7 +554,7 @@ export default function GlobalERPOverviewDashboard({
                   });
                   const maxDay = Math.max(...days, 1);
                   return days.map((cnt, i) => {
-                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(36, Math.round((cnt / maxDay) * 32)));
+                    const height = cnt === 0 ? 6 : Math.max(10, Math.min(28, Math.round((cnt / maxDay) * 26)));
                     return (
                       <div
                         key={i}
@@ -416,9 +572,13 @@ export default function GlobalERPOverviewDashboard({
                 })()}
               </div>
 
-              <div className="d-flex align-items-center text-success fs-12 fw-medium">
-                <span className="me-1">{qualityChecks.length > 0 ? `${qcPassPercent}% ↑` : '100% ↑'}</span>
-                <span className="text-muted">in last 7 Days</span>
+              <div className="text-end">
+                <span className="fw-bold text-dark fs-12 d-block font-monospace">
+                  {qcPassPercent}% Quality
+                </span>
+                <span className="text-muted fs-11">
+                  {rejectedInPoolCount} In Rejected Pool
+                </span>
               </div>
             </div>
           </div>
@@ -427,110 +587,162 @@ export default function GlobalERPOverviewDashboard({
 
       {/* 3. Mid Section: Left Highlighted Order Card + Right Main Bar & Spline Chart */}
       <div className="row g-4 mb-4">
-        {/* Left Column: Priority Active Order Card */}
+        {/* Left Column: Priority Active Garment Order Card */}
         <div className="col-12 col-lg-4">
-          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column justify-content-between">
+          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column justify-content-between" style={{ border: '1px solid #e2e8f0' }}>
             <div>
-              <div className="d-flex align-items-center justify-content-between mb-4">
-                <h5 className="fw-bold text-dark mb-0 fs-16" style={{ letterSpacing: '-0.3px' }}>
-                  Active Priority Order
-                </h5>
-                <span className="badge bg-light text-secondary border px-2 py-1 fs-11">
-                  Live Highlight
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <span
+                    className="rounded-circle d-flex align-items-center justify-content-center text-white shadow-xs"
+                    style={{ width: '28px', height: '28px', backgroundColor: '#2e37a4' }}
+                  >
+                    <i className="ti ti-shirt fs-6"></i>
+                  </span>
+                  <h5 className="fw-bold text-dark mb-0 fs-15">
+                    Priority Garment Order
+                  </h5>
+                </div>
+                <span
+                  className="badge rounded-pill px-2.5 py-1 fs-11 fw-semibold"
+                  style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe' }}
+                >
+                  Live Demand
                 </span>
               </div>
 
-              {/* Vendor Profile Info */}
-              <div className="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-16 shadow-sm flex-shrink-0"
-                  style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)' }}
-                >
-                  {activePO.vendorName ? activePO.vendorName.charAt(0) : 'V'}
-                </div>
-                <div className="text-truncate">
-                  <h6 className="fw-bold text-dark mb-0 fs-15 text-truncate">{activePO.vendorName}</h6>
-                  <span className="text-muted fs-12 font-monospace">#{activePO.id}</span>
-                </div>
-              </div>
+              {activeSalesOrder ? (
+                <>
+                  {/* Style & Client Profile Info */}
+                  <div className="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                    <div
+                      className="rounded-3 d-flex align-items-center justify-content-center text-white fw-bold fs-18 shadow-sm flex-shrink-0"
+                      style={{ width: '46px', height: '46px', background: 'linear-gradient(135deg, #2e37a4 0%, #4f46e5 100%)' }}
+                    >
+                      {(activeSalesOrder.styleName || 'K').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-truncate">
+                      <h6 className="fw-bold text-dark mb-0 fs-15 text-truncate text-capitalize">
+                        {activeSalesOrder.styleName || 'Kurta Style'}
+                      </h6>
+                      <span className="text-muted fs-12 font-monospace">#{activeSalesOrder.id || 'RD-2610-0002'}</span>
+                    </div>
+                  </div>
 
-              {/* Order Details Body */}
-              <div className="mb-4">
-                <h6 className="fw-bold text-dark mb-1 fs-14">
-                  {activePO.items && activePO.items[0] ? activePO.items[0].fabricQuality : '100% Cotton Poplin 40s'}
-                </h6>
-                <div className="d-flex align-items-center gap-3 text-secondary fs-12 mb-3">
-                  <span>
-                    <i className="ti ti-calendar me-1 text-muted"></i>
-                    {activePO.date || 'Recent Order'}
-                  </span>
-                  <span>
-                    <i className="ti ti-clock me-1 text-muted"></i>
-                    {(activePO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0).toLocaleString()} Mtrs
-                  </span>
-                </div>
+                  {/* Order Details Body */}
+                  <div className="mb-3">
+                    <div className="d-flex align-items-center gap-2 text-secondary fs-12 mb-3">
+                      <span>
+                        <i className="ti ti-calendar me-1 text-muted"></i>
+                        {activeSalesOrder.orderDate || 'Today'}
+                      </span>
+                      <span>&bull;</span>
+                      <span className="fw-semibold text-dark">
+                        <i className="ti ti-tag me-1 text-primary"></i>
+                        {(activeSalesOrder.totalGarments || activeSalesOrder.totalPieces || 200)} Pcs Booked
+                      </span>
+                    </div>
 
-                <div className="row g-2 mb-3">
-                  <div className="col-6">
-                    <span className="text-muted fs-11 d-block">Department</span>
-                    <span className="fw-semibold text-dark fs-13">Raw Material</span>
-                  </div>
-                  <div className="col-6">
-                    <span className="text-muted fs-11 d-block">Tolerance</span>
-                    <span className="fw-semibold text-dark fs-13">
-                      {activePO.bufferAllowed ? `±${activePO.bufferPercent}%` : 'Standard'}
-                    </span>
-                  </div>
-                </div>
+                    <div className="row g-2 mb-3">
+                      <div className="col-6">
+                        <div className="p-2.5 rounded-3 bg-light border">
+                          <span className="text-muted fs-11 d-block mb-0.5">Greige Demand</span>
+                          <span className="fw-bold text-dark fs-13 font-monospace">
+                            {(() => {
+                              if (Array.isArray(activeSalesOrder.fabricConsumptions) && activeSalesOrder.fabricConsumptions.length > 0) {
+                                const totalGreige = activeSalesOrder.fabricConsumptions.reduce((sum, r) => {
+                                  const dyedRate = parseFloat(r.dyedRate) || 0;
+                                  const shrink = parseFloat(r.shrinkPct) || 0;
+                                  const greigeRate = shrink < 100 ? dyedRate / (1 - shrink / 100) : dyedRate;
+                                  const pcs = parseInt(r.pcs) || 0;
+                                  return sum + (greigeRate * pcs);
+                                }, 0);
+                                return `${totalGreige.toFixed(1)}m`;
+                              }
+                              return `${activeSalesOrder.totalFabricGreige || 0}m`;
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-6">
+                        <div className="p-2.5 rounded-3 bg-light border">
+                          <span className="text-muted fs-11 d-block mb-0.5">Dyed Demand</span>
+                          <span className="fw-bold text-dark fs-13 font-monospace">
+                            {(() => {
+                              if (Array.isArray(activeSalesOrder.fabricConsumptions) && activeSalesOrder.fabricConsumptions.length > 0) {
+                                const totalDyed = activeSalesOrder.fabricConsumptions.reduce((sum, r) => {
+                                  const dyedRate = parseFloat(r.dyedRate) || 0;
+                                  const pcs = parseInt(r.pcs) || 0;
+                                  return sum + (dyedRate * pcs);
+                                }, 0);
+                                return `${totalDyed.toFixed(1)}m`;
+                              }
+                              return `${activeSalesOrder.totalFabricDyed || 0}m`;
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="p-3 rounded-3 bg-light border mb-2">
-                  <div className="d-flex justify-content-between fs-12 text-secondary mb-1">
-                    <span>Order Value:</span>
-                    <span className="fw-bold text-dark">
-                      ₹{Number(activePO.totalAmount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                    </span>
+                    <div className="p-3 rounded-3 bg-light border mb-2">
+                      <div className="d-flex justify-content-between fs-12 text-secondary mb-1">
+                        <span>Customer Allocations:</span>
+                        <span className="fw-semibold text-dark">
+                          {activeSalesOrder.customerOrders?.length || 2} Clients
+                        </span>
+                      </div>
+                      <div className="d-flex justify-content-between fs-12 text-secondary">
+                        <span>Production Stage:</span>
+                        <span
+                          className="badge rounded-pill px-2.5 py-0.5"
+                          style={{
+                            backgroundColor: activeSalesOrder.stage === 'Confirmed' ? '#dcfce7' : '#e0e7ff',
+                            color: activeSalesOrder.stage === 'Confirmed' ? '#16a34a' : '#2e37a4'
+                          }}
+                        >
+                          {activeSalesOrder.stage || activeSalesOrder.status || 'Draft'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="d-flex justify-content-between fs-12 text-secondary">
-                    <span>Current Status:</span>
-                    <span className="badge bg-primary-subtle text-primary fw-medium px-2 py-1">
-                      {activePO.status || 'Active'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <div className="text-center py-4 text-muted fs-13">No sales orders active.</div>
+              )}
             </div>
 
             {/* Action Buttons */}
             <div>
               <button
                 type="button"
-                className="btn w-100 text-white fw-semibold py-2 mb-2 rounded-3 shadow-sm fs-13"
-                style={{ backgroundColor: '#2547b6', border: 'none' }}
-                onClick={() => onNavigateTab('pos')}
+                className="btn w-100 text-white fw-semibold py-2 mb-2 rounded-3 shadow-sm fs-13 d-flex align-items-center justify-content-center gap-1.5"
+                style={{ backgroundColor: '#2e37a4', border: 'none' }}
+                onClick={() => onNavigateTab(activeSalesOrder ? `/orders/${activeSalesOrder.id}` : 'orders')}
               >
-                View Full Purchase Orders ({purchaseOrders.length})
+                <i className="ti ti-eye fs-15"></i>
+                <span>Open Sales Order #{activeSalesOrder?.id || 'Detail'}</span>
               </button>
 
               <div className="row g-2">
                 <div className="col-6">
                   <button
                     type="button"
-                    className="btn btn-dark w-100 fw-medium py-2 rounded-3 fs-12 d-flex align-items-center justify-content-center gap-1"
-                    onClick={() => onNavigateTab('grn')}
+                    className="btn btn-outline-primary w-100 fw-medium py-2 rounded-3 fs-12 d-flex align-items-center justify-content-center gap-1 border"
+                    style={{ borderColor: '#2e37a4', color: '#2e37a4' }}
+                    onClick={() => onNavigateTab('/orders/new')}
                   >
-                    <i className="ti ti-package fs-14"></i>
-                    <span>Inward GRN</span>
+                    <i className="ti ti-plus fs-14"></i>
+                    <span>+ New Order</span>
                   </button>
                 </div>
                 <div className="col-6">
                   <button
                     type="button"
-                    className="btn btn-outline-secondary w-100 fw-medium py-2 rounded-3 fs-12 bg-white d-flex align-items-center justify-content-center gap-1 border"
-                    style={{ borderColor: '#e2e8f0', color: '#334155' }}
-                    onClick={() => onNavigateTab('vendors')}
+                    className="btn btn-dark w-100 fw-medium py-2 rounded-3 fs-12 d-flex align-items-center justify-content-center gap-1"
+                    onClick={() => onNavigateTab('pos')}
                   >
-                    <i className="ti ti-user fs-14"></i>
-                    <span>Vendors</span>
+                    <i className="ti ti-file-invoice fs-14"></i>
+                    <span>Mill POs ({purchaseOrders.length})</span>
                   </button>
                 </div>
               </div>
@@ -910,7 +1122,217 @@ export default function GlobalERPOverviewDashboard({
         </div>
       </div>
 
-      {/* 5. Bottom Split: Live Purchase Orders Ledger & Live Audit Log Feed */}
+      {/* 5. LIVE GARMENT SALES ORDERS & PRODUCTION PIPELINE */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white" style={{ border: '1px solid #e2e8f0' }}>
+            <div className="d-flex flex-wrap align-items-center justify-content-between mb-3 pb-2 border-bottom gap-2">
+              <div className="d-flex align-items-center gap-2.5">
+                <div
+                  className="rounded-2 d-flex align-items-center justify-content-center text-white shadow-xs"
+                  style={{ width: '34px', height: '34px', backgroundColor: '#2e37a4' }}
+                >
+                  <i className="ti ti-shirt fs-5"></i>
+                </div>
+                <div>
+                  <div className="d-flex align-items-center gap-2">
+                    <h5 className="fw-bold text-dark mb-0 fs-16">
+                      Live Garment Sales Orders &amp; Production Pipeline
+                    </h5>
+                    <span
+                      className="badge rounded-pill px-2.5 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1"
+                      style={{ backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}
+                    >
+                      <span className="rounded-circle" style={{ width: '6px', height: '6px', backgroundColor: '#10b981' }} />
+                      Live Synced
+                    </span>
+                  </div>
+                  <span className="text-muted fs-12">
+                    Live client orders, style configurations, garment piece counts, and fabric Greige &amp; Dyed meter demand
+                  </span>
+                </div>
+              </div>
+
+              <div className="d-flex align-items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm text-white rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1 shadow-xs"
+                  style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '12px' }}
+                  onClick={() => onNavigateTab('/orders/new')}
+                >
+                  <i className="ti ti-plus fs-14"></i>
+                  <span>+ New Sales Order</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1.5 fw-medium bg-white"
+                  style={{ borderColor: '#cbd5e1', fontSize: '12px' }}
+                  onClick={() => onNavigateTab('orders')}
+                >
+                  <span>View All Orders &rarr;</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Strip */}
+            <div className="row g-2 mb-3">
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                  <span className="text-muted fs-12">Active Orders:</span>
+                  <span className="fw-bold text-dark font-monospace fs-13">{totalSalesOrdersCount}</span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                  <span className="text-muted fs-12">Total Garments:</span>
+                  <span className="fw-bold font-monospace fs-13" style={{ color: '#2e37a4' }}>
+                    {totalGarmentsBooked.toLocaleString()} Pcs
+                  </span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                  <span className="text-muted fs-12">Greige Fabric Demand:</span>
+                  <span className="fw-bold text-success font-monospace fs-13">{totalSalesGreigeFabric.toFixed(1)} m</span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                  <span className="text-muted fs-12">Dyed Fabric Demand:</span>
+                  <span className="fw-bold text-dark font-monospace fs-13">{totalSalesDyedFabric.toFixed(1)} m</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Reactive Table */}
+            <div className="table-responsive bg-white rounded-3 border overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
+              <table className="table table-hover align-middle mb-0 fs-13">
+                <thead className="table-light text-secondary">
+                  <tr>
+                    <th style={{ fontWeight: 600 }}>Order #</th>
+                    <th style={{ fontWeight: 600 }}>Style / Articles</th>
+                    <th style={{ fontWeight: 600 }}>Customer Allocation</th>
+                    <th className="text-center" style={{ fontWeight: 600 }}>Pieces</th>
+                    <th style={{ fontWeight: 600 }}>Fabric &amp; Sourcing</th>
+                    <th className="text-center" style={{ fontWeight: 600 }}>Dyed Demand</th>
+                    <th className="text-center" style={{ fontWeight: 600 }}>Greige Demand</th>
+                    <th className="text-center" style={{ fontWeight: 600 }}>Stage</th>
+                    <th className="text-end" style={{ fontWeight: 600 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="text-center py-4 text-muted">
+                        No sales orders registered yet. Click '+ New Sales Order' to create one.
+                      </td>
+                    </tr>
+                  ) : (
+                    salesOrders.map((so) => {
+                      let ordGreige = 0;
+                      let ordDyed = 0;
+                      if (Array.isArray(so.fabricConsumptions) && so.fabricConsumptions.length > 0) {
+                        so.fabricConsumptions.forEach((r) => {
+                          const dyedRate = parseFloat(r.dyedRate) || 0;
+                          const shrink = parseFloat(r.shrinkPct) || 0;
+                          const greigeRate = shrink < 100 ? dyedRate / (1 - shrink / 100) : dyedRate;
+                          const pcs = parseInt(r.pcs) || 0;
+                          ordDyed += dyedRate * pcs;
+                          ordGreige += greigeRate * pcs;
+                        });
+                      } else {
+                        ordGreige = Number(so.totalFabricGreige) || 0;
+                        ordDyed = Number(so.totalFabricDyed) || 0;
+                      }
+
+                      const primaryFabric = so.fabricConsumptions?.[0]?.fabricQuality || so.articles?.[0]?.fabricQuality || 'Desizer Flex';
+                      const primarySourcing = so.articles?.[0]?.sourcing || 'Greige';
+
+                      return (
+                        <tr key={so.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td className="fw-bold font-monospace" style={{ color: '#2e37a4' }}>
+                            {so.id}
+                          </td>
+                          <td>
+                            <div className="fw-semibold text-dark text-capitalize">
+                              {so.styleName || 'Kurta'}
+                            </div>
+                            <div className="d-flex align-items-center gap-1 mt-0.5">
+                              {(so.articles || [{ name: 'Kurta' }]).map((art, aIdx) => (
+                                <span key={aIdx} className="badge bg-light text-secondary border fs-11 py-0.5 px-1.5 rounded-2">
+                                  {art.name === 'Pant' ? '👖' : '👕'} {art.name}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="text-dark fw-medium">
+                              {so.customerOrders?.length > 0
+                                ? so.customerOrders.map((c) => `${c.customerName || 'Customer'} (${c.totalPieces || 50})`).join(', ')
+                                : 'Customer 1 (50 pcs)'}
+                            </div>
+                            <span className="text-muted fs-11">
+                              {so.orderDate || 'Recent'}
+                            </span>
+                          </td>
+                          <td className="text-center fw-bold text-dark font-monospace">
+                            {Number(so.totalGarments || so.totalPieces || 200)} Pcs
+                          </td>
+                          <td>
+                            <span className="fw-medium text-dark">{primaryFabric}</span>
+                            <span
+                              className="badge ms-1.5 px-2 py-0.5 rounded-2 fw-semibold"
+                              style={{
+                                fontSize: '10px',
+                                backgroundColor: primarySourcing === 'Greige' ? '#eef2ff' : '#f0fdf4',
+                                color: primarySourcing === 'Greige' ? '#2e37a4' : '#15803d',
+                                border: `1px solid ${primarySourcing === 'Greige' ? '#c7d2fe' : '#bbf7d0'}`
+                              }}
+                            >
+                              {primarySourcing}
+                            </span>
+                          </td>
+                          <td className="text-center font-monospace text-muted">
+                            {ordDyed > 0 ? `${ordDyed.toFixed(1)}m` : '—'}
+                          </td>
+                          <td className="text-center font-monospace fw-semibold text-dark">
+                            {ordGreige > 0 ? `${ordGreige.toFixed(1)}m` : '—'}
+                          </td>
+                          <td className="text-center">
+                            <span
+                              className="badge px-2.5 py-1 rounded-pill fw-semibold"
+                              style={{
+                                fontSize: '11px',
+                                backgroundColor: so.stage === 'Confirmed' || so.status === 'Confirmed' ? '#dcfce7' : '#f1f5f9',
+                                color: so.stage === 'Confirmed' || so.status === 'Confirmed' ? '#16a34a' : '#475569'
+                              }}
+                            >
+                              {so.stage || so.status || 'Draft'}
+                            </span>
+                          </td>
+                          <td className="text-end">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary py-1 px-2.5 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
+                              style={{ fontSize: '12px', borderColor: '#2e37a4', color: '#2e37a4' }}
+                              onClick={() => onNavigateTab(`/orders/${so.id}`)}
+                            >
+                              <span>Open</span>
+                              <i className="ti ti-arrow-right fs-12"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Bottom Split: Live Purchase Orders Ledger & Live Audit Log Feed */}
       <div className="row g-4">
         {/* Left: Purchase Orders Table */}
         <div className="col-12 col-lg-8">

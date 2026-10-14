@@ -1,15 +1,16 @@
 // =========================================================================
 // Rain Drop ERP - Navigation Menu Configuration
-// All labels are fully translated with clean titles (no raw nav.* keys)
+// Exact Sidebar Hierarchy matching the system & video layout
 // =========================================================================
 
 export const navigationMenu = [
   {
-    title: 'Raw Material Procurement',
+    title: 'Main Navigation',
     items: [
-      { label: 'Overview Dashboard', link: '/dashboard', icon: 'ti ti-layout-dashboard' },
+      { label: 'Dashboard', link: '/dashboard', icon: 'ti ti-layout-dashboard' },
+      { label: 'Orders', link: '/orders', icon: 'ti ti-shopping-bag' },
       {
-        label: 'Procurement Workflow',
+        label: 'Procurement',
         icon: 'ti ti-shopping-cart',
         open: true,
         submenu: [
@@ -21,63 +22,20 @@ export const navigationMenu = [
         ]
       },
       {
-        label: 'Master Data',
+        label: 'Masters',
         icon: 'ti ti-database',
-        open: true,
+        open: false,
         submenu: [
-          { label: 'Vendors Master', link: '/vendors' },
-          { label: 'Fabrics Master', link: '/fabrics' },
+          { label: 'Customer Master', link: '/customers' },
+          { label: 'Article Master', link: '/articles' },
           { label: 'Color Master', link: '/colors' },
+          { label: 'Size Series Master', link: '/sizes' },
+          { label: 'Accessories Master', link: '/accessories' },
+          { label: 'Fabrics Master', link: '/fabrics' },
+          { label: 'Vendors Master', link: '/vendors' },
           { label: 'Transporters Master', link: '/transporters' }
         ]
       }
-      /* =========================================================================
-       * OUT OF SCOPE FOR MODULE 1 (Deferred to Future Stages - Section 2.2 / 10)
-       * =========================================================================
-      {
-        label: 'Processing (Dye/Print)',
-        icon: 'ti ti-brush',
-        submenu: [
-          { label: 'Purchase Orders', link: '/processing-pos' },
-          { label: 'New PO', link: '/processing-new' },
-          { label: 'Record Inward', link: '/processing-inward' }
-        ]
-      },
-      {
-        label: 'Cutting',
-        icon: 'ti ti-scissors',
-        submenu: [
-          { label: 'Purchase Orders', link: '/cutting-pos' },
-          { label: 'New PO', link: '/cutting-new' },
-          { label: 'Record Inward', link: '/cutting-inward' }
-        ]
-      },
-      {
-        label: 'Production',
-        icon: 'ti ti-shirt',
-        submenu: [
-          { label: 'After-Cut Embroidery', link: '/production-embroidery' },
-          { label: 'Single Cut Order', link: '/production-single-cut' },
-          { label: 'Stitching Jobs', link: '/production-stitching' }
-        ]
-      },
-      {
-        label: 'Finishing',
-        icon: 'ti ti-sparkles',
-        submenu: [
-          { label: 'Batches', link: '/finishing-batches' },
-          { label: 'Inspection Reports', link: '/finishing-reports' }
-        ]
-      },
-      {
-        label: 'Dispatch',
-        icon: 'ti ti-send',
-        submenu: [
-          { label: 'Dispatch', link: '/dispatch' },
-          { label: 'Packing List', link: '/dispatch-packing' }
-        ]
-      }
-      ========================================================================= */
     ]
   }
 ];

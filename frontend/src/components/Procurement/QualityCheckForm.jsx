@@ -325,6 +325,93 @@ export default function QualityCheckForm({
     }
   };
 
+  const handleMarkAllPiecesReject = () => {
+    const updated = {};
+    grnPieces.forEach((p, idx) => {
+      const key = p.key || `pc_${idx}`;
+      updated[key] = {
+        ...(pieceInspections[key] || {}),
+        checked: true,
+        actualWidth: pieceInspections[key]?.actualWidth || formData.actualWidth || formData.expectedWidth,
+        actualFold: pieceInspections[key]?.actualFold || formData.actualFold || formData.expectedFold,
+        status: 'Reject',
+        notes: pieceInspections[key]?.notes || 'Defective piece rejected'
+      };
+    });
+    setPieceInspections(updated);
+    setFormData((prev) => ({ ...prev, qcStatus: 'Reject' }));
+    showToast('All pieces marked as Reject.', 'error');
+  };
+
+  const handleMarkAllPiecesOK = () => {
+    const updated = {};
+    grnPieces.forEach((p, idx) => {
+      const key = p.key || `pc_${idx}`;
+      updated[key] = {
+        ...(pieceInspections[key] || {}),
+        checked: true,
+        actualWidth: pieceInspections[key]?.actualWidth || formData.actualWidth || formData.expectedWidth,
+        actualFold: pieceInspections[key]?.actualFold || formData.actualFold || formData.expectedFold,
+        status: 'OK',
+        notes: ''
+      };
+    });
+    setPieceInspections(updated);
+    setFormData((prev) => ({ ...prev, qcStatus: 'OK' }));
+    showToast('All pieces marked as OK.', 'success');
+  };
+
+  const handleRejectAll = () => {
+    const updated = {};
+    grnPieces.forEach((p, idx) => {
+      const key = p.key || `pc_${idx}`;
+      updated[key] = {
+        ...(pieceInspections[key] || {}),
+        checked: true,
+        actualWidth: pieceInspections[key]?.actualWidth || formData.actualWidth || formData.expectedWidth,
+        actualFold: pieceInspections[key]?.actualFold || formData.actualFold || formData.expectedFold,
+        status: 'Reject',
+        notes: pieceInspections[key]?.notes || 'Entire lot rejected'
+      };
+    });
+    setPieceInspections(updated);
+
+    const allRejectedList = grnPieces.map((p, idx) => {
+      const key = p.key || `pc_${idx}`;
+      return {
+        ...p,
+        ...updated[key],
+        status: 'Reject'
+      };
+    });
+
+    const payload = {
+      ...formData,
+      qcStatus: 'Reject',
+      actualWidth: Number(formData.actualWidth) || 0,
+      actualFold: Number(formData.actualFold) || 100,
+      pieceInspections: updated,
+      inspectedPieces: allRejectedList,
+      totalReceivedMeters,
+      goodQty: 0,
+      heldBackQty: totalReceivedMeters,
+      rejectedQty: totalReceivedMeters,
+      issuePieces: allRejectedList,
+      flatDefectQty: 0,
+      defectReason: formData.defectReason || 'Entire shipment rejected during quality inspection',
+      decidedAt: new Date().toLocaleDateString('en-GB')
+    };
+
+    if (onSaveQC) {
+      onSaveQC(payload);
+    }
+
+    showToast('Entire item and all pieces rejected. Sent to Rejected Stock Pool.', 'error');
+    setTimeout(() => {
+      if (onBack) onBack();
+    }, 600);
+  };
+
   const matchedPO = purchaseOrders.find((p) => selectedGRN?.linkedPOs && selectedGRN.linkedPOs.includes(p.id));
   const againstPO = matchedPO?.id || selectedGRN?.linkedPOs?.[0] || selectedGRN?.poId || 'PO-1001';
 
@@ -541,9 +628,33 @@ export default function QualityCheckForm({
               <h5 className="fw-bold text-dark mb-0 fs-16">
                 Bale / piece-level inspection
               </h5>
-              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill">
-                optional
-              </span>
+              <div className="d-flex align-items-center gap-2">
+                {grnPieces.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger py-0.5 px-2.5 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
+                      onClick={handleMarkAllPiecesReject}
+                      title="Mark all pieces as Reject"
+                    >
+                      <i className="ti ti-x fs-12"></i>
+                      <span>Reject All Pieces</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-success py-0.5 px-2.5 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
+                      onClick={handleMarkAllPiecesOK}
+                      title="Mark all pieces as OK"
+                    >
+                      <i className="ti ti-check fs-12"></i>
+                      <span>Mark All OK</span>
+                    </button>
+                  </>
+                )}
+                <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill">
+                  optional
+                </span>
+              </div>
             </div>
             <p className="text-secondary fs-12 mb-3">
               Most shipments are checked as a whole (above). If only specific pieces need a closer look, tick them below &mdash; each gets its own width/fold/photo/status, independent of the overall decision.
@@ -747,6 +858,16 @@ export default function QualityCheckForm({
             >
               <i className="ti ti-shield-alert fs-16"></i>
               <span>Send Whole Item for Admin Approval</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
+              style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+              onClick={handleRejectAll}
+            >
+              <i className="ti ti-x fs-16"></i>
+              <span>Reject Item (Reject All)</span>
             </button>
 
             <button

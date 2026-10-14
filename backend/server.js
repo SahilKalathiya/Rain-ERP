@@ -7,6 +7,8 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { testConnection } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const procurementRoutes = require('./routes/procurementRoutes');
+const salesMastersRoutes = require('./routes/salesMastersRoutes');
+const salesOrderRoutes = require('./routes/salesOrderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +22,8 @@ app.use(morgan('dev'));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/procurement', procurementRoutes);
+app.use('/api/masters', salesMastersRoutes);
+app.use('/api/orders', salesOrderRoutes);
 
 // Root and API Info Route
 app.get('/', (req, res) => {

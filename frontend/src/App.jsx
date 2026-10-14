@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar/Sidebar';
 import Header from './components/Header/Header';
-import ProductionModule from './components/Production/ProductionModule';
 import OrdersModule from './components/Orders/OrdersModule';
-import CuttingModule from './components/Cutting/CuttingModule';
+import CustomerMasterView from './components/Masters/CustomerMasterView';
+import ArticleMasterView from './components/Masters/ArticleMasterView';
+import SizeMasterView from './components/Masters/SizeMasterView';
+import AccessoriesMasterView from './components/Masters/AccessoriesMasterView';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
 import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
@@ -40,22 +42,65 @@ export default function App() {
     };
   });
 
-  const [currentRoute, setCurrentRoute] = useState('/dashboard');
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname) {
+      const p = window.location.pathname.replace(/^\/react/, '') || '/orders';
+      return (p === '/' || p === '') ? '/orders' : p;
+    }
+    return '/orders';
+  });
   const [sidebarClickCount, setSidebarClickCount] = useState(0);
+  const [routeExtraData, setRouteExtraData] = useState(() => {
+    try {
+      const s = sessionStorage.getItem('erp_route_extra_data');
+      if (s) return JSON.parse(s);
+    } catch (e) {}
+    return null;
+  });
+
+  // Sync route with browser navigation (Back / Forward)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined' && window.location.pathname) {
+        const p = window.location.pathname.replace(/^\/react/, '') || '/orders';
+        setCurrentRoute((p === '/' || p === '') ? '/orders' : p);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // When user clicks explicitly in the Sidebar menu
   const handleSidebarNavigate = (route) => {
     setCurrentRoute(route);
+    setRouteExtraData(null);
+    try {
+      sessionStorage.removeItem('erp_route_extra_data');
+    } catch (e) {}
     setSidebarClickCount((prev) => prev + 1);
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState(null, '', `/react${route}`);
+    }
   };
 
-  // When internal submodules synchronize route (e.g. +GRN from PO, Run QC from GRN)
-  const handleRouteNavigate = (route) => {
+  // When internal submodules synchronize route (e.g. +GRN from PO, Run QC from GRN, Proceed to PO from Order)
+  const handleRouteNavigate = (route, extraData) => {
     setCurrentRoute(route);
+    setRouteExtraData(extraData || null);
+    try {
+      if (extraData) {
+        sessionStorage.setItem('erp_route_extra_data', JSON.stringify(extraData));
+      } else {
+        sessionStorage.removeItem('erp_route_extra_data');
+      }
+    } catch (e) {}
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState(null, '', `/react${route}`);
+    }
   };
 
   const renderContent = () => {
-    // Profile & Settings View
+    // 1. Profile & Settings View
     if (currentRoute === '/profile-settings' || currentRoute === '/settings' || currentRoute === '/profile') {
       return (
         <ProfileSettingsView
@@ -66,7 +111,26 @@ export default function App() {
       );
     }
 
-    // Determine submodule from route
+    // 2. Route 1 Sales Orders Module
+    if (currentRoute.startsWith('/orders') || currentRoute.startsWith('/sales')) {
+      return <OrdersModule currentRoute={currentRoute} onNavigateToProcurement={handleRouteNavigate} />;
+    }
+
+    // 3. Route 1 Sales Masters
+    if (currentRoute === '/customers') {
+      return <CustomerMasterView />;
+    }
+    if (currentRoute === '/articles') {
+      return <ArticleMasterView />;
+    }
+    if (currentRoute === '/sizes') {
+      return <SizeMasterView />;
+    }
+    if (currentRoute === '/accessories') {
+      return <AccessoriesMasterView />;
+    }
+
+    // 4. Route 2 Raw Material Procurement Dashboard
     let submodule = 'overview';
     if (currentRoute.startsWith('/procurement-pos') || currentRoute.startsWith('/po')) {
       submodule = 'pos';
@@ -94,6 +158,7 @@ export default function App() {
         initialSubmodule={submodule}
         onNavigate={handleRouteNavigate}
         sidebarClickCount={sidebarClickCount}
+        extraData={routeExtraData}
       />
     );
   };
@@ -144,4 +209,3 @@ export default function App() {
     </div>
   );
 }
-

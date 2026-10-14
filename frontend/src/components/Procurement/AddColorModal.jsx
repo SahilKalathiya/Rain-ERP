@@ -175,6 +175,8 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
   const [isUserEditedName, setIsUserEditedName] = useState(Boolean(initialColor?.name));
   const [isUserEditedPantone, setIsUserEditedPantone] = useState(Boolean(initialColor?.pantone));
   const [category, setCategory] = useState(initialColor?.category || detectCategory(initHex));
+  const [quarterTag, setQuarterTag] = useState(initialColor?.quarterTag || 'Q1');
+  const [isTrending, setIsTrending] = useState(Boolean(initialColor?.isTrending));
   const [errorMessage, setErrorMessage] = useState('');
 
   const [isSamplingImage, setIsSamplingImage] = useState(false);
@@ -379,7 +381,9 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
       name: colorName.trim(),
       hex: finalHex,
       pantone: pantoneCode.trim(),
-      category: category || detectCategory(finalHex)
+      category: category || detectCategory(finalHex),
+      quarterTag: quarterTag || 'Q1',
+      isTrending: Boolean(isTrending)
     };
 
     if (onSave) {
@@ -740,6 +744,42 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
                   setIsUserEditedPantone(true);
                 }}
               />
+            </div>
+
+            {/* SEASON / QUARTER & TRENDING (Client Requirement: Jan-Mar, Apr-Jun, etc.) */}
+            <div className="mb-3 pt-2 border-top" style={{ borderColor: '#f1f5f9' }}>
+              <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                Seasonal Quarter / Collection
+              </label>
+              <select
+                className="form-select form-select-sm fs-13 py-2 bg-white"
+                style={{ borderColor: '#cbd5e1', borderRadius: '8px' }}
+                value={quarterTag}
+                onChange={(e) => setQuarterTag(e.target.value)}
+              >
+                <option value="Q1">🌸 Jan – Mar (Q1 Spring / Trending)</option>
+                <option value="Q2">☀️ Apr – Jun (Q2 Summer Pastels)</option>
+                <option value="Q3">🌧️ Jul – Sep (Q3 Monsoon & Festive)</option>
+                <option value="Q4">❄️ Oct – Dec (Q4 Winter & Wedding)</option>
+                <option value="ALL">🌈 Core All-Season Staple</option>
+              </select>
+              <div className="form-check mt-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="colorIsTrendingCheck"
+                  checked={isTrending}
+                  onChange={(e) => setIsTrending(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label
+                  className="form-check-label fs-13 fw-semibold text-dark"
+                  htmlFor="colorIsTrendingCheck"
+                  style={{ cursor: 'pointer' }}
+                >
+                  ⭐ Mark as Famous / Trending Color (Jan-Mar / Seasonal Hot Seller)
+                </label>
+              </div>
             </div>
           </div>
 

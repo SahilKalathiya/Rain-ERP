@@ -91,6 +91,8 @@ function createServer(port) {
       localFile = fs.existsSync(tryReact) ? tryReact : path.join(SITE_DIR, pathname);
     } else if (pathname === '/favicon.png' || pathname === '/react/favicon.png') {
       localFile = path.join(REACT_DIR, 'favicon.png');
+    } else if (pathname === '/demo.html' || pathname === '/react/demo.html') {
+      localFile = path.join(REACT_DIR, 'demo.html');
     }
 
     // Check if the file exists on disk
