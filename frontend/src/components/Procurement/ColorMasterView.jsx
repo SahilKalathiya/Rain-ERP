@@ -277,7 +277,8 @@ export default function ColorMasterView({
               style={{
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
-                boxShadow: 'none'
+                boxShadow: 'none',
+                paddingLeft: '38px'
               }}
               placeholder="Search colors by name, hex code..."
               value={searchTerm}

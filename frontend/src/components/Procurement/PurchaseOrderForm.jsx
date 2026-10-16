@@ -1716,24 +1716,18 @@ export default function PurchaseOrderForm({
 
       {/* Inline Modal: Vendor Master Creation */}
       {showInlineVendorModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-          <div className="modal-dialog modal-xl modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg rounded-4 p-3">
-              <VendorMasterView
-                vendors={vendors}
-                isInline={true}
-                onSaveVendor={(newVendor) => {
-                  if (onSaveVendor) onSaveVendor(newVendor);
-                  if (newVendor) handleVendorChange(newVendor.id, newVendor);
-                }}
-                onCloseInline={(newCreatedVendor) => {
-                  if (newCreatedVendor) handleVendorChange(newCreatedVendor.id, newCreatedVendor);
-                  setShowInlineVendorModal(false);
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        <VendorMasterView
+          vendors={vendors}
+          isInline={true}
+          onSaveVendor={(newVendor) => {
+            if (onSaveVendor) onSaveVendor(newVendor);
+            if (newVendor) handleVendorChange(newVendor.id, newVendor);
+          }}
+          onCloseInline={(newCreatedVendor) => {
+            if (newCreatedVendor) handleVendorChange(newCreatedVendor.id, newCreatedVendor);
+            setShowInlineVendorModal(false);
+          }}
+        />
       )}
 
       {/* Inline Modal: Fabric Master Creation */}

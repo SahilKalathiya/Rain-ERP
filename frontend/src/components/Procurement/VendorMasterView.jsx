@@ -90,9 +90,9 @@ export default function VendorMasterView({
       email: '',
       address: '',
       city: '',
-      state: 'Gujarat',
+      state: '',
       gstin: '',
-      rating: 5,
+      rating: '',
       bankName: '',
       accountNumber: '',
       ifscCode: '',
@@ -214,8 +214,8 @@ export default function VendorMasterView({
 
       {/* Main View Area */}
       <div className="row g-4">
-        {/* Left Side: Table listing vendors with column filters */}
-        <div className={selectedVendor || isCreatingNew ? 'col-12 col-xl-7' : 'col-12'}>
+        {/* Table listing vendors with column filters */}
+        <div className="col-12">
           <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <div className="d-flex align-items-center justify-content-between mb-3">
               <h5 className="fw-bold text-dark mb-0 fs-16">Registered Vendors</h5>
@@ -350,45 +350,53 @@ export default function VendorMasterView({
           </div>
         </div>
 
-        {/* Right Side: View Mode by default with Section-wise Edit (Section 9.2) */}
+        {/* POPUP MODAL: View / Edit / Create Vendor Dialog */}
         {(selectedVendor || isCreatingNew) && (
-          <div className="col-12 col-xl-5">
-            <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '80px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                <div className="d-flex align-items-center gap-2">
-                  <h5 className="fw-bold text-dark mb-0 fs-18">
-                    {isCreatingNew ? 'Create New Vendor' : formData.name || formData.id}
-                  </h5>
-                  {!isCreatingNew && (
-                    <span className="badge bg-light text-secondary border">{formData.id}</span>
-                  )}
-                </div>
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content border-0 shadow-lg rounded-4 p-4 bg-white">
+                <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-primary-subtle text-primary p-2 rounded-3">
+                      <i className="ti ti-building fs-5"></i>
+                    </span>
+                    <div>
+                      <h5 className="fw-bold text-dark mb-0 fs-18">
+                        {isCreatingNew ? 'Create New Vendor' : formData.name || formData.id}
+                      </h5>
+                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
+                    </div>
+                  </div>
 
-                <div className="d-flex align-items-center gap-2">
-                  {!isEditing && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1"
-                      onClick={() => {
-                        setIsEditing(true);
-                        setActiveSection('all');
-                      }}
-                    >
-                      <i className="ti ti-edit fs-14"></i>
-                      <span>Edit All</span>
-                    </button>
-                  )}
-                  {isInline && (
+                  <div className="d-flex align-items-center gap-2">
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3"
+                        onClick={() => {
+                          setIsEditing(true);
+                          setActiveSection('all');
+                        }}
+                      >
+                        <i className="ti ti-edit fs-14"></i>
+                        <span>Edit All</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn-close ms-2"
-                      onClick={() => onCloseInline && onCloseInline(null)}
+                      onClick={() => {
+                        setSelectedVendor(null);
+                        setIsCreatingNew(false);
+                        setIsEditing(false);
+                        if (isInline && onCloseInline) onCloseInline(null);
+                      }}
                     ></button>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-              <form onSubmit={handleSave}>
+                <form onSubmit={handleSave}>
+                  <div style={{ maxHeight: 'calc(80vh - 140px)', overflowY: 'auto', paddingRight: '4px' }}>
                 {/* SECTION 1: Basic Information */}
                 <div className="mb-4 p-3 bg-light rounded-3">
                   <div className="d-flex align-items-center justify-content-between mb-2">
@@ -584,9 +592,10 @@ export default function VendorMasterView({
                         {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
                           <select
                             className="form-select form-select-sm bg-white"
-                            value={formData.state}
+                            value={formData.state || ''}
                             onChange={(e) => handleTextChange('state', e.target.value)}
                           >
+                            <option value="">Select State</option>
                             <option value="Gujarat">Gujarat</option>
                             <option value="Maharashtra">Maharashtra</option>
                             <option value="Rajasthan">Rajasthan</option>
@@ -698,25 +707,30 @@ export default function VendorMasterView({
                   </div>
                 </div>
 
-                {/* Form Buttons */}
-                {isEditing && (
-                  <div className="d-flex align-items-center justify-content-end gap-2">
+                  </div>
+
+                  {/* Modal Footer Buttons */}
+                  <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
                     <button
                       type="button"
-                      className="btn btn-light btn-sm px-3"
+                      className="btn btn-light px-4 rounded-3"
                       onClick={() => {
-                        if (isCreatingNew) setSelectedVendor(null);
+                        setSelectedVendor(null);
+                        setIsCreatingNew(false);
                         setIsEditing(false);
+                        if (isInline && onCloseInline) onCloseInline(null);
                       }}
                     >
-                      Cancel
+                      {isEditing ? 'Cancel' : 'Close'}
                     </button>
-                    <button type="submit" className="btn btn-primary btn-sm px-4 fw-medium shadow-sm">
-                      Save Vendor
-                    </button>
+                    {isEditing && (
+                      <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
+                        <i className="ti ti-check me-1"></i> Save Vendor
+                      </button>
+                    )}
                   </div>
-                )}
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         )}

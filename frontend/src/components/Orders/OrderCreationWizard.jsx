@@ -181,6 +181,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     setStoredData('raindrop_colors_v1', clean);
     return clean;
   });
+  const getCurrentQuarterTag = () => {
+    const m = new Date().getMonth();
+    if (m <= 2) return 'Q1';
+    if (m <= 5) return 'Q2';
+    if (m <= 8) return 'Q3';
+    return 'Q4';
+  };
+
+  const [newlyAddedColorNames, setNewlyAddedColorNames] = useState(() => new Set());
   const [customerColorTab, setCustomerColorTab] = useState({});
   const [customerColorSearch, setCustomerColorSearch] = useState({});
 
@@ -628,6 +637,96 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     }));
   };
 
+  // Section 7.1 & 7.2: Set Ratio Mode & Calculation (PDF Page 13-14 & 24)
+  const setRatioModeForPairSeries = (cIdx, artId, colorName, seriesId, ratioUsed) => {
+    const key = getSizeConfigKey(artId, colorName);
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, artId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const selectedSizes = sc.selectedSizes || [];
+        const defaultRatio = selectedSizes.map(() => '1').join(':');
+        const ratioStr = sc.ratioString || defaultRatio;
+        const baseQty = sc.baseSetQty || '100';
+
+        let newQtys = { ...(sc.sizeQtys || {}) };
+        if (ratioUsed) {
+          const parts = ratioStr.split(':').map(p => p.trim());
+          if (parts.length === selectedSizes.length && parts.every(p => !isNaN(parseInt(p, 10)))) {
+            const baseNum = parseInt(baseQty, 10) || 0;
+            newQtys = {};
+            selectedSizes.forEach((sz, sIdx) => {
+              newQtys[sz] = String(baseNum * (parseInt(parts[sIdx], 10) || 1));
+            });
+          }
+        }
+        return {
+          ...sc,
+          ratioUsed: Boolean(ratioUsed),
+          ratioString: ratioStr,
+          baseSetQty: baseQty,
+          uniform: ratioUsed ? false : sc.uniform,
+          sizeQtys: newQtys
+        };
+      });
+      return {
+        ...c,
+        sizeConfigs: {
+          ...c.sizeConfigs,
+          [key]: {
+            ...c.sizeConfigs?.[key],
+            seriesConfigs: updatedList,
+            sizeQtys: computeCombinedSizeQtys(updatedList)
+          }
+        }
+      };
+    }));
+  };
+
+  const updateRatioCalculationForPairSeries = (cIdx, artId, colorName, seriesId, ratioStr, baseQty) => {
+    const key = getSizeConfigKey(artId, colorName);
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, artId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const cleanRatio = ratioStr !== undefined ? ratioStr : (sc.ratioString || '');
+        const cleanBase = baseQty !== undefined ? baseQty : (sc.baseSetQty || '100');
+        const parts = cleanRatio.split(':').map(p => p.trim());
+        const selectedSizes = sc.selectedSizes || [];
+
+        let newQtys = { ...(sc.sizeQtys || {}) };
+        // Section 14.4: A ratio string must be validated as a genuine ratio matching the number of selected sizes
+        if (parts.length === selectedSizes.length && parts.every(p => p !== '' && !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0)) {
+          const baseNum = parseInt(cleanBase, 10) || 0;
+          newQtys = {};
+          selectedSizes.forEach((sz, sIdx) => {
+            const mult = parseInt(parts[sIdx], 10) || 0;
+            newQtys[sz] = String(baseNum * mult);
+          });
+        }
+        return {
+          ...sc,
+          ratioString: cleanRatio,
+          baseSetQty: cleanBase,
+          sizeQtys: newQtys
+        };
+      });
+      return {
+        ...c,
+        sizeConfigs: {
+          ...c.sizeConfigs,
+          [key]: {
+            ...c.sizeConfigs?.[key],
+            seriesConfigs: updatedList,
+            sizeQtys: computeCombinedSizeQtys(updatedList)
+          }
+        }
+      };
+    }));
+  };
+
   // Set uniform mode for a specific series of this pair
   const setUniformModeForPairSeries = (cIdx, artId, colorName, seriesId, isUniform) => {
     const key = getSizeConfigKey(artId, colorName);
@@ -992,6 +1091,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       try { await api.saveColor(created); } catch (err) {}
     }
 
+    // Section 14.3: A colour added via "+ Add Colour" mid-order must immediately appear in that order's colour list
+    setNewlyAddedColorNames(prev => new Set(prev).add(created.name));
+
     // Auto-select for active customer
     if (orderCustomers[activeCustomerIndexForNewColor]) {
       const curCust = orderCustomers[activeCustomerIndexForNewColor];
@@ -1274,7 +1376,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
               onClick={() => setShowNewArticleModal(true)}
             >
               <div className="fs-5 mb-1">+</div>
-              <div className="small fw-semibold">+ New Article Type</div>
+              <div className="small fw-semibold">New Article Type</div>
             </div>
           </div>
         </div>
@@ -1583,31 +1685,36 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                           </div>
                           <button
                             type="button"
-                            className="btn btn-sm erp-btn-outline rounded-pill px-3 py-1 fw-semibold shadow-xs d-inline-flex align-items-center gap-1"
+                            className="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-semibold shadow-xs d-inline-flex align-items-center gap-1.5"
+                            style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
                             onClick={() => {
                               setActiveCustomerIndexForNewColor(ci);
                               setShowNewColorModal(true);
                             }}
                           >
-                            <i className="ti ti-palette fs-6"></i>
-                            <span>+ New Color</span>
+                            <i className="ti ti-plus fs-6"></i>
+                            <span>+ Add Colour</span>
                           </button>
                         </div>
 
-                        {/* Seasonal Quarter & Trending Filter Tabs + Search Filter */}
+                        {/* Section 6.2: Seasonal Quarter & Trending Filter Tabs + Search Filter */}
                         <div className="p-2.5 rounded-3 mb-2.5 bg-light border" style={{ borderColor: '#e2e8f0' }}>
                           <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             {/* Filter Tabs */}
                             <div className="d-flex flex-wrap gap-1">
-                              {[
-                                { key: 'all', label: 'All Colors', icon: '🌈' },
-                                { key: 'trending', label: 'Famous / Trending', icon: '⭐' },
-                                { key: 'Q1', label: 'Jan–Mar (Spring Q1)', icon: '🌸' },
-                                { key: 'Q2', label: 'Apr–Jun (Summer Q2)', icon: '☀️' },
-                                { key: 'Q3', label: 'Jul–Sep (Monsoon Q3)', icon: '🌧️' },
-                                { key: 'Q4', label: 'Oct–Dec (Winter Q4)', icon: '❄️' },
-                              ].map(tab => {
-                                const currentTab = customerColorTab[ci] || 'all';
+                              {(() => {
+                                const curQ = getCurrentQuarterTag();
+                                return [
+                                  { key: 'currentSeason', label: `Current Season (${curQ} + Trending)`, icon: '✨' },
+                                  { key: 'trending', label: '⭐ Trending Only', icon: '⭐' },
+                                  { key: 'Q4', label: 'Oct–Dec (Q4)', icon: '❄️' },
+                                  { key: 'Q1', label: 'Jan–Mar (Q1)', icon: '🌸' },
+                                  { key: 'Q2', label: 'Apr–Jun (Q2)', icon: '☀️' },
+                                  { key: 'Q3', label: 'Jul–Sep (Q3)', icon: '🌧️' },
+                                  { key: 'all', label: `All Colours (${masterColors.length})`, icon: '🌈' },
+                                ];
+                              })().map(tab => {
+                                const currentTab = customerColorTab[ci] || 'currentSeason';
                                 const isActive = currentTab === tab.key;
                                 return (
                                   <button
@@ -1692,16 +1799,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                           )}
                         </div>
 
-                        {/* Available Color Badges for Selection */}
+                        {/* Available Color Badges for Selection (Section 6.2 & Section 14.3) */}
                         {(() => {
-                          const currentTab = customerColorTab[ci] || 'all';
+                          const currentTab = customerColorTab[ci] || 'currentSeason';
                           const searchQuery = (customerColorSearch[ci] || '').trim().toLowerCase();
+                          const curQ = getCurrentQuarterTag();
 
                           const displayedColors = masterColors.filter(col => {
-                            if (searchQuery && !col.name.toLowerCase().includes(searchQuery) && !(col.pantone || '').toLowerCase().includes(searchQuery)) {
-                              return false;
+                            // Section 14.3: A colour with no Quarter/Season tag must still be selectable via search
+                            if (searchQuery) {
+                              return col.name.toLowerCase().includes(searchQuery) ||
+                                     (col.pantone || '').toLowerCase().includes(searchQuery);
                             }
-                            if (currentTab === 'trending') return col.isTrending;
+                            // Section 14.3: A colour added via "+ Add Colour" mid-order must immediately appear in that order's colour list
+                            if (newlyAddedColorNames.has(col.name)) return true;
+
+                            if (currentTab === 'currentSeason') {
+                              // Filter & display only colours belonging to the current active Quarter/Season, plus Trending Colours
+                              return col.quarterTag === curQ || Boolean(col.isTrending);
+                            }
+                            if (currentTab === 'trending') return Boolean(col.isTrending);
                             if (currentTab === 'Q1') return col.quarterTag === 'Q1';
                             if (currentTab === 'Q2') return col.quarterTag === 'Q2';
                             if (currentTab === 'Q3') return col.quarterTag === 'Q3';
@@ -1937,107 +2054,200 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                     })}
                                                   </div>
 
-                                                  {/* Uniform Prompt or Manual Entry for this series */}
-                                                  {(sc.selectedSizes || []).length >= 2 ? (
-                                                    sc.uniform === null || sc.uniform === undefined ? (
-                                                      <div
-                                                        className="p-3 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2"
-                                                        style={{ backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '10px' }}
-                                                      >
-                                                        <span className="small fw-semibold" style={{ color: '#2e37a4' }}>
-                                                          Same quantity for all {(sc.selectedSizes || []).length} selected size(s)?
-                                                        </span>
-                                                        <div className="d-flex gap-2">
-                                                          <button
-                                                            type="button"
-                                                            className="btn btn-sm text-white fw-semibold rounded-3 px-3 shadow-xs"
-                                                            style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
-                                                            onClick={() => setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true)}
-                                                          >
-                                                            Yes, same for all
-                                                          </button>
-                                                          <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-white border fw-semibold rounded-3 px-3"
-                                                            style={{ borderColor: '#cbd5e1', color: '#334155' }}
-                                                            onClick={() => setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false)}
-                                                          >
-                                                            No, enter separately
-                                                          </button>
-                                                        </div>
-                                                      </div>
-                                                    ) : (
-                                                      <div>
-                                                        {sc.uniform === true ? (
-                                                          <div className="d-flex align-items-center gap-3 mb-2 flex-wrap">
-                                                            <div style={{ maxWidth: '240px' }}>
-                                                              <label className="form-label small text-muted mb-1">Quantity for all selected sizes</label>
-                                                              <input
-                                                                type="number"
-                                                                className="form-control form-control-sm"
-                                                                placeholder="e.g. 100"
-                                                                value={sc.uniformQty || ''}
-                                                                onChange={(e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)}
-                                                              />
-                                                            </div>
-                                                            <div className="pt-3">
+                                                  {/* Section 7: Size Series, Ratio & Quantity Matrix (PDF Page 13-14 & 24) */}
+                                                  {(sc.selectedSizes || []).length >= 1 ? (
+                                                    <div>
+                                                      {/* Quantity Method Switcher (Section 7.2: Ratio vs Uniform vs Manual) */}
+                                                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 p-2 rounded-3 bg-light border" style={{ borderColor: '#e2e8f0' }}>
+                                                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                          <span className="small fw-semibold text-muted" style={{ fontSize: '12px' }}>
+                                                            Quantity Method:
+                                                          </span>
+                                                          <div className="btn-group btn-group-sm" role="group">
+                                                            <button
+                                                              type="button"
+                                                              className={`btn btn-sm ${!sc.ratioUsed && sc.uniform !== true ? 'btn-primary text-white fw-semibold' : 'btn-white border text-secondary'}`}
+                                                              style={{ fontSize: '12px' }}
+                                                              onClick={() => {
+                                                                setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                                setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                              }}
+                                                            >
+                                                              ✍️ Manual Entry
+                                                            </button>
+
+                                                            <button
+                                                              type="button"
+                                                              className={`btn btn-sm ${sc.ratioUsed ? 'btn-primary text-white fw-semibold' : 'btn-white border text-secondary'}`}
+                                                              style={{ fontSize: '12px' }}
+                                                              onClick={() => {
+                                                                setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                                                              }}
+                                                            >
+                                                              ⚡ Set Ratio (e.g. 1:2:2:1)
+                                                            </button>
+
+                                                            {(sc.selectedSizes || []).length >= 2 && (
                                                               <button
                                                                 type="button"
-                                                                className="btn btn-link p-0 small text-decoration-none fw-semibold"
-                                                                style={{ color: '#2e37a4' }}
-                                                                onClick={() => setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, null)}
+                                                                className={`btn btn-sm ${sc.uniform === true && !sc.ratioUsed ? 'btn-primary text-white fw-semibold' : 'btn-white border text-secondary'}`}
+                                                                style={{ fontSize: '12px' }}
+                                                                onClick={() => {
+                                                                  setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                                  setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                                                                }}
                                                               >
-                                                                change mode
+                                                                🟰 Uniform (Same for All)
+                                                              </button>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {/* Ratio Calculation Card (Section 7.1 & 7.2) */}
+                                                      {sc.ratioUsed && (
+                                                        <div
+                                                          className="p-3 rounded-3 mb-3 shadow-xs"
+                                                          style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '10px' }}
+                                                        >
+                                                          <div className="d-flex align-items-center justify-content-between mb-2">
+                                                            <span className="small fw-bold text-success d-flex align-items-center gap-1.5" style={{ fontSize: '13px' }}>
+                                                              <i className="ti ti-calculator"></i> Set Ratio Calculation Engine (Section 7.2)
+                                                            </span>
+                                                            <span className="badge rounded-pill bg-success-subtle text-success-emphasis border px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                                              {(sc.selectedSizes || []).length} Sizes Selected
+                                                            </span>
+                                                          </div>
+
+                                                          <div className="row g-2 align-items-end">
+                                                            {/* Ratio String Input */}
+                                                            <div className="col-md-5">
+                                                              <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
+                                                                Ratio String (e.g. {(sc.selectedSizes || []).map(() => '1').join(':')})
+                                                              </label>
+                                                              <input
+                                                                type="text"
+                                                                className="form-control form-control-sm font-monospace fw-bold"
+                                                                placeholder={(sc.selectedSizes || []).map(() => '1').join(':')}
+                                                                value={sc.ratioString ?? ''}
+                                                                onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, e.target.value, sc.baseSetQty)}
+                                                                style={{ fontSize: '13px', borderColor: '#86efac' }}
+                                                              />
+                                                            </div>
+
+                                                            {/* Base Set Quantity */}
+                                                            <div className="col-md-4">
+                                                              <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
+                                                                Base Set Quantity
+                                                              </label>
+                                                              <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="form-control form-control-sm fw-bold"
+                                                                placeholder="e.g. 100"
+                                                                value={sc.baseSetQty ?? ''}
+                                                                onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value)}
+                                                                style={{ fontSize: '13px', borderColor: '#86efac' }}
+                                                              />
+                                                            </div>
+
+                                                            {/* Recalculate Button */}
+                                                            <div className="col-md-3">
+                                                              <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-success w-100 fw-semibold"
+                                                                style={{ height: '31px', fontSize: '12px' }}
+                                                                onClick={() => {
+                                                                  const parts = (sc.ratioString || '').split(':').map(p => p.trim());
+                                                                  const base = parseInt(sc.baseSetQty, 10) || 100;
+                                                                  updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, String(base));
+                                                                }}
+                                                              >
+                                                                <i className="ti ti-refresh me-1"></i> Apply Ratio
                                                               </button>
                                                             </div>
                                                           </div>
-                                                        ) : (
-                                                          <div className="mb-2">
-                                                            <button
-                                                              type="button"
-                                                              className="btn btn-link p-0 small text-decoration-none fw-semibold"
-                                                              style={{ color: '#2e37a4' }}
-                                                              onClick={() => setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, null)}
-                                                            >
-                                                                change mode
-                                                            </button>
-                                                          </div>
-                                                        )}
 
-                                                        {/* Pieces Grid */}
-                                                        <div className="d-flex flex-wrap gap-2 pt-2 border-top">
-                                                          {(sc.selectedSizes || []).map((sz) => (
-                                                            <div key={sz} className="d-flex flex-column align-items-center p-1.5 px-2 rounded-3 border bg-light">
+                                                          {/* Section 14.4 Validation & Ratio Preview */}
+                                                          {(() => {
+                                                            const parts = (sc.ratioString || '').split(':').map(p => p.trim());
+                                                            const selectedSizes = sc.selectedSizes || [];
+                                                            const isCountMatch = parts.length === selectedSizes.length;
+                                                            const isValidNums = parts.every(p => p !== '' && !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0);
+
+                                                            if (!isCountMatch || !isValidNums) {
+                                                              return (
+                                                                <div className="mt-2 text-danger small fw-medium" style={{ fontSize: '12px' }}>
+                                                                  <i className="ti ti-alert-triangle me-1"></i>
+                                                                  Ratio requires exactly ${selectedSizes.length} numbers separated by colons (e.g. ${selectedSizes.map((_, i) => i === 1 || i === 2 ? '2' : '1').join(':')}) to match sizes [${selectedSizes.join(', ')}].
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            const base = parseInt(sc.baseSetQty, 10) || 0;
+                                                            return (
+                                                              <div className="d-flex flex-wrap align-items-center gap-1.5 mt-2 pt-2 border-top" style={{ borderColor: '#bbf7d0', fontSize: '12px' }}>
+                                                                <span className="text-muted fw-medium me-1">Size Breakdown:</span>
+                                                                {selectedSizes.map((sz, idx) => {
+                                                                  const mult = parseInt(parts[idx], 10) || 0;
+                                                                  const res = base * mult;
+                                                                  return (
+                                                                    <span key={sz} className="badge bg-white text-dark border px-2 py-1 shadow-xs" style={{ borderColor: '#86efac' }}>
+                                                                      <strong>${sz}:</strong> ${mult} &times; ${base} = <span className="text-success fw-bold">${res} pcs</span>
+                                                                    </span>
+                                                                  );
+                                                                })}
+                                                              </div>
+                                                            );
+                                                          })()}
+                                                        </div>
+                                                      )}
+
+                                                      {/* Uniform Quantity Input */}
+                                                      {sc.uniform === true && !sc.ratioUsed && (
+                                                        <div className="d-flex align-items-center gap-3 mb-2.5 p-3 rounded-3 bg-light border" style={{ borderColor: '#e2e8f0' }}>
+                                                          <div style={{ maxWidth: '240px' }}>
+                                                            <label className="form-label small text-muted mb-1 fw-semibold">Quantity for all selected sizes</label>
+                                                            <input
+                                                              type="number"
+                                                              className="form-control form-control-sm"
+                                                              placeholder="e.g. 100"
+                                                              value={sc.uniformQty || ''}
+                                                              onChange={(e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)}
+                                                            />
+                                                          </div>
+                                                          <div className="small text-muted pt-3">
+                                                            Auto-fills {sc.uniformQty || 0} pieces across all {(sc.selectedSizes || []).length} sizes.
+                                                          </div>
+                                                        </div>
+                                                      )}
+
+                                                      {/* Pieces Grid: Size Quantity Inputs */}
+                                                      <div className="d-flex flex-wrap gap-2 pt-2 border-top">
+                                                        {(sc.selectedSizes || []).map((sz, sIdx) => {
+                                                          const parts = (sc.ratioString || '').split(':').map(p => p.trim());
+                                                          const ratioPart = sc.ratioUsed && parts[sIdx] !== undefined ? parts[sIdx] : null;
+
+                                                          return (
+                                                            <div key={sz} className="d-flex flex-column align-items-center p-1.5 px-2 rounded-3 border bg-light shadow-2xs">
                                                               <span className="small fw-bold text-dark">{sz}</span>
+                                                              {ratioPart !== null && (
+                                                                <span className="badge rounded-pill bg-success-subtle text-success border px-1" style={{ fontSize: '9px', marginTop: '1px' }}>
+                                                                  &times;${ratioPart}
+                                                                </span>
+                                                              )}
                                                               <input
                                                                 type="number"
                                                                 className="form-control form-control-sm text-center bg-white mt-1"
-                                                                style={{ width: '60px', height: '28px' }}
+                                                                style={{ width: '68px', height: '30px' }}
                                                                 placeholder="0"
                                                                 value={sc.sizeQtys?.[sz] ?? ''}
                                                                 onChange={(e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)}
                                                               />
                                                             </div>
-                                                          ))}
-                                                        </div>
+                                                          );
+                                                        })}
                                                       </div>
-                                                    )
-                                                  ) : (sc.selectedSizes || []).length === 1 ? (
-                                                    /* Single size directly shows quantity input */
-                                                    <div className="d-flex flex-wrap gap-2 pt-2 border-top">
-                                                      {(sc.selectedSizes || []).map((sz) => (
-                                                        <div key={sz} className="d-flex flex-column align-items-center p-1.5 px-2 rounded-3 border bg-light">
-                                                          <span className="small fw-bold text-dark">{sz}</span>
-                                                          <input
-                                                            type="number"
-                                                            className="form-control form-control-sm text-center bg-white mt-1"
-                                                            style={{ width: '60px', height: '28px' }}
-                                                            placeholder="0"
-                                                            value={sc.sizeQtys?.[sz] ?? ''}
-                                                            onChange={(e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)}
-                                                          />
-                                                        </div>
-                                                      ))}
                                                     </div>
                                                   ) : (
                                                     <div className="text-muted small pt-1" style={{ fontSize: '13px', color: '#64748b' }}>Select at least one size above to enter quantities.</div>

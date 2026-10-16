@@ -6,6 +6,7 @@ import CustomerMasterView from './components/Masters/CustomerMasterView';
 import ArticleMasterView from './components/Masters/ArticleMasterView';
 import SizeMasterView from './components/Masters/SizeMasterView';
 import AccessoriesMasterView from './components/Masters/AccessoriesMasterView';
+import ColorMasterView from './components/Masters/ColorMasterView';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
 import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
@@ -42,13 +43,8 @@ export default function App() {
     };
   });
 
-  const [currentRoute, setCurrentRoute] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.pathname) {
-      const p = window.location.pathname.replace(/^\/react/, '') || '/orders';
-      return (p === '/' || p === '') ? '/orders' : p;
-    }
-    return '/orders';
-  });
+  // Default route is always /dashboard on page reload / initial load
+  const [currentRoute, setCurrentRoute] = useState('/dashboard');
   const [sidebarClickCount, setSidebarClickCount] = useState(0);
   const [routeExtraData, setRouteExtraData] = useState(() => {
     try {
@@ -58,12 +54,20 @@ export default function App() {
     return null;
   });
 
+  // On initial page load / refresh, always land on Dashboard
+  useEffect(() => {
+    setCurrentRoute('/dashboard');
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      window.history.replaceState(null, '', '/react/dashboard');
+    }
+  }, []);
+
   // Sync route with browser navigation (Back / Forward)
   useEffect(() => {
     const handlePopState = () => {
       if (typeof window !== 'undefined' && window.location.pathname) {
-        const p = window.location.pathname.replace(/^\/react/, '') || '/orders';
-        setCurrentRoute((p === '/' || p === '') ? '/orders' : p);
+        const p = window.location.pathname.replace(/^\/react/, '') || '/dashboard';
+        setCurrentRoute((p === '/' || p === '') ? '/dashboard' : p);
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -113,7 +117,14 @@ export default function App() {
 
     // 2. Route 1 Sales Orders Module
     if (currentRoute.startsWith('/orders') || currentRoute.startsWith('/sales')) {
-      return <OrdersModule currentRoute={currentRoute} onNavigateToProcurement={handleRouteNavigate} />;
+      return (
+        <OrdersModule
+          currentRoute={currentRoute}
+          sidebarClickCount={sidebarClickCount}
+          onNavigate={handleRouteNavigate}
+          onNavigateToProcurement={handleRouteNavigate}
+        />
+      );
     }
 
     // 3. Route 1 Sales Masters
@@ -128,6 +139,9 @@ export default function App() {
     }
     if (currentRoute === '/accessories') {
       return <AccessoriesMasterView />;
+    }
+    if (currentRoute === '/colors') {
+      return <ColorMasterView />;
     }
 
     // 4. Route 2 Raw Material Procurement Dashboard

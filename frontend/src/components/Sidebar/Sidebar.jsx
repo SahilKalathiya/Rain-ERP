@@ -80,7 +80,10 @@ export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
               {section.items.map((item, idx) => {
                 const hasSub = item.submenu && item.submenu.length > 0;
                 const isOpen = !!openMenus[item.label];
-                const isActive = item.link === currentRoute;
+                const isActive =
+                  item.link === currentRoute ||
+                  (item.link === '/orders' && currentRoute.startsWith('/orders')) ||
+                  (item.link === '/dashboard' && (currentRoute === '/dashboard' || currentRoute === '/'));
 
                 return (
                   <li key={idx}>

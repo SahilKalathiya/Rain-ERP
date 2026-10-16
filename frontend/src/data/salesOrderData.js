@@ -130,234 +130,719 @@ export const initialSizeSeries = [
 ];
 
 export const initialAccessoryMasters = [
+  // Buttons Category (Matching Image 2 Specification)
   {
     id: 'ACC-BTN-01',
+    name: 'Coconut',
+    category: 'Buttons',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true,
+    sizes: [],
+    colors: [],
+    buttonSizes: '',
+    buttonColors: ''
+  },
+  {
+    id: 'ACC-BTN-02',
     name: 'Coconut Button',
     category: 'Buttons',
+    subType: 'Coconut',
+    size: '',
+    color: '',
+    sizes: [],
+    colors: [],
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 10,
-    hsnCode: '96062100',
-    description: 'Natural coconut shell buttons for kurtas & shirts (14L, 18L, 20L)',
-    buttonSizes: '14L, 18L, 20L',
-    buttonColors: 'Natural, Dark Brown, Gold',
-    sizes: ['14L', '18L', '20L'],
-    colors: ['Natural', 'Dark Brown', 'Gold'],
-    defaultReqPerPc: '',
-    defaultPlacement: '',
-    defaultColor: '',
-    defaultSize: '',
-    varieties: [
-      { id: 'VAR-01', name: 'Coconut', sizes: [], colors: ['Natural', 'Dark Brown', 'Gold'] },
-      { id: 'VAR-02', name: 'Coconut Button (Natural) [14L]', sizes: ['14L'], colors: ['Natural'] }
-    ],
+    maxBuffer: '',
+    hsnCode: '',
     active: true
   },
   {
-    id: 'ACC-001',
-    name: 'Buttons',
+    id: 'ACC-BTN-03',
+    name: 'Embroidered',
     category: 'Buttons',
+    size: '',
+    sizes: [],
+    colors: [],
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 10,
-    hsnCode: '96062100',
-    description: 'Natural coconut shell & poly buttons',
-    buttonSizes: '14L, 18L, 20L',
-    buttonColors: 'Natural, Dark Brown, Gold',
-    varieties: [
-      { id: 'VAR-01', name: 'Coconut', sizes: [], colors: ['Natural', 'Dark Brown', 'Gold'] },
-      { id: 'VAR-02', name: 'Coconut Button (Natural) [14L]', sizes: ['14L'], colors: ['Natural'] },
-      { id: 'VAR-03', name: 'Embroidered [18 L]', sizes: ['18L'], colors: ['Multi', 'Gold'] },
-      { id: 'VAR-04', name: 'Eyelet (Gold) [18 L]', sizes: ['18L'], colors: ['Gold', 'Silver'] },
-      { id: 'VAR-05', name: 'MOP', sizes: ['14L', '16L'], colors: ['Pearl White'] },
-      { id: 'VAR-06', name: 'Metal 2 hole', sizes: ['16L', '18L'], colors: ['Antique Brass', 'Silver'] },
-      { id: 'VAR-07', name: 'Mould', sizes: ['18L'], colors: ['Dyed Match'] },
-      { id: 'VAR-08', name: 'Pignose', sizes: ['16L'], colors: ['Gold'] },
-      { id: 'VAR-09', name: 'Plastic', sizes: ['18L', '20L'], colors: ['Black', 'White', 'Clear'] }
-    ],
+    maxBuffer: '',
+    hsnCode: '',
     active: true
   },
   {
-    id: 'ACC-002',
-    name: 'Lace',
+    id: 'ACC-BTN-04',
+    name: 'Eyelet',
+    category: 'Buttons',
+    size: '',
+    sizes: [],
+    color: '',
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-05',
+    name: 'Eyelet Test',
+    category: 'Buttons',
+    sizes: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-06',
+    name: 'Gold Eyelet',
+    category: 'Buttons',
+    size: '',
+    sizes: [],
+    color: '',
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-07',
+    name: 'MOP',
+    category: 'Buttons',
+    sizes: [],
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-08',
+    name: 'Metal 2 hole',
+    category: 'Buttons',
+    sizes: [],
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-09',
+    name: 'Mould',
+    category: 'Buttons',
+    sizes: [],
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-10',
+    name: 'Pignose',
+    category: 'Buttons',
+    size: '',
+    sizes: [],
+    color: '',
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  {
+    id: 'ACC-BTN-11',
+    name: 'Plastic',
+    category: 'Buttons',
+    sizes: [],
+    colors: [],
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    maxBuffer: '',
+    hsnCode: '',
+    active: true
+  },
+  // Lace Category
+  {
+    id: 'ACC-LAC-01',
+    name: 'Cotton Crochet 18mm',
     category: 'Lace',
     unit: 'Meter',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '58081000',
-    description: 'Cotton crochet & zari borders',
-    varieties: [
-      { id: 'LAC-01', name: 'Cotton Crochet 18mm', size: '18mm', defaultShrinkage: 3.0, fabricPerMeterLace: 0.12 },
-      { id: 'LAC-02', name: 'Zari Border 2 inch', size: '2 inch', defaultShrinkage: 1.0, fabricPerMeterLace: 0.25 }
-    ],
+    laceSize: '18 mm',
+    defaultShrinkage: 3.0,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '18mm cotton crochet lace border',
     active: true
   },
   {
-    id: 'ACC-003',
-    name: 'Tassels',
+    id: 'ACC-LAC-02',
+    name: 'Zari Border 2 inch',
+    category: 'Lace',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    laceSize: '2 inch',
+    defaultShrinkage: 1.0,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '2 inch metallic zari decorative border',
+    active: true
+  },
+  {
+    id: 'ACC-LAC-03',
+    name: 'Gota Patti Lace',
+    category: 'Lace',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    laceSize: '1 inch',
+    defaultShrinkage: 0,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Gold gota patti lace ribbon',
+    active: true
+  },
+  {
+    id: 'ACC-LAC-04',
+    name: 'Chemical Lace',
+    category: 'Lace',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    laceSize: '1.5 inch',
+    defaultShrinkage: 2.0,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Detailed chemical cutwork lace',
+    active: true
+  },
+
+  // Tassels Category
+  {
+    id: 'ACC-TAS-01',
+    name: 'Ready Made Silk Latkan',
     category: 'Tassels',
+    tasselType: 'Ready Made',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 8,
-    hsnCode: '58089000',
-    description: 'Silk & latkan decorative hangings',
-    varieties: [
-      { id: 'TAS-01', name: 'Ready Made Silk Latkan', type: 'Ready Made', sizes: ['2 inch', '3 inch'] },
-      { id: 'TAS-02', name: 'Job Work Handmade Tassel', type: 'Job Work', sizes: ['2.5 inch'], threadConsumption: 15 }
-    ],
+    size: '2.5 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Readymade silk thread latkan with golden beads',
     active: true
   },
   {
-    id: 'ACC-004',
-    name: 'Dori (Drawstring)',
+    id: 'ACC-TAS-02',
+    name: 'Job Work Handmade Tassel',
+    category: 'Tassels',
+    tasselType: 'Job Work',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '3 inch',
+    threadConsumption: 15,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Handcrafted job work tassel for garment dori',
+    active: true
+  },
+  {
+    id: 'ACC-TAS-03',
+    name: 'Beaded Latkan',
+    category: 'Tassels',
+    tasselType: 'Ready Made',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '2 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Glass bead & pearl hanging latkan',
+    active: true
+  },
+  {
+    id: 'ACC-TAS-04',
+    name: 'Cotton Thread Tassel',
+    category: 'Tassels',
+    tasselType: 'Job Work',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '2.5 inch',
+    threadConsumption: 20,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Cotton fringed tassel for dupattas & kurtas',
+    active: true
+  },
+
+  // Thread Category
+  {
+    id: 'ACC-THR-01',
+    name: 'Kantha Pattern Thread',
+    category: 'Thread',
+    unit: 'Box',
+    piecesPerUnit: 15,
+    threadPattern: 'Kantha',
+    globalThreadMetric: 15,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Specialised thread for Kantha embroidery & stitching',
+    active: true
+  },
+  {
+    id: 'ACC-THR-02',
+    name: 'Couching Pattern Thread',
+    category: 'Thread',
+    unit: 'Box',
+    piecesPerUnit: 15,
+    threadPattern: 'Couching',
+    globalThreadMetric: 15,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Heavy cord thread for decorative couching work',
+    active: true
+  },
+  {
+    id: 'ACC-THR-03',
+    name: 'Standard Stitching Thread',
+    category: 'Thread',
+    unit: 'Box',
+    piecesPerUnit: 15,
+    threadPattern: 'Stitching',
+    threadPerPiece: 60,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '40/2 general garment sewing & stitching thread',
+    active: true
+  },
+  {
+    id: 'ACC-THR-04',
+    name: 'Overlock Thread',
+    category: 'Thread',
+    unit: 'Cone',
+    piecesPerUnit: 1,
+    threadPattern: 'Stitching',
+    threadPerPiece: 45,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Multi-filament overlock & serging cone thread',
+    active: true
+  },
+
+  // Dori Category
+  {
+    id: 'ACC-DOR-01',
+    name: 'Matching Fabric Dori',
     category: 'Dori',
     unit: 'Meter',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '56075000',
-    description: 'Fabric turned drawstrings for pajamas and kurtas',
-    varieties: [
-      { id: 'DOR-01', name: 'Matching Fabric Dori', fabricQuality: 'Grey Cotton Fabrics (100*100)', widths: ['44', '58'], consumptionPerWidth: { '44': 12.5, '58': 9.8 } }
-    ],
+    doriRequiredSize: '40 cm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Self fabric turned dori for pajama waist & necklines',
     active: true
   },
   {
-    id: 'ACC-005',
-    name: 'Thread',
-    category: 'Thread',
+    id: 'ACC-DOR-02',
+    name: 'Cotton Braided Dori',
+    category: 'Dori',
     unit: 'Meter',
     piecesPerUnit: 1,
-    maxBuffer: 10,
-    hsnCode: '52041100',
-    description: 'Stitching, Kantha & Couching thread patterns',
-    varieties: [
-      { id: 'THR-01', name: 'Kantha Pattern Thread', pattern: 'Kantha', threadPerStitch: 15, defaultBoxMeters: 6000 },
-      { id: 'THR-02', name: 'Couching Pattern Thread', pattern: 'Couching', threadPerStitch: 15, defaultBoxMeters: 6000 },
-      { id: 'THR-03', name: 'Standard Stitching Thread', pattern: 'Stitching', threadPerPiece: 60, consumptionPer100Pcs: 6000 }
-    ],
+    doriRequiredSize: '45 cm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Braided cotton cord for waist tie-ups',
     active: true
   },
   {
-    id: 'ACC-006',
-    name: 'Elastic',
+    id: 'ACC-DOR-03',
+    name: 'Metallic Zari Dori',
+    category: 'Dori',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    doriRequiredSize: '40 cm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Twisted metallic gold & silver cord',
+    active: true
+  },
+  {
+    id: 'ACC-DOR-04',
+    name: 'Elasticated Dori',
+    category: 'Dori',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    doriRequiredSize: '35 cm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Stretch cord for comfortable gathers & drawstrings',
+    active: true
+  },
+
+  // Elastic Category
+  {
+    id: 'ACC-ELA-01',
+    name: '1 inch Woven Waistband Elastic',
     category: 'Elastic',
     unit: 'Meter',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '56041000',
-    description: 'Braided waist & cuff elastic band',
-    varieties: [
-      { id: 'ELA-01', name: '1 inch Woven Waistband Elastic', size: '1 inch', consumption: 0.85 }
-    ],
+    requiredSize: '1 inch',
+    fabricConsumption: 0.85,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '1 inch non-roll woven elastic band for pants & pajamas',
     active: true
   },
   {
-    id: 'ACC-007',
-    name: 'Beads & Sequins',
+    id: 'ACC-ELA-02',
+    name: '1.5 inch Knitted Elastic',
+    category: 'Elastic',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    requiredSize: '1.5 inch',
+    fabricConsumption: 0.90,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '1.5 inch soft knitted waistband elastic',
+    active: true
+  },
+  {
+    id: 'ACC-ELA-03',
+    name: '0.5 inch Braided Elastic',
+    category: 'Elastic',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    requiredSize: '0.5 inch',
+    fabricConsumption: 0.50,
+    maxBuffer: '',
+    hsnCode: '',
+    description: '0.5 inch elastic for sleeve cuffs & necklines',
+    active: true
+  },
+  {
+    id: 'ACC-ELA-04',
+    name: 'Cord Elastic 3mm',
+    category: 'Elastic',
+    unit: 'Meter',
+    piecesPerUnit: 1,
+    requiredSize: '3mm',
+    fabricConsumption: 0.40,
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Round thin elastic cord for loops & buttons',
+    active: true
+  },
+
+  // Beads & Sequins Category
+  {
+    id: 'ACC-BDS-01',
+    name: 'Gold Sequin 5mm',
     category: 'Beads & Sequins',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '71179090',
-    description: 'Gold & pearl decorative embellishments',
-    varieties: [
-      { id: 'BD-01', name: 'Gold Sequin 5mm (Gold) [5mm]', size: '5mm', sizes: ['5mm'] },
-      { id: 'BD-02', name: 'Moti / Pearl Beads 4mm', size: '4mm', sizes: ['4mm'] }
-    ],
+    requiredSize: '5mm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: '5mm shiny gold flat sequins for embroidery',
     active: true
   },
   {
-    id: 'ACC-008',
-    name: 'Hook',
+    id: 'ACC-BDS-02',
+    name: 'Moti / Pearl Beads 4mm',
+    category: 'Beads & Sequins',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    requiredSize: '4mm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Off-white round glass pearls for neck work',
+    active: true
+  },
+  {
+    id: 'ACC-BDS-03',
+    name: 'Silver Cutdana Beads',
+    category: 'Beads & Sequins',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    requiredSize: '2mm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Glass cutdana bugle beads for hand embellishments',
+    active: true
+  },
+  {
+    id: 'ACC-BDS-04',
+    name: 'Acrylic Mirror Sequins',
+    category: 'Beads & Sequins',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    requiredSize: '10mm',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Round mirror sequins for festive kurtas',
+    active: true
+  },
+
+  // Hook Category
+  {
+    id: 'ACC-HOK-01',
+    name: 'Hook & Eye (Silver)',
     category: 'Hook',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '83081000',
-    description: 'Hook and eye clasps & trouser waistband hooks',
-    varieties: [
-      { id: 'HK-01', name: 'Hook & Eye (Silver)', size: 'Standard', sizes: ['Small', 'Standard'] },
-      { id: 'HK-02', name: 'Pant Hook Metal', size: 'Standard', sizes: ['Standard'] }
-    ],
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Silver nickel plated hook and eye fasteners',
     active: true
   },
   {
-    id: 'ACC-009',
-    name: 'Zipper',
+    id: 'ACC-HOK-02',
+    name: 'Pant Hook Metal',
+    category: 'Hook',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Steel waistband clasps for trousers & pajamas',
+    active: true
+  },
+  {
+    id: 'ACC-HOK-03',
+    name: 'Collar Hook & Eye',
+    category: 'Hook',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Small',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Small discreet hook for Nehru collar closure',
+    active: true
+  },
+  {
+    id: 'ACC-HOK-04',
+    name: 'Heavy Duty Coat Hook',
+    category: 'Hook',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Large',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Reinforced hook for sherwanis & jackets',
+    active: true
+  },
+
+  // Zipper Category
+  {
+    id: 'ACC-ZIP-01',
+    name: 'Concealed Zipper [8 inch]',
     category: 'Zipper',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '96071100',
-    description: 'Concealed, nylon and metal zippers',
-    varieties: [
-      { id: 'ZIP-01', name: 'Concealed Zipper [8 inch]', size: '8 inch', sizes: ['7 inch', '8 inch', '10 inch'] },
-      { id: 'ZIP-02', name: 'Metal Zipper [12 inch]', size: '12 inch', sizes: ['10 inch', '12 inch'] },
-      { id: 'ZIP-03', name: 'Nylon Coil Zipper [7 inch]', size: '7 inch', sizes: ['7 inch', '9 inch'] }
-    ],
+    size: '8 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: '8 inch invisible nylon zip for side plackets',
     active: true
   },
   {
-    id: 'ACC-010',
-    name: 'Label',
+    id: 'ACC-ZIP-02',
+    name: 'Metal Zipper [12 inch]',
+    category: 'Zipper',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '12 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Antique brass metal teeth zipper for jackets',
+    active: true
+  },
+  {
+    id: 'ACC-ZIP-03',
+    name: 'Nylon Coil Zipper [7 inch]',
+    category: 'Zipper',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '7 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: '7 inch standard nylon zipper for pocket closures',
+    active: true
+  },
+  {
+    id: 'ACC-ZIP-04',
+    name: 'Invisible Zipper 16 inch',
+    category: 'Zipper',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '16 inch',
+    maxBuffer: '',
+    hsnCode: '',
+    description: '16 inch concealed back zip for women tops & kurtas',
+    active: true
+  },
+
+  // Label Category
+  {
+    id: 'ACC-LBL-01',
+    name: 'Brand Main Woven Label',
     category: 'Label',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '58071000',
-    description: 'Brand woven main labels, wash care & size tags',
-    varieties: [
-      { id: 'LBL-01', name: 'Brand Main Woven Label', size: 'Standard', sizes: ['Standard'] },
-      { id: 'LBL-02', name: 'Wash Care Satin Label', size: 'Standard', sizes: ['Standard'] },
-      { id: 'LBL-03', name: 'Size Pip Label', size: 'Standard', sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] }
-    ],
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'High-density woven neck label with brand logo',
     active: true
   },
   {
-    id: 'ACC-011',
-    name: 'Packaging',
+    id: 'ACC-LBL-02',
+    name: 'Wash Care Satin Label',
+    category: 'Label',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Printed satin care & composition instruction label',
+    active: true
+  },
+  {
+    id: 'ACC-LBL-03',
+    name: 'Size Pip Label',
+    category: 'Label',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Small folded size indicator label (XS, S, M, L, XL, XXL)',
+    active: true
+  },
+  {
+    id: 'ACC-LBL-04',
+    name: 'Country of Origin / MRP Tag',
+    category: 'Label',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Cardboard paper price & compliance barcode hangtag',
+    active: true
+  },
+
+  // Packaging Category
+  {
+    id: 'ACC-PKG-01',
+    name: 'Polybag (12x15)',
     category: 'Packaging',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '39232100',
-    description: 'Polybags, butter paper & hang tags',
-    varieties: [
-      { id: 'PKG-01', name: 'Polybag (12x15)', size: '12x15', sizes: ['10x12', '12x15', '14x18'] },
-      { id: 'PKG-02', name: 'Butter Paper', size: 'Standard', sizes: ['Standard'] },
-      { id: 'PKG-03', name: 'Hangtag with String', size: 'Standard', sizes: ['Standard'] }
-    ],
+    size: '12x15',
+    maxBuffer: '',
+    hsnCode: '',
+    description: '12x15 inch transparent self-adhesive garment polybag',
     active: true
   },
   {
-    id: 'ACC-012',
-    name: 'Other',
+    id: 'ACC-PKG-02',
+    name: 'Butter Paper',
+    category: 'Packaging',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Acid-free tissue paper for garment folding',
+    active: true
+  },
+  {
+    id: 'ACC-PKG-03',
+    name: 'Hangtag with String',
+    category: 'Packaging',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Premium branded card hangtag with cotton thread string',
+    active: true
+  },
+  {
+    id: 'ACC-PKG-04',
+    name: 'Carton Box (5-Ply)',
+    category: 'Packaging',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: '24x18x12',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Heavy duty corrugated shipping box for 50 pieces',
+    active: true
+  },
+
+  // Other Category
+  {
+    id: 'ACC-OTH-01',
+    name: 'Safety Pin',
     category: 'Other',
     unit: 'Piece',
     piecesPerUnit: 1,
-    maxBuffer: 5,
-    hsnCode: '99999999',
-    description: 'Miscellaneous accessories, pins, tapes and trims',
-    varieties: [
-      { id: 'OTH-01', name: 'Safety Pin', size: 'Standard', sizes: ['Standard'] },
-      { id: 'OTH-02', name: 'Hanger Loop Tape', size: 'Standard', sizes: ['Standard'] }
-    ],
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Rust-proof nickel steel safety pins for tag attachment',
+    active: true
+  },
+  {
+    id: 'ACC-OTH-02',
+    name: 'Hanger Loop Tape',
+    category: 'Other',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Thin satin ribbon tape for internal shoulder hanging loops',
+    active: true
+  },
+  {
+    id: 'ACC-OTH-03',
+    name: 'Collar Stay Bone',
+    category: 'Other',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Plastic insert bones to keep shirt/kurta collar firm',
+    active: true
+  },
+  {
+    id: 'ACC-OTH-04',
+    name: 'Shoulder Pad (Cotton)',
+    category: 'Other',
+    unit: 'Piece',
+    piecesPerUnit: 1,
+    size: 'Standard',
+    maxBuffer: '',
+    hsnCode: '',
+    description: 'Cotton padded inserts for structured blazers & sherwanis',
     active: true
   }
 ];
 
-export const initialThreadSizes = [
-  { id: 'THS-001', brandName: 'Vardhman Poly', packagingType: 'Reel', piecesPerBox: 15, threadLengthPerPiece: 20.0, boxCapacity: 6000, active: true },
-  { id: 'THS-002', brandName: 'Coats Astra', packagingType: 'Cone', piecesPerBox: 1, threadLengthPerPiece: 5000.0, boxCapacity: 5000, active: true },
-  { id: 'THS-003', brandName: 'Madura Coats', packagingType: 'Cone', piecesPerBox: 1, threadLengthPerPiece: 10000.0, boxCapacity: 10000, active: true }
-];
-
-export const initialThreadColors = [
-  { id: 'TCC-001', brandName: 'Vardhman Poly', colorNumber: 'VR-101 (Black)', colorCode: '#000000', active: true },
-  { id: 'TCC-002', brandName: 'Vardhman Poly', colorNumber: 'VR-204 (Off White)', colorCode: '#F8F8FF', active: true },
-  { id: 'TCC-003', brandName: 'Coats Astra', colorNumber: 'CA-550 (Golden Zari)', colorCode: '#FFD700', active: true },
-  { id: 'TCC-004', brandName: 'Madura Coats', colorNumber: 'MC-890 (Navy)', colorCode: '#000080', active: true }
-];
 
 export const initialSalesOrders = [
   {
@@ -587,3 +1072,159 @@ export const setStoredData = (key, data) => {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {}
 };
+
+export const getStoredAccessoriesMaster = () => {
+  try {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('erp_accessories_master_v1') : null;
+    let list = saved ? JSON.parse(saved) : null;
+    
+    const buttonSeeds = initialAccessoryMasters.filter(a => a.category === 'Buttons');
+    
+    const genericOldIds = ['ACC-001', 'ACC-002', 'ACC-003', 'ACC-004', 'ACC-005', 'ACC-006', 'ACC-007', 'ACC-008', 'ACC-009', 'ACC-010', 'ACC-011', 'ACC-012'];
+    const genericNames = ['Buttons', 'Lace', 'Tassels', 'Dori', 'Dori (Drawstring)', 'Thread', 'Elastic', 'Beads & Sequins', 'Hook', 'Zipper', 'Label', 'Packaging', 'Other'];
+
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('erp_accessories_master_v1', JSON.stringify(initialAccessoryMasters));
+      }
+      return [...initialAccessoryMasters];
+    }
+
+    // Filter out old generic placeholders
+    list = list.filter(item => !(genericOldIds.includes(item.id) && genericNames.includes(item.name)));
+
+    // Ensure all seed items are present in list
+    initialAccessoryMasters.forEach(seed => {
+      const idx = list.findIndex(m => m.id === seed.id || (m.category === seed.category && m.name.toLowerCase() === seed.name.toLowerCase()));
+      if (idx === -1) {
+        list.push(seed);
+      } else {
+        list[idx] = {
+          ...seed,
+          ...list[idx],
+          name: seed.name,
+          category: seed.category,
+          active: list[idx].active !== false
+        };
+      }
+    });
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('erp_accessories_master_v1', JSON.stringify(list));
+    }
+    return list;
+  } catch (e) {
+    return [...initialAccessoryMasters];
+  }
+};
+
+// =========================================================================
+// Section 8: New Masters for Threads (Requirements Document Pages 14-15)
+// =========================================================================
+
+// 8.1 Thread Sizes Master (Packaging & Units)
+export const initialThreadSizes = [
+  {
+    id: 'TSZ-001',
+    brandName: 'Coats India',
+    packagingType: 'Reel',
+    piecesPerBox: 15,
+    threadLengthPerPiece: 20, // metres
+    boxCapacity: 300,
+    cones: 0,
+    active: true
+  },
+  {
+    id: 'TSZ-002',
+    brandName: 'Vardhman',
+    packagingType: 'Cone',
+    piecesPerBox: 2,
+    threadLengthPerPiece: 500, // metres
+    boxCapacity: 1000,
+    cones: 2,
+    active: true
+  },
+  {
+    id: 'TSZ-003',
+    brandName: 'Madura Coats',
+    packagingType: 'Cone',
+    piecesPerBox: 1,
+    threadLengthPerPiece: 1000, // metres
+    boxCapacity: 1000,
+    cones: 1,
+    active: true
+  },
+  {
+    id: 'TSZ-004',
+    brandName: 'Astra Poly',
+    packagingType: 'Box',
+    piecesPerBox: 12,
+    threadLengthPerPiece: 150, // metres
+    boxCapacity: 1800,
+    cones: 0,
+    active: true
+  }
+];
+
+export const getStoredThreadSizes = () => {
+  return getStoredData('erp_thread_sizes_v1', initialThreadSizes);
+};
+
+export const setStoredThreadSizes = (data) => {
+  setStoredData('erp_thread_sizes_v1', data);
+};
+
+// 8.2 Thread Brand & Color Code Master
+export const initialThreadBrandColors = [
+  {
+    id: 'TBC-001',
+    brandName: 'Coats Astra',
+    colorNumber: '4001',
+    colorCode: '#333333',
+    active: true
+  },
+  {
+    id: 'TBC-002',
+    brandName: 'Coats Astra',
+    colorNumber: '1002',
+    colorCode: '#FFFFF0',
+    active: true
+  },
+  {
+    id: 'TBC-003',
+    brandName: 'Vardhman Poly',
+    colorNumber: '5023',
+    colorCode: '#800000',
+    active: true
+  },
+  {
+    id: 'TBC-004',
+    brandName: 'Madura Anchor',
+    colorNumber: '7810',
+    colorCode: '#FFD700',
+    active: true
+  },
+  {
+    id: 'TBC-005',
+    brandName: 'Coats Epic',
+    colorNumber: '2045',
+    colorCode: '#228B22',
+    active: true
+  },
+  {
+    id: 'TBC-006',
+    brandName: 'Coats Dual Duty',
+    colorNumber: '6108',
+    colorCode: '#000080',
+    active: true
+  }
+];
+
+export const getStoredThreadBrandColors = () => {
+  return getStoredData('erp_thread_brand_colors_v1', initialThreadBrandColors);
+};
+
+export const setStoredThreadBrandColors = (data) => {
+  setStoredData('erp_thread_brand_colors_v1', data);
+};
+

@@ -39,10 +39,10 @@ export default function TransporterMasterView({
       phone: '',
       email: '',
       address: '',
-      city: 'Surat',
-      state: 'Gujarat',
+      city: '',
+      state: '',
       gstin: '',
-      vehicleTypes: ['Tempo', 'Truck'],
+      vehicleTypes: [],
       active: true
     };
   });
@@ -56,10 +56,10 @@ export default function TransporterMasterView({
       phone: '',
       email: '',
       address: '',
-      city: 'Surat',
-      state: 'Gujarat',
+      city: '',
+      state: '',
       gstin: '',
-      vehicleTypes: ['Tempo', 'Truck'],
+      vehicleTypes: [],
       active: true
     });
     setIsCreatingNew(true);
@@ -145,7 +145,7 @@ export default function TransporterMasterView({
 
       <div className="row g-4">
         {/* Table Column */}
-        <div className={selectedTransporter || isCreatingNew ? 'col-12 col-xl-7' : 'col-12'}>
+        <div className="col-12">
           <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <div className="d-flex align-items-center justify-content-between mb-3">
               <h5 className="fw-bold text-dark mb-0 fs-16">Transporters List</h5>
@@ -236,42 +236,50 @@ export default function TransporterMasterView({
           </div>
         </div>
 
-        {/* View / Edit Mode */}
+        {/* POPUP MODAL: View / Edit / Create Transporter Dialog */}
         {(selectedTransporter || isCreatingNew) && (
-          <div className="col-12 col-xl-5">
-            <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '80px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                <div className="d-flex align-items-center gap-2">
-                  <h5 className="fw-bold text-dark mb-0 fs-18">
-                    {isCreatingNew ? 'Create New Transporter' : formData.name || formData.id}
-                  </h5>
-                  {!isCreatingNew && (
-                    <span className="badge bg-light text-secondary border">{formData.id}</span>
-                  )}
-                </div>
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content border-0 shadow-lg rounded-4 p-4 bg-white">
+                <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-primary-subtle text-primary p-2 rounded-3">
+                      <i className="ti ti-truck fs-5"></i>
+                    </span>
+                    <div>
+                      <h5 className="fw-bold text-dark mb-0 fs-18">
+                        {isCreatingNew ? 'Create New Transporter' : formData.name || formData.id}
+                      </h5>
+                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
+                    </div>
+                  </div>
 
-                <div className="d-flex align-items-center gap-2">
-                  {!isEditing && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <i className="ti ti-edit fs-14"></i>
-                      <span>Edit</span>
-                    </button>
-                  )}
-                  {isInline && (
+                  <div className="d-flex align-items-center gap-2">
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <i className="ti ti-edit fs-14"></i>
+                        <span>Edit</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn-close ms-2"
-                      onClick={() => onCloseInline && onCloseInline(null)}
+                      onClick={() => {
+                        setSelectedTransporter(null);
+                        setIsCreatingNew(false);
+                        setIsEditing(false);
+                        if (isInline && onCloseInline) onCloseInline(null);
+                      }}
                     ></button>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-              <form onSubmit={handleSave}>
+                <form onSubmit={handleSave}>
+                  <div style={{ maxHeight: 'calc(80vh - 140px)', overflowY: 'auto', paddingRight: '4px' }}>
                 <div className="mb-3 p-3 bg-light rounded-3">
                   <div className="mb-2">
                     <label className="form-label fs-12 fw-semibold mb-1">Transporter Name *</label>
@@ -341,24 +349,30 @@ export default function TransporterMasterView({
                   </div>
                 </div>
 
-                {isEditing && (
-                  <div className="d-flex align-items-center justify-content-end gap-2">
+                  </div>
+
+                  {/* Modal Footer Controls */}
+                  <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
                     <button
                       type="button"
-                      className="btn btn-light btn-sm px-3"
+                      className="btn btn-light px-4 rounded-3"
                       onClick={() => {
-                        if (isCreatingNew) setSelectedTransporter(null);
+                        setSelectedTransporter(null);
+                        setIsCreatingNew(false);
                         setIsEditing(false);
+                        if (isInline && onCloseInline) onCloseInline(null);
                       }}
                     >
-                      Cancel
+                      {isEditing ? 'Cancel' : 'Close'}
                     </button>
-                    <button type="submit" className="btn btn-primary btn-sm px-4 fw-medium shadow-sm">
-                      Save Transporter
-                    </button>
+                    {isEditing && (
+                      <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
+                        <i className="ti ti-check me-1"></i> Save Transporter
+                      </button>
+                    )}
                   </div>
-                )}
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         )}

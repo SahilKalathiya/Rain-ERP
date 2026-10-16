@@ -1,5 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { getStoredData, setStoredData, initialAccessoryMasters } from '../../data/salesOrderData';
+import { getStoredData, setStoredData, initialAccessoryMasters, getStoredAccessoriesMaster } from '../../data/salesOrderData';
+import { initialVendors, initialPurchaseOrders, initialFabrics as procurementFabrics } from '../../data/procurementData';
+import {
+  AccessoryPOButtonsBar,
+  GenericAccessoryPOModal,
+  TasselPOModal,
+  ThreadPOModal,
+  OrderPurchaseOrdersCard
+} from './AccessoryPOModals';
 
 export default function OrderDetailView({
   order,
@@ -27,27 +35,11 @@ export default function OrderDetailView({
   const [toastMessage, setToastMessage] = useState('');
 
   // Master Accessories Dynamic State (Sourced from Accessories Master)
-  const [masterAccessories, setMasterAccessories] = useState(() => {
-    const stored = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
-    const merged = Array.isArray(stored) ? [...stored] : [...initialAccessoryMasters];
-    initialAccessoryMasters.forEach(initItem => {
-      if (!merged.some(m => m.id === initItem.id || (m.category === initItem.category && m.name === initItem.name))) {
-        merged.push(initItem);
-      }
-    });
-    return merged;
-  });
+  const [masterAccessories, setMasterAccessories] = useState(() => getStoredAccessoriesMaster());
 
   useEffect(() => {
     const handleUpdate = () => {
-      const stored = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
-      const merged = Array.isArray(stored) ? [...stored] : [...initialAccessoryMasters];
-      initialAccessoryMasters.forEach(initItem => {
-        if (!merged.some(m => m.id === initItem.id || (m.category === initItem.category && m.name === initItem.name))) {
-          merged.push(initItem);
-        }
-      });
-      setMasterAccessories(merged);
+      setMasterAccessories(getStoredAccessoriesMaster());
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('erp_accessories_master_updated', handleUpdate);
@@ -57,9 +49,132 @@ export default function OrderDetailView({
     };
   }, []);
 
+  // Master Fabrics Dynamic State (Sourced from Fabric Master)
+  const [masterFabricsList, setMasterFabricsList] = useState(() => {
+    try {
+      const s = getStoredData('raindrop_fabrics_v1', null);
+      if (Array.isArray(s) && s.length > 0) return s;
+    } catch (e) {}
+    return procurementFabrics || [];
+  });
+
+  // Width Dropdown active article state
+  const [activeWidthDropdown, setActiveWidthDropdown] = useState(null);
+
+  useEffect(() => {
+    const handleFabricsUpdate = () => {
+      try {
+        const s = getStoredData('raindrop_fabrics_v1', null);
+        if (Array.isArray(s) && s.length > 0) setMasterFabricsList(s);
+      } catch (e) {}
+    };
+    const handleCloseWidthDropdown = () => setActiveWidthDropdown(null);
+
+    window.addEventListener('storage', handleFabricsUpdate);
+    window.addEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+    document.addEventListener('click', handleCloseWidthDropdown);
+    return () => {
+      window.removeEventListener('storage', handleFabricsUpdate);
+      window.removeEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+      document.removeEventListener('click', handleCloseWidthDropdown);
+    };
+  }, []);
+
   // Accessories BOM State
   const [selectedBomCustomer, setSelectedBomCustomer] = useState('');
   const bomCustomerName = selectedBomCustomer || order?.customerOrders?.[0]?.customerName || order?.customerName || 'Black Label';
+
+  // Accessory PO Generation Modals State
+  const [activePOModalCategory, setActivePOModalCategory] = useState(null);
+
+  const [vendorsList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('raindrop_vendors_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return initialVendors;
+  });
+
+  const [orderPurchaseOrders, setOrderPurchaseOrders] = useState(() => {
+    try {
+      const saved = localStorage.getItem('raindrop_pos_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(p => p.orderId === order?.id || p.order_id === order?.id || p.orderNumber === order?.orderNumber);
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [allocatedGarments, setAllocatedGarments] = useState(() => {
+    const allocated = {};
+    try {
+      const saved = localStorage.getItem('raindrop_pos_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(po => {
+            if ((po.orderId === order?.id || po.order_id === order?.id) && Array.isArray(po.items)) {
+              po.items.forEach(it => {
+                const key = `${it.accessory_id}__${it.order_article_id}`;
+                allocated[key] = (allocated[key] || 0) + (it.no_of_garments || 0);
+              });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+    return allocated;
+  });
+
+  const handleSaveAccessoryPO = (newPO) => {
+    setOrderPurchaseOrders(prev => [newPO, ...prev]);
+
+    try {
+      const saved = localStorage.getItem('raindrop_pos_v1');
+      let currentList = [];
+      if (saved) {
+        currentList = JSON.parse(saved);
+      } else {
+        currentList = [...initialPurchaseOrders];
+      }
+      const updated = [newPO, ...currentList.filter(p => p.id !== newPO.id)];
+      localStorage.setItem('raindrop_pos_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('raindrop_pos_updated', { detail: newPO }));
+    } catch (e) {
+      console.error('Error saving PO to localStorage:', e);
+    }
+
+    setAllocatedGarments(prev => {
+      const copy = { ...prev };
+      if (Array.isArray(newPO.items)) {
+        newPO.items.forEach(it => {
+          const key = `${it.accessory_id}__${it.order_article_id}`;
+          copy[key] = (copy[key] || 0) + (it.no_of_garments || 0);
+        });
+      }
+      return copy;
+    });
+
+    const logText = `${newPO.po_type_display || newPO.poType || 'Accessory PO'} (${newPO.po_number || newPO.poNumber}) created for ₹${parseFloat(newPO.total_amount || 0).toFixed(2)}`;
+    setOrderHistory(prev => [
+      {
+        date: new Date().toISOString(),
+        dateFormatted: formatDateWithTime(new Date().toISOString()),
+        text: logText
+      },
+      ...prev
+    ]);
+
+    setToastMessage(`Purchase Order ${newPO.po_number || newPO.poNumber} created successfully!`);
+    setShowToast(true);
+  };
 
   const CATEGORY_METADATA = {
     'Buttons': { name: 'Buttons', icon: 'ti ti-circle-dot', iconColor: '#475569', bgColor: '#f1f5f9', poBtnText: 'Button PO', poBtnColor: '#2563eb', defaultUnit: 'PCS' },
@@ -114,6 +229,7 @@ export default function OrderDetailView({
       const varieties = [];
 
       inCat.forEach(m => {
+        // 1. Explicit varieties in master
         if (Array.isArray(m.varieties) && m.varieties.length > 0) {
           m.varieties.forEach(v => {
             if (v?.name && !varieties.some(x => x.name.toLowerCase() === v.name.toLowerCase())) {
@@ -124,8 +240,8 @@ export default function OrderDetailView({
                 hasSizes: sizes.length > 0,
                 sizes: sizes,
                 colors: colors,
-                defaultSize: '',
-                defaultColor: '',
+                defaultSize: v.size || '',
+                defaultColor: v.color || '',
                 defaultPlacement: '',
                 defaultReqPerPc: '',
                 type: v.type || m.source || '',
@@ -134,6 +250,32 @@ export default function OrderDetailView({
             }
           });
         }
+
+        // 2. Formatted variety with size/color (Matching Image 3: "+ Coconut Button (Natural) [14L]", "+ Embroidered [18 L]", "+ Eyelet (Gold) [18 L]")
+        const hasColor = Boolean(m.color);
+        const hasSize = Boolean(m.size);
+        if (hasColor || hasSize) {
+          const formattedLabel = `${m.name}${hasColor ? ` (${m.color})` : ''}${hasSize ? ` [${m.size}]` : ''}`;
+          if (!varieties.some(x => x.name.toLowerCase() === formattedLabel.toLowerCase())) {
+            const parsedSizes = m.sizes || (m.size ? [m.size] : []);
+            const parsedColors = m.colors || (m.color ? [m.color] : []);
+            varieties.push({
+              name: formattedLabel,
+              baseName: m.name,
+              hasSizes: parsedSizes.length > 0,
+              sizes: parsedSizes,
+              colors: parsedColors,
+              defaultSize: m.size || '',
+              defaultColor: m.color || '',
+              defaultPlacement: '',
+              defaultReqPerPc: '',
+              type: m.subType || m.source || '',
+              unit: m.unit || meta.defaultUnit
+            });
+          }
+        }
+
+        // 3. Base accessory name (Matching Image 3: "+ Coconut", "+ Coconut Button", "+ MOP", "+ Metal 2 hole", "+ Mould", "+ Pignose", "+ Plastic")
         if (m.name && m.name.toLowerCase() !== catName.toLowerCase()) {
           if (!varieties.some(x => x.name.toLowerCase() === m.name.toLowerCase())) {
             const parsedSizes = m.buttonSizes
@@ -141,17 +283,18 @@ export default function OrderDetailView({
               : (m.sizes || (m.laceSize ? [m.laceSize] : (m.size ? [m.size] : [])));
             const parsedColors = m.buttonColors
               ? m.buttonColors.split(',').map(s => s.trim()).filter(Boolean)
-              : (m.colors || []);
+              : (m.colors || (m.color ? [m.color] : []));
             varieties.push({
               name: m.name,
+              baseName: m.name,
               hasSizes: parsedSizes.length > 0,
               sizes: parsedSizes,
               colors: parsedColors,
-              defaultSize: '',
-              defaultColor: '',
+              defaultSize: m.size || '',
+              defaultColor: m.color || '',
               defaultPlacement: '',
               defaultReqPerPc: '',
-              type: m.source || '',
+              type: m.subType || m.source || '',
               unit: m.unit || meta.defaultUnit
             });
           }
@@ -540,6 +683,8 @@ export default function OrderDetailView({
     const targetArticle = selectedBomArticle || orderArticles[0]?.name || 'Kurta';
     const resolvedSizes = (varObj?.sizes && varObj.sizes.length > 0) ? varObj.sizes : [];
     const resolvedColors = (varObj?.colors && varObj.colors.length > 0) ? varObj.colors : [];
+    const initialSize = varObj?.defaultSize || '';
+    const initialColor = varObj?.defaultColor || '';
 
     const newItems = [];
     const newEditingIds = {};
@@ -556,9 +701,9 @@ export default function OrderDetailView({
           articleColor: co.display,
           totalQty: co.qty,
           placement: '',
-          accessoryColor: '',
-          size: '',
-          source: '',
+          accessoryColor: initialColor,
+          size: initialSize,
+          source: varObj?.type || '',
           fabricColor: '—',
           reqPerPc: '',
           extraPerPack: '',
@@ -582,9 +727,9 @@ export default function OrderDetailView({
         colors: resolvedColors,
         articleRows: initialArticleRows,
         placement: '',
-        accessoryColor: '',
-        size: '',
-        source: '',
+        accessoryColor: initialColor,
+        size: initialSize,
+        source: varObj?.type || '',
         fabricColor: '—',
         reqPerPc: '',
         extraPerPack: '',
@@ -939,8 +1084,8 @@ export default function OrderDetailView({
                       </td>
 
                       <td style={{ minWidth: '120px', padding: '6px 8px' }}>
-                        {item.hasSizes && item.sizes && item.sizes.length > 0 ? (
-                          isEditing ? (
+                        {isEditing ? (
+                          item.hasSizes && item.sizes && item.sizes.length > 0 ? (
                             <select
                               className="form-select form-select-sm"
                               value={row.size ?? ''}
@@ -951,12 +1096,17 @@ export default function OrderDetailView({
                               {item.sizes.map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
                             </select>
                           ) : (
-                            <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Size"
+                              value={row.size ?? ''}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
+                              style={inputStyle}
+                            />
                           )
                         ) : (
-                          <span style={{ color: '#c2410c', fontStyle: 'italic', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                            No sizes in master
-                          </span>
+                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
                         )}
                       </td>
 
@@ -1395,17 +1545,24 @@ export default function OrderDetailView({
                       )}
                     </td>
                     <td style={{ minWidth: '110px', padding: '6px 8px' }}>
-                      {item.hasSizes && item.sizes && item.sizes.length > 0 ? (
-                        isEditing ? (
+                      {isEditing ? (
+                        item.hasSizes && item.sizes && item.sizes.length > 0 ? (
                           <select className="form-select form-select-sm" value={row.size ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)} style={selectStyle}>
                             <option value="">Select Size</option>
                             {item.sizes.map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
                           </select>
                         ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Size"
+                            value={row.size ?? ''}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
+                            style={inputStyle}
+                          />
                         )
                       ) : (
-                        <span style={{ color: '#c2410c', fontStyle: 'italic', fontSize: '12px', whiteSpace: 'nowrap' }}>No sizes in master</span>
+                        <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
                       )}
                     </td>
                     <td style={{ minWidth: '130px', padding: '6px 8px' }}>
@@ -1480,37 +1637,86 @@ export default function OrderDetailView({
     return init;
   });
 
-  // Fabric Consumption Rows state for interactive table
+  // Fabric Consumption Rows state for interactive table (Demo 5 specification)
   const [consumptionRows, setConsumptionRows] = useState(() => {
+    const resolveWidth = (val) => {
+      if (!val || val === '—' || val === '-') return '';
+      const clean = String(val).replace(/&quot;/g, '').replace(/"/g, '').trim();
+      return clean ? `${clean}"` : '';
+    };
+
+    const getFabricDefaultWidth = (fq, artFab) => {
+      const fromFab = resolveWidth(artFab?.width);
+      if (fromFab) return fromFab;
+      if (!fq) return '44"';
+      let allF = procurementFabrics || [];
+      try {
+        const stored = getStoredData('raindrop_fabrics_v1', null);
+        if (Array.isArray(stored) && stored.length > 0) allF = stored;
+      } catch (e) {}
+      const matched = allF?.find(f => 
+        (f.qualityName || f.quality || f.name)?.toLowerCase() === fq.toLowerCase() ||
+        f.id === artFab?.fabricId
+      );
+      if (matched?.widths?.[0]) {
+        const wClean = String(matched.widths[0]).replace(/"/g, '').trim();
+        return `${wClean}"`;
+      }
+      if (fq.toLowerCase().includes('liva') || fq.toLowerCase().includes('pant') || fq.toLowerCase().includes('2.40')) return '47"';
+      if (fq.toLowerCase().includes('cambryc') || fq.toLowerCase().includes('cambric')) return '';
+      return '44"';
+    };
+
     // If order already has saved fabricConsumptions, initialize from them
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
       return order.fabricConsumptions.map((fc, idx) => {
-        const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || 'Kurta';
+        const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
         const artIdx = fc.articleIndex !== undefined
           ? fc.articleIndex
           : (order?.articles ? order.articles.findIndex(a => a.name === artName) : idx);
+        const art = (order?.articles && order.articles[artIdx]) || {};
+        const artFab = art.fabrics?.[0] || {};
+        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricName || artFab.quality || art.fabricQuality || (idx === 0 ? '100/100 Mulmul' : idx === 1 ? '2.40/20s CF' : '60os Cambryc');
+        
+        // Priority for starting width: fabric's defined width from Fabric Master -> artFab.width -> art.width -> order.width -> default
+        const initialWidth = resolveWidth(artFab.width) ||
+          getFabricDefaultWidth(fabQuality, artFab) ||
+          resolveWidth(fc.width) ||
+          resolveWidth(art.width) ||
+          resolveWidth(order?.width) ||
+          '44"';
+
+        const shrink = parseFloat(fc.shrinkPercent || fc.shrinkPct || artFab.shrinkagePercent || artFab.shrinkage || (idx === 1 ? 3.5 : 4));
+        const buf = parseFloat(fc.bufferPercent || fc.bufferPct || artFab.bufferPercent || 10);
+
         return {
           key: fc.key || `row_${idx}`,
           articleIndex: artIdx >= 0 ? artIdx : idx,
           articleName: artName,
           articleCode: artName.toUpperCase(),
-          fabricQuality: fc.fabricQuality || fc.fabricName || 'Desizer Flex',
-          width: fc.width && fc.width !== '—' ? fc.width : '',
+          articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+          role: fc.role || artFab.pieceLabel || artFab.role || 'Main',
+          fabricQuality: fabQuality,
+          source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
+          width: initialWidth,
           colorName: fc.colorName || 'Charcoal',
           colorHex: fc.colorHex || '#333333',
-          dyedRate: parseFloat(fc.dyedRate || fc.consumptionPerGarment || fc.dyedPerPiece) || 0,
-          shrinkPct: parseFloat(fc.shrinkPercent || fc.shrinkPct) || (fc.fabricQuality?.includes('Chanderi') ? 3 : 6),
-          pcs: parseInt(fc.pcs || fc.pieces) || 100
+          dyedRate: (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '') ? fc.dyedRate : (idx === 0 ? 1.5 : idx === 1 ? 3.0 : 0.0),
+          shrinkPct: shrink,
+          bufferPct: buf,
+          pcs: parseInt(fc.pcs || fc.pieces, 10) || (idx === 0 ? 400 : 300),
+          locked: fc.locked !== undefined ? !!fc.locked : false
         };
       });
     }
 
-    // Otherwise, generate rows from order.articles and customer orders or default Kurta + Plazo sample
+    // Otherwise, generate rows from order.articles and customer orders or default matching Prototype Demo (Kurta, Pant, Dupatta)
     const articles = (order?.articles && order.articles.length > 0)
       ? order.articles
       : [
-          { name: 'Kurta', fabricQuality: 'Desizer Flex', shrinkPct: 6 },
-          { name: 'Plazo', fabricQuality: 'Chanderi Silk', shrinkPct: 3 }
+          { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
+          { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
+          { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
         ];
 
     // Colors list from customer orders
@@ -1521,6 +1727,9 @@ export default function OrderDetailView({
           if (!colors.includes(col)) colors.push(col);
         });
       });
+    }
+    if (colors.length === 0 && Array.isArray(order?.colors) && order.colors.length > 0) {
+      colors = [...order.colors];
     }
     if (colors.length === 0) {
       colors = ['Charcoal', 'Green'];
@@ -1541,26 +1750,75 @@ export default function OrderDetailView({
       'Yellow': '#FFD700'
     };
 
+    const getCustomerPcs = (artName, colName) => {
+      let sum = 0;
+      if (Array.isArray(order?.customerOrders)) {
+        order.customerOrders.forEach(cust => {
+          Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
+            const kLow = key.toLowerCase();
+            const aLow = (artName || '').toLowerCase();
+            const cLow = (colName || '').toLowerCase();
+            if (kLow.includes(aLow) && (cLow === '' || kLow.includes(cLow))) {
+              if (Array.isArray(cfg?.seriesConfigs)) {
+                cfg.seriesConfigs.forEach(sc => {
+                  Object.values(sc.sizeQtys || {}).forEach(q => {
+                    sum += parseInt(q, 10) || 0;
+                  });
+                });
+              } else if (cfg?.sizeQtys) {
+                Object.values(cfg.sizeQtys || {}).forEach(q => {
+                  sum += parseInt(q, 10) || 0;
+                });
+              }
+            }
+          });
+        });
+      }
+      return sum;
+    };
+
     const rows = [];
     articles.forEach((art, aIdx) => {
-      const fabName = art.fabricQuality || (aIdx === 0 ? 'Desizer Flex' : 'Chanderi Silk');
-      const shrinkVal = art.shrinkage || (aIdx === 0 ? 6 : 3);
-      const totalArtPcs = art.totalPieces || order?.totalGarments || 200;
-      const pcsPerColor = Math.round(totalArtPcs / (colors.length || 1));
+      const artFab = art.fabrics?.[0] || {};
+      const artName = art.name || (aIdx === 0 ? 'Kurta' : aIdx === 1 ? 'Pant' : 'Dupatta');
+      const fabName = artFab.fabricName || artFab.quality || art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc');
+      const role = artFab.pieceLabel || artFab.role || 'Main';
+      const source = art.sourcing || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
+      
+      const initialWidth = resolveWidth(artFab.width) ||
+        getFabricDefaultWidth(fabName, artFab) ||
+        resolveWidth(art.width) ||
+        resolveWidth(order?.width) ||
+        (aIdx === 1 ? '47"' : aIdx === 2 ? '' : '44"');
 
-      colors.forEach(col => {
+      const shrinkVal = parseFloat(artFab.shrinkagePercent || artFab.shrinkage || art.shrinkage || (aIdx === 1 ? 3.5 : aIdx === 2 ? 6 : 4));
+      const bufferVal = parseFloat(artFab.bufferPercent || 10);
+      const defaultDyed = art.consumption !== undefined ? art.consumption : (aIdx === 0 ? 1.5 : aIdx === 1 ? 3.0 : 0.0);
+
+      // Dupatta might only have 1 color in sample
+      const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || 'Charcoal'] : colors;
+
+      artColors.forEach((col, cIdx) => {
+        const custPcs = getCustomerPcs(artName, col);
+        const pcsVal = custPcs > 0 ? custPcs : (cIdx === 0 ? 400 : 300);
+
         rows.push({
-          key: `${art.name}_${col}`,
+          key: `${artName}_${role}_${col}`,
           articleIndex: aIdx,
-          articleName: art.name,
-          articleCode: (art.name || '').toUpperCase(),
+          articleName: artName,
+          articleCode: (artName || '').toUpperCase(),
+          articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+          role: role,
           fabricQuality: fabName,
-          width: art.width ? `${art.width}"` : '',
+          source: source,
+          width: initialWidth,
           colorName: col,
           colorHex: colorHexMap[col] || '#333333',
-          dyedRate: 0.00,
+          dyedRate: defaultDyed,
           shrinkPct: shrinkVal,
-          pcs: pcsPerColor
+          bufferPct: bufferVal,
+          pcs: pcsVal,
+          locked: false
         });
       });
     });
@@ -1733,17 +1991,18 @@ export default function OrderDetailView({
 
   const handleSaveConsumption = () => {
     const currentScroll = typeof window !== 'undefined' ? window.scrollY : 0;
-    // Calculate total dyed and total greige meters from consumption rows
     const totalDyedCalculated = consumptionRows.reduce((sum, r) => {
       const dyedRate = parseFloat(r.dyedRate) || 0;
-      const pcs = parseInt(r.pcs) || 0;
+      const pcs = parseInt(r.pcs, 10) || 0;
       return sum + (dyedRate * pcs);
     }, 0);
     const totalGreigeCalculated = consumptionRows.reduce((sum, r) => {
+      const artSourcing = (articleSourcing[r.articleName] || r.source || 'Greige').toLowerCase();
+      const isDyed = artSourcing.includes('dyed');
       const dyedRate = parseFloat(r.dyedRate) || 0;
-      const shrink = parseFloat(r.shrinkPct) || 0;
-      const greigeRate = shrink < 100 ? dyedRate / (1 - shrink / 100) : dyedRate;
-      const pcs = parseInt(r.pcs) || 0;
+      const shrink = isDyed ? 0 : (parseFloat(r.shrinkPct) || 0);
+      const greigeRate = isDyed ? dyedRate : (shrink < 100 ? dyedRate * (1 + shrink / 100) : dyedRate);
+      const pcs = parseInt(r.pcs, 10) || 0;
       return sum + (greigeRate * pcs);
     }, 0);
 
@@ -1755,12 +2014,10 @@ export default function OrderDetailView({
       articleSourcing
     };
 
-    // Save to localStorage
     const saved = getStoredData('erp_sales_orders_v1', []);
     const updated = [updatedOrder, ...saved.filter(o => o.id !== updatedOrder.id)];
     setStoredData('erp_sales_orders_v1', updated);
 
-    // Dispatch real-time synchronization events for live dashboard update
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
@@ -1781,6 +2038,243 @@ export default function OrderDetailView({
       });
     }
   };
+
+  const handleCancelConsumption = () => {
+    if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
+      setConsumptionRows([...order.fabricConsumptions]);
+    }
+    setShowRateCalculation(false);
+    setToastMessage('Changes cancelled.');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
+  };
+
+  const handleToggleArticleSourcing = (artName, mode) => {
+    setArticleSourcing(prev => ({ ...prev, [artName]: mode }));
+    setConsumptionRows(prev => prev.map(r => {
+      if (r.articleName === artName) {
+        return {
+          ...r,
+          source: mode === 'Dyed' ? 'Dyed Fabric' : 'Greige Fabric'
+        };
+      }
+      return r;
+    }));
+  };
+
+  const handleUpdateArticleWidth = (artName, newWidth) => {
+    setConsumptionRows(prev => prev.map(r => {
+      if (r.articleName === artName) {
+        return { ...r, width: newWidth === '—' ? '' : newWidth };
+      }
+      return r;
+    }));
+  };
+
+  // Sourced directly from Fabric Master (Section 3.2 & Order Consumption)
+  const getFabricMasterWidths = (fabricQuality, currentWidth) => {
+    let allFabrics = masterFabricsList;
+    if (!allFabrics || allFabrics.length === 0) {
+      try {
+        const stored = getStoredData('raindrop_fabrics_v1', null);
+        if (Array.isArray(stored) && stored.length > 0) allFabrics = stored;
+      } catch (e) {}
+    }
+    if (!allFabrics || allFabrics.length === 0) {
+      allFabrics = procurementFabrics || [];
+    }
+
+    const fqClean = String(fabricQuality || '').toLowerCase().trim();
+
+    // 1. Direct or fuzzy match with Fabric Master
+    let matched = allFabrics.find(f => {
+      const q = String(f.qualityName || f.quality_name || f.quality || f.name || '').toLowerCase().trim();
+      const id = String(f.id || '').toLowerCase().trim();
+      return q === fqClean || id === fqClean;
+    });
+
+    if (!matched && fqClean) {
+      matched = allFabrics.find(f => {
+        const q = String(f.qualityName || f.quality_name || f.quality || f.name || '').toLowerCase().trim();
+        if (!q) return false;
+        return fqClean.includes(q) || q.includes(fqClean);
+      });
+    }
+
+    if (!matched && fqClean) {
+      const keywords = ['mulmul', 'rayon', 'liva', 'cambric', 'cambryc', 'cotton', 'georgette', 'silk', 'modal', 'chanderi'];
+      const foundKeyword = keywords.find(k => fqClean.includes(k));
+      if (foundKeyword) {
+        matched = allFabrics.find(f => {
+          const q = String(f.qualityName || f.quality_name || f.quality || f.name || '').toLowerCase();
+          return q.includes(foundKeyword);
+        });
+      }
+    }
+
+    let resultWidths = [];
+    if (matched) {
+      let rawWidths = matched.widths;
+      if (typeof rawWidths === 'string') {
+        try {
+          rawWidths = JSON.parse(rawWidths);
+        } catch (e) {
+          rawWidths = rawWidths.split(',').map(s => s.trim());
+        }
+      }
+      if (Array.isArray(rawWidths) && rawWidths.length > 0) {
+        resultWidths = rawWidths.map(w => {
+          const clean = String(w).replace(/&quot;/g, '').replace(/"/g, '').trim();
+          return clean ? `${clean}"` : '';
+        }).filter(Boolean);
+      }
+    }
+
+    if (resultWidths.length === 0 && fqClean) {
+      const matchNum = fqClean.match(/(\d{2,3})\s*(?:["”]|inch)?/);
+      if (matchNum && Number(matchNum[1]) >= 30 && Number(matchNum[1]) <= 120) {
+        resultWidths = [`${matchNum[1]}"`];
+      }
+    }
+
+    if (resultWidths.length === 0) {
+      resultWidths = ['44"', '58"'];
+    }
+
+    const cleanCurrent = currentWidth && currentWidth !== '—'
+      ? (String(currentWidth).includes('"') ? String(currentWidth) : `${currentWidth}"`)
+      : null;
+    if (cleanCurrent && !resultWidths.includes(cleanCurrent)) {
+      resultWidths.push(cleanCurrent);
+    }
+
+    return Array.from(new Set(resultWidths));
+  };
+
+  const handleUpdateArticleDyedRate = (artName, val) => {
+    const num = val === '' ? '' : (parseFloat(val) || 0);
+    setConsumptionRows(prev => prev.map(r => {
+      if (r.articleName === artName) {
+        return { ...r, dyedRate: num };
+      }
+      return r;
+    }));
+  };
+
+  const [showRateCalculation, setShowRateCalculation] = useState(false);
+
+  // Group consumption rows by Article for Image 3 layout (Rowspan per article)
+  const articleGroups = useMemo(() => {
+    const map = new Map();
+    consumptionRows.forEach((row, rIdx) => {
+      const artName = row.articleName || 'Article';
+      if (!map.has(artName)) {
+        const sourcingMode = (articleSourcing[artName] || row.source || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+
+        map.set(artName, {
+          articleName: artName,
+          articleCode: (row.articleCode || artName).toUpperCase(),
+          articleIndex: row.articleIndex !== undefined ? row.articleIndex : map.size,
+          icon: row.articleIcon || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+          fabricQuality: row.fabricQuality || '',
+          width: row.width || '',
+          sourcing: sourcingMode,
+          shrinkPct: parseFloat(row.shrinkPct) || 4,
+          dyedRate: row.dyedRate,
+          rows: []
+        });
+      }
+      map.get(artName).rows.push({ ...row, originalIndex: rIdx });
+    });
+    return Array.from(map.values());
+  }, [consumptionRows, articleSourcing]);
+
+  // Group subtotals for bottom summary rows matching Image 4
+  const fabricSummaryRows = useMemo(() => {
+    const map = new Map();
+    consumptionRows.forEach(r => {
+      const fabName = r.fabricQuality || 'Fabric';
+      const width = r.width && r.width !== '—' ? r.width : '';
+      const key = `${fabName}_${width}`;
+      const artSourcing = (articleSourcing[r.articleName] || r.source || 'Greige').toLowerCase();
+      const isDyed = artSourcing.includes('dyed');
+      const shrink = isDyed ? 0 : (parseFloat(r.shrinkPct) || 0);
+      const dyed = parseFloat(r.dyedRate) || 0;
+      const pcs = parseInt(r.pcs, 10) || 0;
+      const greigePerPc = dyed > 0 ? (isDyed ? dyed : dyed * (1 + shrink / 100)) : 0;
+      const totalDyed = dyed > 0 ? dyed * pcs : 0;
+      const totalGreige = greigePerPc > 0 ? greigePerPc * pcs : 0;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          fabricName: fabName,
+          width: width,
+          pcs: 0,
+          totalDyed: 0,
+          totalGreige: 0,
+          hasValues: false
+        });
+      }
+      const cur = map.get(key);
+      cur.pcs += pcs;
+      cur.totalDyed += totalDyed;
+      cur.totalGreige += totalGreige;
+      if (dyed > 0) cur.hasValues = true;
+    });
+    return Array.from(map.values());
+  }, [consumptionRows, articleSourcing]);
+
+  // Section 8 Rate Calculations & Intelligent Recommendation Engine
+  const rateCalculations = useMemo(() => {
+    return fabricSummaryRows.map(fs => {
+      let greigeRate = 145;
+      let dyeingCost = 35;
+      const fn = fs.fabricName.toLowerCase();
+      if (fn.includes('rayon') || fn.includes('liva') || fn.includes('2.40')) {
+        greigeRate = 165;
+        dyeingCost = 45;
+      } else if (fn.includes('silk') || fn.includes('tussar')) {
+        greigeRate = 280;
+        dyeingCost = 60;
+      } else if (fn.includes('cambryc') || fn.includes('cambric')) {
+        greigeRate = 125;
+        dyeingCost = 35;
+      }
+
+      const matchingRows = consumptionRows.filter(r => (r.fabricQuality || '').toLowerCase() === fs.fabricName.toLowerCase());
+      const isDyed = matchingRows.some(r => (articleSourcing[r.articleName] || r.source || '').toLowerCase().includes('dyed'));
+
+      const ratePerMetre = isDyed ? (greigeRate + dyeingCost + 15) : (greigeRate + dyeingCost);
+      const totalMetres = isDyed ? fs.totalDyed : fs.totalGreige;
+      const totalCost = totalMetres * ratePerMetre;
+      const costPerGarment = fs.pcs > 0 ? totalCost / fs.pcs : 0;
+
+      return {
+        fabricName: fs.fabricName,
+        width: fs.width,
+        isDyed,
+        ratePerMetre,
+        totalMetres,
+        totalCost,
+        costPerGarment,
+        pcs: fs.pcs
+      };
+    });
+  }, [fabricSummaryRows, consumptionRows, articleSourcing]);
+
+  const rateTotals = useMemo(() => {
+    const totalCost = rateCalculations.reduce((sum, r) => sum + r.totalCost, 0);
+    const totalMetres = rateCalculations.reduce((sum, r) => sum + r.totalMetres, 0);
+    const totalPcs = rateCalculations.reduce((sum, r) => sum + r.pcs, 0);
+    
+    const greigeCount = rateCalculations.filter(r => !r.isDyed).length;
+    let rec = "Greige sourcing path with in-house processing saves ~8.4% margin across standard widths. Optimal marker efficiency achieved with minimal cut wastage.";
+    if (greigeCount === 0) {
+      rec = "Notice: All articles currently set to Ready-Dyed. Switching base garments (e.g. Kurta) to Greige sourcing can save approx ₹24.50 per garment in procurement costs.";
+    }
+
+    return { totalCost, totalMetres, totalPcs, recommendation: rec };
+  }, [rateCalculations]);
 
   const handleConfirmOrder = () => {
     setConfirmed(true);
@@ -1831,84 +2325,62 @@ export default function OrderDetailView({
     setPhotoFileName('');
   };
 
-  // Group consumption rows by Fabric Quality
-  const groupedByFabric = useMemo(() => {
-    const groups = {};
-    consumptionRows.forEach((row, idx) => {
-      const fab = row.fabricQuality || 'Desizer Flex';
-      if (!groups[fab]) {
-        groups[fab] = {
-          fabricQuality: fab,
-          rows: [],
-          totalPcs: 0,
-          totalDyed: 0,
-          totalGreige: 0
-        };
+  // Group subtotals per fabric quality + width (Demo 5 specification)
+  const fabricGroups = useMemo(() => {
+    const map = {};
+    consumptionRows.forEach(row => {
+      const widthStr = row.width || '44"';
+      const gk = `${row.fabricQuality} (${widthStr})`;
+      if (!map[gk]) {
+        map[gk] = { pcs: 0, dyed: 0, greige: 0, orderQty: 0 };
       }
-      const sourcingKey = row.articleName || row.articleIndex || 'Kurta';
-      const isGreige = (articleSourcing[sourcingKey] || articleSourcing[row.articleIndex] || 'Greige') === 'Greige';
-      const greigeRate = isGreige
-        ? (row.shrinkPct < 100 ? (row.dyedRate / (1 - row.shrinkPct / 100)) : row.dyedRate)
-        : row.dyedRate;
-      const totalDyedVal = row.dyedRate * row.pcs;
-      const totalGreigeVal = greigeRate * row.pcs;
+      const isGreige = (row.source || 'Greige Fabric').toLowerCase().includes('greige');
+      const shrinkPct = isGreige ? (parseFloat(row.shrinkPct) || 0) : 0;
+      const bufferPct = parseFloat(row.bufferPct) || 10;
+      const dyed = parseFloat(row.dyedRate) || 0;
+      const hasDyed = dyed > 0;
+      const greigePerPc = hasDyed ? (isGreige ? dyed * (1 + shrinkPct / 100) : dyed) : 0;
+      const totalDyed = hasDyed ? dyed * row.pcs : 0;
+      const totalGreige = greigePerPc * row.pcs;
+      const orderQty = totalGreige * (1 + bufferPct / 100);
 
-      // Quick cost estimates per metre (PDF 1 - Section 8)
-      const fabricRate = parseFloat(row.fabricRate) || (fab.includes('Chanderi') ? 35.0 : 28.5);
-      const dyedRatePerMeter = parseFloat(row.dyedRatePerMeter) || (fab.includes('Chanderi') ? 52.0 : 42.0);
+      map[gk].pcs += row.pcs;
+      map[gk].dyed += totalDyed;
+      map[gk].greige += totalGreige;
+      map[gk].orderQty += orderQty;
+    });
+    return map;
+  }, [consumptionRows]);
 
-      groups[fab].rows.push({
-        ...row,
-        globalIdx: idx,
-        isGreige,
-        greigeRate,
-        fabricRate,
-        dyedRatePerMeter,
-        totalDyedVal,
-        totalGreigeVal
+  const toggleRowLock = (rIdx) => {
+    setConsumptionRows(prev => {
+      const updated = [...prev];
+      updated[rIdx] = { ...updated[rIdx], locked: !updated[rIdx].locked };
+      return updated;
+    });
+  };
+
+  const handleRowOrderFabric = (row, orderQty) => {
+    if (!orderQty || orderQty <= 0) {
+      setToastMessage('Enter a Dyed (m/pc) value for this row first, so there is a quantity to order');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+    handleSaveConsumption();
+    if (onTriggerProcurement) {
+      onTriggerProcurement('Create PO', {
+        ...order,
+        targetFabric: row.fabricQuality,
+        targetWidth: row.width,
+        targetColor: row.colorName,
+        targetOrderQty: orderQty
       });
-      groups[fab].totalPcs += row.pcs;
-      groups[fab].totalDyed += totalDyedVal;
-      groups[fab].totalGreige += totalGreigeVal;
-    });
-    return groups;
-  }, [consumptionRows, articleSourcing]);
-
-  // Cost calculation engine state (PDF 1 - Section 8)
-  const [showCostSummary, setShowCostSummary] = useState(false);
-  const [costSummaryData, setCostSummaryData] = useState(null);
-
-  const handleCalculateCost = () => {
-    let totalCost = 0;
-    let totalPieces = 0;
-    let totalGreigeMeters = 0;
-    let totalDyedMeters = 0;
-
-    Object.values(groupedByFabric).forEach(group => {
-      group.rows.forEach(r => {
-        const rateToUse = r.isGreige ? (r.fabricRate || 28.5) : (r.dyedRatePerMeter || 42.0);
-        const metersToUse = r.isGreige ? r.totalGreigeVal : r.totalDyedVal;
-        totalCost += metersToUse * rateToUse;
-        totalPieces += r.pcs;
-        if (r.isGreige) totalGreigeMeters += r.totalGreigeVal;
-        else totalDyedMeters += r.totalDyedVal;
-      });
-    });
-
-    const costPerGarment = totalPieces > 0 ? (totalCost / totalPieces) : 0;
-
-    setCostSummaryData({
-      totalCost,
-      costPerGarment,
-      totalGreigeMeters,
-      totalDyedMeters,
-      marketRatePerMetre: 32.50,
-      recommendedOption: 'Sourcing Greige at 44" width gives the lowest net cost (saves ~₹3.80/m vs direct Dyed sourcing). Recommended for optimal manufacturing margins.'
-    });
-    setShowCostSummary(true);
-    setToastMessage('Live market rates fetched & costing summary calculated successfully!');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2500);
+    } else {
+      setToastMessage(`Purchase order queued for ${orderQty.toFixed(1)}m of ${row.fabricQuality} (${row.width})`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
   };
 
   return (
@@ -2662,405 +3134,635 @@ export default function OrderDetailView({
       </div>
 
       {/* =========================================================================
-       * 10. FABRIC COLOUR & CONSUMPTION CARD (Rain Drop ERP Theme)
+       * 6. FABRIC COLOUR & CONSUMPTION CARD (Matching Image 3 & Image 4 Specifications)
        * ========================================================================= */}
       <div
-        className="card border-0 shadow-sm rounded-4 bg-white"
+        className="card border-0 shadow-sm rounded-4 bg-white overflow-hidden"
         style={{
           border: '1px solid #e2e8f0',
-          padding: '24px',
           marginBottom: '24px',
-          borderRadius: '14px',
-          backgroundColor: '#ffffff'
+          borderRadius: '16px'
         }}
       >
-        <div className="d-flex align-items-center justify-content-between flex-wrap" style={{ gap: '14px', marginBottom: '20px' }}>
-          <div className="d-flex align-items-center" style={{ gap: '14px' }}>
-            <div
-              className="rounded-3 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0"
-              style={{ width: '38px', height: '38px', minWidth: '38px', backgroundColor: '#2e37a4', borderRadius: '10px' }}
-            >
-              <i className="ti ti-scissors" style={{ fontSize: '18px', lineHeight: 1 }}></i>
-            </div>
-            <div>
-              <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '16px' }}>
-                Fabric Colour &amp; Consumption
-              </h6>
-              <div className="text-muted small" style={{ fontSize: '12px', marginTop: '2px' }}>
-                {consumptionRows.length} article-colour combinations
-              </div>
-            </div>
+        {/* Card Header (Rain Drop ERP Theme) */}
+        <div
+          className="d-flex align-items-center gap-3 p-3 px-4 bg-white"
+          style={{ borderBottom: '1px solid #f1f5f9' }}
+        >
+          <div
+            className="rounded-3 d-flex align-items-center justify-content-center text-primary shadow-xs"
+            style={{
+              width: '40px',
+              height: '40px',
+              minWidth: '40px',
+              backgroundColor: '#eef2ff',
+              borderRadius: '10px'
+            }}
+          >
+            <i className="ti ti-scissors fs-4"></i>
           </div>
           <div>
-            {isConsumptionEditing ? (
-              <span className="badge rounded-pill fw-semibold px-2.5 py-1" style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '12px' }}>
-                <i className="ti ti-pencil me-1"></i> Edit Mode
-              </span>
-            ) : (
-              <span className="badge rounded-pill fw-semibold px-2.5 py-1" style={{ backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: '12px' }}>
-                <i className="ti ti-check me-1"></i> Saved
-              </span>
-            )}
+            <h5 className="fw-bold mb-0 text-dark" style={{ fontSize: '16.5px', letterSpacing: '-0.01em' }}>
+              Fabric Colour &amp; Consumption
+            </h5>
+            <div className="text-muted small" style={{ fontSize: '12px' }}>
+              {consumptionRows.length} article-colour combinations
+            </div>
           </div>
         </div>
 
-        {/* Interactive Table */}
-        <div className="table-responsive bg-white rounded-3 border overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
-          <table className="table table-sm align-middle mb-0" style={{ fontSize: '13px' }}>
-            <thead className="bg-light text-muted">
+        {/* Table container */}
+        <div
+          className="table-responsive bg-white custom-horizontal-scroll"
+          style={{
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            border: 'none',
+            paddingBottom: '0'
+          }}
+        >
+          <table
+            className="table align-middle mb-0"
+            style={{
+              fontSize: '13px',
+              borderCollapse: 'collapse',
+              width: '100%',
+              minWidth: '920px'
+            }}
+          >
+            <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
               <tr>
-                <th style={{ minWidth: '120px', fontWeight: 600 }}>Article</th>
-                <th style={{ minWidth: '130px', fontWeight: 600 }}>Fabric</th>
-                <th className="text-center" style={{ minWidth: '100px', fontWeight: 600 }} title="Quick estimate fabric rate per metre">
-                  Fabric Rate
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Article</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Fabric</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
+                  Width<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(in)</span>
                 </th>
-                <th style={{ minWidth: '95px', fontWeight: 600 }}>Width (in)</th>
-                <th style={{ minWidth: '100px', fontWeight: 600 }}>Colour</th>
-                <th className="text-center" style={{ minWidth: '95px', fontWeight: 600 }}>Dyed (m/pc)</th>
-                <th className="text-center" style={{ minWidth: '95px', fontWeight: 600 }} title="Quick estimate dyed rate per metre">
-                  Dyed Rate
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Colour</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
+                  Dyed<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
                 </th>
-                <th className="text-center" style={{ minWidth: '80px', fontWeight: 600 }}>Shrink %</th>
-                <th className="text-center" style={{ minWidth: '95px', fontWeight: 600 }}>Greige (m/pc)</th>
-                <th className="text-center" style={{ minWidth: '70px', fontWeight: 600 }}>Pcs</th>
-                <th className="text-center" style={{ minWidth: '85px', fontWeight: 600 }}>Total Dyed</th>
-                <th className="text-center" style={{ minWidth: '95px', fontWeight: 600 }}>Total Greige</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Shrink %</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
+                  Greige<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
+                </th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Pcs</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Dyed</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Greige</th>
               </tr>
             </thead>
             <tbody>
-              {Object.values(groupedByFabric).map((group, gIdx) => {
-                return (
-                  <React.Fragment key={gIdx}>
-                    {group.rows.map((row, rIdx) => {
-                      const isFirstInArticle = rIdx === 0 || row.articleName !== group.rows[rIdx - 1]?.articleName;
-                      const sourcingKey = row.articleName || row.articleIndex || 'Kurta';
-                      const currentSourcing = articleSourcing[sourcingKey] || articleSourcing[row.articleIndex] || 'Greige';
-                      const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(row.articleName || '');
+              {articleGroups.map((group) => {
+                const isDyedSourced = group.sourcing === 'Dyed';
+                const dyedVal = parseFloat(group.dyedRate) || 0;
+                const hasDyedVal = dyedVal > 0;
+                const shrinkPct = isDyedSourced ? 0 : (group.shrinkPct || 0);
 
-                      return (
-                        <tr key={row.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          {/* Article Column (Merged or shown on first row) */}
-                          <td style={{ verticalAlign: 'middle' }}>
-                            {isFirstInArticle ? (
-                              <div>
-                                <div className="d-flex align-items-center gap-1.5 fw-bold text-dark">
-                                  <span style={{ fontSize: '16px' }}>{isBottom ? '👖' : '👕'}</span>
-                                  <span>{row.articleName}</span>
-                                </div>
-                                <div className="text-muted text-uppercase" style={{ fontSize: '10px' }}>
-                                  {row.articleCode}
-                                </div>
-                                <div className="d-flex align-items-center gap-1 mt-1">
-                                  {isConsumptionEditing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="btn btn-xs py-0.5 px-2 rounded-2 fw-semibold"
-                                        style={{
-                                          fontSize: '11px',
-                                          backgroundColor: currentSourcing === 'Greige' ? '#2e37a4' : '#ffffff',
-                                          color: currentSourcing === 'Greige' ? '#ffffff' : '#64748b',
-                                          border: currentSourcing === 'Greige' ? '1px solid #2e37a4' : '1px solid #cbd5e1'
-                                        }}
-                                        onClick={() => toggleSourcing(sourcingKey, 'Greige')}
-                                      >
-                                        Greige
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-xs py-0.5 px-2 rounded-2 fw-semibold"
-                                        style={{
-                                          fontSize: '11px',
-                                          backgroundColor: currentSourcing === 'Dyed' ? '#2e37a4' : '#ffffff',
-                                          color: currentSourcing === 'Dyed' ? '#ffffff' : '#64748b',
-                                          border: currentSourcing === 'Dyed' ? '1px solid #2e37a4' : '1px solid #cbd5e1'
-                                        }}
-                                        onClick={() => toggleSourcing(sourcingKey, 'Dyed')}
-                                      >
-                                        Dyed
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <span
-                                      className="badge fw-semibold"
-                                      style={{
-                                        fontSize: '11px',
-                                        backgroundColor: currentSourcing === 'Greige' ? '#2e37a4' : '#64748b',
-                                        color: '#ffffff',
-                                        padding: '3px 8px',
-                                        borderRadius: '4px'
-                                      }}
-                                    >
-                                      {currentSourcing}
-                                    </span>
-                                  )}
-                                </div>
+                const widthOptions = getFabricMasterWidths(group.fabricQuality, group.width);
+
+                return group.rows.map((row, rIdx) => {
+                  const isFirstRow = rIdx === 0;
+                  const pcs = parseInt(row.pcs, 10) || 0;
+                  const greigePerPc = hasDyedVal ? (isDyedSourced ? dyedVal : dyedVal * (1 + shrinkPct / 100)) : null;
+                  const totalDyed = hasDyedVal ? dyedVal * pcs : null;
+                  const totalGreige = greigePerPc !== null ? greigePerPc * pcs : null;
+
+                  return (
+                    <tr
+                      key={row.key || `${group.articleName}_${rIdx}`}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        verticalAlign: 'middle',
+                        backgroundColor: '#ffffff'
+                      }}
+                    >
+                      {/* ARTICLE (Rowspan per article) */}
+                      {isFirstRow && (
+                        <td
+                          rowSpan={group.rows.length}
+                          style={{
+                            verticalAlign: 'middle',
+                            padding: '12px 14px',
+                            borderRight: '1px solid #f1f5f9',
+                            borderBottom: '1px solid #e2e8f0'
+                          }}
+                        >
+                          <div className="d-flex align-items-center gap-2 mb-1.5">
+                            <span className="fs-5">{group.icon}</span>
+                            <div>
+                              <div className="fw-bold text-dark fs-14" style={{ lineHeight: 1.2 }}>
+                                {group.articleName}
                               </div>
-                            ) : null}
-                          </td>
+                              <div className="text-muted text-uppercase" style={{ fontSize: '10px', letterSpacing: '0.04em' }}>
+                                {group.articleCode}
+                              </div>
+                            </div>
+                          </div>
 
-                          {/* Fabric Column */}
-                          <td style={{ verticalAlign: 'middle' }}>
-                            {isFirstInArticle ? (
-                              <span className="text-dark fw-medium">{row.fabricQuality}</span>
-                            ) : null}
-                          </td>
+                          {/* Toggle Buttons: [ Greige ] [ Dyed ] */}
+                          <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
+                            <button
+                              type="button"
+                              className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
+                                !isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                              }`}
+                              style={{
+                                fontSize: '11px',
+                                backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
+                                border: 'none'
+                              }}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige')}
+                              title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
+                            >
+                              Greige
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
+                                isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                              }`}
+                              style={{
+                                fontSize: '11px',
+                                backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
+                                border: 'none'
+                              }}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed')}
+                              title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
+                            >
+                              Dyed
+                            </button>
+                          </div>
+                        </td>
+                      )}
 
-                          {/* Fabric Rate (per Metre) Column - PDF 1 Section 8 */}
-                          <td className="text-center" style={{ verticalAlign: 'middle' }}>
-                            {isFirstInArticle ? (
-                              <span className="badge rounded-pill fw-semibold font-monospace" style={{ backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', fontSize: '11.5px' }}>
-                                ₹{row.fabricRate.toFixed(2)}/m
-                              </span>
-                            ) : null}
-                          </td>
+                      {/* FABRIC (Rowspan per article) */}
+                      {isFirstRow && (
+                        <td
+                          rowSpan={group.rows.length}
+                          style={{
+                            verticalAlign: 'middle',
+                            padding: '12px 14px',
+                            borderRight: '1px solid #f1f5f9',
+                            borderBottom: '1px solid #e2e8f0'
+                          }}
+                        >
+                          <div className="fw-semibold text-dark fs-13">
+                            {group.fabricQuality || 'Grey Cotton Reyon'}
+                          </div>
+                        </td>
+                      )}
 
-                          {/* Width Column */}
-                          <td style={{ verticalAlign: 'middle' }}>
-                            {isFirstInArticle ? (
-                              isConsumptionEditing ? (
-                                <select
-                                  className="form-select form-select-sm rounded-2 fw-semibold text-dark shadow-xs"
+                      {/* WIDTH (IN) (Rowspan per article - comes from selected fabric) */}
+                      {isFirstRow && (
+                        <td
+                          rowSpan={group.rows.length}
+                          style={{
+                            verticalAlign: 'middle',
+                            textAlign: 'center',
+                            padding: '10px 8px',
+                            borderRight: '1px solid #f1f5f9',
+                            borderBottom: '1px solid #e2e8f0'
+                          }}
+                        >
+                          <div className="position-relative d-inline-block">
+                            <button
+                              type="button"
+                              className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1.5 fw-semibold transition-all shadow-none"
+                              style={{
+                                minWidth: '66px',
+                                height: '30px',
+                                padding: '2px 8px',
+                                fontSize: '12.5px',
+                                fontWeight: 600,
+                                color: group.width && group.width !== '—' ? '#4361ee' : '#64748b',
+                                backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#ffffff',
+                                border: activeWidthDropdown === group.articleName
+                                  ? '1.5px solid #4361ee'
+                                  : (group.width && group.width !== '—' ? '1.5px solid #c7d2fe' : '1.5px solid #cbd5e1'),
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                boxShadow: activeWidthDropdown === group.articleName
+                                  ? '0 0 0 3px rgba(67, 97, 238, 0.15)'
+                                  : 'none'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveWidthDropdown(activeWidthDropdown === group.articleName ? null : group.articleName);
+                              }}
+                              title="Select fabric width from Fabric Master"
+                            >
+                              <span>{group.width || '—'}</span>
+                              <i
+                                className={`ti ti-chevron-${activeWidthDropdown === group.articleName ? 'up' : 'down'}`}
+                                style={{ fontSize: '11px', color: '#4361ee', transition: 'transform 0.15s ease' }}
+                              ></i>
+                            </button>
+
+                            {activeWidthDropdown === group.articleName && (
+                              <div
+                                className="position-absolute bg-white rounded-3 border py-1 animate__animated animate__fadeIn"
+                                style={{
+                                  top: 'calc(100% + 4px)',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  zIndex: 1060,
+                                  minWidth: '95px',
+                                  borderColor: '#c7d2fe',
+                                  boxShadow: '0 10px 25px -5px rgba(67, 97, 238, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.06)',
+                                  borderRadius: '8px'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div
+                                  className="px-2.5 py-1 border-bottom mb-1 fw-bold"
+                                  style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6366f1' }}
+                                >
+                                  Fabric Width
+                                </div>
+                                <button
+                                  type="button"
+                                  className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
                                   style={{
-                                    width: '125px',
-                                    height: '32px',
-                                    fontSize: '13px',
-                                    fontWeight: 600,
-                                    borderColor: row.width ? '#c7d2fe' : '#cbd5e1',
-                                    backgroundColor: '#ffffff',
-                                    paddingLeft: '10px',
-                                    paddingRight: '22px',
+                                    fontSize: '12.5px',
+                                    color: (!group.width || group.width === '—') ? '#4361ee' : '#64748b',
+                                    backgroundColor: (!group.width || group.width === '—') ? '#eef2ff' : 'transparent',
                                     cursor: 'pointer'
                                   }}
-                                  value={(() => {
-                                    if (!row.width || row.width === '—') return '';
-                                    const clean = String(row.width).replace(/&quot;/g, '').replace(/"/g, '').trim();
-                                    return clean ? `${clean}"` : '';
-                                  })()}
-                                  onChange={(e) => handleUpdateWidth(row.globalIdx, e.target.value)}
+                                  onMouseEnter={(e) => {
+                                    if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = '#f8fafc';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                  onClick={() => {
+                                    handleUpdateArticleWidth(group.articleName, '');
+                                    setActiveWidthDropdown(null);
+                                  }}
                                 >
-                                  <option value="">— Select Width —</option>
-                                  <option value='44"'>44&quot;</option>
-                                  <option value='48"'>48&quot;</option>
-                                  <option value='54"'>54&quot;</option>
-                                  <option value='58"'>58&quot;</option>
-                                  <option value='60"'>60&quot;</option>
-                                </select>
-                              ) : (
-                                <span className="fw-semibold text-dark fs-13 font-monospace">
-                                  {row.width || '—'}
-                                </span>
-                              )
-                            ) : null}
-                          </td>
-
-                          {/* Colour */}
-                          <td style={{ verticalAlign: 'middle' }}>
-                            <div className="d-flex align-items-center gap-2">
-                              <span
-                                className="rounded-circle d-inline-block flex-shrink-0"
-                                style={{ width: '12px', height: '12px', backgroundColor: row.colorHex }}
-                              />
-                              <span className="text-dark">{row.colorName}</span>
-                            </div>
-                          </td>
-
-                          {/* Dyed (m/pc) Column */}
-                          <td className="text-center" style={{ verticalAlign: 'middle' }}>
-                            {isConsumptionEditing ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="form-control form-control-sm text-end fw-semibold mx-auto"
-                                style={{
-                                  width: '75px',
-                                  height: '28px',
-                                  fontSize: '12px',
-                                  border: '1px solid #f59e0b',
-                                  backgroundColor: '#ffffff'
-                                }}
-                                value={row.dyedRate === 0 ? '0.00' : row.dyedRate}
-                                onChange={(e) => handleUpdateDyedRate(row.globalIdx, e.target.value)}
-                              />
-                            ) : (
-                              <span className="fw-bold text-dark font-monospace fs-13">
-                                {row.dyedRate > 0 ? parseFloat(row.dyedRate).toFixed(2) : '—'}
-                              </span>
+                                  <span>—</span>
+                                  {(!group.width || group.width === '—') && (
+                                    <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
+                                  )}
+                                </button>
+                                {widthOptions.map((w) => {
+                                  const isSelected = group.width === w;
+                                  return (
+                                    <button
+                                      key={w}
+                                      type="button"
+                                      className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
+                                      style={{
+                                        fontSize: '12.5px',
+                                        color: isSelected ? '#4361ee' : '#334155',
+                                        backgroundColor: isSelected ? '#eef2ff' : 'transparent',
+                                        cursor: 'pointer'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                      }}
+                                      onClick={() => {
+                                        handleUpdateArticleWidth(group.articleName, w);
+                                        setActiveWidthDropdown(null);
+                                      }}
+                                    >
+                                      <span>{w}</span>
+                                      {isSelected && (
+                                        <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             )}
-                          </td>
+                          </div>
+                        </td>
+                      )}
 
-                          {/* Dyed Rate (per Metre) Column - PDF 1 Section 8 */}
-                          <td className="text-center" style={{ verticalAlign: 'middle' }}>
-                            <span className="badge rounded-pill fw-semibold font-monospace" style={{ backgroundColor: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8', fontSize: '11.5px' }}>
-                              ₹{row.dyedRatePerMeter.toFixed(2)}/m
-                            </span>
-                          </td>
-
-                          {/* Shrink % */}
-                          <td className="text-center text-muted" style={{ verticalAlign: 'middle' }}>
-                            {isFirstInArticle ? `${row.shrinkPct}%` : '—'}
-                          </td>
-
-                          {/* Greige (m/pc) */}
-                          <td className="text-center text-muted font-monospace" style={{ verticalAlign: 'middle' }}>
-                            {row.dyedRate > 0 ? row.greigeRate.toFixed(3) : '—'}
-                          </td>
-
-                          {/* Pcs */}
-                          <td className="text-center fw-medium text-dark" style={{ verticalAlign: 'middle' }}>
-                            {row.pcs}
-                          </td>
-
-                          {/* Total Dyed */}
-                          <td className="text-center text-muted font-monospace" style={{ verticalAlign: 'middle' }}>
-                            {row.dyedRate > 0 ? `${row.totalDyedVal.toFixed(1)}m` : '—'}
-                          </td>
-
-                          {/* Total Greige */}
-                          <td className="text-center text-muted font-monospace" style={{ verticalAlign: 'middle' }}>
-                            {row.dyedRate > 0 ? `${row.totalGreigeVal.toFixed(1)}m` : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {/* Fabric Quality Subtotal Row */}
-                    <tr style={{ backgroundColor: '#f8fafc', fontWeight: 600 }}>
-                      <td colSpan={9} className="text-dark ps-3 py-2">
-                        {group.fabricQuality}
+                      {/* COLOUR (Per row) */}
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div className="d-flex align-items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
+                          <span
+                            className="d-inline-block rounded-circle flex-shrink-0"
+                            style={{
+                              width: '11px',
+                              height: '11px',
+                              backgroundColor: row.colorHex || '#333333',
+                              border: '1px solid rgba(0,0,0,0.1)'
+                            }}
+                          />
+                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
+                            {row.colorName}
+                          </span>
+                        </div>
                       </td>
-                      <td className="text-center text-dark py-2">
-                        {group.totalPcs}
+
+                      {/* DYED (M/PC) (Rowspan per article) */}
+                      {isFirstRow && (
+                        <td
+                          rowSpan={group.rows.length}
+                          style={{
+                            verticalAlign: 'middle',
+                            textAlign: 'center',
+                            padding: '10px 8px',
+                            borderRight: '1px solid #f1f5f9',
+                            borderBottom: '1px solid #e2e8f0'
+                          }}
+                        >
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            className="form-control form-control-sm text-center font-monospace"
+                            style={{
+                              width: '78px',
+                              height: '32px',
+                              margin: '0 auto',
+                              border: '1.5px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = '#4361ee';
+                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(67, 97, 238, 0.15)';
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            placeholder="0.000"
+                            value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
+                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value)}
+                          />
+                        </td>
+                      )}
+
+                      {/* SHRINK % (Rowspan per article - blank if Dyed) */}
+                      {isFirstRow && (
+                        <td
+                          rowSpan={group.rows.length}
+                          style={{
+                            verticalAlign: 'middle',
+                            textAlign: 'center',
+                            padding: '10px 8px',
+                            borderRight: '1px solid #f1f5f9',
+                            borderBottom: '1px solid #e2e8f0',
+                            fontSize: '13px',
+                            color: '#475569',
+                            fontWeight: 500
+                          }}
+                        >
+                          {isDyedSourced ? '—' : (group.shrinkPct ? `${group.shrinkPct}%` : '—')}
+                        </td>
+                      )}
+
+                      {/* GREIGE (M/PC) */}
+                      <td
+                        style={{
+                          padding: '10px 8px',
+                          textAlign: 'center',
+                          fontVariantNumeric: 'tabular-nums',
+                          color: '#334155',
+                          fontSize: '13px',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        {greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(2) : '—'}
                       </td>
-                      <td className="text-center text-muted font-monospace py-2">
-                        {group.totalDyed > 0 ? `${group.totalDyed.toFixed(1)}m` : '—'}
+
+                      {/* PCS */}
+                      <td
+                        style={{
+                          padding: '10px 8px',
+                          textAlign: 'center',
+                          fontVariantNumeric: 'tabular-nums',
+                          color: '#1e293b',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        {pcs}
                       </td>
-                      <td className="text-center text-muted font-monospace py-2">
-                        {group.totalGreige > 0 ? `${group.totalGreige.toFixed(1)}m` : '—'}
+
+                      {/* TOTAL DYED */}
+                      <td
+                        style={{
+                          padding: '10px 12px',
+                          textAlign: 'center',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          color: '#1d4ed8',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        {totalDyed !== null && totalDyed > 0 ? totalDyed.toFixed(2) : '—'}
+                      </td>
+
+                      {/* TOTAL GREIGE */}
+                      <td
+                        style={{
+                          padding: '10px 12px',
+                          textAlign: 'center',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          color: '#7e22ce',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        {totalGreige !== null && totalGreige > 0 ? totalGreige.toFixed(2) : '—'}
                       </td>
                     </tr>
-                  </React.Fragment>
-                );
+                  );
+                });
               })}
+
+              {/* SUMMARY ROWS AT BOTTOM */}
+              {fabricSummaryRows.map((fs, idx) => (
+                <tr
+                  key={`summary_${idx}`}
+                  style={{
+                    borderTop: idx === 0 ? '2px solid #cbd5e1' : '1px solid #e2e8f0',
+                    borderBottom: '1px solid #e2e8f0',
+                    backgroundColor: '#f8fafc'
+                  }}
+                >
+                  <td
+                    colSpan={7}
+                    className="fw-bold text-dark ps-3 py-2.5"
+                    style={{ fontSize: '13.5px' }}
+                  >
+                    <span>{fs.fabricName}</span>
+                    {fs.width ? (
+                      <span className="badge bg-white text-primary border ms-2 font-monospace" style={{ fontSize: '11px', borderColor: '#c7d2fe' }}>
+                        {fs.width}
+                      </span>
+                    ) : ''}
+                  </td>
+                  <td
+                    className="text-center fw-bold text-dark py-2.5"
+                    style={{ fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {fs.pcs}
+                  </td>
+                  <td
+                    className="text-center fw-bold py-2.5"
+                    style={{
+                      fontSize: '13px',
+                      color: '#4361ee',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  >
+                    {fs.hasValues && fs.totalDyed > 0 ? fs.totalDyed.toFixed(2) : '—'}
+                  </td>
+                  <td
+                    className="text-center fw-bold py-2.5"
+                    style={{
+                      fontSize: '13px',
+                      color: '#0284c7',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  >
+                    {fs.hasValues && fs.totalGreige > 0 ? fs.totalGreige.toFixed(2) : '—'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
-        {/* Costing Summary & Intelligent Recommendation Card (PDF 1 - Section 8) */}
-        {showCostSummary && costSummaryData && (
-          <div className="mt-4 p-3.5 rounded-4 bg-light border" style={{ borderColor: '#c7d2fe' }}>
-            <div className="d-flex justify-content-between align-items-center mb-3">
+        {/* Bottom Actions Bar */}
+        <div
+          className="d-flex align-items-center justify-content-end gap-2.5 p-3 px-4 bg-white"
+          style={{ borderTop: '1px solid #f1f5f9' }}
+        >
+          <button
+            type="button"
+            className="btn btn-outline-secondary px-3.5 py-2 rounded-3 fw-semibold bg-white shadow-xs transition-all"
+            style={{ borderColor: '#cbd5e1', color: '#475569', fontSize: '13px' }}
+            onClick={handleCancelConsumption}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
+            style={{
+              backgroundColor: '#eef2ff',
+              borderColor: '#c7d2fe',
+              fontSize: '13px'
+            }}
+            onClick={() => setShowRateCalculation(prev => !prev)}
+            title="Calculate Rate & View Costing Breakdown (PDF Section 8)"
+          >
+            <i className="ti ti-calculator fs-5"></i>
+            <span>Calculate Rate</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn px-4 py-2 rounded-3 fw-semibold text-white shadow-sm d-flex align-items-center gap-2 transition-all"
+            style={{
+              backgroundColor: '#2e37a4',
+              borderColor: '#2e37a4',
+              fontSize: '13px'
+            }}
+            onClick={handleSaveConsumption}
+          >
+            <i className="ti ti-device-floppy fs-5"></i>
+            <span>Save</span>
+          </button>
+        </div>
+
+        {/* Section 8 Intelligent Costing & Rate Calculation Breakdown */}
+        {showRateCalculation && (
+          <div className="p-4 border-top" style={{ backgroundColor: '#f8fafc' }}>
+            <div className="d-flex align-items-center justify-content-between mb-3">
               <div className="d-flex align-items-center gap-2">
-                <div
-                  className="rounded-2 d-flex align-items-center justify-content-center text-white shadow-xs"
-                  style={{ width: '28px', height: '28px', backgroundColor: '#4f46e5', borderRadius: '6px' }}
-                >
-                  <i className="ti ti-chart-pie" style={{ fontSize: '15px' }}></i>
+                <span className="badge bg-primary-subtle text-primary p-2 rounded-2">
+                  <i className="ti ti-chart-arrows fs-5"></i>
+                </span>
+                <div>
+                  <h6 className="fw-bold text-dark mb-0 fs-15">Fabric Rate Calculation &amp; Procurement Costing</h6>
+                  <small className="text-muted">Section 8 &bull; Market Rate, Fabric Cost per Garment &amp; Margin Optimization Engine</small>
                 </div>
-                <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '14.5px' }}>Costing Summary &amp; Recommendation</h6>
               </div>
               <button
                 type="button"
-                className="btn btn-sm btn-link text-secondary p-0 text-decoration-none"
-                onClick={() => setShowCostSummary(false)}
-              >
-                <i className="ti ti-x"></i>
-              </button>
+                className="btn-close"
+                onClick={() => setShowRateCalculation(false)}
+                title="Close breakdown"
+              ></button>
             </div>
 
-            <div className="row g-3 mb-3">
-              <div className="col-12 col-sm-4">
-                <div className="p-3 bg-white rounded-3 border shadow-xs">
-                  <div className="text-muted small fw-medium mb-1">Total Fabric Cost / Garment</div>
-                  <div className="fw-bold font-monospace" style={{ fontSize: '18px', color: '#2e37a4' }}>
-                    ₹{costSummaryData.costPerGarment.toFixed(2)} <span className="small text-muted fw-normal">/ pc</span>
-                  </div>
-                </div>
-              </div>
-              <div className="col-12 col-sm-4">
-                <div className="p-3 bg-white rounded-3 border shadow-xs">
-                  <div className="text-muted small fw-medium mb-1">Overall Procurement Cost</div>
-                  <div className="fw-bold font-monospace" style={{ fontSize: '18px', color: '#059669' }}>
-                    ₹{Math.round(costSummaryData.totalCost).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-              <div className="col-12 col-sm-4">
-                <div className="p-3 bg-white rounded-3 border shadow-xs">
-                  <div className="text-muted small fw-medium mb-1">Live Market Rate Benchmark</div>
-                  <div className="fw-bold font-monospace text-dark" style={{ fontSize: '18px' }}>
-                    ₹{costSummaryData.marketRatePerMetre.toFixed(2)} <span className="small text-muted fw-normal">/ m</span>
-                  </div>
-                </div>
-              </div>
+            {/* Rates table */}
+            <div className="table-responsive rounded-3 border bg-white mb-3 shadow-2xs">
+              <table className="table table-sm align-middle mb-0" style={{ fontSize: '13px' }}>
+                <thead className="bg-light">
+                  <tr>
+                    <th className="py-2.5 px-3">Fabric Quality</th>
+                    <th className="py-2.5 px-3 text-center">Selected Width</th>
+                    <th className="py-2.5 px-3 text-center">Sourcing Path</th>
+                    <th className="py-2.5 px-3 text-end">Market Rate (₹/m)</th>
+                    <th className="py-2.5 px-3 text-end">Total Metres</th>
+                    <th className="py-2.5 px-3 text-end">Est. Fabric Cost</th>
+                    <th className="py-2.5 px-3 text-end">Cost / Garment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rateCalculations.map((rc, idx) => (
+                    <tr key={idx}>
+                      <td className="py-2.5 px-3 fw-semibold text-dark">{rc.fabricName}</td>
+                      <td className="py-2.5 px-3 text-center">{rc.width || 'Default'}</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`badge ${rc.isDyed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'} px-2 py-1`}>
+                          {rc.isDyed ? 'Dyed / Stock' : 'Greige + Dyeing'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-end font-monospace">₹{rc.ratePerMetre.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-end font-monospace">{rc.totalMetres.toFixed(1)}m</td>
+                      <td className="py-2.5 px-3 text-end font-monospace fw-bold text-dark">₹{rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2.5 px-3 text-end font-monospace fw-semibold text-primary">₹{rc.costPerGarment.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-light fw-bold">
+                  <tr>
+                    <td colSpan={4} className="py-2.5 px-3 text-dark">Total Order Procurement Cost</td>
+                    <td className="py-2.5 px-3 text-end font-monospace">{rateTotals.totalMetres.toFixed(1)}m</td>
+                    <td className="py-2.5 px-3 text-end font-monospace text-success fs-14">
+                      ₹{rateTotals.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-2.5 px-3 text-end font-monospace text-primary">
+                      Avg ₹{(rateTotals.totalCost / (rateTotals.totalPcs || 1)).toFixed(2)}/pc
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
-            {/* Intelligent Recommendation */}
-            <div className="p-3 rounded-3 d-flex align-items-start gap-2.5" style={{ backgroundColor: '#eef2ff', border: '1px solid #c7d2fe' }}>
-              <div className="text-warning mt-0.5" style={{ fontSize: '16px' }}>✨</div>
+            {/* Section 8 Intelligent Recommendation */}
+            <div className="p-3 rounded-3 border d-flex align-items-start gap-2.5" style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}>
+              <i className="ti ti-bulb text-success fs-4 mt-0.5"></i>
               <div>
-                <div className="fw-bold small" style={{ color: '#2e37a4' }}>Intelligent Procurement Recommendation:</div>
-                <div className="small text-secondary mt-0.5">
-                  {costSummaryData.recommendedOption}
+                <div className="fw-bold text-success fs-13 mb-1">
+                  Intelligent Procurement &amp; Marker Optimization Recommendation
+                </div>
+                <div className="text-dark small" style={{ fontSize: '12.5px', lineHeight: 1.5 }}>
+                  {rateTotals.recommendation}
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* Bottom Action: Calculate Cost, Print / PDF & Edit / Save Button with clear separator and generous margin */}
-        <div
-          className="d-flex justify-content-end align-items-center gap-2.5 mt-4 pt-3.5 flex-wrap"
-          style={{ borderTop: '1px solid #e2e8f0' }}
-        >
-          <button
-            type="button"
-            className="btn rounded-3 px-3.5 py-2 fw-semibold d-flex align-items-center gap-1.5 shadow-xs transition-all text-white"
-            style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5' }}
-            onClick={handleCalculateCost}
-            title="Fetch live rates and compute costing summary"
-          >
-            <i className="ti ti-calculator" style={{ fontSize: '17px' }}></i>
-            <span>Calculate Cost</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-white border rounded-3 px-3.5 py-2 fw-semibold d-flex align-items-center gap-1.5 shadow-xs transition-all"
-            style={{ borderColor: '#c7d2fe', color: '#2e37a4', backgroundColor: '#ffffff' }}
-            onClick={() => window.print()}
-            title="Print or Save as PDF"
-          >
-            <i className="ti ti-printer" style={{ fontSize: '18px' }}></i>
-            <span>Print / PDF</span>
-          </button>
-
-          {isConsumptionEditing ? (
-            <button
-              type="button"
-              className="btn text-white rounded-3 px-4 py-2 fw-semibold d-flex align-items-center gap-1.5 shadow-sm transition-all"
-              style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
-              onClick={handleSaveConsumption}
-            >
-              <i className="ti ti-device-floppy" style={{ fontSize: '18px' }}></i>
-              <span>Save</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn text-white rounded-3 px-4 py-2 fw-semibold d-flex align-items-center gap-1.5 shadow-sm transition-all"
-              style={{
-                backgroundColor: '#2e37a4',
-                borderColor: '#2e37a4'
-              }}
-              onClick={() => setIsConsumptionEditing(true)}
-            >
-              <i className="ti ti-edit" style={{ fontSize: '18px' }}></i>
-              <span>Edit</span>
-            </button>
-          )}
-        </div>
       </div>
 
 
@@ -3381,11 +4083,11 @@ export default function OrderDetailView({
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                     }}
                   >
-                    {/* Header with Title and Save / Edit / Trash buttons (Matching Image 3 & Video) */}
+                    {/* Header with Title and Save / Edit / Trash buttons (Matching Image 3) */}
                     <div className="d-flex align-items-center justify-content-between flex-wrap" style={{ gap: '12px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
                       <div className="d-flex align-items-center gap-2">
-                        <span className="fw-bold text-dark" style={{ fontSize: '15.5px' }}>
-                          {item.varietyName || item.category || 'Accessory'}
+                        <span className="fw-bold text-dark" style={{ fontSize: '16px' }}>
+                          {item.category || item.varietyName || 'Accessory'}
                         </span>
                         <span
                           className="badge rounded-pill px-2.5 py-0.5 fw-bold"
@@ -3393,9 +4095,14 @@ export default function OrderDetailView({
                         >
                           #{item.configIndex || item.instanceNum || 1}
                         </span>
-                        <span className="fw-bold" style={{ fontSize: '13px', color: '#7c3aed' }}>
-                          {item.unit || 'PCS'}
+                        <span className="fw-bold" style={{ fontSize: '13.5px', color: '#7c3aed' }}>
+                          {item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].includes(item.category) ? 'Meter' : 'Pcs')}
                         </span>
+                        {item.varietyName && item.varietyName.toLowerCase() !== (item.category || '').toLowerCase() && (
+                          <span className="text-muted fw-normal" style={{ fontSize: '12.5px' }}>
+                            · {item.varietyName}
+                          </span>
+                        )}
                       </div>
 
                       <div className="d-flex align-items-center" style={{ gap: '8px' }}>
@@ -3487,188 +4194,14 @@ export default function OrderDetailView({
         </div>
       </div>
 
-      {/* =========================================================================
-       * 10. BASKET & PROCUREMENT HANDOFF ACTION BAR (Section 9 of PDF 1)
-       * ========================================================================= */}
-      <div
-        className="card border-0 shadow-sm rounded-4 bg-white"
-        style={{
-          border: '1px solid #e2e8f0',
-          padding: '24px',
-          marginTop: '24px',
-          marginBottom: '24px'
-        }}
-      >
-        <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: '16px', marginBottom: '16px' }}>
-          <div className="d-flex align-items-center" style={{ gap: '14px' }}>
-            <div
-              className="d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-              style={{
-                width: '40px',
-                height: '40px',
-                minWidth: '40px',
-                backgroundColor: '#2e37a4',
-                borderRadius: '10px'
-              }}
-            >
-              <i className="ti ti-shopping-cart" style={{ fontSize: '20px', lineHeight: 1 }}></i>
-            </div>
-            <div>
-              <h6 className="fw-bold text-dark mb-0.5" style={{ fontSize: '16px' }}>Basket &amp; Procurement Handoff</h6>
-              <span className="text-muted small" style={{ fontSize: '12.5px' }}>
-                Handoff saved specifications directly into Purchase Orders, Challans &amp; Material Requests
-              </span>
-            </div>
-          </div>
-          <span
-            className="badge rounded-pill fw-semibold"
-            style={{
-              backgroundColor: '#eef2ff',
-              color: '#2e37a4',
-              border: '1px solid #c7d2fe',
-              fontSize: '12px',
-              padding: '7px 14px'
-            }}
-          >
-            Ready for Procurement
-          </span>
-        </div>
+      {/* 7 Colorful Accessory PO Generation Buttons matching live ERP & user screenshot */}
+      <AccessoryPOButtonsBar
+        onOpenModal={(catKey) => setActivePOModalCategory(catKey)}
+      />
 
-        <div
-          className="d-flex flex-wrap align-items-center"
-          style={{
-            gap: '12px',
-            marginTop: '16px',
-            paddingTop: '16px',
-            borderTop: '1px solid #f1f5f9'
-          }}
-        >
-          <button
-            type="button"
-            className="btn shadow-xs transition-all text-white"
-            style={{
-              backgroundColor: '#2e37a4',
-              borderColor: '#2e37a4',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '9px 18px',
-              borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onNavigateToProcurement) {
-                onNavigateToProcurement('/procurement-pos', order);
-              } else if (onTriggerProcurement) {
-                onTriggerProcurement('Create PO', order);
-              }
-            }}
-          >
-            <i className="ti ti-file-plus" style={{ fontSize: '16px' }}></i>
-            <span>Create PO</span>
-          </button>
 
-          <button
-            type="button"
-            className="btn shadow-xs transition-all text-white"
-            style={{
-              backgroundColor: '#0284c7',
-              borderColor: '#0284c7',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '9px 18px',
-              borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onTriggerProcurement) {
-                onTriggerProcurement('Send to Process', order);
-              }
-            }}
-          >
-            <i className="ti ti-color-swatch" style={{ fontSize: '16px' }}></i>
-            <span>Send to Process</span>
-          </button>
 
-          <button
-            type="button"
-            className="btn shadow-xs transition-all text-white"
-            style={{
-              backgroundColor: '#059669',
-              borderColor: '#059669',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '9px 18px',
-              borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onTriggerProcurement) {
-                onTriggerProcurement('Order Material', order);
-              }
-            }}
-          >
-            <i className="ti ti-package" style={{ fontSize: '16px' }}></i>
-            <span>Order Material</span>
-          </button>
 
-          {/* Accessory Category PO Buttons */}
-          <button
-            type="button"
-            className="btn shadow-xs transition-all"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1.5px solid #c7d2fe',
-              color: '#2e37a4',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '9px 18px',
-              borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onTriggerProcurement) {
-                onTriggerProcurement('Button PO', order);
-              }
-            }}
-          >
-            <i className="ti ti-circle-dot" style={{ fontSize: '15px' }}></i>
-            <span>Button PO</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn shadow-xs transition-all"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1.5px solid #c7d2fe',
-              color: '#2e37a4',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '9px 18px',
-              borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onTriggerProcurement) {
-                onTriggerProcurement('Lace PO', order);
-              }
-            }}
-          >
-            <i className="ti ti-cut" style={{ fontSize: '15px' }}></i>
-            <span>Lace PO</span>
-          </button>
-        </div>
-      </div>
 
       {/* =========================================================================
        * BOTTOM ACTION BUTTONS ROW (No background card, clean direct buttons)
@@ -3743,6 +4276,40 @@ export default function OrderDetailView({
           ))}
         </div>
       </div>
+
+      {/* 7 Accessory Purchase Order Generation Modals */}
+      {activePOModalCategory === 'TASSEL' ? (
+        <TasselPOModal
+          isOpen={true}
+          onClose={() => setActivePOModalCategory(null)}
+          order={order}
+          vendors={vendorsList}
+          addedAccessories={addedAccessories}
+          allocatedGarments={allocatedGarments}
+          onSavePO={handleSaveAccessoryPO}
+        />
+      ) : activePOModalCategory === 'THREAD' ? (
+        <ThreadPOModal
+          isOpen={true}
+          onClose={() => setActivePOModalCategory(null)}
+          order={order}
+          vendors={vendorsList}
+          addedAccessories={addedAccessories}
+          allocatedGarments={allocatedGarments}
+          onSavePO={handleSaveAccessoryPO}
+        />
+      ) : activePOModalCategory ? (
+        <GenericAccessoryPOModal
+          isOpen={true}
+          onClose={() => setActivePOModalCategory(null)}
+          order={order}
+          categoryKey={activePOModalCategory}
+          vendors={vendorsList}
+          addedAccessories={addedAccessories}
+          allocatedGarments={allocatedGarments}
+          onSavePO={handleSaveAccessoryPO}
+        />
+      ) : null}
     </div>
   );
 }

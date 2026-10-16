@@ -18,6 +18,9 @@ export default function Header({
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const profileDropdownRef = useRef(null);
 
+  const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   // Close dropdowns on click outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -29,11 +32,123 @@ export default function Header({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Section 11.1 Platform-wide Search Calculation
+  const searchResults = React.useMemo(() => {
+    const q = (searchGlobalQuery || '').trim().toLowerCase();
+    if (!q) return [];
+
+    const results = [];
+
+    // Helper to get array from localStorage
+    const getSaved = (key) => {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : [];
+      } catch (e) {
+        return [];
+      }
+    };
+
+    // 1. Customers
+    const customers = getSaved('erp_customers_v1');
+    customers.forEach((c) => {
+      if (
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.id || '').toLowerCase().includes(q) ||
+        (c.type || '').toLowerCase().includes(q) ||
+        (c.city || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: '👥',
+          title: c.name,
+          subtitle: `${c.id} • ${c.type} • ${c.city || ''}`,
+          category: 'Customer',
+          route: '/customers'
+        });
+      }
+    });
+
+    // 2. Colors
+    const colors = getSaved('erp_colors_master_v1');
+    colors.forEach((col) => {
+      if (
+        (col.name || '').toLowerCase().includes(q) ||
+        (col.hexCode || '').toLowerCase().includes(q) ||
+        (col.pantoneCode || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: '🎨',
+          title: col.name,
+          subtitle: `${col.id} • ${col.hexCode} • ${col.pantoneCode || ''}`,
+          category: 'Color',
+          route: '/colors'
+        });
+      }
+    });
+
+    // 3. Articles
+    const articles = getSaved('erp_articles_v1');
+    articles.forEach((art) => {
+      if (
+        (art.name || '').toLowerCase().includes(q) ||
+        (art.id || '').toLowerCase().includes(q) ||
+        (art.description || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: art.icon || '👕',
+          title: art.name,
+          subtitle: `${art.id} • Priority #${art.sortOrder || '—'}`,
+          category: 'Article',
+          route: '/articles'
+        });
+      }
+    });
+
+    // 4. Size Series
+    const sizeSeries = getSaved('erp_size_series_v1');
+    sizeSeries.forEach((ser) => {
+      if (
+        (ser.name || '').toLowerCase().includes(q) ||
+        (ser.id || '').toLowerCase().includes(q) ||
+        (ser.sizes || []).some((sz) => String(sz).toLowerCase().includes(q))
+      ) {
+        results.push({
+          icon: '📏',
+          title: ser.name,
+          subtitle: `${ser.id} • Sizes: ${(ser.sizes || []).slice(0, 5).join(', ')}...`,
+          category: 'Size Series',
+          route: '/sizes'
+        });
+      }
+    });
+
+    // 5. Accessories
+    const accessories = getSaved('erp_accessories_master_v1');
+    accessories.forEach((acc) => {
+      if (
+        (acc.name || '').toLowerCase().includes(q) ||
+        (acc.id || '').toLowerCase().includes(q) ||
+        (acc.category || '').toLowerCase().includes(q) ||
+        (acc.threadPattern || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: '🧵',
+          title: acc.name,
+          subtitle: `${acc.id} • ${acc.category} ${acc.threadPattern ? `(${acc.threadPattern})` : ''}`,
+          category: 'Accessory',
+          route: '/accessories'
+        });
+      }
+    });
+
+    return results.slice(0, 10);
+  }, [searchGlobalQuery]);
+
   return (
     <header className="navbar navbar-expand bg-white border-bottom px-4 py-2 sticky-top shadow-none" style={{ zIndex: 1040 }}>
       <div className="container-fluid p-0 d-flex align-items-center justify-content-between">
-        {/* Search */}
-        <div className="position-relative" style={{ width: '380px' }}>
+        {/* Section 11.1: Platform-wide Global Search Bar */}
+        <div className="position-relative" style={{ width: '420px' }}>
           <i
             className="ti ti-search position-absolute text-muted fs-15"
             style={{
@@ -50,10 +165,75 @@ export default function Header({
             style={{
               borderRadius: '10px',
               border: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc'
+              backgroundColor: '#f8fafc',
+              paddingLeft: '38px',
+              paddingRight: searchGlobalQuery ? '32px' : '14px'
             }}
-            placeholder="Search anything across ERP..."
+            placeholder="Search across customers, colors, articles, sizes, accessories..."
+            value={searchGlobalQuery}
+            onChange={(e) => setSearchGlobalQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
           />
+          {searchGlobalQuery && (
+            <button
+              type="button"
+              className="btn btn-xs btn-link text-muted position-absolute p-0 text-decoration-none"
+              style={{ right: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 3 }}
+              onClick={() => {
+                setSearchGlobalQuery('');
+                setIsSearchFocused(false);
+              }}
+            >
+              <i className="ti ti-x"></i>
+            </button>
+          )}
+
+          {/* Global Search Results Dropdown */}
+          {isSearchFocused && searchGlobalQuery.trim().length > 0 && (
+            <div
+              className="position-absolute start-0 end-0 mt-1 bg-white rounded-3 shadow-xl border overflow-hidden"
+              style={{
+                zIndex: 1060,
+                maxHeight: '380px',
+                overflowY: 'auto',
+                borderColor: '#cbd5e1'
+              }}
+            >
+              {searchResults.length === 0 ? (
+                <div className="p-3 text-center text-muted small">
+                  No records found matching "{searchGlobalQuery}"
+                </div>
+              ) : (
+                <div className="py-1">
+                  {searchResults.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="px-3 py-2 border-bottom d-flex align-items-center justify-content-between hover-bg-light cursor-pointer"
+                      style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                      onMouseDown={() => {
+                        setIsSearchFocused(false);
+                        setSearchGlobalQuery('');
+                        if (onNavigate) onNavigate(item.route);
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fs-5">{item.icon}</span>
+                        <div>
+                          <div className="fw-bold text-dark fs-13">{item.title}</div>
+                          <span className="text-muted" style={{ fontSize: '11px' }}>
+                            {item.subtitle}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="badge bg-light text-secondary border font-monospace small">
+                        {item.category}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Tools & Menus */}

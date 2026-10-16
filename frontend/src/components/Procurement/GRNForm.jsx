@@ -1479,28 +1479,22 @@ export default function GRNForm({
 
       {/* INLINE MODAL: TRANSPORTER MASTER CREATION */}
       {showInlineTransporterModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg rounded-4 p-3">
-              <TransporterMasterView
-                transporters={transporters}
-                isInline={true}
-                onCloseInline={() => setShowInlineTransporterModal(false)}
-                onSaveTransporter={(newTransporter) => {
-                  if (onSaveTransporter) {
-                    onSaveTransporter(newTransporter);
-                  }
-                  setFormData((prev) => ({
-                    ...prev,
-                    transporterId: newTransporter.id,
-                    transporterName: newTransporter.name
-                  }));
-                  setShowInlineTransporterModal(false);
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        <TransporterMasterView
+          transporters={transporters}
+          isInline={true}
+          onCloseInline={() => setShowInlineTransporterModal(false)}
+          onSaveTransporter={(newTransporter) => {
+            if (onSaveTransporter) {
+              onSaveTransporter(newTransporter);
+            }
+            setFormData((prev) => ({
+              ...prev,
+              transporterId: newTransporter.id,
+              transporterName: newTransporter.name
+            }));
+            setShowInlineTransporterModal(false);
+          }}
+        />
       )}
 
       {/* INLINE TOAST NOTIFICATION */}

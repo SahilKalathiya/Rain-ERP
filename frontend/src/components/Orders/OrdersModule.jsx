@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import OrdersListView from './OrdersListView';
 import OrderDetailView from './OrderDetailView';
 import OrderCreationWizard from './OrderCreationWizard';
@@ -6,7 +6,7 @@ import { initialSalesOrders, getStoredData, setStoredData } from '../../data/sal
 
 import ProcurementModal from './ProcurementModal';
 
-export default function OrdersModule({ currentRoute, onNavigateToProcurement }) {
+export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNavigate, onNavigateToProcurement }) {
   const [orders, setOrders] = useState(() => getStoredData('erp_sales_orders_v1', initialSalesOrders));
   const [procurementModal, setProcurementModal] = useState({ isOpen: false });
 
@@ -28,6 +28,22 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
     return 'list';
   });
 
+  const prevSidebarCount = useRef(sidebarClickCount);
+
+  // When user clicks "Orders" in the sidebar, reset viewMode to 'list' and clear selectedOrder
+  useEffect(() => {
+    if (sidebarClickCount > prevSidebarCount.current) {
+      prevSidebarCount.current = sidebarClickCount;
+      setSelectedOrder(null);
+      setViewMode('list');
+      if (onNavigate) {
+        onNavigate('/orders');
+      } else if (typeof window !== 'undefined' && window.history?.replaceState) {
+        window.history.replaceState(null, '', '/react/orders');
+      }
+    }
+  }, [sidebarClickCount, onNavigate]);
+
   // Sync state whenever currentRoute prop changes (e.g. from Dashboard or Sidebar)
   useEffect(() => {
     if (currentRoute) {
@@ -44,6 +60,7 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
             setViewMode('detail');
           }
         } else if (currentRoute === '/orders' || currentRoute === '/orders/' || currentRoute === '/sales') {
+          setSelectedOrder(null);
           setViewMode('list');
         }
       }
@@ -71,7 +88,9 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
   const handleNewOrder = () => {
     setSelectedOrder(null);
     setViewMode('create');
-    if (typeof window !== 'undefined' && window.history?.pushState) {
+    if (onNavigate) {
+      onNavigate('/orders/new');
+    } else if (typeof window !== 'undefined' && window.history?.pushState) {
       window.history.pushState(null, '', '/react/orders/new');
     }
   };
@@ -79,7 +98,9 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
   const handleViewOrder = (order) => {
     setSelectedOrder(order);
     setViewMode('detail');
-    if (typeof window !== 'undefined' && window.history?.pushState) {
+    if (onNavigate) {
+      onNavigate(`/orders/${order.id}`);
+    } else if (typeof window !== 'undefined' && window.history?.pushState) {
       window.history.pushState(null, '', `/react/orders/${order.id}`);
     }
   };
@@ -87,7 +108,9 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
   const handleEditOrder = (order) => {
     setSelectedOrder(order);
     setViewMode('create');
-    if (typeof window !== 'undefined' && window.history?.pushState) {
+    if (onNavigate) {
+      onNavigate('/orders/new');
+    } else if (typeof window !== 'undefined' && window.history?.pushState) {
       window.history.pushState(null, '', '/react/orders/new');
     }
   };
@@ -111,7 +134,9 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
         if (shouldScroll) {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        if (window.history?.pushState) {
+        if (onNavigate) {
+          onNavigate(`/orders/${newOrder.id}`);
+        } else if (window.history?.pushState) {
           window.history.pushState(null, '', `/react/orders/${newOrder.id}`);
         }
       }
@@ -193,9 +218,21 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
         <OrderCreationWizard
           onSaveOrder={(newOrder, action) => handleSaveOrder(newOrder, action, true)}
           onCancel={() => {
-            setViewMode(selectedOrder ? 'detail' : 'list');
-            if (typeof window !== 'undefined' && window.history?.pushState) {
-              window.history.pushState(null, '', selectedOrder ? `/react/orders/${selectedOrder.id}` : '/react/orders');
+            if (selectedOrder) {
+              setViewMode('detail');
+              if (onNavigate) {
+                onNavigate(`/orders/${selectedOrder.id}`);
+              } else if (typeof window !== 'undefined' && window.history?.pushState) {
+                window.history.pushState(null, '', `/react/orders/${selectedOrder.id}`);
+              }
+            } else {
+              setSelectedOrder(null);
+              setViewMode('list');
+              if (onNavigate) {
+                onNavigate('/orders');
+              } else if (typeof window !== 'undefined' && window.history?.pushState) {
+                window.history.pushState(null, '', '/react/orders');
+              }
             }
           }}
         />
@@ -205,8 +242,11 @@ export default function OrdersModule({ currentRoute, onNavigateToProcurement }) 
         <OrderDetailView
           order={selectedOrder}
           onBack={() => {
+            setSelectedOrder(null);
             setViewMode('list');
-            if (typeof window !== 'undefined' && window.history?.pushState) {
+            if (onNavigate) {
+              onNavigate('/orders');
+            } else if (typeof window !== 'undefined' && window.history?.pushState) {
               window.history.pushState(null, '', '/react/orders');
             }
           }}

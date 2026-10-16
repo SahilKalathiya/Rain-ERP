@@ -732,7 +732,7 @@ export default function GlobalERPOverviewDashboard({
                     onClick={() => onNavigateTab('/orders/new')}
                   >
                     <i className="ti ti-plus fs-14"></i>
-                    <span>+ New Order</span>
+                    <span>New Order</span>
                   </button>
                 </div>
                 <div className="col-6">
@@ -1161,7 +1161,7 @@ export default function GlobalERPOverviewDashboard({
                   onClick={() => onNavigateTab('/orders/new')}
                 >
                   <i className="ti ti-plus fs-14"></i>
-                  <span>+ New Sales Order</span>
+                  <span>New Sales Order</span>
                 </button>
                 <button
                   type="button"

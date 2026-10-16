@@ -17,6 +17,21 @@ export default function FabricMasterView({
   const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
 
+  const STANDARD_FABRIC_TYPES = [
+    'Greige / Undyed',
+    'Cotton',
+    'Rayon',
+    'Modal',
+    'Silk',
+    'Georgette',
+    'Linen',
+    'Polyester',
+    'Viscose',
+    'Blended'
+  ];
+
+  const [isCustomFabricType, setIsCustomFabricType] = useState(false);
+
   React.useEffect(() => {
     if (fabrics && fabrics.length > 0) {
       setFabricList(fabrics);
@@ -86,6 +101,7 @@ export default function FabricMasterView({
     });
     setWidthInput('');
     setFormErrors({});
+    setIsCustomFabricType(false);
     setIsCreatingNew(true);
     setIsEditing(true);
     setSelectedFabric(null);
@@ -100,10 +116,13 @@ export default function FabricMasterView({
       ? JSON.parse(f.widths || '["44"]')
       : ['44', '58'];
 
+    const fType = f.fabricType || f.fabric_type || '';
+    setIsCustomFabricType(Boolean(fType && !STANDARD_FABRIC_TYPES.includes(fType)));
+
     setFormData({
       ...f,
       qualityName: f.qualityName || f.quality_name || '',
-      fabricType: f.fabricType || f.fabric_type || '',
+      fabricType: fType,
       widths: parsedWidths,
       hsnCode: f.hsnCode || f.hsn_code || '520811'
     });
@@ -211,6 +230,8 @@ export default function FabricMasterView({
 
     try {
       localStorage.setItem('raindrop_fabrics_v1', JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('raindrop_fabrics_updated'));
+      window.dispatchEvent(new Event('storage'));
     } catch (err) {}
 
     if (api && api.saveFabric) {
@@ -287,37 +308,77 @@ export default function FabricMasterView({
                 <div className="row g-2">
                   <div className="col-6">
                     <label className="form-label fs-12 fw-semibold mb-1">Fabric Type *</label>
-                    <select
-                      className={`form-select form-select-sm bg-white ${formErrors.fabricType ? 'is-invalid' : ''}`}
-                      value={formData.fabricType}
-                      onChange={(e) => {
-                        const newType = e.target.value;
-                        const isNewGreige = Boolean(
-                          newType &&
-                          (newType.toLowerCase().includes('greige') ||
-                           newType.toLowerCase().includes('grey') ||
-                           newType.toLowerCase().includes('undyed'))
-                        );
-                        setFormData({
-                          ...formData,
-                          fabricType: newType,
-                          defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
-                        });
-                        if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
-                      }}
-                    >
-                      <option value="">Select fabric type...</option>
-                      <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
-                      <option value="Cotton">Cotton (Processed)</option>
-                      <option value="Rayon">Rayon</option>
-                      <option value="Modal">Modal</option>
-                      <option value="Silk">Silk</option>
-                      <option value="Georgette">Georgette</option>
-                      <option value="Linen">Linen</option>
-                      <option value="Polyester">Polyester</option>
-                      <option value="Viscose">Viscose</option>
-                      <option value="Blended">Blended</option>
-                    </select>
+                    {isCustomFabricType ? (
+                      <div className="input-group input-group-sm">
+                        <input
+                          type="text"
+                          className={`form-control form-control-sm bg-white ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                          placeholder="Type custom fabric type..."
+                          autoFocus
+                          value={formData.fabricType || ''}
+                          onChange={(e) => {
+                            const newType = e.target.value;
+                            setFormData({
+                              ...formData,
+                              fabricType: newType
+                            });
+                            if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setIsCustomFabricType(false);
+                            setFormData({ ...formData, fabricType: '' });
+                          }}
+                          title="Switch back to dropdown list"
+                        >
+                          <i className="ti ti-chevron-down"></i>
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        className={`form-select form-select-sm bg-white ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                        value={formData.fabricType}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          if (newType === 'Other') {
+                            setIsCustomFabricType(true);
+                            setFormData({
+                              ...formData,
+                              fabricType: ''
+                            });
+                            return;
+                          }
+                          const isNewGreige = Boolean(
+                            newType &&
+                            (newType.toLowerCase().includes('greige') ||
+                             newType.toLowerCase().includes('grey') ||
+                             newType.toLowerCase().includes('undyed'))
+                          );
+                          setFormData({
+                            ...formData,
+                            fabricType: newType,
+                            defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
+                          });
+                          if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
+                        }}
+                      >
+                        <option value="">Select fabric type...</option>
+                        <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
+                        <option value="Cotton">Cotton (Processed)</option>
+                        <option value="Rayon">Rayon</option>
+                        <option value="Modal">Modal</option>
+                        <option value="Silk">Silk</option>
+                        <option value="Georgette">Georgette</option>
+                        <option value="Linen">Linen</option>
+                        <option value="Polyester">Polyester</option>
+                        <option value="Viscose">Viscose</option>
+                        <option value="Blended">Blended</option>
+                        <option value="Other">Other (Custom type...)</option>
+                      </select>
+                    )}
                     {formErrors.fabricType && <div className="invalid-feedback fs-11">{formErrors.fabricType}</div>}
                   </div>
 
@@ -526,7 +587,7 @@ export default function FabricMasterView({
       {/* Main Grid */}
       <div className="row g-4">
         {/* Table Column */}
-        <div className={selectedFabric || isCreatingNew ? 'col-12 col-xl-7' : 'col-12'}>
+        <div className="col-12">
           <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <div className="d-flex align-items-center justify-content-between mb-3">
               <div className="d-flex align-items-center gap-2">
@@ -666,42 +727,51 @@ export default function FabricMasterView({
           </div>
         </div>
 
-        {/* View / Edit Mode by default (Section 9.2) */}
+        {/* POPUP MODAL: View / Edit / Create Fabric Dialog */}
         {(selectedFabric || isCreatingNew) && (
-          <div className="col-12 col-xl-5">
-            <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '80px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                <div className="d-flex align-items-center gap-2">
-                  <h5 className="fw-bold text-dark mb-0 fs-18">
-                    {isCreatingNew ? 'Create New Fabric' : formData.qualityName || formData.id}
-                  </h5>
-                  {!isCreatingNew && (
-                    <span className="badge bg-light text-secondary border">{formData.id}</span>
-                  )}
-                </div>
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content border-0 shadow-lg rounded-4 p-4 bg-white">
+                <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-primary-subtle text-primary p-2 rounded-3">
+                      <i className="ti ti-palette fs-5"></i>
+                    </span>
+                    <div>
+                      <h5 className="fw-bold text-dark mb-0 fs-18">
+                        {isCreatingNew ? 'Create New Fabric' : formData.qualityName || formData.id}
+                      </h5>
+                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
+                    </div>
+                  </div>
 
-                <div className="d-flex align-items-center gap-2">
-                  {!isEditing && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <i className="ti ti-edit fs-14"></i>
-                      <span>Edit Fabric</span>
-                    </button>
-                  )}
-                  {isInline && (
+                  <div className="d-flex align-items-center gap-2">
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <i className="ti ti-edit fs-14"></i>
+                        <span>Edit Fabric</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn-close ms-2"
-                      onClick={() => onCloseInline && onCloseInline(null)}
+                      onClick={() => {
+                        setSelectedFabric(null);
+                        setIsCreatingNew(false);
+                        setIsEditing(false);
+                        setWidthInput('');
+                        if (isInline && onCloseInline) onCloseInline(null);
+                      }}
                     ></button>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-              <form onSubmit={handleSave}>
+                <form onSubmit={handleSave}>
+                  <div style={{ maxHeight: 'calc(80vh - 140px)', overflowY: 'auto', paddingRight: '4px' }}>
                 {/* 1. Quality & Fabric Type */}
                 <div className="mb-3 p-3 bg-light rounded-3">
                   <div className="mb-2">
@@ -729,41 +799,81 @@ export default function FabricMasterView({
                       <label className="form-label fs-12 fw-semibold mb-1">Fabric Type *</label>
                       {isEditing ? (
                         <>
-                          <select
-                            className={`form-select form-select-sm bg-white ${
-                              formErrors.fabricType ? 'is-invalid' : ''
-                            }`}
-                            value={formData.fabricType}
-                            onChange={(e) => {
-                              const newType = e.target.value;
-                              const isNewGreige = Boolean(
-                                newType &&
-                                (newType.toLowerCase().includes('greige') ||
-                                 newType.toLowerCase().includes('grey') ||
-                                 newType.toLowerCase().includes('undyed'))
-                              );
-                              setFormData({
-                                ...formData,
-                                fabricType: newType,
-                                defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
-                              });
-                              if (formErrors.fabricType) {
-                                setFormErrors((prev) => ({ ...prev, fabricType: null }));
-                              }
-                            }}
-                          >
-                            <option value="">Select fabric type...</option>
-                            <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
-                            <option value="Cotton">Cotton (Processed)</option>
-                            <option value="Rayon">Rayon</option>
-                            <option value="Modal">Modal</option>
-                            <option value="Silk">Silk</option>
-                            <option value="Georgette">Georgette</option>
-                            <option value="Linen">Linen</option>
-                            <option value="Polyester">Polyester</option>
-                            <option value="Viscose">Viscose</option>
-                            <option value="Blended">Blended</option>
-                          </select>
+                          {isCustomFabricType ? (
+                            <div className="input-group input-group-sm">
+                              <input
+                                type="text"
+                                className={`form-control form-control-sm bg-white ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                                placeholder="Type custom fabric type..."
+                                autoFocus
+                                value={formData.fabricType || ''}
+                                onChange={(e) => {
+                                  const newType = e.target.value;
+                                  setFormData({
+                                    ...formData,
+                                    fabricType: newType
+                                  });
+                                  if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-outline-secondary"
+                                onClick={() => {
+                                  setIsCustomFabricType(false);
+                                  setFormData({ ...formData, fabricType: '' });
+                                }}
+                                title="Switch back to dropdown list"
+                              >
+                                <i className="ti ti-chevron-down"></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <select
+                              className={`form-select form-select-sm bg-white ${
+                                formErrors.fabricType ? 'is-invalid' : ''
+                              }`}
+                              value={formData.fabricType}
+                              onChange={(e) => {
+                                const newType = e.target.value;
+                                if (newType === 'Other') {
+                                  setIsCustomFabricType(true);
+                                  setFormData({
+                                    ...formData,
+                                    fabricType: ''
+                                  });
+                                  return;
+                                }
+                                const isNewGreige = Boolean(
+                                  newType &&
+                                  (newType.toLowerCase().includes('greige') ||
+                                   newType.toLowerCase().includes('grey') ||
+                                   newType.toLowerCase().includes('undyed'))
+                                );
+                                setFormData({
+                                  ...formData,
+                                  fabricType: newType,
+                                  defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
+                                });
+                                if (formErrors.fabricType) {
+                                  setFormErrors((prev) => ({ ...prev, fabricType: null }));
+                                }
+                              }}
+                            >
+                              <option value="">Select fabric type...</option>
+                              <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
+                              <option value="Cotton">Cotton (Processed)</option>
+                              <option value="Rayon">Rayon</option>
+                              <option value="Modal">Modal</option>
+                              <option value="Silk">Silk</option>
+                              <option value="Georgette">Georgette</option>
+                              <option value="Linen">Linen</option>
+                              <option value="Polyester">Polyester</option>
+                              <option value="Viscose">Viscose</option>
+                              <option value="Blended">Blended</option>
+                              <option value="Other">Other (Custom type...)</option>
+                            </select>
+                          )}
                           {formErrors.fabricType && (
                             <div className="invalid-feedback fs-11">{formErrors.fabricType}</div>
                           )}
@@ -956,12 +1066,13 @@ export default function FabricMasterView({
                   </div>
                 </div>
 
-                {/* Edit Controls */}
-                {isEditing && (
-                  <div className="d-flex align-items-center justify-content-end gap-2">
+                  </div>
+
+                  {/* Modal Footer Controls */}
+                  <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
                     <button
                       type="button"
-                      className="btn btn-light btn-sm px-3"
+                      className="btn btn-light px-4 rounded-3"
                       onClick={() => {
                         if (isCreatingNew) {
                           setSelectedFabric(null);
@@ -971,16 +1082,19 @@ export default function FabricMasterView({
                         }
                         setWidthInput('');
                         setIsEditing(false);
+                        if (isInline && onCloseInline) onCloseInline(null);
                       }}
                     >
-                      Cancel
+                      {isEditing ? 'Cancel' : 'Close'}
                     </button>
-                    <button type="submit" className="btn btn-primary btn-sm px-4 fw-medium shadow-sm">
-                      Save Fabric
-                    </button>
+                    {isEditing && (
+                      <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
+                        <i className="ti ti-check me-1"></i> Save Fabric
+                      </button>
+                    )}
                   </div>
-                )}
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         )}
