@@ -233,11 +233,11 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
             ></i>
             <input
               type="text"
-              className="form-control rounded-pill bg-white"
+              className="form-control rounded-pill bg-white search-input-integrated"
               placeholder="Search colors, HEX, Pantone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ borderColor: '#cbd5e1', fontSize: '13px', height: '38px', paddingLeft: '40px' }}
+              style={{ borderColor: '#cbd5e1', fontSize: '13px', height: '38px', paddingLeft: '44px' }}
             />
           </div>
 

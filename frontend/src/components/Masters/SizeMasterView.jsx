@@ -219,19 +219,38 @@ export default function SizeMasterView() {
       name: '',
       displayOrder: '',
       active: true,
-      sizeRecords: []
+      sizeRecords: [
+        {
+          id: `SZ-${nextSeq}-01`,
+          seriesId: nextSeq,
+          sizeName: '',
+          displayName: '',
+          description: ''
+        }
+      ]
     });
     setIsCreatingNewSeries(true);
     setIsEditingSeries(true);
   };
 
   const handleEditSeries = (series) => {
+    const records = (series.sizeRecords && series.sizeRecords.length > 0)
+      ? series.sizeRecords.map((r) => ({ ...r }))
+      : [
+          {
+            id: `SZ-${series.id}-01`,
+            seriesId: series.id,
+            sizeName: '',
+            displayName: '',
+            description: ''
+          }
+        ];
     setSeriesFormData({
       id: series.id,
       name: series.name,
       displayOrder: series.displayOrder || 1,
       active: series.active !== false,
-      sizeRecords: [...(series.sizeRecords || [])]
+      sizeRecords: records
     });
     setIsCreatingNewSeries(false);
     setIsEditingSeries(true);
@@ -314,7 +333,23 @@ export default function SizeMasterView() {
   };
 
   const handleRemoveSizeRow = (index) => {
-    const filtered = seriesFormData.sizeRecords.filter((_, i) => i !== index);
+    const current = seriesFormData.sizeRecords || [];
+    if (current.length <= 1) {
+      setSeriesFormData({
+        ...seriesFormData,
+        sizeRecords: [
+          {
+            id: `SZ-${seriesFormData.id || 'SER'}-01`,
+            seriesId: seriesFormData.id,
+            sizeName: '',
+            displayName: '',
+            description: ''
+          }
+        ]
+      });
+      return;
+    }
+    const filtered = current.filter((_, i) => i !== index);
     setSeriesFormData({ ...seriesFormData, sizeRecords: filtered });
   };
 
@@ -444,11 +479,11 @@ export default function SizeMasterView() {
             ></i>
             <input
               type="text"
-              className="form-control form-control-sm rounded-3 border"
+              className="form-control form-control-sm rounded-3 border search-input-integrated"
               placeholder="Search series name or size (e.g. Alphabetic, Numeric, XL, 38)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '36px' }}
+              style={{ paddingLeft: '42px' }}
             />
           </div>
           <div className="text-muted small">
@@ -685,18 +720,13 @@ export default function SizeMasterView() {
                           </tr>
                         </thead>
                         <tbody>
-                          {seriesFormData.sizeRecords.length === 0 && (
-                            <tr>
-                              <td colSpan="5" className="text-center py-4 text-muted small">
-                                <i className="ti ti-ruler-2 me-1 opacity-50"></i>
-                                No size records in this series yet. Click <strong>+ Add More Size</strong> above to add sizes.
-                              </td>
-                            </tr>
-                          )}
-                          {seriesFormData.sizeRecords.map((sz, rIdx) => (
+                          {((seriesFormData.sizeRecords && seriesFormData.sizeRecords.length > 0)
+                            ? seriesFormData.sizeRecords
+                            : [{ id: `SZ-${seriesFormData.id || 'SER'}-01`, sizeName: '', displayName: '', description: '' }]
+                          ).map((sz, rIdx, arr) => (
                             <tr
                               key={sz.id || rIdx}
-                              draggable
+                              draggable={arr.length > 1}
                               onDragStart={() => setModalDraggedIdx(rIdx)}
                               onDragOver={(e) => {
                                 e.preventDefault();
@@ -715,14 +745,16 @@ export default function SizeMasterView() {
                                 setModalDragOverIdx(null);
                               }}
                               style={{
-                                cursor: 'move',
+                                cursor: arr.length > 1 ? 'move' : 'default',
                                 opacity: modalDraggedIdx === rIdx ? 0.35 : 1,
                                 backgroundColor: modalDragOverIdx === rIdx ? '#f0f4ff' : undefined,
                                 transition: 'all 0.15s ease'
                               }}
                             >
                               <td className="text-muted small ps-2 font-monospace">
-                                <i className="ti ti-grip-vertical text-muted opacity-40 me-1" style={{ fontSize: '11px' }}></i>
+                                {arr.length > 1 && (
+                                  <i className="ti ti-grip-vertical text-muted opacity-40 me-1" style={{ fontSize: '11px' }}></i>
+                                )}
                                 {rIdx + 1}
                               </td>
                               <td>
@@ -731,9 +763,10 @@ export default function SizeMasterView() {
                                   className="form-control form-control-sm font-monospace fw-bold"
                                   placeholder="e.g. S, 32, XL"
                                   required
-                                  value={sz.sizeName}
+                                  value={sz.sizeName || ''}
                                   onChange={(e) => {
-                                    const updated = [...seriesFormData.sizeRecords];
+                                    const updated = [...(seriesFormData.sizeRecords || arr)];
+                                    if (!updated[rIdx]) updated[rIdx] = { ...sz };
                                     updated[rIdx].sizeName = e.target.value.toUpperCase();
                                     setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
                                   }}
@@ -744,9 +777,10 @@ export default function SizeMasterView() {
                                   type="text"
                                   className="form-control form-control-sm"
                                   placeholder="e.g. Small (36)"
-                                  value={sz.displayName}
+                                  value={sz.displayName || ''}
                                   onChange={(e) => {
-                                    const updated = [...seriesFormData.sizeRecords];
+                                    const updated = [...(seriesFormData.sizeRecords || arr)];
+                                    if (!updated[rIdx]) updated[rIdx] = { ...sz };
                                     updated[rIdx].displayName = e.target.value;
                                     setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
                                   }}
@@ -757,23 +791,35 @@ export default function SizeMasterView() {
                                   type="text"
                                   className="form-control form-control-sm"
                                   placeholder="Optional description"
-                                  value={sz.description}
+                                  value={sz.description || ''}
                                   onChange={(e) => {
-                                    const updated = [...seriesFormData.sizeRecords];
+                                    const updated = [...(seriesFormData.sizeRecords || arr)];
+                                    if (!updated[rIdx]) updated[rIdx] = { ...sz };
                                     updated[rIdx].description = e.target.value;
                                     setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
                                   }}
                                 />
                               </td>
                               <td className="text-end pe-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-xs btn-link text-danger p-0 text-decoration-none"
-                                  onClick={() => handleRemoveSizeRow(rIdx)}
-                                  title="Remove row"
-                                >
-                                  <i className="ti ti-trash"></i>
-                                </button>
+                                {arr.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-link text-danger p-0 text-decoration-none"
+                                    onClick={() => handleRemoveSizeRow(rIdx)}
+                                    title="Remove row"
+                                  >
+                                    <i className="ti ti-trash"></i>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-link text-muted p-0 text-decoration-none"
+                                    onClick={() => handleRemoveSizeRow(rIdx)}
+                                    title="Clear fields"
+                                  >
+                                    <i className="ti ti-backspace"></i>
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}

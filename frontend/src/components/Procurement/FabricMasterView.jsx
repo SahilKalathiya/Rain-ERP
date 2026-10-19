@@ -617,7 +617,7 @@ export default function FabricMasterView({
                   type="text"
                   placeholder="Search by ID, Quality Name, or GSM..."
                   className="form-control form-control-sm bg-light fs-12 search-input-integrated"
-                  style={{ borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}
+                  style={{ borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', paddingLeft: '40px' }}
                   value={colFilters.name}
                   onChange={(e) => setColFilters({ ...colFilters, name: e.target.value })}
                 />

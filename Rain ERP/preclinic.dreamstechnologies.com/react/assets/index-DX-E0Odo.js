@@ -14565,14 +14565,14 @@
           icon: "ti ti-database",
           open: false,
           submenu: [
-            { label: "Customer Master", link: "/customers" },
-            { label: "Article Master", link: "/articles" },
-            { label: "Color Master", link: "/colors" },
-            { label: "Size Series Master", link: "/sizes" },
-            { label: "Accessories Master", link: "/accessories" },
-            { label: "Fabrics Master", link: "/fabrics" },
-            { label: "Vendors Master", link: "/vendors" },
-            { label: "Transporters Master", link: "/transporters" }
+            { label: "Customer", link: "/customers" },
+            { label: "Article", link: "/articles" },
+            { label: "Color", link: "/colors" },
+            { label: "Size Series", link: "/sizes" },
+            { label: "Accessories", link: "/accessories" },
+            { label: "Fabrics", link: "/fabrics" },
+            { label: "Vendors", link: "/vendors" },
+            { label: "Transporters", link: "/transporters" }
           ]
         }
       ]
@@ -19081,7 +19081,7 @@
         accessoryColor: item.accessoryColor || "",
         size: item.size || "",
         source: item.source || "",
-        fabricColor: item.fabricColor || "\u2014",
+        fabricColor: item.fabricColor && item.fabricColor !== "\u2014" ? item.fabricColor : "",
         reqPerPc: item.reqPerPc || "",
         extraPerPack: item.extraPerPack || "",
         bufferPct: item.bufferPct || "",
@@ -19098,7 +19098,7 @@
           accessoryColor: "",
           size: "",
           source: "",
-          fabricColor: "\u2014",
+          fabricColor: "",
           reqPerPc: "",
           extraPerPack: "",
           bufferPct: ""
@@ -19106,6 +19106,21 @@
       ];
     };
     const handleUpdateCardRowField = (itemId, articleName, rowIndex, field, value) => {
+      let finalValue = value;
+      if (field === "bufferPct") {
+        if (value !== "" && value !== null && value !== void 0) {
+          const num = parseFloat(value);
+          if (!isNaN(num)) {
+            if (num > 10) {
+              finalValue = "10";
+            } else if (num < 0) {
+              finalValue = "0";
+            } else {
+              finalValue = value;
+            }
+          }
+        }
+      }
       setAddedAccessories((prev) => prev.map((item) => {
         if (item.id !== itemId) return item;
         const currentRows = getCardArticleRows(item, articleName);
@@ -19113,26 +19128,27 @@
         const isAllColoursRow = targetRow?.articleColor === "All colours";
         const updatedRows = currentRows.map((r, rIdx) => {
           if (rIdx === rowIndex) {
-            const updated = { ...r, [field]: value };
-            if (field === "source") {
-              if (value !== "Job Work") {
-                updated.fabricColor = "\u2014";
-              } else if (!updated.fabricColor || updated.fabricColor === "\u2014") {
-                updated.fabricColor = "";
+            const custom = { ...r.customized || {} };
+            if (rIdx > 0 && !isAllColoursRow) {
+              const topVal = currentRows[0]?.[field];
+              if (finalValue === topVal) {
+                delete custom[field];
+              } else {
+                custom[field] = true;
               }
             }
-            return updated;
+            return { ...r, [field]: finalValue, customized: custom };
           }
           if (isAllColoursRow) {
-            const updated = { ...r, [field]: value };
-            if (field === "source") {
-              if (value !== "Job Work") {
-                updated.fabricColor = "\u2014";
-              } else if (!updated.fabricColor || updated.fabricColor === "\u2014") {
-                updated.fabricColor = "";
-              }
+            const custom = { ...r.customized || {} };
+            delete custom[field];
+            return { ...r, [field]: finalValue, customized: custom };
+          }
+          if (rowIndex === 0) {
+            const isCustomized = r.customized ? Boolean(r.customized[field]) : r[field] !== void 0 && r[field] !== "" && r[field] !== currentRows[0]?.[field];
+            if (!isCustomized) {
+              return { ...r, [field]: finalValue };
             }
-            return updated;
           }
           return r;
         });
@@ -19210,7 +19226,7 @@
             accessoryColor: initialColor,
             size: initialSize,
             source: varObj?.type || "",
-            fabricColor: "\u2014",
+            fabricColor: "",
             reqPerPc: "",
             extraPerPack: "",
             bufferPct: "",
@@ -19235,7 +19251,7 @@
           accessoryColor: initialColor,
           size: initialSize,
           source: varObj?.type || "",
-          fabricColor: "\u2014",
+          fabricColor: "",
           reqPerPc: "",
           extraPerPack: "",
           bufferPct: "",
@@ -19523,7 +19539,7 @@
               /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work"),
               /* @__PURE__ */ import_react5.default.createElement("option", { value: "In-House" }, "In-House"),
               /* @__PURE__ */ import_react5.default.createElement("option", { value: "Vendor / Mill" }, "Vendor / Mill")
-            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, row.source === "Job Work" ? isEditing ? /* @__PURE__ */ import_react5.default.createElement(
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
                 type: "text",
@@ -19533,7 +19549,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value),
                 style: inputStyle
               }
-            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor || "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "70px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement(
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "70px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
                 type: "number",
@@ -19562,11 +19578,16 @@
               {
                 type: "number",
                 min: "0",
-                max: "110",
+                max: "10",
                 step: "0.5",
                 className: "form-control form-control-sm text-center",
                 value: row.bufferPct ?? "",
                 placeholder: "0",
+                onKeyDown: (e) => {
+                  if (["-", "+", "e", "E"].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                },
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
@@ -19587,7 +19608,25 @@
             const bufferVal = parseFloat(row.bufferPct) || 0;
             const qtyVal = parseFloat(row.totalQty) || 0;
             const totalVal = (greigeVal * qtyVal * (1 + bufferVal / 100)).toFixed(1);
-            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, isAllColours ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Front..", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "90px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", step: "0.01", min: "0", className: "form-control form-control-sm text-center", value: row.dyedRate ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "dyedRate", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.dyedRate || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.shrinkPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "shrinkPct", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.shrinkPct ? row.shrinkPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "85px", padding: "6px 8px", fontSize: "13px" } }, greigeVal.toFixed(3)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.bufferPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + "m"));
+            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, isAllColours ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Front..", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "90px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", step: "0.01", min: "0", className: "form-control form-control-sm text-center", value: row.dyedRate ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "dyedRate", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.dyedRate || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.shrinkPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "shrinkPct", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.shrinkPct ? row.shrinkPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "85px", padding: "6px 8px", fontSize: "13px" } }, greigeVal.toFixed(3)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
+              "input",
+              {
+                type: "number",
+                min: "0",
+                max: "10",
+                step: "0.5",
+                className: "form-control form-control-sm text-center",
+                value: row.bufferPct ?? "",
+                placeholder: "0",
+                onKeyDown: (e) => {
+                  if (["-", "+", "e", "E"].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                },
+                onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
+                style: inputStyle
+              }
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + "m"));
           });
         }))));
       }
@@ -19602,7 +19641,25 @@
             const bufferVal = parseFloat(row.bufferPct) || 0;
             const qtyVal = parseFloat(row.totalQty) || 0;
             const totalVal = (reqVal * qtyVal * (1 + bufferVal / 100)).toFixed(1);
-            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, isAllColours ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Front..", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, row.source === "Job Work" ? isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor || "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "70px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "95px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", max: "110", className: "form-control form-control-sm text-center", value: row.bufferPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value), style: inputStyle }), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + " PCS"));
+            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, isAllColours ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Front..", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "70px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "95px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
+              "input",
+              {
+                type: "number",
+                min: "0",
+                max: "10",
+                step: "0.5",
+                className: "form-control form-control-sm text-center",
+                value: row.bufferPct ?? "",
+                placeholder: "0",
+                onKeyDown: (e) => {
+                  if (["-", "+", "e", "E"].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                },
+                onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
+                style: inputStyle
+              }
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + " PCS"));
           });
         }))));
       }
@@ -19626,7 +19683,25 @@
               onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "size", e.target.value),
               style: inputStyle
             }
-          ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.size || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "In-House" }, "In-House"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Vendor / Mill" }, "Vendor / Mill")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, row.source === "Job Work" ? isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor || "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "70px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", max: "110", className: "form-control form-control-sm text-center", value: row.bufferPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value), style: inputStyle }), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + " PCS"));
+          ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.size || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "In-House" }, "In-House"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Vendor / Mill" }, "Vendor / Mill")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "70px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
+            "input",
+            {
+              type: "number",
+              min: "0",
+              max: "10",
+              step: "0.5",
+              className: "form-control form-control-sm text-center",
+              value: row.bufferPct ?? "",
+              placeholder: "0",
+              onKeyDown: (e) => {
+                if (["-", "+", "e", "E"].includes(e.key)) {
+                  e.preventDefault();
+                }
+              },
+              onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
+              style: inputStyle
+            }
+          ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "90px", color: "#2e37a4", fontWeight: 700, fontSize: "13px", padding: "6px 8px" } }, isAllColours ? "\u2014" : totalVal + " PCS"));
         });
       }))));
     };
@@ -22608,11 +22683,11 @@
         "input",
         {
           type: "text",
-          className: "form-control form-control-sm rounded-3 border",
+          className: "form-control form-control-sm rounded-3 border search-input-integrated",
           placeholder: "Global search across all customer fields (11.1)...",
           value: searchQuery,
           onChange: (e) => setSearchQuery(e.target.value),
-          style: { paddingLeft: "36px" }
+          style: { paddingLeft: "42px" }
         }
       )), /* @__PURE__ */ import_react6.default.createElement("div", { className: "text-muted small" }, "Showing ", /* @__PURE__ */ import_react6.default.createElement("strong", null, filteredCustomers.length), " of ", /* @__PURE__ */ import_react6.default.createElement("strong", null, customers.length), " customers")), /* @__PURE__ */ import_react6.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react6.default.createElement("table", { className: "table table-hover align-middle mb-0" }, /* @__PURE__ */ import_react6.default.createElement("thead", { className: "bg-light" }, /* @__PURE__ */ import_react6.default.createElement("tr", null, /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "120px" } }, "CUSTOMER ID"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "200px" } }, "CUSTOMER NAME"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "150px" } }, "TYPE"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "130px" } }, "PHONE"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "130px" } }, "CITY"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "130px" } }, "STATE"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "160px" } }, "GSTIN"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold text-center", style: { minWidth: "100px" } }, "STATUS"), /* @__PURE__ */ import_react6.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold text-end", style: { minWidth: "110px" } }, "ACTIONS")), /* @__PURE__ */ import_react6.default.createElement("tr", { className: "bg-white border-bottom" }, /* @__PURE__ */ import_react6.default.createElement("td", { className: "p-1.5" }, /* @__PURE__ */ import_react6.default.createElement(
         "input",
@@ -23853,11 +23928,11 @@
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm rounded-3 border",
+        className: "form-control form-control-sm rounded-3 border search-input-integrated",
         placeholder: "Global search articles (11.1)...",
         value: searchQuery,
         onChange: (e) => setSearchQuery(e.target.value),
-        style: { paddingLeft: "36px" }
+        style: { paddingLeft: "42px" }
       }
     )), /* @__PURE__ */ import_react7.default.createElement("div", { className: "text-muted small" }, "Showing ", /* @__PURE__ */ import_react7.default.createElement("strong", null, filteredArticles.length), " of ", /* @__PURE__ */ import_react7.default.createElement("strong", null, articles.length), " articles")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react7.default.createElement("table", { className: "table table-hover align-middle mb-0" }, /* @__PURE__ */ import_react7.default.createElement("thead", { className: "bg-light" }, /* @__PURE__ */ import_react7.default.createElement("tr", null, /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "110px" } }, "ARTICLE ID"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "80px" } }, "ICON"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "180px" } }, "ARTICLE NAME"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold text-center", style: { minWidth: "120px" } }, "SORT ORDER"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold", style: { minWidth: "220px" } }, "DESCRIPTION"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold text-center", style: { minWidth: "100px" } }, "STATUS"), /* @__PURE__ */ import_react7.default.createElement("th", { className: "py-2.5 px-3 text-muted small fw-bold text-end", style: { minWidth: "110px" } }, "ACTIONS")), /* @__PURE__ */ import_react7.default.createElement("tr", { className: "bg-white border-bottom" }, /* @__PURE__ */ import_react7.default.createElement("td", { className: "p-1.5" }, /* @__PURE__ */ import_react7.default.createElement(
       "input",
@@ -24417,7 +24492,7 @@
         type: "text",
         placeholder: "Search by ID, Quality Name, or GSM...",
         className: "form-control form-control-sm bg-light fs-12 search-input-integrated",
-        style: { borderRadius: "8px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" },
+        style: { borderRadius: "8px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc", paddingLeft: "40px" },
         value: colFilters.name,
         onChange: (e) => setColFilters({ ...colFilters, name: e.target.value })
       }
@@ -27957,18 +28032,35 @@
         name: "",
         displayOrder: "",
         active: true,
-        sizeRecords: []
+        sizeRecords: [
+          {
+            id: `SZ-${nextSeq}-01`,
+            seriesId: nextSeq,
+            sizeName: "",
+            displayName: "",
+            description: ""
+          }
+        ]
       });
       setIsCreatingNewSeries(true);
       setIsEditingSeries(true);
     };
     const handleEditSeries = (series) => {
+      const records = series.sizeRecords && series.sizeRecords.length > 0 ? series.sizeRecords.map((r) => ({ ...r })) : [
+        {
+          id: `SZ-${series.id}-01`,
+          seriesId: series.id,
+          sizeName: "",
+          displayName: "",
+          description: ""
+        }
+      ];
       setSeriesFormData({
         id: series.id,
         name: series.name,
         displayOrder: series.displayOrder || 1,
         active: series.active !== false,
-        sizeRecords: [...series.sizeRecords || []]
+        sizeRecords: records
       });
       setIsCreatingNewSeries(false);
       setIsEditingSeries(true);
@@ -28040,7 +28132,23 @@
       });
     };
     const handleRemoveSizeRow = (index) => {
-      const filtered = seriesFormData.sizeRecords.filter((_, i) => i !== index);
+      const current = seriesFormData.sizeRecords || [];
+      if (current.length <= 1) {
+        setSeriesFormData({
+          ...seriesFormData,
+          sizeRecords: [
+            {
+              id: `SZ-${seriesFormData.id || "SER"}-01`,
+              seriesId: seriesFormData.id,
+              sizeName: "",
+              displayName: "",
+              description: ""
+            }
+          ]
+        });
+        return;
+      }
+      const filtered = current.filter((_, i) => i !== index);
       setSeriesFormData({ ...seriesFormData, sizeRecords: filtered });
     };
     const handleQuickAddSizeSubmit = (e) => {
@@ -28136,11 +28244,11 @@
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm rounded-3 border",
+        className: "form-control form-control-sm rounded-3 border search-input-integrated",
         placeholder: "Search series name or size (e.g. Alphabetic, Numeric, XL, 38)...",
         value: searchTerm,
         onChange: (e) => setSearchTerm(e.target.value),
-        style: { paddingLeft: "36px" }
+        style: { paddingLeft: "42px" }
       }
     )), /* @__PURE__ */ import_react13.default.createElement("div", { className: "text-muted small" }, /* @__PURE__ */ import_react13.default.createElement("strong", null, seriesList.length), " size series configured \u2022 Drag or use arrows to reorder display priority"))), /* @__PURE__ */ import_react13.default.createElement("div", { className: "d-flex flex-column gap-3.5" }, filteredSeries.map((series, idx) => /* @__PURE__ */ import_react13.default.createElement(
       "div",
@@ -28290,11 +28398,11 @@
       },
       /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-plus" }),
       /* @__PURE__ */ import_react13.default.createElement("span", null, "Add More Size")
-    )), /* @__PURE__ */ import_react13.default.createElement("div", { className: "table-responsive bg-white rounded-3 border" }, /* @__PURE__ */ import_react13.default.createElement("table", { className: "table table-sm align-middle mb-0" }, /* @__PURE__ */ import_react13.default.createElement("thead", { className: "table-light small text-muted text-uppercase" }, /* @__PURE__ */ import_react13.default.createElement("tr", null, /* @__PURE__ */ import_react13.default.createElement("th", { style: { width: "40px" } }, "#"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "100px" } }, "Size Name *"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "140px" } }, "Display Name"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "160px" } }, "Description"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { width: "40px" } }))), /* @__PURE__ */ import_react13.default.createElement("tbody", null, seriesFormData.sizeRecords.length === 0 && /* @__PURE__ */ import_react13.default.createElement("tr", null, /* @__PURE__ */ import_react13.default.createElement("td", { colSpan: "5", className: "text-center py-4 text-muted small" }, /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-ruler-2 me-1 opacity-50" }), "No size records in this series yet. Click ", /* @__PURE__ */ import_react13.default.createElement("strong", null, "+ Add More Size"), " above to add sizes.")), seriesFormData.sizeRecords.map((sz, rIdx) => /* @__PURE__ */ import_react13.default.createElement(
+    )), /* @__PURE__ */ import_react13.default.createElement("div", { className: "table-responsive bg-white rounded-3 border" }, /* @__PURE__ */ import_react13.default.createElement("table", { className: "table table-sm align-middle mb-0" }, /* @__PURE__ */ import_react13.default.createElement("thead", { className: "table-light small text-muted text-uppercase" }, /* @__PURE__ */ import_react13.default.createElement("tr", null, /* @__PURE__ */ import_react13.default.createElement("th", { style: { width: "40px" } }, "#"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "100px" } }, "Size Name *"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "140px" } }, "Display Name"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { minWidth: "160px" } }, "Description"), /* @__PURE__ */ import_react13.default.createElement("th", { style: { width: "40px" } }))), /* @__PURE__ */ import_react13.default.createElement("tbody", null, (seriesFormData.sizeRecords && seriesFormData.sizeRecords.length > 0 ? seriesFormData.sizeRecords : [{ id: `SZ-${seriesFormData.id || "SER"}-01`, sizeName: "", displayName: "", description: "" }]).map((sz, rIdx, arr) => /* @__PURE__ */ import_react13.default.createElement(
       "tr",
       {
         key: sz.id || rIdx,
-        draggable: true,
+        draggable: arr.length > 1,
         onDragStart: () => setModalDraggedIdx(rIdx),
         onDragOver: (e) => {
           e.preventDefault();
@@ -28313,13 +28421,13 @@
           setModalDragOverIdx(null);
         },
         style: {
-          cursor: "move",
+          cursor: arr.length > 1 ? "move" : "default",
           opacity: modalDraggedIdx === rIdx ? 0.35 : 1,
           backgroundColor: modalDragOverIdx === rIdx ? "#f0f4ff" : void 0,
           transition: "all 0.15s ease"
         }
       },
-      /* @__PURE__ */ import_react13.default.createElement("td", { className: "text-muted small ps-2 font-monospace" }, /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-grip-vertical text-muted opacity-40 me-1", style: { fontSize: "11px" } }), rIdx + 1),
+      /* @__PURE__ */ import_react13.default.createElement("td", { className: "text-muted small ps-2 font-monospace" }, arr.length > 1 && /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-grip-vertical text-muted opacity-40 me-1", style: { fontSize: "11px" } }), rIdx + 1),
       /* @__PURE__ */ import_react13.default.createElement("td", null, /* @__PURE__ */ import_react13.default.createElement(
         "input",
         {
@@ -28327,9 +28435,10 @@
           className: "form-control form-control-sm font-monospace fw-bold",
           placeholder: "e.g. S, 32, XL",
           required: true,
-          value: sz.sizeName,
+          value: sz.sizeName || "",
           onChange: (e) => {
-            const updated = [...seriesFormData.sizeRecords];
+            const updated = [...seriesFormData.sizeRecords || arr];
+            if (!updated[rIdx]) updated[rIdx] = { ...sz };
             updated[rIdx].sizeName = e.target.value.toUpperCase();
             setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
           }
@@ -28341,9 +28450,10 @@
           type: "text",
           className: "form-control form-control-sm",
           placeholder: "e.g. Small (36)",
-          value: sz.displayName,
+          value: sz.displayName || "",
           onChange: (e) => {
-            const updated = [...seriesFormData.sizeRecords];
+            const updated = [...seriesFormData.sizeRecords || arr];
+            if (!updated[rIdx]) updated[rIdx] = { ...sz };
             updated[rIdx].displayName = e.target.value;
             setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
           }
@@ -28355,15 +28465,16 @@
           type: "text",
           className: "form-control form-control-sm",
           placeholder: "Optional description",
-          value: sz.description,
+          value: sz.description || "",
           onChange: (e) => {
-            const updated = [...seriesFormData.sizeRecords];
+            const updated = [...seriesFormData.sizeRecords || arr];
+            if (!updated[rIdx]) updated[rIdx] = { ...sz };
             updated[rIdx].description = e.target.value;
             setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
           }
         }
       )),
-      /* @__PURE__ */ import_react13.default.createElement("td", { className: "text-end pe-2" }, /* @__PURE__ */ import_react13.default.createElement(
+      /* @__PURE__ */ import_react13.default.createElement("td", { className: "text-end pe-2" }, arr.length > 1 ? /* @__PURE__ */ import_react13.default.createElement(
         "button",
         {
           type: "button",
@@ -28372,6 +28483,15 @@
           title: "Remove row"
         },
         /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-trash" })
+      ) : /* @__PURE__ */ import_react13.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-xs btn-link text-muted p-0 text-decoration-none",
+          onClick: () => handleRemoveSizeRow(rIdx),
+          title: "Clear fields"
+        },
+        /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-backspace" })
       ))
     ))))))), /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal-footer border-top py-3 px-4" }, /* @__PURE__ */ import_react13.default.createElement("button", { type: "button", className: "btn btn-outline-secondary rounded-3", onClick: () => setIsEditingSeries(false) }, "Cancel"), /* @__PURE__ */ import_react13.default.createElement("button", { type: "submit", className: "btn btn-primary rounded-3 px-4 fw-semibold" }, /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-check me-1" }), " Save Size Series")))))), activeSeriesForAddSize && /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal-dialog modal-dialog-centered" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 bg-white" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal-header border-bottom py-3 px-4" }, /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("h5", { className: "modal-title fw-bold text-dark mb-0" }, "Add Size to Series: ", activeSeriesForAddSize.name), /* @__PURE__ */ import_react13.default.createElement("p", { className: "text-muted small mb-0" }, "Unlimited size records per series")), /* @__PURE__ */ import_react13.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setActiveSeriesForAddSize(null) })), /* @__PURE__ */ import_react13.default.createElement("form", { onSubmit: handleQuickAddSizeSubmit }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "modal-body p-4" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Size Name *"), /* @__PURE__ */ import_react13.default.createElement(
       "input",
@@ -28715,7 +28835,7 @@
       threadPattern: "Stitching",
       threadPerStitch: 15,
       threadPerPiece: 60,
-      boxes: [],
+      boxes: [{ reelsPerBox: "", metersPerReel: "" }],
       coneSizes: [],
       placements: [],
       processRemarks: ""
@@ -28769,7 +28889,7 @@
         threadPattern: acc.threadPattern || "Kantha",
         threadPerStitch: acc.threadPerStitch !== void 0 ? acc.threadPerStitch : 15,
         threadPerPiece: acc.threadPerPiece !== void 0 ? acc.threadPerPiece : 60,
-        boxes: acc.boxes || acc.boxesConfig || [],
+        boxes: acc.boxes && acc.boxes.length > 0 ? acc.boxes : acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: "", metersPerReel: "" }],
         coneSizes: acc.coneSizes || [],
         placements: acc.placements || acc.availablePlacements || [],
         processRemarks: acc.processRemarks || "",
@@ -28932,11 +29052,11 @@
       "input",
       {
         type: "text",
-        className: "form-control rounded-pill bg-white",
+        className: "form-control rounded-pill bg-white search-input-integrated",
         placeholder: "Search accessories, sub types, HSN...",
         value: searchQuery,
         onChange: (e) => setSearchQuery(e.target.value),
-        style: { borderColor: "#cbd5e1", fontSize: "13.5px", height: "40px", paddingLeft: "40px" }
+        style: { borderColor: "#cbd5e1", fontSize: "13.5px", height: "40px", paddingLeft: "44px" }
       }
     ), searchQuery && /* @__PURE__ */ import_react14.default.createElement(
       "button",
@@ -29310,14 +29430,15 @@
             value: formData.threadPerStitch ?? 15,
             onChange: (e) => setFormData({ ...formData, threadPerStitch: e.target.value })
           }
-        )), showBoxCone && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3 border" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-semibold text-dark small mb-2" }, "Available boxes (each box = 6000 m):"), (formData.boxes || []).map((b, i) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Reels per box"), /* @__PURE__ */ import_react14.default.createElement(
+        )), showBoxCone && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3 border" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-semibold text-dark small mb-2" }, "Available boxes (each box = 6000 m):"), (formData.boxes && formData.boxes.length > 0 ? formData.boxes : [{ reelsPerBox: "", metersPerReel: "" }]).map((b, i, arr) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Reels per box"), /* @__PURE__ */ import_react14.default.createElement(
           "input",
           {
             type: "number",
             className: "form-control form-control-sm",
+            placeholder: "e.g. 15",
             value: b.reelsPerBox ?? "",
             onChange: (e) => {
-              const updated = [...formData.boxes || []];
+              const updated = formData.boxes && formData.boxes.length > 0 ? [...formData.boxes] : [{ reelsPerBox: "", metersPerReel: "" }];
               updated[i] = { ...updated[i], reelsPerBox: e.target.value };
               setFormData({ ...formData, boxes: updated });
             },
@@ -29328,34 +29449,50 @@
           {
             type: "number",
             className: "form-control form-control-sm",
+            placeholder: "e.g. 20",
             value: b.metersPerReel ?? "",
             onChange: (e) => {
-              const updated = [...formData.boxes || []];
+              const updated = formData.boxes && formData.boxes.length > 0 ? [...formData.boxes] : [{ reelsPerBox: "", metersPerReel: "" }];
               updated[i] = { ...updated[i], metersPerReel: e.target.value };
               setFormData({ ...formData, boxes: updated });
             },
             style: { height: "36px", borderRadius: "6px" }
           }
-        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-2 pb-1 text-end" }, /* @__PURE__ */ import_react14.default.createElement(
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-2 pb-1 text-end" }, arr.length > 1 ? /* @__PURE__ */ import_react14.default.createElement(
           "button",
           {
             type: "button",
             className: "btn btn-sm btn-link text-danger p-0 text-decoration-none",
             onClick: () => {
-              const updated = (formData.boxes || []).filter((_, idx) => idx !== i);
+              const updated = arr.filter((_, idx) => idx !== i);
               setFormData({ ...formData, boxes: updated });
             }
           },
           "Remove"
+        ) : /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-link text-muted p-0 text-decoration-none",
+            title: "Clear row",
+            onClick: () => {
+              setFormData({
+                ...formData,
+                boxes: [{ reelsPerBox: "", metersPerReel: "" }]
+              });
+            }
+          },
+          "Clear"
         )))), /* @__PURE__ */ import_react14.default.createElement(
           "button",
           {
             type: "button",
             className: "btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold",
             onClick: () => {
+              const current = formData.boxes && formData.boxes.length > 0 ? [...formData.boxes] : [{ reelsPerBox: "", metersPerReel: "" }];
               setFormData({
                 ...formData,
-                boxes: [...formData.boxes || [], { reelsPerBox: "", metersPerReel: "" }]
+                boxes: [...current, { reelsPerBox: "", metersPerReel: "" }]
               });
             }
           },
@@ -29488,10 +29625,32 @@
         "input",
         {
           type: "number",
+          min: "0",
+          max: "5",
+          step: "any",
           className: "form-control",
           placeholder: "e.g. 5",
           value: formData.maxBuffer ?? "",
-          onChange: (e) => setFormData({ ...formData, maxBuffer: e.target.value }),
+          onKeyDown: (e) => {
+            if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+          },
+          onChange: (e) => {
+            const val = e.target.value;
+            if (val === "") {
+              setFormData({ ...formData, maxBuffer: "" });
+              return;
+            }
+            const num = parseFloat(val);
+            if (isNaN(num)) {
+              setFormData({ ...formData, maxBuffer: "" });
+            } else if (num > 5) {
+              setFormData({ ...formData, maxBuffer: 5 });
+            } else if (num < 0) {
+              setFormData({ ...formData, maxBuffer: 0 });
+            } else {
+              setFormData({ ...formData, maxBuffer: val });
+            }
+          },
           style: { height: "42px", borderRadius: "8px" }
         }
       )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "HSN code"), /* @__PURE__ */ import_react14.default.createElement(
@@ -29814,7 +29973,7 @@
       },
       /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-edit me-1" }),
       " Edit Section"
-    )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "card-body p-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Maximum Buffer"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-bold text-dark mt-1" }, selectedAccessory.maxBuffer ? `${selectedAccessory.maxBuffer}%` : "\u2014")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "HSN Code"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-bold font-monospace text-dark mt-1" }, selectedAccessory.hsnCode || "\u2014")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Status"), /* @__PURE__ */ import_react14.default.createElement("span", { className: `badge ${selectedAccessory.active ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"} px-2.5 py-1 rounded-pill mt-1` }, selectedAccessory.active ? "Active" : "Inactive")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Last Modified"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "small text-secondary mt-1" }, selectedAccessory.lastModified ? new Date(selectedAccessory.lastModified).toLocaleDateString() : "Active")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Description / Specifications"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-2.5 bg-light rounded text-secondary small border mt-1" }, selectedAccessory.description || "No description entered.")))))))), selectedCategory !== "Thread Sizes" && selectedCategory !== "Thread Brand & Colors" && !isEditing && !selectedAccessory && /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-3" }, filteredAccessories.map((acc) => {
+    )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "card-body p-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Maximum Buffer"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-bold text-dark mt-1" }, selectedAccessory.maxBuffer !== void 0 && selectedAccessory.maxBuffer !== null && selectedAccessory.maxBuffer !== "" ? `${selectedAccessory.maxBuffer}%` : "\u2014")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "HSN Code"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-bold font-monospace text-dark mt-1" }, selectedAccessory.hsnCode || "\u2014")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Status"), /* @__PURE__ */ import_react14.default.createElement("span", { className: `badge ${selectedAccessory.active ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"} px-2.5 py-1 rounded-pill mt-1` }, selectedAccessory.active ? "Active" : "Inactive")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Last Modified"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "small text-secondary mt-1" }, selectedAccessory.lastModified ? new Date(selectedAccessory.lastModified).toLocaleDateString() : "Active")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small" }, "Description / Specifications"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-2.5 bg-light rounded text-secondary small border mt-1" }, selectedAccessory.description || "No description entered.")))))))), selectedCategory !== "Thread Sizes" && selectedCategory !== "Thread Brand & Colors" && !isEditing && !selectedAccessory && /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-3" }, filteredAccessories.map((acc) => {
       const isButton = acc.category === "Buttons";
       return /* @__PURE__ */ import_react14.default.createElement("div", { key: acc.id, className: "col-md-6 col-lg-4" }, /* @__PURE__ */ import_react14.default.createElement(
         "div",
@@ -30329,11 +30488,11 @@
       "input",
       {
         type: "text",
-        className: "form-control rounded-pill bg-white",
+        className: "form-control rounded-pill bg-white search-input-integrated",
         placeholder: "Search colors, HEX, Pantone...",
         value: searchTerm,
         onChange: (e) => setSearchTerm(e.target.value),
-        style: { borderColor: "#cbd5e1", fontSize: "13px", height: "38px", paddingLeft: "40px" }
+        style: { borderColor: "#cbd5e1", fontSize: "13px", height: "38px", paddingLeft: "44px" }
       }
     )), /* @__PURE__ */ import_react15.default.createElement(
       "select",
@@ -37803,7 +37962,7 @@
           borderRadius: "8px",
           borderColor: "#e2e8f0",
           boxShadow: "none",
-          paddingLeft: "38px"
+          paddingLeft: "40px"
         },
         placeholder: "Search colors by name, hex code...",
         value: searchTerm,

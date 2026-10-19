@@ -1278,11 +1278,11 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
               ></i>
               <input
                 type="text"
-                className="form-control form-control-sm rounded-3 border"
+                className="form-control form-control-sm rounded-3 border search-input-integrated"
                 placeholder="Global search articles (11.1)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: '36px' }}
+                style={{ paddingLeft: '42px' }}
               />
             </div>
             <div className="text-muted small">

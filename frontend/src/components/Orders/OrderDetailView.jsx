@@ -561,7 +561,7 @@ export default function OrderDetailView({
       accessoryColor: item.accessoryColor || '',
       size: item.size || '',
       source: item.source || '',
-      fabricColor: item.fabricColor || '—',
+      fabricColor: (item.fabricColor && item.fabricColor !== '—') ? item.fabricColor : '',
       reqPerPc: item.reqPerPc || '',
       extraPerPack: item.extraPerPack || '',
       bufferPct: item.bufferPct || '',
@@ -578,7 +578,7 @@ export default function OrderDetailView({
         accessoryColor: '',
         size: '',
         source: '',
-        fabricColor: '—',
+        fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
         bufferPct: ''
@@ -587,6 +587,22 @@ export default function OrderDetailView({
   };
 
   const handleUpdateCardRowField = (itemId, articleName, rowIndex, field, value) => {
+    let finalValue = value;
+    if (field === 'bufferPct') {
+      if (value !== '' && value !== null && value !== undefined) {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          if (num > 10) {
+            finalValue = '10';
+          } else if (num < 0) {
+            finalValue = '0';
+          } else {
+            finalValue = value;
+          }
+        }
+      }
+    }
+
     setAddedAccessories(prev => prev.map(item => {
       if (item.id !== itemId) return item;
 
@@ -596,27 +612,33 @@ export default function OrderDetailView({
 
       const updatedRows = currentRows.map((r, rIdx) => {
         if (rIdx === rowIndex) {
-          const updated = { ...r, [field]: value };
-          if (field === 'source') {
-            if (value !== 'Job Work') {
-              updated.fabricColor = '—';
-            } else if (!updated.fabricColor || updated.fabricColor === '—') {
-              updated.fabricColor = '';
+          const custom = { ...(r.customized || {}) };
+          if (rIdx > 0 && !isAllColoursRow) {
+            const topVal = currentRows[0]?.[field];
+            if (finalValue === topVal) {
+              delete custom[field];
+            } else {
+              custom[field] = true;
             }
           }
-          return updated;
+          return { ...r, [field]: finalValue, customized: custom };
         }
+
         if (isAllColoursRow) {
-          const updated = { ...r, [field]: value };
-          if (field === 'source') {
-            if (value !== 'Job Work') {
-              updated.fabricColor = '—';
-            } else if (!updated.fabricColor || updated.fabricColor === '—') {
-              updated.fabricColor = '';
-            }
-          }
-          return updated;
+          const custom = { ...(r.customized || {}) };
+          delete custom[field];
+          return { ...r, [field]: finalValue, customized: custom };
         }
+
+        if (rowIndex === 0) {
+          const isCustomized = r.customized
+            ? Boolean(r.customized[field])
+            : (r[field] !== undefined && r[field] !== '' && r[field] !== currentRows[0]?.[field]);
+          if (!isCustomized) {
+            return { ...r, [field]: finalValue };
+          }
+        }
+
         return r;
       });
 
@@ -704,7 +726,7 @@ export default function OrderDetailView({
           accessoryColor: initialColor,
           size: initialSize,
           source: varObj?.type || '',
-          fabricColor: '—',
+          fabricColor: '',
           reqPerPc: '',
           extraPerPack: '',
           bufferPct: '',
@@ -730,7 +752,7 @@ export default function OrderDetailView({
         accessoryColor: initialColor,
         size: initialSize,
         source: varObj?.type || '',
-        fabricColor: '—',
+        fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
         bufferPct: '',
@@ -1130,21 +1152,17 @@ export default function OrderDetailView({
                       </td>
 
                       <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                        {row.source === 'Job Work' ? (
-                          isEditing ? (
-                            <input
-                              type="text"
-                              className="form-control form-control-sm"
-                              placeholder="e.g., Maroon"
-                              value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
-                              style={inputStyle}
-                            />
-                          ) : (
-                            <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor || '—'}</span>
-                          )
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="e.g., Maroon"
+                            value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
+                            style={inputStyle}
+                          />
                         ) : (
-                          <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
                         )}
                       </td>
 
@@ -1188,11 +1206,16 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max="110"
+                              max="10"
                               step="0.5"
                               className="form-control form-control-sm text-center"
                               value={row.bufferPct ?? ''}
                               placeholder="0"
+                              onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
@@ -1320,7 +1343,25 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '80px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="number" min="0" className="form-control form-control-sm text-center" value={row.bufferPct ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)} style={inputStyle} />
+                          <div className="d-flex flex-column align-items-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              className="form-control form-control-sm text-center"
+                              value={row.bufferPct ?? ''}
+                              placeholder="0"
+                              onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
+                              style={inputStyle}
+                            />
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                          </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
                         )}
@@ -1427,14 +1468,10 @@ export default function OrderDetailView({
                         )}
                       </td>
                       <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                        {row.source === 'Job Work' ? (
-                          isEditing ? (
-                            <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
-                          ) : (
-                            <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor || '—'}</span>
-                          )
+                        {isEditing ? (
+                          <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
                         ) : (
-                          <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
                         )}
                       </td>
                       <td className="text-center text-muted" style={{ minWidth: '70px', padding: '6px 8px' }}>—</td>
@@ -1449,7 +1486,22 @@ export default function OrderDetailView({
                       <td style={{ minWidth: '80px', padding: '6px 8px' }}>
                         {isEditing ? (
                           <div className="d-flex flex-column align-items-center">
-                            <input type="number" min="0" max="110" className="form-control form-control-sm text-center" value={row.bufferPct ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)} style={inputStyle} />
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              className="form-control form-control-sm text-center"
+                              value={row.bufferPct ?? ''}
+                              placeholder="0"
+                              onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
+                              style={inputStyle}
+                            />
                             <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
                           </div>
                         ) : (
@@ -1579,14 +1631,10 @@ export default function OrderDetailView({
                       )}
                     </td>
                     <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                      {row.source === 'Job Work' ? (
-                        isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor || '—'}</span>
-                        )
+                      {isEditing ? (
+                        <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
                       ) : (
-                        <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                        <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
                       )}
                     </td>
                     <td style={{ minWidth: '70px', padding: '6px 8px' }}>
@@ -1599,7 +1647,22 @@ export default function OrderDetailView({
                     <td style={{ minWidth: '80px', padding: '6px 8px' }}>
                       {isEditing ? (
                         <div className="d-flex flex-column align-items-center">
-                          <input type="number" min="0" max="110" className="form-control form-control-sm text-center" value={row.bufferPct ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)} style={inputStyle} />
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.5"
+                            className="form-control form-control-sm text-center"
+                            value={row.bufferPct ?? ''}
+                            placeholder="0"
+                            onKeyDown={(e) => {
+                              if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
+                            style={inputStyle}
+                          />
                           <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
                         </div>
                       ) : (

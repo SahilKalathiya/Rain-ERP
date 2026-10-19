@@ -342,7 +342,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     threadPattern: 'Stitching',
     threadPerStitch: 15,
     threadPerPiece: 60,
-    boxes: [],
+    boxes: [{ reelsPerBox: '', metersPerReel: '' }],
     coneSizes: [],
     placements: [],
     processRemarks: ''
@@ -411,7 +411,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       threadPattern: acc.threadPattern || 'Kantha',
       threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15,
       threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : 60,
-      boxes: acc.boxes || acc.boxesConfig || [],
+      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
       coneSizes: acc.coneSizes || [],
       placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
@@ -617,11 +617,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
           ></i>
           <input
             type="text"
-            className="form-control rounded-pill bg-white"
+            className="form-control rounded-pill bg-white search-input-integrated"
             placeholder="Search accessories, sub types, HSN..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ borderColor: '#cbd5e1', fontSize: '13.5px', height: '40px', paddingLeft: '40px' }}
+            style={{ borderColor: '#cbd5e1', fontSize: '13.5px', height: '40px', paddingLeft: '44px' }}
           />
           {searchQuery && (
             <button
@@ -1156,16 +1156,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             <div className="fw-semibold text-dark small mb-2">
                               Available boxes (each box = 6000 m):
                             </div>
-                            {(formData.boxes || []).map((b, i) => (
+                            {((formData.boxes && formData.boxes.length > 0) ? formData.boxes : [{ reelsPerBox: '', metersPerReel: '' }]).map((b, i, arr) => (
                               <div key={i} className="row g-2 align-items-end mb-2">
                                 <div className="col-5">
                                   <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Reels per box</label>
                                   <input
                                     type="number"
                                     className="form-control form-control-sm"
+                                    placeholder="e.g. 15"
                                     value={b.reelsPerBox ?? ''}
                                     onChange={(e) => {
-                                      const updated = [...(formData.boxes || [])];
+                                      const updated = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
                                       updated[i] = { ...updated[i], reelsPerBox: e.target.value };
                                       setFormData({ ...formData, boxes: updated });
                                     }}
@@ -1177,9 +1178,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   <input
                                     type="number"
                                     className="form-control form-control-sm"
+                                    placeholder="e.g. 20"
                                     value={b.metersPerReel ?? ''}
                                     onChange={(e) => {
-                                      const updated = [...(formData.boxes || [])];
+                                      const updated = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
                                       updated[i] = { ...updated[i], metersPerReel: e.target.value };
                                       setFormData({ ...formData, boxes: updated });
                                     }}
@@ -1187,16 +1189,32 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   />
                                 </div>
                                 <div className="col-2 pb-1 text-end">
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                    onClick={() => {
-                                      const updated = (formData.boxes || []).filter((_, idx) => idx !== i);
-                                      setFormData({ ...formData, boxes: updated });
-                                    }}
-                                  >
-                                    Remove
-                                  </button>
+                                  {arr.length > 1 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                      onClick={() => {
+                                        const updated = arr.filter((_, idx) => idx !== i);
+                                        setFormData({ ...formData, boxes: updated });
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                                      title="Clear row"
+                                      onClick={() => {
+                                        setFormData({
+                                          ...formData,
+                                          boxes: [{ reelsPerBox: '', metersPerReel: '' }]
+                                        });
+                                      }}
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -1204,9 +1222,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               type="button"
                               className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
                               onClick={() => {
+                                const current = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
                                 setFormData({
                                   ...formData,
-                                  boxes: [...(formData.boxes || []), { reelsPerBox: '', metersPerReel: '' }]
+                                  boxes: [...current, { reelsPerBox: '', metersPerReel: '' }]
                                 });
                               }}
                             >
@@ -1406,10 +1425,32 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       <label className="form-label fw-semibold text-dark small mb-1.5">Maximum buffer (%)</label>
                       <input
                         type="number"
+                        min="0"
+                        max="5"
+                        step="any"
                         className="form-control"
                         placeholder="e.g. 5"
                         value={formData.maxBuffer ?? ''}
-                        onChange={(e) => setFormData({ ...formData, maxBuffer: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            setFormData({ ...formData, maxBuffer: '' });
+                            return;
+                          }
+                          const num = parseFloat(val);
+                          if (isNaN(num)) {
+                            setFormData({ ...formData, maxBuffer: '' });
+                          } else if (num > 5) {
+                            setFormData({ ...formData, maxBuffer: 5 });
+                          } else if (num < 0) {
+                            setFormData({ ...formData, maxBuffer: 0 });
+                          } else {
+                            setFormData({ ...formData, maxBuffer: val });
+                          }
+                        }}
                         style={{ height: '42px', borderRadius: '8px' }}
                       />
                     </div>
@@ -2129,7 +2170,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   <div className="row g-4">
                     <div className="col-md-3">
                       <div className="text-muted small">Maximum Buffer</div>
-                      <div className="fw-bold text-dark mt-1">{selectedAccessory.maxBuffer ? `${selectedAccessory.maxBuffer}%` : '—'}</div>
+                      <div className="fw-bold text-dark mt-1">{selectedAccessory.maxBuffer !== undefined && selectedAccessory.maxBuffer !== null && selectedAccessory.maxBuffer !== '' ? `${selectedAccessory.maxBuffer}%` : '—'}</div>
                     </div>
                     <div className="col-md-3">
                       <div className="text-muted small">HSN Code</div>

@@ -1295,11 +1295,11 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
               ></i>
               <input
                 type="text"
-                className="form-control form-control-sm rounded-3 border"
+                className="form-control form-control-sm rounded-3 border search-input-integrated"
                 placeholder="Global search across all customer fields (11.1)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: '36px' }}
+                style={{ paddingLeft: '42px' }}
               />
             </div>
             <div className="text-muted small">

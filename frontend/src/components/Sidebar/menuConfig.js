@@ -26,14 +26,14 @@ export const navigationMenu = [
         icon: 'ti ti-database',
         open: false,
         submenu: [
-          { label: 'Customer Master', link: '/customers' },
-          { label: 'Article Master', link: '/articles' },
-          { label: 'Color Master', link: '/colors' },
-          { label: 'Size Series Master', link: '/sizes' },
-          { label: 'Accessories Master', link: '/accessories' },
-          { label: 'Fabrics Master', link: '/fabrics' },
-          { label: 'Vendors Master', link: '/vendors' },
-          { label: 'Transporters Master', link: '/transporters' }
+          { label: 'Customer', link: '/customers' },
+          { label: 'Article', link: '/articles' },
+          { label: 'Color', link: '/colors' },
+          { label: 'Size Series', link: '/sizes' },
+          { label: 'Accessories', link: '/accessories' },
+          { label: 'Fabrics', link: '/fabrics' },
+          { label: 'Vendors', link: '/vendors' },
+          { label: 'Transporters', link: '/transporters' }
         ]
       }
     ]
