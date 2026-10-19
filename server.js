@@ -143,7 +143,14 @@ function createServer(port) {
         if (!html.includes('<base')) {
           html = html.replace('<head>', '<head>\n    <base href="/react/">');
         }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
+        // Force fresh bundle timestamp on every load to prevent browser caching old code
+        html = html.replace(/index-DX-E0Odo\.js(?:\?v=[^"']*)?/, `index-DX-E0Odo.js?v=${Date.now()}`);
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=UTF-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        });
         return res.end(html);
       }
     }

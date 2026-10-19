@@ -446,7 +446,7 @@ export default function SizeMasterView() {
           <div>
             <h4 className="fw-bold text-dark mb-0 fs-18">Size Master</h4>
             <p className="text-muted small mb-0">
-              Route 1 (Section 5) &bull; Size Series (Alphabetic, Numeric, Roman) & Individual Size Records
+              Size Series (Alphabetic, Numeric, Roman) &amp; Individual Size Records
             </p>
           </div>
         </div>

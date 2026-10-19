@@ -9,7 +9,8 @@ import {
   setStoredThreadSizes,
   initialThreadBrandColors,
   getStoredThreadBrandColors,
-  setStoredThreadBrandColors
+  setStoredThreadBrandColors,
+  initialArticles
 } from '../../data/salesOrderData';
 
 const ACCESSORY_CATEGORIES = [
@@ -84,6 +85,9 @@ const getCategoryColor = (cat) => {
     default: return '#2e37a4';
   }
 };
+
+const THREAD_SIZE_OPTIONS = ['40/2', '30/2', '20/2', '20/3', '120s', 'Tex 40', 'Ticket 120'];
+const THREAD_UNIT_OPTIONS = ['Cone', 'Reel', 'Meter', 'Box', 'Kilogram', 'Dozen', 'Gross'];
 
 const THREAD_PATTERNS = [
   'Stitching',
@@ -280,10 +284,33 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   // Section 8 State: Thread Sizes & Thread Brand Colors
   const [threadSizes, setThreadSizes] = useState(() => getStoredThreadSizes());
   const [threadColors, setThreadColors] = useState(() => getStoredThreadBrandColors());
+  const [articlesList] = useState(() => {
+    try {
+      const stored = getStoredData('erp_articles_master', null);
+      if (Array.isArray(stored) && stored.length > 0) return stored;
+    } catch (e) {}
+    return initialArticles || [];
+  });
+
+  const allAvailableFabrics = useMemo(() => {
+    try {
+      const stored = getStoredData('raindrop_fabrics_v1', null);
+      if (Array.isArray(stored) && stored.length > 0) {
+        const names = stored.map(f => f.quality || f.qualityName || f.name).filter(Boolean);
+        if (names.length > 0) return Array.from(new Set(names));
+      }
+    } catch (e) {}
+    return FABRIC_QUALITIES;
+  }, []);
 
   // Thread Suggestion Engine State (Section 8.1)
   const [calcMetres, setCalcMetres] = useState(1100);
   const [calcSuggestions, setCalcSuggestions] = useState(null);
+
+  // Custom Input Mode with Dropdown Toggle Button (Matching Fabric Type design)
+  const [isCustomThreadSize, setIsCustomThreadSize] = useState(false);
+  const [isCustomThreadUnit, setIsCustomThreadUnit] = useState(false);
+  const [isCustomPackaging, setIsCustomPackaging] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -332,19 +359,28 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     tasselType: 'Ready Made',
     jobWorkRows: [],
 
-    // Dori / Elastic / Beads & Sequins
-    fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }],
+    // Dori (Section 6.4)
+    doriRequiredSize: '',
+    doriUnit: 'Meter',
+    doriFabricEntries: [{ fabricQuality: '', widthSizes: [], consumptions: {} }],
+
+    // Elastic (Section 6.5) & Beads & Sequins (Section 6.6)
+    fabricRows: [{ fabricQuality: '', fabricName: '', size: '', unit: cat === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: '' }],
     fabricEntries: [],
 
-    // Thread
-    sizeValue: '',
-    sizeUnit: 'mm',
-    threadPattern: 'Stitching',
-    threadPerStitch: 15,
-    threadPerPiece: 60,
-    boxes: [{ reelsPerBox: '', metersPerReel: '' }],
+    // Thread (PDF Section 7.1 - 7.5): Start clean, retaining only explicit PDF defaults
+    threadSize: '',
+    threadSizeCustom: '',
+    threadPattern: '',
+    threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
+    threadPerPiece: 60,  // Explicit PDF Default (Page 13)
+    boxes: [],
     coneSizes: [],
     placements: [],
+    articlePlacements: [],
+    globalThreadMetric: 15, // Explicit PDF Default (Page 12)
+    stitchingArticles: [],
+    consumptionPer100Pcs: {},
     processRemarks: ''
   });
 
@@ -383,6 +419,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       : 'Buttons';
 
     setFormData(getEmptyAccessoryForm(targetCat));
+    setIsCustomThreadSize(false);
+    setIsCustomThreadUnit(false);
     setIsCreatingNew(true);
     setIsEditing(true);
     setSelectedAccessory(null);
@@ -396,6 +434,14 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       ? acc.buttonColorsList
       : (acc.buttonColors ? acc.buttonColors.split(',').map(s => s.trim()).filter(Boolean) : (acc.colors?.length ? acc.colors : (acc.color ? [acc.color] : [])));
 
+    const isCustomSz = Boolean(acc.threadSize && !THREAD_SIZE_OPTIONS.includes(acc.threadSize) && !(threadSizes || []).some(ts => {
+      const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
+      return ts.id === acc.threadSize || label === acc.threadSize;
+    }));
+    const isCustomU = Boolean(acc.unit && !THREAD_UNIT_OPTIONS.includes(acc.unit));
+    setIsCustomThreadSize(isCustomSz);
+    setIsCustomThreadUnit(isCustomU);
+
     setFormData({
       ...acc,
       name: acc.name || '',
@@ -408,25 +454,32 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       sizeUnit: acc.sizeUnit || 'mm',
       unit: acc.unit || (CONTINUOUS_UNITS.includes(acc.category) ? 'Meter' : 'Piece'),
       piecesPerUnit: acc.piecesPerUnit !== undefined && acc.piecesPerUnit !== '' ? acc.piecesPerUnit : 1,
-      threadPattern: acc.threadPattern || 'Kantha',
+      threadPattern: acc.threadPattern || '',
+      threadSize: acc.threadSize || acc.size || '',
+      threadSizeCustom: acc.threadSizeCustom || '',
+      globalThreadMetric: acc.globalThreadMetric !== undefined ? acc.globalThreadMetric : 15,
+      articlePlacements: acc.articlePlacements || [],
+      stitchingArticles: acc.stitchingArticles || (acc.consumptionPer100Pcs ? Object.keys(acc.consumptionPer100Pcs) : []),
+      consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
       threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15,
       threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : 60,
-      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
+      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : []),
       coneSizes: acc.coneSizes || [],
       placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
       jobWorkRows: acc.jobWorkRows || [],
+      doriRequiredSize: acc.doriRequiredSize || acc.requiredSize || acc.size || '',
+      doriUnit: acc.doriUnit || acc.unit || 'Meter',
+      doriFabricEntries: (acc.doriFabricEntries && acc.doriFabricEntries.length > 0)
+        ? acc.doriFabricEntries
+        : (acc.category === 'Dori' && acc.fabricEntries && acc.fabricEntries.length > 0
+            ? acc.fabricEntries
+            : [{ fabricQuality: '', widthSizes: [], consumptions: {} }]),
       fabricRows: (acc.fabricRows && acc.fabricRows.length > 0)
         ? acc.fabricRows
-        : (acc.fabricEntries && acc.fabricEntries.length > 0
-          ? acc.fabricEntries
-          : [{
-              fabricName: acc.fabricName || acc.fabricQuality || FABRIC_QUALITIES[0],
-              fabricQuality: acc.fabricQuality || acc.fabricName || FABRIC_QUALITIES[0],
-              size: acc.doriRequiredSize || acc.requiredSize || acc.size || '',
-              unit: acc.unit || 'Meter',
-              consumption: acc.fabricConsumption || acc.consumption || ''
-            }]),
+        : (acc.fabricEntries && acc.fabricEntries.length > 0 && acc.category !== 'Dori'
+            ? acc.fabricEntries
+            : [{ fabricQuality: '', fabricName: '', size: acc.requiredSize || '', unit: acc.category === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: acc.fabricConsumption || '' }]),
       buttonSizesList: szList,
       buttonColorsList: clList,
       variants: acc.variants || szList,
@@ -465,9 +518,26 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       variants: formData.variants || formData.buttonSizesList || [],
       colors: formData.colors || formData.buttonColorsList || [],
       laceSize: formData.laceSizeValue ? `${formData.laceSizeValue} ${formData.laceSizeUnit || 'mm'}` : (formData.laceSize || ''),
-      threadSize: formData.sizeValue ? `${formData.sizeValue} ${formData.sizeUnit || 'mm'}` : (formData.threadSize || ''),
+      threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
+      threadSizeCustom: formData.threadSizeCustom || '',
+      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' ? 'Meter' : 'Piece'))),
+      unitCustom: formData.unitCustom || '',
+      piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
+      threadPattern: formData.threadPattern || 'Stitching',
+      threadPerStitch: parseFloat(formData.threadPerStitch) || 15,
+      threadPerPiece: parseFloat(formData.threadPerPiece) || 60,
+      globalThreadMetric: parseFloat(formData.globalThreadMetric) || 15,
+      articlePlacements: formData.articlePlacements || [],
+      stitchingArticles: formData.stitchingArticles || [],
+      consumptionPer100Pcs: formData.consumptionPer100Pcs || {},
       boxesConfig: formData.boxes || formData.boxesConfig || [],
-      fabricEntries: formData.fabricRows || formData.fabricEntries || [],
+      doriRequiredSize: formData.doriRequiredSize || formData.size || '',
+      doriUnit: formData.doriUnit || formData.unit || 'Meter',
+      doriFabricEntries: formData.doriFabricEntries || [],
+      fabricRows: formData.fabricRows || [],
+      fabricEntries: formData.category === 'Dori'
+        ? (formData.doriFabricEntries || [])
+        : (formData.fabricRows || []),
       name: capitalizedName,
       id: formData.id || `ACC-${Date.now().toString().slice(-4)}`
     };
@@ -813,10 +883,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           setFormData({
                             ...formData,
                             category: cat,
-                            unit: CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece',
+                            unit: cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece'),
                             fabricRows: (!formData.fabricRows || formData.fabricRows.length === 0)
-                              ? [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }]
-                              : formData.fabricRows
+                              ? [{ fabricName: '', fabricQuality: '', size: '', unit: cat === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: '' }]
+                              : formData.fabricRows,
+                            doriFabricEntries: (!formData.doriFabricEntries || formData.doriFabricEntries.length === 0)
+                              ? [{ fabricQuality: '', widthSizes: [], consumptions: {} }]
+                              : formData.doriFabricEntries
                           });
                         }}
                         style={{ height: '42px', borderRadius: '8px' }}
@@ -1080,214 +1153,759 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   )}
 
                   {/* ============================================================== */}
-                  {/* CATEGORY 4: THREAD (SIZE AND EXTRA PROCESSES REMOVED)       */}
+                  {/* CATEGORY 4: THREAD CONFIGURATION (PDF SECTION 7.1 - 7.5)       */}
                   {/* ============================================================== */}
                   {formData.category === 'Thread' && (() => {
-                    const showBoxCone = ['Kantha', 'Couching', 'Stitching'].includes(formData.threadPattern);
-                    const showPlacements = ['Kantha', 'Couching'].includes(formData.threadPattern);
-                    const showProcessOnly = ['Button Tacking', 'Handwork'].includes(formData.threadPattern);
+                    const isKanthaCouching = formData.threadPattern === 'Kantha' || formData.threadPattern === 'Couching';
+                    const isStitching = formData.threadPattern === 'Stitching';
+                    const isProcessOnly = formData.threadPattern === 'Button Tacking' || formData.threadPattern === 'Handwork';
 
                     return (
                       <>
-                        <div className="row g-3 mb-3">
-                          <div className="col-12">
-                            <label className="form-label fw-semibold text-dark small mb-1.5">Ordering unit</label>
+                        {/* 7.1 Base Thread Configuration (Data Structure) */}
+                        <div className="card p-3 rounded-3 mb-3 border bg-white shadow-2xs" style={{ borderColor: '#e2e8f0' }}>
+                          <div className="fw-bold text-dark fs-14 mb-2.5 d-flex align-items-center gap-2">
+                            <i className="ti ti-needle-thread text-primary"></i>
+                            <span>Base Thread Configuration</span>
+                          </div>
+
+                          <div className="row g-3 mb-2.5">
+                            {/* Size / Count (Text / Dropdown with Other - Mandatory: Yes) */}
+                            <div className="col-md-4">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Size / Count <span className="text-danger">*</span>
+                              </label>
+                              {isCustomThreadSize ? (
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm bg-white fw-bold"
+                                    placeholder="Type custom size / count..."
+                                    autoFocus
+                                    value={formData.threadSizeCustom ?? (formData.threadSize === 'Other' ? '' : formData.threadSize)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setFormData({ ...formData, threadSizeCustom: val, threadSize: val });
+                                    }}
+                                    style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-2.5"
+                                    onClick={() => {
+                                      setIsCustomThreadSize(false);
+                                      setFormData({ ...formData, threadSize: '', threadSizeCustom: '' });
+                                    }}
+                                    title="Switch back to dropdown list"
+                                    style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
+                                  >
+                                    <i className="ti ti-chevron-down"></i>
+                                  </button>
+                                </div>
+                              ) : (
+                                <select
+                                  className="form-select form-select-sm"
+                                  value={THREAD_SIZE_OPTIONS.includes(formData.threadSize) || (threadSizes || []).some(ts => {
+                                    const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
+                                    return ts.id === formData.threadSize || label === formData.threadSize;
+                                  }) ? formData.threadSize : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'Other') {
+                                      setIsCustomThreadSize(true);
+                                      setFormData({ ...formData, threadSize: '', threadSizeCustom: '' });
+                                    } else {
+                                      setIsCustomThreadSize(false);
+                                      setFormData({ ...formData, threadSize: val, threadSizeCustom: '' });
+                                    }
+                                  }}
+                                  style={{ height: '38px', borderRadius: '7px' }}
+                                >
+                                  <option value="">-- Select Size / Count --</option>
+                                  {threadSizes && threadSizes.length > 0 && (
+                                    <optgroup label="From Thread Sizes Master">
+                                      {threadSizes.map((ts) => {
+                                        const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
+                                        return (
+                                          <option key={ts.id || label} value={label}>{label}</option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+                                  <optgroup label="Standard Sizes / Counts">
+                                    {THREAD_SIZE_OPTIONS.map((sz) => (
+                                      <option key={sz} value={sz}>{sz}</option>
+                                    ))}
+                                  </optgroup>
+                                  <option value="Other">Other (Custom Size)...</option>
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Unit (Dropdown with Other - Mandatory: Yes) */}
+                            <div className="col-md-4">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Unit <span className="text-danger">*</span>
+                              </label>
+                              {isCustomThreadUnit ? (
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm bg-white fw-bold"
+                                    placeholder="Type custom unit..."
+                                    autoFocus
+                                    value={formData.unitCustom ?? (formData.unit === 'Other' ? '' : formData.unit)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setFormData({ ...formData, unitCustom: val, unit: val });
+                                    }}
+                                    style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-2.5"
+                                    onClick={() => {
+                                      setIsCustomThreadUnit(false);
+                                      setFormData({ ...formData, unit: '', unitCustom: '' });
+                                    }}
+                                    title="Switch back to dropdown list"
+                                    style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
+                                  >
+                                    <i className="ti ti-chevron-down"></i>
+                                  </button>
+                                </div>
+                              ) : (
+                                <select
+                                  className="form-select form-select-sm"
+                                  value={THREAD_UNIT_OPTIONS.includes(formData.unit) ? formData.unit : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'Other') {
+                                      setIsCustomThreadUnit(true);
+                                      setFormData({ ...formData, unit: '', unitCustom: '' });
+                                    } else {
+                                      setIsCustomThreadUnit(false);
+                                      setFormData({ ...formData, unit: val, unitCustom: '' });
+                                    }
+                                  }}
+                                  style={{ height: '38px', borderRadius: '7px' }}
+                                >
+                                  <option value="">-- Select Unit --</option>
+                                  {THREAD_UNIT_OPTIONS.map((u) => (
+                                    <option key={u} value={u}>{u}</option>
+                                  ))}
+                                  <option value="Other">Other (Custom Unit)...</option>
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Pieces Per Unit (Number - Mandatory: Yes) */}
+                            <div className="col-md-4">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Pieces Per Unit <span className="text-danger">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                className="form-control form-control-sm fw-bold"
+                                value={formData.piecesPerUnit ?? 1}
+                                placeholder="1"
+                                onChange={(e) => setFormData({ ...formData, piecesPerUnit: parseInt(e.target.value, 10) || 1 })}
+                                style={{ height: '38px', borderRadius: '7px' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Thread Pattern (Dropdown - Mandatory: Yes, drives pattern-specific fields below) */}
+                          <div className="mt-2 pt-2 border-top">
+                            <label className="form-label fw-semibold text-dark small mb-1">
+                              Thread Pattern <span className="text-danger">*</span> (Kantha / Couching / Stitching / Embroidery / Button Tacking / Handwork)
+                            </label>
                             <select
-                              className="form-select"
-                              value={formData.unit || 'Meter'}
-                              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                              style={{ height: '42px', borderRadius: '8px' }}
+                              className="form-select form-select-sm fw-bold"
+                              value={formData.threadPattern || ''}
+                              onChange={(e) => {
+                                const pat = e.target.value;
+                                // Section 12.4: Changing thread pattern must not carry incompatible data across
+                                setFormData(prev => ({
+                                  ...prev,
+                                  threadPattern: pat
+                                }));
+                              }}
+                              style={{ height: '40px', borderRadius: '7px', borderColor: '#2e37a4', color: '#1e293b' }}
                             >
-                              {CONTINUOUS_UNITS.map((u) => (
-                                <option key={u} value={u}>{u}</option>
+                              <option value="">-- Select Thread Pattern --</option>
+                              {THREAD_PATTERNS.map((p) => (
+                                <option key={p} value={p}>{p}</option>
                               ))}
                             </select>
                           </div>
                         </div>
 
-                        <p className="form-text text-muted mb-3" style={{ fontSize: '12.5px', lineHeight: 1.4 }}>
-                          Thread is measured continuously, not counted per piece — there's no "pieces per unit" here.
-                        </p>
-
-                        <div className="mb-3">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Thread pattern</label>
-                          <select
-                            className="form-select"
-                            value={formData.threadPattern || 'Stitching'}
-                            onChange={(e) => {
-                              const pat = e.target.value;
-                              setFormData({
-                                ...formData,
-                                threadPattern: pat,
-                                threadPerStitch: formData.threadPerStitch || 15,
-                                threadPerPiece: formData.threadPerPiece || 60
-                              });
-                            }}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          >
-                            {THREAD_PATTERNS.map((p) => (
-                              <option key={p} value={p}>{p}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {formData.threadPattern === 'Stitching' && (
-                          <div className="mb-3">
-                            <label className="form-label fw-semibold text-dark small mb-1.5">
-                              Thread per piece (m)
-                            </label>
-                            <input
-                              type="number"
-                              className="form-control mb-1.5"
-                              style={{ width: '130px', height: '42px', borderRadius: '8px' }}
-                              value={formData.threadPerPiece ?? 60}
-                              onChange={(e) => setFormData({ ...formData, threadPerPiece: e.target.value })}
-                            />
-                            <div className="form-text text-muted" style={{ fontSize: '12px' }}>
-                              Auto-fills the BOM quantity per piece; remains editable there.
-                            </div>
-                          </div>
-                        )}
-
-                        {(formData.threadPattern === 'Kantha' || formData.threadPattern === 'Couching') && (
-                          <div className="mb-3">
-                            <label className="form-label fw-semibold text-dark small mb-1.5">
-                              Thread per stitch (m per 1m of stitching)
-                            </label>
-                            <input
-                              type="number"
-                              className="form-control"
-                              style={{ width: '130px', height: '42px', borderRadius: '8px' }}
-                              value={formData.threadPerStitch ?? 15}
-                              onChange={(e) => setFormData({ ...formData, threadPerStitch: e.target.value })}
-                            />
-                          </div>
-                        )}
-
-                        {showBoxCone && (
-                          <div className="mb-3 p-3 bg-light rounded-3 border">
-                            <div className="fw-semibold text-dark small mb-2">
-                              Available boxes (each box = 6000 m):
-                            </div>
-                            {((formData.boxes && formData.boxes.length > 0) ? formData.boxes : [{ reelsPerBox: '', metersPerReel: '' }]).map((b, i, arr) => (
-                              <div key={i} className="row g-2 align-items-end mb-2">
-                                <div className="col-5">
-                                  <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Reels per box</label>
-                                  <input
-                                    type="number"
-                                    className="form-control form-control-sm"
-                                    placeholder="e.g. 15"
-                                    value={b.reelsPerBox ?? ''}
-                                    onChange={(e) => {
-                                      const updated = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
-                                      updated[i] = { ...updated[i], reelsPerBox: e.target.value };
-                                      setFormData({ ...formData, boxes: updated });
-                                    }}
-                                    style={{ height: '36px', borderRadius: '6px' }}
-                                  />
-                                </div>
-                                <div className="col-5">
-                                  <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Meters per reel</label>
-                                  <input
-                                    type="number"
-                                    className="form-control form-control-sm"
-                                    placeholder="e.g. 20"
-                                    value={b.metersPerReel ?? ''}
-                                    onChange={(e) => {
-                                      const updated = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
-                                      updated[i] = { ...updated[i], metersPerReel: e.target.value };
-                                      setFormData({ ...formData, boxes: updated });
-                                    }}
-                                    style={{ height: '36px', borderRadius: '6px' }}
-                                  />
-                                </div>
-                                <div className="col-2 pb-1 text-end">
-                                  {arr.length > 1 ? (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                      onClick={() => {
-                                        const updated = arr.filter((_, idx) => idx !== i);
-                                        setFormData({ ...formData, boxes: updated });
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
-                                      title="Clear row"
-                                      onClick={() => {
-                                        setFormData({
-                                          ...formData,
-                                          boxes: [{ reelsPerBox: '', metersPerReel: '' }]
-                                        });
-                                      }}
-                                    >
-                                      Clear
-                                    </button>
-                                  )}
-                                </div>
+                        {/* 7.2 Kantha & 7.3 Couching Pattern (Shared Configuration Definition - Section 12.4) */}
+                        {isKanthaCouching && (
+                          <div className="card p-3.5 rounded-3 mb-3 border shadow-2xs" style={{ backgroundColor: '#f8faff', borderColor: '#c7d2fe' }}>
+                            <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge rounded-pill px-2.5 py-1 text-white" style={{ backgroundColor: '#2e37a4' }}>
+                                  {formData.threadPattern}
+                                </span>
+                                <span className="fw-bold text-dark fs-14">Pattern Configuration</span>
                               </div>
-                            ))}
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
-                              onClick={() => {
-                                const current = (formData.boxes && formData.boxes.length > 0) ? [...formData.boxes] : [{ reelsPerBox: '', metersPerReel: '' }];
-                                setFormData({
-                                  ...formData,
-                                  boxes: [...current, { reelsPerBox: '', metersPerReel: '' }]
-                                });
-                              }}
-                            >
-                              + Add more
-                            </button>
+                              <span className="small text-muted" style={{ fontSize: '11.5px' }}>
+                                {formData.threadPattern === 'Kantha' ? 'Running Stitch Pattern' : 'Surface Thread Pattern'}
+                              </span>
+                            </div>
 
-                            <div className="mt-3">
+                            {/* Thread Per Stitch (metres) - Default 15m, editable */}
+                            <div className="mb-3">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Thread Per Stitch (metres required for 1m of stitching) <span className="text-danger">*</span>
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="form-control fw-bold"
+                                  value={formData.threadPerStitch ?? 15}
+                                  onChange={(e) => setFormData({ ...formData, threadPerStitch: parseFloat(e.target.value) || 0 })}
+                                  style={{ height: '36px' }}
+                                />
+                                <span className="input-group-text bg-white text-muted">m / stitch</span>
+                              </div>
+                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
+                                Default: 15 m per metre of stitching, remains editable.
+                              </div>
+                            </div>
+
+                            {/* Available Boxes (Reels Per Box x Metres Per Reel = 6000 m) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <label className="form-label fw-bold text-dark small mb-0">
+                                  Available Boxes (Each box = 6000 m)
+                                </label>
+                                <span className="badge bg-light text-muted border" style={{ fontSize: '11px' }}>
+                                  Reels Per Box &times; Metres Per Reel
+                                </span>
+                              </div>
+                              {(!formData.boxes || formData.boxes.length === 0) ? (
+                                <div className="text-muted small py-2 mb-2" style={{ fontSize: '12px' }}>
+                                  No box configurations added. Click &quot;+ Add Box Configuration&quot; below if you use boxed packaging (e.g. 15 reels &times; 400m).
+                                </div>
+                              ) : (
+                                formData.boxes.map((b, i, arr) => {
+                                  const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
+                                  return (
+                                    <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
+                                      <div className="col-4">
+                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Reels Per Box</label>
+                                        <input
+                                          type="number"
+                                          className="form-control form-control-sm fw-bold"
+                                          placeholder="e.g. 15"
+                                          value={b.reelsPerBox ?? ''}
+                                          onChange={(e) => {
+                                            const updated = [...arr];
+                                            updated[i] = { ...updated[i], reelsPerBox: e.target.value };
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="col-4">
+                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Metres Per Reel</label>
+                                        <input
+                                          type="number"
+                                          className="form-control form-control-sm fw-bold"
+                                          placeholder="e.g. 400"
+                                          value={b.metersPerReel ?? ''}
+                                          onChange={(e) => {
+                                            const updated = [...arr];
+                                            updated[i] = { ...updated[i], metersPerReel: e.target.value };
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="col-3 text-center">
+                                        <span className={`badge ${totalBoxMetres === 6000 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-dark'}`} style={{ fontSize: '11px' }}>
+                                          = {totalBoxMetres || 0} m
+                                        </span>
+                                      </div>
+                                      <div className="col-1 text-end">
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                          onClick={() => {
+                                            const updated = arr.filter((_, idx) => idx !== i);
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        >
+                                          <i className="ti ti-trash"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
+                                style={{ fontSize: '12px' }}
+                                onClick={() => {
+                                  const current = formData.boxes || [];
+                                  setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
+                                }}
+                              >
+                                <i className="ti ti-plus"></i> Add Box Configuration
+                              </button>
+                            </div>
+
+                            {/* Available Cone Sizes (Repeatable) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
                               <TagInput
-                                label="Available cone sizes (m)"
+                                label="Available Cone Sizes (e.g. 5000 m, 10000 m)"
                                 tags={formData.coneSizes || []}
                                 onChange={(newTags) => setFormData({ ...formData, coneSizes: newTags })}
-                                placeholder="Type a value, press Enter"
+                                placeholder="Type cone size (e.g. 5000 m) and press Enter"
+                                suggestions={['5000 m', '10000 m', '20000 m']}
                               />
                             </div>
 
-                            {showPlacements && (
-                              <div className="mt-3">
-                                <TagInput
-                                  label="Available placements"
-                                  tags={formData.placements || []}
-                                  onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
-                                  placeholder="Type a value, press Enter"
-                                />
-                                <div className="form-text text-muted mt-1" style={{ fontSize: '12px' }}>
-                                  e.g. Sleeves, Front, Back — some may be predefined via Manufacturing Defaults.
+                            {/* Available Placements (Repeatable chips/buttons) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <label className="form-label fw-bold text-dark small mb-1">
+                                Available Placements (Predefined & Manufacturing Defaults)
+                              </label>
+                              <TagInput
+                                label=""
+                                tags={formData.placements || []}
+                                onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
+                                placeholder="Add placement (e.g. Sleeves, Collar) and press Enter"
+                                suggestions={['Sleeves', 'Front', 'Back', 'Collar', 'Hemline', 'Pocket', 'Placket']}
+                              />
+                            </div>
+
+                            {/* Article -> Placement -> Thread Line Chain (Section 7.2 table, Page 12 functional points, Section 10.2 wireframe) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <div>
+                                  <span className="fw-bold text-dark fs-13 d-block">
+                                    Article &rarr; Placement &rarr; Thread Line Chain
+                                  </span>
+                                  <span className="text-muted small" style={{ fontSize: '11px' }}>
+                                    Section 10.2: Configure thread required per placement line for each article
+                                  </span>
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        )}
-                        {formData.threadPattern === 'Embroidery' && (
-                          <div className="form-text text-muted mb-3" style={{ fontSize: '12.5px' }}>
-                            No additional measurements required for Embroidery.
+
+                              {/* Repeatable Article Blocks */}
+                              {(!formData.articlePlacements || formData.articlePlacements.length === 0) ? (
+                                <div className="text-muted small py-2.5 mb-2.5 bg-light rounded-2 p-3 border" style={{ fontSize: '12px', borderColor: '#e2e8f0' }}>
+                                  No article placement blocks configured yet. Click &quot;+ Add Article Block&quot; below to configure thread requirements per placement line for an article.
+                                </div>
+                              ) : (
+                                formData.articlePlacements.map((artBlock, abIdx, allBlocks) => (
+                                  <div key={abIdx} className="p-3 mb-2.5 rounded-3 border bg-light position-relative" style={{ borderColor: '#cbd5e1' }}>
+                                    <div className="d-flex align-items-center justify-content-between mb-2.5 flex-wrap gap-2">
+                                      <div className="d-flex align-items-center gap-2">
+                                        <span className="badge rounded-circle p-1.5" style={{ backgroundColor: '#2e37a4', color: '#fff', fontSize: '11px', width: '22px', height: '22px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          {abIdx + 1}
+                                        </span>
+                                        <label className="form-label fw-bold text-dark small mb-0">Article:</label>
+                                        <select
+                                          className="form-select form-select-sm fw-semibold"
+                                          value={artBlock.article || ''}
+                                          onChange={(e) => {
+                                            const updated = [...allBlocks];
+                                            updated[abIdx] = { ...updated[abIdx], article: e.target.value };
+                                            setFormData({ ...formData, articlePlacements: updated });
+                                          }}
+                                          style={{ width: '160px', height: '34px' }}
+                                        >
+                                          {articlesList.map(a => (
+                                            <option key={a.id || a.name} value={a.name}>{a.icon || '👕'} {a.name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline-danger d-inline-flex align-items-center gap-1"
+                                        style={{ fontSize: '11px' }}
+                                        onClick={() => {
+                                          const updated = allBlocks.filter((_, idx) => idx !== abIdx);
+                                          setFormData({ ...formData, articlePlacements: updated });
+                                        }}
+                                      >
+                                        <i className="ti ti-trash"></i> Remove Article Block
+                                      </button>
+                                    </div>
+
+                                    {/* Placements for this article */}
+                                    <div className="table-responsive bg-white rounded-2 border mb-2">
+                                      <table className="table table-sm align-middle mb-0" style={{ fontSize: '12px' }}>
+                                        <thead className="bg-light">
+                                          <tr>
+                                            <th style={{ width: '50%' }}>Placement (e.g. Sleeves, Front)</th>
+                                            <th style={{ width: '35%' }}>Thread Required (metres)</th>
+                                            <th style={{ width: '15%' }} className="text-center">Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(artBlock.placements || []).map((pLine, plIdx, plArr) => (
+                                            <tr key={plIdx}>
+                                              <td>
+                                                <input
+                                                  type="text"
+                                                  className="form-control form-control-sm"
+                                                  placeholder="e.g. Sleeves"
+                                                  value={pLine.placement || ''}
+                                                  onChange={(e) => {
+                                                    const updatedBlocks = [...allBlocks];
+                                                    const updatedPlacements = [...artBlock.placements];
+                                                    updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], placement: e.target.value };
+                                                    updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
+                                                    setFormData({ ...formData, articlePlacements: updatedBlocks });
+                                                  }}
+                                                />
+                                              </td>
+                                              <td>
+                                                <div className="input-group input-group-sm">
+                                                  <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    className="form-control fw-bold"
+                                                    placeholder="e.g. 4.5"
+                                                    value={pLine.threadRequired || ''}
+                                                    onChange={(e) => {
+                                                      const updatedBlocks = [...allBlocks];
+                                                      const updatedPlacements = [...artBlock.placements];
+                                                      updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], threadRequired: e.target.value };
+                                                      updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
+                                                      setFormData({ ...formData, articlePlacements: updatedBlocks });
+                                                    }}
+                                                  />
+                                                  <span className="input-group-text bg-white text-muted">m</span>
+                                                </div>
+                                              </td>
+                                              <td className="text-center">
+                                                {plArr.length > 1 && (
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                                    onClick={() => {
+                                                      const updatedBlocks = [...allBlocks];
+                                                      const updatedPlacements = artBlock.placements.filter((_, idx) => idx !== plIdx);
+                                                      updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
+                                                      setFormData({ ...formData, articlePlacements: updatedBlocks });
+                                                    }}
+                                                  >
+                                                    <i className="ti ti-x"></i>
+                                                  </button>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-link text-primary p-0 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1"
+                                      style={{ fontSize: '11.5px' }}
+                                      onClick={() => {
+                                        const updatedBlocks = [...allBlocks];
+                                        const updatedPlacements = [...(artBlock.placements || []), { placement: '', threadRequired: '' }];
+                                        updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
+                                        setFormData({ ...formData, articlePlacements: updatedBlocks });
+                                      }}
+                                    >
+                                      <i className="ti ti-plus"></i> Add Placement Line
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+
+                              {/* Add More Article Button */}
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 fw-semibold"
+                                style={{ fontSize: '12px' }}
+                                onClick={() => {
+                                  const current = formData.articlePlacements || [];
+                                  const nextArticleName = articlesList[current.length % articlesList.length]?.name || 'Kurta';
+                                  setFormData({
+                                    ...formData,
+                                    articlePlacements: [
+                                      ...current,
+                                      { article: nextArticleName, placements: [{ placement: '', threadRequired: '' }] }
+                                    ]
+                                  });
+                                }}
+                              >
+                                <i className="ti ti-plus"></i> Add Article Block
+                              </button>
+                            </div>
+
+                            {/* One-Time Global Thread Stitching Metric (Page 12, Page 18) */}
+                            <div className="p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <label className="form-label fw-bold text-dark small mb-1">
+                                One-Time Global Thread Stitching Metric <span className="text-danger">*</span>
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '280px' }}>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="form-control fw-bold"
+                                  value={formData.globalThreadMetric ?? 15}
+                                  onChange={(e) => setFormData({ ...formData, globalThreadMetric: parseFloat(e.target.value) || 0 })}
+                                  style={{ height: '36px' }}
+                                />
+                                <span className="input-group-text bg-white text-muted">m / stitch metre</span>
+                              </div>
+                              <div className="form-text text-muted" style={{ fontSize: '11px' }}>
+                                Entered once and applies to both Kantha and Couching — separate from and in addition to per-placement Thread Required values.
+                              </div>
+                            </div>
                           </div>
                         )}
 
-                        {showProcessOnly && (
-                          <div className="mb-3">
-                            <p className="form-text text-muted mb-2" style={{ fontSize: '12.5px' }}>
+                        {/* 7.4 Stitching Pattern */}
+                        {isStitching && (
+                          <div className="card p-3.5 rounded-3 mb-3 border shadow-2xs" style={{ backgroundColor: '#f8faff', borderColor: '#c7d2fe' }}>
+                            <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge rounded-pill px-2.5 py-1 text-white" style={{ backgroundColor: '#2e37a4' }}>
+                                  Stitching
+                                </span>
+                                <span className="fw-bold text-dark fs-14">Pattern Configuration</span>
+                              </div>
+                              <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
+                            </div>
+
+                            {/* Thread Per Piece - Default 60m, editable */}
+                            <div className="mb-3">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Thread Per Piece (metres) <span className="text-danger">*</span>
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '220px' }}>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  className="form-control fw-bold"
+                                  value={formData.threadPerPiece ?? 60}
+                                  onChange={(e) => setFormData({ ...formData, threadPerPiece: parseFloat(e.target.value) || 0 })}
+                                  style={{ height: '36px' }}
+                                />
+                                <span className="input-group-text bg-white text-muted">m / piece</span>
+                              </div>
+                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
+                                Default: 60 m, auto-populates BOM Quantity per Piece (editable).
+                              </div>
+                            </div>
+
+                            {/* Available Boxes (Same structure as Kantha) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <label className="form-label fw-bold text-dark small mb-0">
+                                  Available Boxes (Each box = 6000 m)
+                                </label>
+                                <span className="badge bg-light text-muted border" style={{ fontSize: '11px' }}>
+                                  Reels Per Box &times; Metres Per Reel
+                                </span>
+                              </div>
+                              {(!formData.boxes || formData.boxes.length === 0) ? (
+                                <div className="text-muted small py-2 mb-2" style={{ fontSize: '12px' }}>
+                                  No box configurations added. Click &quot;+ Add Box Configuration&quot; below if you use boxed packaging (e.g. 15 reels &times; 400m).
+                                </div>
+                              ) : (
+                                formData.boxes.map((b, i, arr) => {
+                                  const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
+                                  return (
+                                    <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
+                                      <div className="col-4">
+                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Reels Per Box</label>
+                                        <input
+                                          type="number"
+                                          className="form-control form-control-sm fw-bold"
+                                          placeholder="e.g. 15"
+                                          value={b.reelsPerBox ?? ''}
+                                          onChange={(e) => {
+                                            const updated = [...arr];
+                                            updated[i] = { ...updated[i], reelsPerBox: e.target.value };
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="col-4">
+                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Metres Per Reel</label>
+                                        <input
+                                          type="number"
+                                          className="form-control form-control-sm fw-bold"
+                                          placeholder="e.g. 400"
+                                          value={b.metersPerReel ?? ''}
+                                          onChange={(e) => {
+                                            const updated = [...arr];
+                                            updated[i] = { ...updated[i], metersPerReel: e.target.value };
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="col-3 text-center">
+                                        <span className={`badge ${totalBoxMetres === 6000 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-dark'}`} style={{ fontSize: '11px' }}>
+                                          = {totalBoxMetres || 0} m
+                                        </span>
+                                      </div>
+                                      <div className="col-1 text-end">
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                          onClick={() => {
+                                            const updated = arr.filter((_, idx) => idx !== i);
+                                            setFormData({ ...formData, boxes: updated });
+                                          }}
+                                        >
+                                          <i className="ti ti-trash"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
+                                style={{ fontSize: '12px' }}
+                                onClick={() => {
+                                  const current = formData.boxes || [];
+                                  setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
+                                }}
+                              >
+                                <i className="ti ti-plus"></i> Add Box Configuration
+                              </button>
+                            </div>
+
+                            {/* Available Cone Sizes (Repeatable) */}
+                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <TagInput
+                                label="Available Cone Sizes (e.g. 5000 m, 10000 m)"
+                                tags={formData.coneSizes || []}
+                                onChange={(newTags) => setFormData({ ...formData, coneSizes: newTags })}
+                                placeholder="Type cone size (e.g. 5000 m) and press Enter"
+                                suggestions={['5000 m', '10000 m', '20000 m']}
+                              />
+                            </div>
+
+                            {/* Targeted Articles (Multi-Select) & Dynamic Thread Consumption per 100 Pieces (per Article) */}
+                            <div className="p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <label className="form-label fw-bold text-dark small mb-1">
+                                Targeted Articles &amp; Consumption per 100 Pieces <span className="text-danger">*</span>
+                              </label>
+                              <div className="form-text text-muted mb-2.5" style={{ fontSize: '11.5px' }}>
+                                Select targeted articles via multi-select; for each article, a manual input dynamically opens to record Thread Consumption per 100 Pieces, strictly in metres.
+                              </div>
+
+                              {/* Multi-select chips for articles */}
+                              <div className="d-flex flex-wrap gap-1.5 mb-3">
+                                {articlesList.map((art) => {
+                                  const isSelected = (formData.stitchingArticles || []).includes(art.name);
+                                  return (
+                                    <button
+                                      key={art.id || art.name}
+                                      type="button"
+                                      className={`btn btn-sm d-inline-flex align-items-center gap-1.5 py-1 px-2.5 rounded-pill border transition-all ${
+                                        isSelected ? 'btn-primary text-white shadow-xs fw-semibold' : 'bg-light text-secondary'
+                                      }`}
+                                      style={{ fontSize: '12px' }}
+                                      onClick={() => {
+                                        const current = formData.stitchingArticles || [];
+                                        const next = isSelected
+                                          ? current.filter(a => a !== art.name)
+                                          : [...current, art.name];
+                                        
+                                        const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
+                                        if (!isSelected && !nextConsumption[art.name]) {
+                                          nextConsumption[art.name] = '';
+                                        }
+                                        setFormData({
+                                          ...formData,
+                                          stitchingArticles: next,
+                                          consumptionPer100Pcs: nextConsumption
+                                        });
+                                      }}
+                                    >
+                                      <span>{art.icon || '👕'}</span>
+                                      <span>{art.name}</span>
+                                      <i className={`ti ti-${isSelected ? 'check' : 'plus'} small`}></i>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Dynamic input boxes per selected article */}
+                              {(formData.stitchingArticles || []).length > 0 && (
+                                <div className="p-2.5 bg-light rounded-3 border">
+                                  <div className="small fw-semibold text-muted mb-2">
+                                    Thread Consumption per 100 Pieces (strictly in metres):
+                                  </div>
+                                  <div className="row g-2">
+                                    {(formData.stitchingArticles || []).map((artName) => (
+                                      <div key={artName} className="col-md-6">
+                                        <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-2 shadow-2xs">
+                                          <span className="fw-semibold text-dark small" style={{ fontSize: '12.5px' }}>
+                                            {artName}:
+                                          </span>
+                                          <div className="input-group input-group-sm" style={{ width: '150px' }}>
+                                            <input
+                                              type="number"
+                                              className="form-control fw-bold"
+                                              placeholder="e.g. 6000"
+                                              value={formData.consumptionPer100Pcs?.[artName] ?? ''}
+                                              onChange={(e) => {
+                                                setFormData({
+                                                  ...formData,
+                                                  consumptionPer100Pcs: {
+                                                    ...(formData.consumptionPer100Pcs || {}),
+                                                    [artName]: e.target.value
+                                                  }
+                                                });
+                                              }}
+                                            />
+                                            <span className="input-group-text bg-light text-muted" style={{ fontSize: '11px' }}>m / 100pcs</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 7.5 Embroidery, Button Tacking & Handwork */}
+                        {formData.threadPattern === 'Embroidery' && (
+                          <div className="alert alert-info py-2.5 px-3 rounded-3 small mb-3 d-flex align-items-center gap-2">
+                            <i className="ti ti-info-circle fs-5"></i>
+                            <span>No additional measurements are required for <strong>Embroidery</strong>.</span>
+                          </div>
+                        )}
+
+                        {isProcessOnly && (
+                          <div className="card p-3 rounded-3 mb-3 border bg-light shadow-2xs" style={{ borderColor: '#e2e8f0' }}>
+                            <div className="fw-bold text-dark small mb-1">
+                              {formData.threadPattern}
+                            </div>
+                            <p className="form-text text-muted mb-2" style={{ fontSize: '12px' }}>
                               No special measurements required — the BOM only records that this process is required.
                             </p>
-                            <label className="form-label fw-semibold text-dark small mb-1.5">Remarks (optional)</label>
+                            <label className="form-label fw-semibold text-dark small mb-1">Remarks (optional)</label>
                             <input
                               type="text"
-                              className="form-control"
-                              placeholder="Optional process remarks"
+                              className="form-control form-control-sm"
+                              placeholder={`Optional remarks for ${formData.threadPattern}`}
                               value={formData.processRemarks || ''}
                               onChange={(e) => setFormData({ ...formData, processRemarks: e.target.value })}
-                              style={{ height: '42px', borderRadius: '8px' }}
+                              style={{ height: '38px', borderRadius: '7px' }}
                             />
                           </div>
                         )}
@@ -1295,47 +1913,257 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     );
                   })()}
 
-                                    {/* ============================================================== */}
-                  {/* CATEGORY 5: DORI / ELASTIC / BEADS & SEQUINS (SCREENSHOT 3)     */}
                   {/* ============================================================== */}
-                  {(formData.category === 'Dori' || formData.category === 'Elastic' || formData.category === 'Beads & Sequins') && (() => {
-                    const currentFabricRows = (formData.fabricRows && formData.fabricRows.length > 0)
-                      ? formData.fabricRows
-                      : [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }];
+                  {/* CATEGORY 5: DORI (DRAWSTRING) CONFIGURATION (SECTION 6.4 & 10.1) */}
+                  {/* ============================================================== */}
+                  {formData.category === 'Dori' && (() => {
+                    const doriEntries = (formData.doriFabricEntries && formData.doriFabricEntries.length > 0)
+                      ? formData.doriFabricEntries
+                      : [{ fabricQuality: '', widthSizes: [], consumptions: {} }];
 
                     return (
                       <div className="mb-3">
-                        <div className="fw-semibold text-dark small mb-2">
-                          Fabric consumption (e.g. how much is needed per 1 m of fabric):
+                        {/* Top Level: Required Size & Unit */}
+                        <div className="row g-3 mb-3">
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold text-dark small mb-1.5">
+                              Required size <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. 35 cm, 40 cm"
+                              value={formData.doriRequiredSize || formData.size || ''}
+                              onChange={(e) => setFormData({ ...formData, doriRequiredSize: e.target.value, size: e.target.value })}
+                              style={{ height: '42px', borderRadius: '8px' }}
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold text-dark small mb-1.5">
+                              Unit <span className="text-danger">*</span>
+                            </label>
+                            <select
+                              className="form-select"
+                              value={formData.doriUnit || formData.unit || 'Meter'}
+                              onChange={(e) => setFormData({ ...formData, doriUnit: e.target.value, unit: e.target.value })}
+                              style={{ height: '42px', borderRadius: '8px' }}
+                            >
+                              <option value="Meter">Meter</option>
+                              <option value="Piece">Piece</option>
+                              <option value="cm">cm</option>
+                              <option value="inch">inch</option>
+                            </select>
+                          </div>
                         </div>
-                        {currentFabricRows.map((r, i, arr) => (
+
+                        {/* Fabric Entry Section (Step 1 -> Step 2 -> Step 3) */}
+                        <div className="p-3 bg-light rounded-3 border mb-3">
+                          <div className="fw-semibold text-dark small mb-2 d-flex justify-content-between align-items-center">
+                            <span>Fabric Entry Flow (Fabric Quality &rarr; Widths &rarr; Consumption):</span>
+                            <span className="badge bg-purple-subtle text-purple border" style={{ fontSize: '11px' }}>
+                              Section 6.4
+                            </span>
+                          </div>
+
+                          {doriEntries.map((fe, idx) => {
+                            const selectedWidths = fe.widthSizes || [];
+                            return (
+                              <div key={idx} className="p-3 bg-white rounded-3 border mb-3 shadow-2xs">
+                                <div className="d-flex justify-content-between align-items-center mb-2.5 pb-2 border-bottom">
+                                  <span className="fw-bold text-dark small">
+                                    Fabric Entry #{idx + 1}
+                                  </span>
+                                  {doriEntries.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                      onClick={() => {
+                                        const updated = doriEntries.filter((_, i) => i !== idx);
+                                        setFormData({ ...formData, doriFabricEntries: updated });
+                                      }}
+                                    >
+                                      <i className="ti ti-trash me-1"></i> Remove Fabric
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Step 1: Fabric Quality */}
+                                <div className="mb-3">
+                                  <label className="form-label text-muted small mb-1 fw-medium">
+                                    Step 1: Fabric Quality <span className="text-danger">*</span>
+                                  </label>
+                                  <select
+                                    className="form-select form-select-sm"
+                                    value={fe.fabricQuality || ''}
+                                    onChange={(e) => {
+                                      const updated = [...doriEntries];
+                                      updated[idx] = { ...updated[idx], fabricQuality: e.target.value };
+                                      setFormData({ ...formData, doriFabricEntries: updated });
+                                    }}
+                                    style={{ height: '38px', borderRadius: '7px' }}
+                                  >
+                                    <option value="">-- Select Fabric Quality --</option>
+                                    {allAvailableFabrics.map((fq) => (
+                                      <option key={fq} value={fq}>{fq}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Step 2: Width Size(s) Multi-select Chips */}
+                                <div className="mb-3">
+                                  <label className="form-label text-muted small mb-1 fw-medium">
+                                    Step 2: Width Size(s) <span className="text-danger">*</span>
+                                  </label>
+                                  <div className="d-flex flex-wrap gap-2">
+                                    {STANDARD_WIDTHS.map((w) => {
+                                      const isSelected = selectedWidths.includes(w);
+                                      return (
+                                        <button
+                                          key={w}
+                                          type="button"
+                                          className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold font-monospace ${
+                                            isSelected ? 'btn-primary text-white' : 'btn-outline-secondary bg-white text-dark'
+                                          }`}
+                                          style={{ fontSize: '12px' }}
+                                          onClick={() => {
+                                            const updated = [...doriEntries];
+                                            const curWidths = fe.widthSizes || [];
+                                            const curCons = { ...(fe.consumptions || {}) };
+                                            if (isSelected) {
+                                              const nextWidths = curWidths.filter(x => x !== w);
+                                              delete curCons[w];
+                                              updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
+                                            } else {
+                                              const nextWidths = [...curWidths, w];
+                                              updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
+                                            }
+                                            setFormData({ ...formData, doriFabricEntries: updated });
+                                          }}
+                                        >
+                                          {isSelected ? `✓ ${w}` : `+ ${w}`}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Step 3: Consumption per Width (cm) */}
+                                {selectedWidths.length > 0 && (
+                                  <div className="p-2.5 rounded-3 bg-light border">
+                                    <label className="form-label text-muted small mb-1.5 fw-medium">
+                                      Step 3: Fabric Consumption per Width (cm)
+                                    </label>
+                                    <div className="row g-2">
+                                      {selectedWidths.map((w) => (
+                                        <div key={w} className={selectedWidths.length === 1 ? 'col-12' : 'col-md-6 col-lg-3'}>
+                                          <div className="input-group input-group-sm">
+                                            <span className="input-group-text bg-white fw-semibold font-monospace small px-2">
+                                              {w}
+                                            </span>
+                                            <input
+                                              type="number"
+                                              step="0.1"
+                                              className="form-control text-end font-monospace"
+                                              placeholder="e.g. 15"
+                                              value={fe.consumptions?.[w] ?? ''}
+                                              onChange={(e) => {
+                                                const updated = [...doriEntries];
+                                                const cons = { ...(fe.consumptions || {}) };
+                                                cons[w] = e.target.value;
+                                                updated[idx] = { ...updated[idx], consumptions: cons };
+                                                setFormData({ ...formData, doriFabricEntries: updated });
+                                              }}
+                                            />
+                                            <span className="input-group-text bg-light text-muted small px-2">
+                                              cm
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                doriFabricEntries: [
+                                  ...doriEntries,
+                                  { fabricQuality: '', widthSizes: [], consumptions: {} }
+                                ]
+                              });
+                            }}
+                          >
+                            <i className="ti ti-plus"></i> Add More Fabric
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ============================================================== */}
+                  {/* CATEGORY 6: ELASTIC CONFIGURATION (SECTION 6.5)                */}
+                  {/* ============================================================== */}
+                  {formData.category === 'Elastic' && (() => {
+                    const elasticEntries = (formData.fabricRows && formData.fabricRows.length > 0)
+                      ? formData.fabricRows
+                      : [{ fabricQuality: '', fabricName: '', size: '', unit: 'Meter', consumption: '' }];
+
+                    return (
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div>
+                            <div className="fw-semibold text-dark small">
+                              Elastic Configuration (per 1m fabric):
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '11.5px' }}>
+                              Define associated fabric and elastic consumption required per 1 metre of fabric
+                            </div>
+                          </div>
+                          <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '11px' }}>
+                            Section 6.5
+                          </span>
+                        </div>
+
+                        {elasticEntries.map((r, i, arr) => (
                           <div key={i} className="row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border">
                             <div className="col-md-4">
-                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Associated fabric</label>
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Associated fabric <span className="text-danger">*</span>
+                              </label>
                               <select
                                 className="form-select form-select-sm"
-                                value={r.fabricName || r.fabricQuality || FABRIC_QUALITIES[0]}
+                                value={r.fabricQuality || r.fabricName || ''}
                                 onChange={(e) => {
-                                  const updated = [...currentFabricRows];
-                                  updated[i] = { ...updated[i], fabricName: e.target.value, fabricQuality: e.target.value };
+                                  const updated = [...elasticEntries];
+                                  updated[i] = { ...updated[i], fabricQuality: e.target.value, fabricName: e.target.value };
                                   setFormData({ ...formData, fabricRows: updated });
                                 }}
                                 style={{ height: '36px', borderRadius: '6px' }}
                               >
-                                {FABRIC_QUALITIES.map((fq) => (
+                                <option value="">-- Select Associated Fabric --</option>
+                                {allAvailableFabrics.map((fq) => (
                                   <option key={fq} value={fq}>{fq}</option>
                                 ))}
                               </select>
                             </div>
                             <div className="col-md-2">
-                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Required size</label>
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Required size <span className="text-danger">*</span>
+                              </label>
                               <input
                                 type="text"
                                 className="form-control form-control-sm"
-                                placeholder="e.g. 40"
+                                placeholder="e.g. 1/2&quot;, 1&quot;, 20mm"
                                 value={r.size || ''}
                                 onChange={(e) => {
-                                  const updated = [...currentFabricRows];
+                                  const updated = [...elasticEntries];
                                   updated[i] = { ...updated[i], size: e.target.value };
                                   setFormData({ ...formData, fabricRows: updated });
                                 }}
@@ -1343,31 +2171,38 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               />
                             </div>
                             <div className="col-md-2">
-                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Unit</label>
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Unit <span className="text-danger">*</span>
+                              </label>
                               <select
                                 className="form-select form-select-sm"
                                 value={r.unit || 'Meter'}
                                 onChange={(e) => {
-                                  const updated = [...currentFabricRows];
+                                  const updated = [...elasticEntries];
                                   updated[i] = { ...updated[i], unit: e.target.value };
                                   setFormData({ ...formData, fabricRows: updated });
                                 }}
                                 style={{ height: '36px', borderRadius: '6px' }}
                               >
-                                {ACCESSORY_UNITS.map((u) => (
-                                  <option key={u} value={u}>{u}</option>
-                                ))}
+                                <option value="Meter">Meter</option>
+                                <option value="Piece">Piece</option>
+                                <option value="Yard">Yard</option>
+                                <option value="Roll">Roll</option>
+                                <option value="Packet">Packet</option>
                               </select>
                             </div>
                             <div className="col-md-3">
-                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Consumption / 1m fabric</label>
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Elastic consumption <span className="text-danger">*</span>
+                              </label>
                               <input
                                 type="number"
+                                step="0.01"
                                 className="form-control form-control-sm"
-                                placeholder="0.00"
+                                placeholder="e.g. 0.85"
                                 value={r.consumption ?? ''}
                                 onChange={(e) => {
-                                  const updated = [...currentFabricRows];
+                                  const updated = [...elasticEntries];
                                   updated[i] = { ...updated[i], consumption: e.target.value };
                                   setFormData({ ...formData, fabricRows: updated });
                                 }}
@@ -1380,7 +2215,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   type="button"
                                   className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
                                   onClick={() => {
-                                    const updated = currentFabricRows.filter((_, idx) => idx !== i);
+                                    const updated = elasticEntries.filter((_, idx) => idx !== i);
                                     setFormData({ ...formData, fabricRows: updated });
                                   }}
                                 >
@@ -1394,7 +2229,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   onClick={() => {
                                     setFormData({
                                       ...formData,
-                                      fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }]
+                                      fabricRows: [{ fabricQuality: '', fabricName: '', size: '', unit: 'Meter', consumption: '' }]
                                     });
                                   }}
                                 >
@@ -1406,18 +2241,169 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         ))}
                         <button
                           type="button"
-                          className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
+                          className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
                           onClick={() => {
                             setFormData({
                               ...formData,
                               fabricRows: [
-                                ...currentFabricRows,
-                                { fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }
+                                ...elasticEntries,
+                                { fabricQuality: '', fabricName: '', size: '', unit: 'Meter', consumption: '' }
                               ]
                             });
                           }}
                         >
-                          + Add more
+                          <i className="ti ti-plus"></i> Add More Entry
+                        </button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ============================================================== */}
+                  {/* CATEGORY 7: BEADS & SEQUINS CONFIGURATION (SECTION 6.6)         */}
+                  {/* ============================================================== */}
+                  {formData.category === 'Beads & Sequins' && (() => {
+                    const beadsEntries = (formData.fabricRows && formData.fabricRows.length > 0)
+                      ? formData.fabricRows
+                      : [{ fabricQuality: '', fabricName: '', size: '', unit: 'Gram', consumption: '' }];
+
+                    return (
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div>
+                            <div className="fw-semibold text-dark small">
+                              Beads &amp; Sequins Configuration (per 1m fabric):
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '11.5px' }}>
+                              Define associated fabric and beads &amp; sequins consumption required per 1 metre of fabric
+                            </div>
+                          </div>
+                          <span className="badge bg-danger-subtle text-danger border" style={{ fontSize: '11px' }}>
+                            Section 6.6
+                          </span>
+                        </div>
+
+                        {beadsEntries.map((r, i, arr) => (
+                          <div key={i} className="row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border">
+                            <div className="col-md-4">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Associated fabric <span className="text-danger">*</span>
+                              </label>
+                              <select
+                                className="form-select form-select-sm"
+                                value={r.fabricQuality || r.fabricName || ''}
+                                onChange={(e) => {
+                                  const updated = [...beadsEntries];
+                                  updated[i] = { ...updated[i], fabricQuality: e.target.value, fabricName: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              >
+                                <option value="">-- Select Associated Fabric --</option>
+                                {allAvailableFabrics.map((fq) => (
+                                  <option key={fq} value={fq}>{fq}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-md-2">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Required size <span className="text-danger">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="e.g. 2mm, 4mm, Size 11/0"
+                                value={r.size || ''}
+                                onChange={(e) => {
+                                  const updated = [...beadsEntries];
+                                  updated[i] = { ...updated[i], size: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              />
+                            </div>
+                            <div className="col-md-2">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Unit <span className="text-danger">*</span>
+                              </label>
+                              <select
+                                className="form-select form-select-sm"
+                                value={r.unit || 'Gram'}
+                                onChange={(e) => {
+                                  const updated = [...beadsEntries];
+                                  updated[i] = { ...updated[i], unit: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              >
+                                <option value="Gram">Gram</option>
+                                <option value="Packet">Packet</option>
+                                <option value="Piece">Piece</option>
+                                <option value="Gross">Gross</option>
+                                <option value="Meter">Meter</option>
+                              </select>
+                            </div>
+                            <div className="col-md-3">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>
+                                Consumption / 1m fabric <span className="text-danger">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="form-control form-control-sm"
+                                placeholder="e.g. 25"
+                                value={r.consumption ?? ''}
+                                onChange={(e) => {
+                                  const updated = [...beadsEntries];
+                                  updated[i] = { ...updated[i], consumption: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              />
+                            </div>
+                            <div className="col-md-1 pb-1 text-end">
+                              {arr.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                  onClick={() => {
+                                    const updated = beadsEntries.filter((_, idx) => idx !== i);
+                                    setFormData({ ...formData, fabricRows: updated });
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                                  title="Clear row"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      fabricRows: [{ fabricQuality: '', fabricName: '', size: '', unit: 'Gram', consumption: '' }]
+                                    });
+                                  }}
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              fabricRows: [
+                                ...beadsEntries,
+                                { fabricQuality: '', fabricName: '', size: '', unit: 'Gram', consumption: '' }
+                              ]
+                            });
+                          }}
+                        >
+                          <i className="ti ti-plus"></i> Add More Entry
                         </button>
                       </div>
                     );
@@ -2115,49 +3101,203 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     </div>
                   )}
 
-                  {(selectedAccessory.category === 'Elastic' || selectedAccessory.category === 'Beads & Sequins') && (
+                  {selectedAccessory.category === 'Elastic' && (
                     <div className="d-flex flex-column gap-2.5">
-                      <div>
-                        <div className="text-muted small">Associated Fabric Quality</div>
-                        <div className="fw-bold text-dark">{selectedAccessory.associatedFabric || 'Mulmul Cotton'}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted small">Required Size</div>
-                        <div className="fw-semibold text-secondary">{selectedAccessory.requiredSize || '1 inch'}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted small">Fabric Consumption</div>
-                        <div className="fw-bold text-primary">{selectedAccessory.fabricConsumption || 0.85} per 1m fabric</div>
-                      </div>
+                      <div className="text-muted small fw-semibold">Elastic Configuration Entries:</div>
+                      {((selectedAccessory.fabricRows && selectedAccessory.fabricRows.length > 0)
+                        ? selectedAccessory.fabricRows
+                        : [{
+                            fabricQuality: selectedAccessory.associatedFabric || 'Mulmul Cotton',
+                            size: selectedAccessory.requiredSize || '1 inch',
+                            unit: selectedAccessory.unit || 'Meter',
+                            consumption: selectedAccessory.fabricConsumption || 0.85
+                          }]
+                      ).map((row, rIdx) => (
+                        <div key={rIdx} className="p-2.5 bg-light rounded-3 border small">
+                          <div className="d-flex justify-content-between mb-1">
+                            <span className="fw-bold text-dark">{row.fabricQuality || row.fabricName || '—'}</span>
+                            <span className="badge bg-primary-subtle text-primary border">{row.size || '—'}</span>
+                          </div>
+                          <div className="text-muted">
+                            Consumption: <strong className="text-primary">{row.consumption || '—'} {row.unit || 'Meter'}</strong> per 1m fabric
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedAccessory.category === 'Beads & Sequins' && (
+                    <div className="d-flex flex-column gap-2.5">
+                      <div className="text-muted small fw-semibold">Beads &amp; Sequins Configuration Entries:</div>
+                      {((selectedAccessory.fabricRows && selectedAccessory.fabricRows.length > 0)
+                        ? selectedAccessory.fabricRows
+                        : [{
+                            fabricQuality: selectedAccessory.associatedFabric || 'Mulmul Cotton',
+                            size: selectedAccessory.requiredSize || '4mm',
+                            unit: selectedAccessory.unit || 'Gram',
+                            consumption: selectedAccessory.fabricConsumption || 25
+                          }]
+                      ).map((row, rIdx) => (
+                        <div key={rIdx} className="p-2.5 bg-light rounded-3 border small">
+                          <div className="d-flex justify-content-between mb-1">
+                            <span className="fw-bold text-dark">{row.fabricQuality || row.fabricName || '—'}</span>
+                            <span className="badge bg-danger-subtle text-danger border">{row.size || '—'}</span>
+                          </div>
+                          <div className="text-muted">
+                            Consumption: <strong className="text-danger">{row.consumption || '—'} {row.unit || 'Gram'}</strong> per 1m fabric
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   {selectedAccessory.category === 'Thread' && (
-                    <div className="d-flex flex-column gap-2.5">
-                      <div>
-                        <div className="text-muted small">Thread Pattern</div>
-                        <span className="badge bg-purple-subtle text-purple border px-2.5 py-1">{selectedAccessory.threadPattern || 'Kantha'}</span>
+                    <div className="d-flex flex-column gap-3">
+                      <div className="row g-2">
+                        <div className="col-4">
+                          <div className="text-muted small">Size / Count</div>
+                          <span className="badge bg-light text-dark border px-2.5 py-1 font-monospace fw-bold">
+                            {selectedAccessory.threadSize || selectedAccessory.size || '-'}
+                          </span>
+                        </div>
+                        <div className="col-4">
+                          <div className="text-muted small">Ordering Unit</div>
+                          <div className="fw-semibold text-dark small">{selectedAccessory.unit || 'Cone'}</div>
+                        </div>
+                        <div className="col-4">
+                          <div className="text-muted small">Pieces Per Unit</div>
+                          <div className="fw-bold text-dark small">{selectedAccessory.piecesPerUnit || 1}</div>
+                        </div>
                       </div>
+
+                      <div>
+                        <div className="text-muted small mb-1">Thread Pattern</div>
+                        <span className="badge rounded-pill px-3 py-1 text-white fw-semibold" style={{ backgroundColor: '#2e37a4' }}>
+                          {selectedAccessory.threadPattern || 'Stitching'}
+                        </span>
+                      </div>
+
                       {['Kantha', 'Couching'].includes(selectedAccessory.threadPattern) && (
-                        <div>
-                          <div className="text-muted small">Global Thread Stitching Metric</div>
-                          <div className="fw-bold text-dark">{selectedAccessory.globalThreadMetric || 15} m / stitch metre</div>
-                          <div className="text-muted small mt-2">Article Placements:</div>
-                          {(selectedAccessory.articlePlacements || []).map((ap, apIdx) => (
-                            <div key={apIdx} className="p-2 bg-light rounded border mb-1 small">
-                              <strong>{ap.article}</strong>: {(ap.placements || []).map(p => `${p.placement} (${p.threadRequired}m)`).join(', ')}
+                        <div className="d-flex flex-column gap-2.5 pt-2 border-top">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <div className="text-muted small">Thread Per Stitch</div>
+                              <div className="fw-bold text-dark">{selectedAccessory.threadPerStitch || 15} m / stitch</div>
                             </div>
-                          ))}
+                            <div className="col-6">
+                              <div className="text-muted small">Global Stitching Metric</div>
+                              <div className="fw-bold text-primary">{selectedAccessory.globalThreadMetric || 15} m / stitch metre</div>
+                            </div>
+                          </div>
+
+                          {selectedAccessory.boxes && selectedAccessory.boxes.length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1">Available Boxes:</div>
+                              <div className="d-flex flex-wrap gap-1.5">
+                                {selectedAccessory.boxes.map((b, i) => (
+                                  <span key={i} className="badge bg-light text-dark border px-2 py-1 small">
+                                    {b.reelsPerBox} reels &times; {b.metersPerReel}m ({(parseFloat(b.reelsPerBox)||0)*(parseFloat(b.metersPerReel)||0)}m)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedAccessory.coneSizes && selectedAccessory.coneSizes.length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1">Cone Sizes:</div>
+                              <div className="d-flex flex-wrap gap-1">
+                                {selectedAccessory.coneSizes.map((cs, i) => (
+                                  <span key={i} className="badge rounded-pill bg-white text-secondary border px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                    {cs}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedAccessory.placements && selectedAccessory.placements.length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1">Available Placements:</div>
+                              <div className="d-flex flex-wrap gap-1">
+                                {selectedAccessory.placements.map((p, i) => (
+                                  <span key={i} className="badge rounded-pill bg-light text-dark border px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedAccessory.articlePlacements && selectedAccessory.articlePlacements.length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1.5 fw-semibold">Article &rarr; Placement &rarr; Thread Line Chain:</div>
+                              {selectedAccessory.articlePlacements.map((ap, apIdx) => (
+                                <div key={apIdx} className="p-2.5 bg-light rounded-2 border mb-2 shadow-2xs">
+                                  <div className="fw-bold text-dark small mb-1">👘 {ap.article}</div>
+                                  <div className="d-flex flex-wrap gap-1.5">
+                                    {(ap.placements || []).map((p, pIdx) => (
+                                      <span key={pIdx} className="badge bg-white text-dark border px-2 py-1 shadow-2xs" style={{ fontSize: '11.5px' }}>
+                                        <span className="text-muted">{p.placement}:</span> <strong className="text-primary">{p.threadRequired}m</strong>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
+
                       {selectedAccessory.threadPattern === 'Stitching' && (
-                        <div>
-                          <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                          <div className="fw-bold text-dark">{selectedAccessory.threadPerPiece || 60} m / piece</div>
-                          <div className="text-muted small mt-2">Consumption per 100 pcs:</div>
-                          {Object.entries(selectedAccessory.consumptionPer100Pcs || {}).map(([art, m]) => (
-                            <div key={art} className="badge bg-light text-dark border me-1 mt-1">{art}: {m}m / 100 pcs</div>
-                          ))}
+                        <div className="d-flex flex-column gap-2.5 pt-2 border-top">
+                          <div>
+                            <div className="text-muted small">Thread Per Piece (BOM Default)</div>
+                            <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || 60} m / piece</div>
+                          </div>
+
+                          {selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1.5 fw-semibold">Targeted Articles &amp; Consumption per 100 pcs:</div>
+                              <div className="d-flex flex-wrap gap-2">
+                                {Object.entries(selectedAccessory.consumptionPer100Pcs).map(([art, m]) => (
+                                  <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
+                                    <span className="fw-bold">{art}:</span>
+                                    <span className="text-primary font-monospace fw-bold">{m} m</span>
+                                    <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedAccessory.boxes && selectedAccessory.boxes.length > 0 && (
+                            <div>
+                              <div className="text-muted small mb-1">Available Boxes:</div>
+                              <div className="d-flex flex-wrap gap-1.5">
+                                {selectedAccessory.boxes.map((b, i) => (
+                                  <span key={i} className="badge bg-light text-dark border px-2 py-1 small">
+                                    {b.reelsPerBox} reels &times; {b.metersPerReel}m ({(parseFloat(b.reelsPerBox)||0)*(parseFloat(b.metersPerReel)||0)}m)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedAccessory.threadPattern === 'Embroidery' && (
+                        <div className="alert alert-info py-2 px-3 rounded-2 small mb-0">
+                          Process required — no additional measurements needed for Embroidery.
+                        </div>
+                      )}
+
+                      {['Button Tacking', 'Handwork'].includes(selectedAccessory.threadPattern) && (
+                        <div className="p-2.5 bg-light rounded-2 border">
+                          <div className="small fw-semibold text-dark mb-1">{selectedAccessory.threadPattern} (Process Requirement)</div>
+                          <div className="text-muted small">
+                            Remarks: {selectedAccessory.processRemarks || 'Standard process specification'}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2512,24 +3652,51 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold small text-muted">Packaging Type *</label>
-                      <select
-                        className="form-select"
-                        value={threadSizeForm.packagingType}
-                        onChange={(e) => setThreadSizeForm({ ...threadSizeForm, packagingType: e.target.value })}
-                      >
-                        <option value="Reel">Reel</option>
-                        <option value="Cone">Cone</option>
-                        <option value="Box">Box</option>
-                        <option value="Other">Other (Custom)</option>
-                      </select>
-                      {threadSizeForm.packagingType === 'Other' && (
-                        <input
-                          type="text"
-                          className="form-control form-control-sm mt-1"
-                          placeholder="Enter custom packaging"
-                          value={threadSizeForm.packagingTypeOther}
-                          onChange={(e) => setThreadSizeForm({ ...threadSizeForm, packagingTypeOther: e.target.value })}
-                        />
+                      {isCustomPackaging ? (
+                        <div className="input-group">
+                          <input
+                            type="text"
+                            className="form-control bg-white fw-semibold"
+                            placeholder="Type custom packaging..."
+                            autoFocus
+                            value={threadSizeForm.packagingTypeOther || (threadSizeForm.packagingType === 'Other' ? '' : threadSizeForm.packagingType)}
+                            onChange={(e) => setThreadSizeForm({ ...threadSizeForm, packagingType: e.target.value, packagingTypeOther: e.target.value })}
+                            style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-3"
+                            onClick={() => {
+                              setIsCustomPackaging(false);
+                              setThreadSizeForm({ ...threadSizeForm, packagingType: 'Reel', packagingTypeOther: '' });
+                            }}
+                            title="Switch back to dropdown list"
+                            style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
+                          >
+                            <i className="ti ti-chevron-down"></i>
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          className="form-select"
+                          value={['Reel', 'Cone', 'Box'].includes(threadSizeForm.packagingType) ? threadSizeForm.packagingType : 'Reel'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'Other') {
+                              setIsCustomPackaging(true);
+                              setThreadSizeForm({ ...threadSizeForm, packagingType: '', packagingTypeOther: '' });
+                            } else {
+                              setIsCustomPackaging(false);
+                              setThreadSizeForm({ ...threadSizeForm, packagingType: val, packagingTypeOther: '' });
+                            }
+                          }}
+                          style={{ height: '38px', borderRadius: '7px' }}
+                        >
+                          <option value="Reel">Reel</option>
+                          <option value="Cone">Cone</option>
+                          <option value="Box">Box</option>
+                          <option value="Other">Other (Custom)...</option>
+                        </select>
                       )}
                     </div>
                     <div className="col-md-6">

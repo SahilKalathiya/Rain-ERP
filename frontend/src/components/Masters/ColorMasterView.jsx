@@ -391,7 +391,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                         {/* Section 6.2: Assign this colour to a specific Quarter? */}
                         <div className="col-md-6">
                           <label className="form-label fw-semibold small text-muted">
-                            Assign this colour to a specific Quarter? (Section 6)
+                            Assign this colour to a specific Quarter?
                           </label>
                           <select
                             className="form-select"

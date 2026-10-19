@@ -537,7 +537,8 @@ export default function OrderDetailView({
       });
     });
     const fallbackColors = colors.length > 0 ? colors : ['Charcoal', 'Green'];
-    const artObj = articlesList.find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
+    const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
+      (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
     const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
     const qtyPerColor = Math.round(totalArtQty / fallbackColors.length);
 
@@ -553,6 +554,11 @@ export default function OrderDetailView({
       return item.articleRows[articleName];
     }
     const colorOpts = getArticleColorOptions(articleName);
+    const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
+      (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
+    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+    const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
+
     const initialRows = colorOpts.map((co, idx) => ({
       id: `row_${articleName}_${idx}`,
       articleColor: co.display,
@@ -573,7 +579,7 @@ export default function OrderDetailView({
       {
         id: `row_${articleName}_0`,
         articleColor: 'All colours',
-        totalQty: '—',
+        totalQty: totalAllQty,
         placement: '',
         accessoryColor: '',
         size: '',
@@ -667,6 +673,10 @@ export default function OrderDetailView({
 
       const currentRows = getCardArticleRows(item, articleName);
       const colorOpts = getArticleColorOptions(articleName);
+      const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
+        (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
+      const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+      const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
       const updatedRows = currentRows.map((r, rIdx) => {
         if (rIdx !== rowIndex) return r;
@@ -674,7 +684,7 @@ export default function OrderDetailView({
           return {
             ...r,
             articleColor: 'All colours',
-            totalQty: '—'
+            totalQty: totalAllQty
           };
         }
         const matchedOpt = colorOpts.find(co => co.display === newColorDisplay);
@@ -998,7 +1008,7 @@ export default function OrderDetailView({
                 <th style={{ padding: '8px 10px' }}>Source</th>
                 <th style={{ padding: '8px 10px' }}>Fabric Colour</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Extra/Pack</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Pack</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Qty</th>
               </tr>
@@ -1008,16 +1018,24 @@ export default function OrderDetailView({
                 const rows = getCardArticleRows(item, currentArticle);
                 const colorOptions = getArticleColorOptions(currentArticle);
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
+                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
+                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
                   const isAllColours = row.articleColor === 'All colours';
                   const reqVal = parseFloat(row.reqPerPc) || 0;
-                  const extraVal = parseFloat(row.extraPerPack) || 0;
+                  const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
+                  const packNum = parseFloat(packInput);
+                  const packMultiplier = (!isNaN(packNum) && packNum > 0) ? packNum : 1;
                   const bufVal = parseFloat(row.bufferPct) || 0;
-                  const artPcs = parseFloat(row.totalQty) || 0;
-                  const baseCalc = (reqVal * artPcs) + extraVal;
+                  const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
+                  const baseCalc = artPcs * reqVal * packMultiplier;
                   const bufQty = (baseCalc * bufVal) / 100;
-                  const liveTotal = (baseCalc + bufQty).toFixed(1);
+                  const liveTotalNum = baseCalc + bufQty;
+                  const liveTotal = liveTotalNum % 1 === 0 ? liveTotalNum.toFixed(0) : liveTotalNum.toFixed(1);
+                  const isJobWork = /job/i.test(row.source || '');
 
                   return (
                     <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
@@ -1066,13 +1084,9 @@ export default function OrderDetailView({
                       </td>
 
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        {isAllColours ? (
-                          <span className="text-muted" style={{ fontSize: '13px' }}>—</span>
-                        ) : (
-                          <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
-                            {row.totalQty || 0}
-                          </span>
-                        )}
+                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
+                        </span>
                       </td>
 
                       <td style={{ minWidth: '130px', padding: '6px 8px' }}>
@@ -1153,16 +1167,22 @@ export default function OrderDetailView({
 
                       <td style={{ minWidth: '125px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g., Maroon"
-                            value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
-                            style={inputStyle}
-                          />
+                          isJobWork ? (
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="e.g., Maroon"
+                              value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
+                              style={inputStyle}
+                            />
+                          ) : (
+                            <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                          )
                         ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
+                          <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
+                            {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
+                          </span>
                         )}
                       </td>
 
@@ -1191,12 +1211,12 @@ export default function OrderDetailView({
                             step="1"
                             className="form-control form-control-sm text-center"
                             value={row.extraPerPack ?? ''}
-                            placeholder="0"
+                            placeholder="1"
                             onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'extraPerPack', e.target.value)}
                             style={inputStyle}
                           />
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.extraPerPack || '0'}</span>
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.extraPerPack || '1'}</span>
                         )}
                       </td>
 
@@ -1229,13 +1249,9 @@ export default function OrderDetailView({
                       </td>
 
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        {isAllColours ? (
-                          <span className="text-muted" style={{ fontSize: '13px' }}>—</span>
-                        ) : (
-                          <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                            {liveTotal} PCS
-                          </span>
-                        )}
+                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {liveTotal} PCS
+                        </span>
                       </td>
                     </tr>
                   );
@@ -1270,6 +1286,10 @@ export default function OrderDetailView({
                 const rows = getCardArticleRows(item, currentArticle);
                 const colorOptions = getArticleColorOptions(currentArticle);
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
+                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
+                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
                   const isAllColours = row.articleColor === 'All colours';
@@ -1277,8 +1297,9 @@ export default function OrderDetailView({
                   const shrinkVal = parseFloat(row.shrinkPct) || 0;
                   const greigeVal = dyedVal * (1 + shrinkVal / 100);
                   const bufferVal = parseFloat(row.bufferPct) || 0;
-                  const qtyVal = parseFloat(row.totalQty) || 0;
-                  const totalVal = (greigeVal * qtyVal * (1 + bufferVal / 100)).toFixed(1);
+                  const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
+                  const totalValNum = (greigeVal * qtyVal * (1 + bufferVal / 100));
+                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
 
                   return (
                     <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
@@ -1304,11 +1325,9 @@ export default function OrderDetailView({
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        {isAllColours ? (
-                          <span className="text-muted" style={{ fontSize: '13px' }}>—</span>
-                        ) : (
-                          <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>{row.totalQty || 0}</span>
-                        )}
+                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
+                        </span>
                       </td>
                       <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                         {isEditing ? (
@@ -1366,8 +1385,10 @@ export default function OrderDetailView({
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
                         )}
                       </td>
-                      <td className="text-center font-monospace" style={{ minWidth: '90px', color: '#2e37a4', fontWeight: 700, fontSize: '13px', padding: '6px 8px' }}>
-                        {isAllColours ? '—' : totalVal + 'm'}
+                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
+                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {totalVal} m
+                        </span>
                       </td>
                     </tr>
                   );
@@ -1404,13 +1425,19 @@ export default function OrderDetailView({
                 const rows = getCardArticleRows(item, currentArticle);
                 const colorOptions = getArticleColorOptions(currentArticle);
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
+                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
+                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
                   const isAllColours = row.articleColor === 'All colours';
                   const reqVal = parseFloat(row.reqPerPc) || 0;
                   const bufferVal = parseFloat(row.bufferPct) || 0;
-                  const qtyVal = parseFloat(row.totalQty) || 0;
-                  const totalVal = (reqVal * qtyVal * (1 + bufferVal / 100)).toFixed(1);
+                  const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
+                  const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
+                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
+                  const isJobWork = /job/i.test(row.source || '');
 
                   return (
                     <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
@@ -1436,11 +1463,9 @@ export default function OrderDetailView({
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        {isAllColours ? (
-                          <span className="text-muted" style={{ fontSize: '13px' }}>—</span>
-                        ) : (
-                          <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>{row.totalQty || 0}</span>
-                        )}
+                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
+                        </span>
                       </td>
                       <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                         {isEditing ? (
@@ -1469,9 +1494,15 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '125px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
+                          isJobWork ? (
+                            <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
+                          ) : (
+                            <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                          )
                         ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
+                          <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
+                            {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
+                          </span>
                         )}
                       </td>
                       <td className="text-center text-muted" style={{ minWidth: '70px', padding: '6px 8px' }}>—</td>
@@ -1508,8 +1539,10 @@ export default function OrderDetailView({
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
                         )}
                       </td>
-                      <td className="text-center font-monospace" style={{ minWidth: '90px', color: '#2e37a4', fontWeight: 700, fontSize: '13px', padding: '6px 8px' }}>
-                        {isAllColours ? '—' : totalVal + ' PCS'}
+                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
+                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                          {totalVal} PCS
+                        </span>
                       </td>
                     </tr>
                   );
@@ -1544,13 +1577,19 @@ export default function OrderDetailView({
               const rows = getCardArticleRows(item, currentArticle);
               const colorOptions = getArticleColorOptions(currentArticle);
               const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
+              const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
+                (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
+              const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+              const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
               return rows.map((row, rIdx) => {
                 const isAllColours = row.articleColor === 'All colours';
                 const reqVal = parseFloat(row.reqPerPc) || 0;
                 const bufferVal = parseFloat(row.bufferPct) || 0;
-                const qtyVal = parseFloat(row.totalQty) || 0;
-                const totalVal = (reqVal * qtyVal * (1 + bufferVal / 100)).toFixed(1);
+                const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
+                const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
+                const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
+                const isJobWork = /job/i.test(row.source || '');
 
                 return (
                   <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
@@ -1576,11 +1615,9 @@ export default function OrderDetailView({
                       )}
                     </td>
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                      {isAllColours ? (
-                        <span className="text-muted" style={{ fontSize: '13px' }}>—</span>
-                      ) : (
-                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>{row.totalQty || 0}</span>
-                      )}
+                      <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
+                        {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
+                      </span>
                     </td>
                     <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                       {isEditing ? (
@@ -1632,9 +1669,15 @@ export default function OrderDetailView({
                     </td>
                     <td style={{ minWidth: '125px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
+                        isJobWork ? (
+                          <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
+                        ) : (
+                          <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
+                        )
                       ) : (
-                        <span className="text-dark" style={{ fontSize: '13px' }}>{row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—'}</span>
+                        <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
+                          {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
+                        </span>
                       )}
                     </td>
                     <td style={{ minWidth: '70px', padding: '6px 8px' }}>
@@ -1669,8 +1712,10 @@ export default function OrderDetailView({
                         <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
                       )}
                     </td>
-                    <td className="text-center font-monospace" style={{ minWidth: '90px', color: '#2e37a4', fontWeight: 700, fontSize: '13px', padding: '6px 8px' }}>
-                      {isAllColours ? '—' : totalVal + ' PCS'}
+                    <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
+                      <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                        {totalVal} PCS
+                      </span>
                     </td>
                   </tr>
                 );
@@ -2225,6 +2270,7 @@ export default function OrderDetailView({
   };
 
   const [showRateCalculation, setShowRateCalculation] = useState(false);
+  const [customMarketRates, setCustomMarketRates] = useState({});
 
   // Group consumption rows by Article for Image 3 layout (Rowspan per article)
   const articleGroups = useMemo(() => {
@@ -2287,53 +2333,112 @@ export default function OrderDetailView({
     return Array.from(map.values());
   }, [consumptionRows, articleSourcing]);
 
-  // Section 8 Rate Calculations & Intelligent Recommendation Engine
+  // Section 8 Rate Calculations & Intelligent Recommendation Engine (Calculates across ALL available widths)
   const rateCalculations = useMemo(() => {
-    return fabricSummaryRows.map(fs => {
-      let greigeRate = 145;
+    // Group fabricSummaryRows by fabricQuality name
+    const fabricsInOrder = new Map();
+    fabricSummaryRows.forEach(fs => {
+      const fName = fs.fabricName || 'Fabric';
+      if (!fabricsInOrder.has(fName)) {
+        fabricsInOrder.set(fName, []);
+      }
+      fabricsInOrder.get(fName).push(fs);
+    });
+
+    const results = [];
+
+    fabricsInOrder.forEach((summaryList, fabricName) => {
+      const matchingRows = consumptionRows.filter(r => (r.fabricQuality || '').toLowerCase() === fabricName.toLowerCase());
+      const isDyed = matchingRows.some(r => (articleSourcing[r.articleName] || r.source || '').toLowerCase().includes('dyed'));
+
+      let baseGreigeRate = 145;
       let dyeingCost = 35;
-      const fn = fs.fabricName.toLowerCase();
+      const fn = fabricName.toLowerCase();
       if (fn.includes('rayon') || fn.includes('liva') || fn.includes('2.40')) {
-        greigeRate = 165;
+        baseGreigeRate = 165;
         dyeingCost = 45;
       } else if (fn.includes('silk') || fn.includes('tussar')) {
-        greigeRate = 280;
+        baseGreigeRate = 280;
         dyeingCost = 60;
       } else if (fn.includes('cambryc') || fn.includes('cambric')) {
-        greigeRate = 125;
+        baseGreigeRate = 125;
         dyeingCost = 35;
       }
 
-      const matchingRows = consumptionRows.filter(r => (r.fabricQuality || '').toLowerCase() === fs.fabricName.toLowerCase());
-      const isDyed = matchingRows.some(r => (articleSourcing[r.articleName] || r.source || '').toLowerCase().includes('dyed'));
+      // Identify currently selected width in order for this fabric
+      const primarySummary = summaryList[0] || { pcs: 0, totalDyed: 0, totalGreige: 0, width: '58"' };
+      const currentSelectedWidth = primarySummary.width || '58"';
+      const currentBaseMetres = isDyed ? primarySummary.totalDyed : primarySummary.totalGreige;
+      const pcs = primarySummary.pcs || 0;
 
-      const ratePerMetre = isDyed ? (greigeRate + dyeingCost + 15) : (greigeRate + dyeingCost);
-      const totalMetres = isDyed ? fs.totalDyed : fs.totalGreige;
-      const totalCost = totalMetres * ratePerMetre;
-      const costPerGarment = fs.pcs > 0 ? totalCost / fs.pcs : 0;
+      // Fetch ALL available widths for this fabric quality from Fabric Master
+      const allWidths = getFabricMasterWidths(fabricName, currentSelectedWidth);
+      const currentWidthInches = parseFloat(String(currentSelectedWidth).replace(/"/g, '')) || 58;
 
-      return {
-        fabricName: fs.fabricName,
-        width: fs.width,
-        isDyed,
-        ratePerMetre,
-        totalMetres,
-        totalCost,
-        costPerGarment,
-        pcs: fs.pcs
-      };
+      allWidths.forEach(w => {
+        const isSelected = w === currentSelectedWidth;
+        const targetWidthInches = parseFloat(String(w).replace(/"/g, '')) || 44;
+
+        // In marker nesting & cutting, metres needed is inversely proportional to width:
+        // totalMetres = baseMetres * (currentWidthInches / targetWidthInches)
+        let totalMetres = currentBaseMetres;
+        if (!isSelected && targetWidthInches > 0 && currentWidthInches > 0) {
+          totalMetres = currentBaseMetres * (currentWidthInches / targetWidthInches);
+        }
+
+        // Market rate adjustments: wider widths have higher linear rate per metre
+        let widthRateAdj = 0;
+        if (targetWidthInches >= 56) {
+          widthRateAdj = 15;
+        } else if (targetWidthInches <= 44) {
+          widthRateAdj = -5;
+        }
+
+        const defaultRate = isDyed
+          ? (baseGreigeRate + dyeingCost + 15 + widthRateAdj)
+          : (baseGreigeRate + dyeingCost + widthRateAdj);
+
+        const rateKey = `${fabricName}_${w}`;
+        const userTypedRate = customMarketRates[rateKey];
+        const hasCustomRate = userTypedRate !== undefined && userTypedRate !== '';
+        const effectiveRate = hasCustomRate ? (parseFloat(userTypedRate) || 0) : defaultRate;
+
+        const totalCost = totalMetres * effectiveRate;
+        const costPerGarment = pcs > 0 ? totalCost / pcs : 0;
+
+        results.push({
+          fabricName,
+          width: w,
+          isSelected,
+          isDyed,
+          rateKey,
+          defaultCalculatedRate: defaultRate,
+          ratePerMetre: effectiveRate,
+          totalMetres,
+          totalCost,
+          costPerGarment,
+          pcs
+        });
+      });
     });
-  }, [fabricSummaryRows, consumptionRows, articleSourcing]);
+
+    return results;
+  }, [fabricSummaryRows, consumptionRows, articleSourcing, masterFabricsList, customMarketRates]);
 
   const rateTotals = useMemo(() => {
-    const totalCost = rateCalculations.reduce((sum, r) => sum + r.totalCost, 0);
-    const totalMetres = rateCalculations.reduce((sum, r) => sum + r.totalMetres, 0);
-    const totalPcs = rateCalculations.reduce((sum, r) => sum + r.pcs, 0);
+    // Totals for the currently SELECTED widths in the order
+    const selectedRows = rateCalculations.filter(r => r.isSelected);
+    const activeRows = selectedRows.length > 0 ? selectedRows : rateCalculations;
+
+    const totalCost = activeRows.reduce((sum, r) => sum + r.totalCost, 0);
+    const totalMetres = activeRows.reduce((sum, r) => sum + r.totalMetres, 0);
+    const totalPcs = activeRows.reduce((sum, r) => sum + r.pcs, 0);
     
-    const greigeCount = rateCalculations.filter(r => !r.isDyed).length;
+    const hasMultipleWidths = rateCalculations.length > activeRows.length;
     let rec = "Greige sourcing path with in-house processing saves ~8.4% margin across standard widths. Optimal marker efficiency achieved with minimal cut wastage.";
-    if (greigeCount === 0) {
-      rec = "Notice: All articles currently set to Ready-Dyed. Switching base garments (e.g. Kurta) to Greige sourcing can save approx ₹24.50 per garment in procurement costs.";
+    
+    if (hasMultipleWidths) {
+      rec = "All available widths calculated: Wider widths (e.g. 58\") provide ~12-18% marker nesting efficiency over narrower widths (44\"), reducing total cut metres and lowering overall fabric cost per garment.";
     }
 
     return { totalCost, totalMetres, totalPcs, recommendation: rec };
@@ -3724,7 +3829,7 @@ export default function OrderDetailView({
               fontSize: '13px'
             }}
             onClick={() => setShowRateCalculation(prev => !prev)}
-            title="Calculate Rate & View Costing Breakdown (PDF Section 8)"
+            title="Calculate Rate & View Costing Breakdown"
           >
             <i className="ti ti-calculator fs-5"></i>
             <span>Calculate Rate</span>
@@ -3755,7 +3860,7 @@ export default function OrderDetailView({
                 </span>
                 <div>
                   <h6 className="fw-bold text-dark mb-0 fs-15">Fabric Rate Calculation &amp; Procurement Costing</h6>
-                  <small className="text-muted">Section 8 &bull; Market Rate, Fabric Cost per Garment &amp; Margin Optimization Engine</small>
+                  <small className="text-muted">Market Rate, Fabric Cost per Garment &amp; Margin Optimization Engine</small>
                 </div>
               </div>
               <button
@@ -3766,13 +3871,13 @@ export default function OrderDetailView({
               ></button>
             </div>
 
-            {/* Rates table */}
+            {/* Rates table with ALL width calculations */}
             <div className="table-responsive rounded-3 border bg-white mb-3 shadow-2xs">
               <table className="table table-sm align-middle mb-0" style={{ fontSize: '13px' }}>
                 <thead className="bg-light">
                   <tr>
                     <th className="py-2.5 px-3">Fabric Quality</th>
-                    <th className="py-2.5 px-3 text-center">Selected Width</th>
+                    <th className="py-2.5 px-3 text-center">Width</th>
                     <th className="py-2.5 px-3 text-center">Sourcing Path</th>
                     <th className="py-2.5 px-3 text-end">Market Rate (₹/m)</th>
                     <th className="py-2.5 px-3 text-end">Total Metres</th>
@@ -3782,24 +3887,93 @@ export default function OrderDetailView({
                 </thead>
                 <tbody>
                   {rateCalculations.map((rc, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2.5 px-3 fw-semibold text-dark">{rc.fabricName}</td>
-                      <td className="py-2.5 px-3 text-center">{rc.width || 'Default'}</td>
+                    <tr
+                      key={idx}
+                      style={{
+                        backgroundColor: rc.isSelected ? '#ffffff' : '#fcfcfd'
+                      }}
+                    >
+                      <td className="py-2.5 px-3 fw-semibold text-dark">
+                        {rc.fabricName}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="d-inline-flex align-items-center gap-1.5">
+                          <span className="fw-bold font-monospace">{rc.width}</span>
+                          {rc.isSelected ? (
+                            <span
+                              className="badge rounded-pill fw-semibold px-2 py-0.5 text-white shadow-2xs"
+                              style={{ backgroundColor: '#2e37a4', fontSize: '10px' }}
+                            >
+                              Selected
+                            </span>
+                          ) : (
+                            <span
+                              className="badge rounded-pill fw-medium px-2 py-0.5 bg-light text-muted border"
+                              style={{ fontSize: '10px' }}
+                            >
+                              Alternative
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 text-center">
                         <span className={`badge ${rc.isDyed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'} px-2 py-1`}>
                           {rc.isDyed ? 'Dyed / Stock' : 'Greige + Dyeing'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-end font-monospace">₹{rc.ratePerMetre.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-end font-monospace">{rc.totalMetres.toFixed(1)}m</td>
-                      <td className="py-2.5 px-3 text-end font-monospace fw-bold text-dark">₹{rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="py-2.5 px-3 text-end font-monospace fw-semibold text-primary">₹{rc.costPerGarment.toFixed(2)}</td>
+                      <td className="py-1.5 px-2 text-end" style={{ width: '145px' }}>
+                        <div
+                          className="input-group input-group-sm ms-auto rounded-2 overflow-hidden shadow-2xs"
+                          style={{
+                            maxWidth: '135px',
+                            border: '1.5px solid #cbd5e1',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <span
+                            className="input-group-text px-2 py-0 bg-light text-dark fw-bold border-0"
+                            style={{ fontSize: '12.5px', color: '#334155' }}
+                          >
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="form-control form-control-sm text-end fw-bold font-monospace bg-white border-0 ps-1 pe-2 shadow-none"
+                            style={{ fontSize: '13px', height: '32px', color: '#0f172a' }}
+                            placeholder={rc.defaultCalculatedRate.toFixed(2)}
+                            value={customMarketRates[rc.rateKey] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomMarketRates(prev => ({
+                                ...prev,
+                                [rc.rateKey]: val
+                              }));
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-end font-monospace fw-semibold">
+                        {rc.totalMetres.toFixed(1)}m
+                      </td>
+                      <td className={`py-2.5 px-3 text-end font-monospace fw-bold ${rc.isSelected ? 'text-dark' : 'text-secondary'}`}>
+                        ₹{rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td
+                        className="py-2.5 px-3 text-end font-monospace fw-semibold"
+                        style={{ color: rc.isSelected ? '#2e37a4' : '#64748b' }}
+                      >
+                        ₹{rc.costPerGarment.toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-light fw-bold">
                   <tr>
-                    <td colSpan={4} className="py-2.5 px-3 text-dark">Total Order Procurement Cost</td>
+                    <td colSpan={4} className="py-2.5 px-3 text-dark">
+                      Total Order Procurement Cost (Active Selected Widths)
+                    </td>
                     <td className="py-2.5 px-3 text-end font-monospace">{rateTotals.totalMetres.toFixed(1)}m</td>
                     <td className="py-2.5 px-3 text-end font-monospace text-success fs-14">
                       ₹{rateTotals.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}

@@ -384,57 +384,80 @@ export const initialAccessoryMasters = [
     active: true
   },
 
-  // Thread Category
+  // Thread Category (Sections 7.1 - 7.5)
+  // Thread Category (Sections 7.1 - 7.5) - Clean defaults per PDF
   {
     id: 'ACC-THR-01',
     name: 'Kantha Pattern Thread',
     category: 'Thread',
-    unit: 'Box',
-    piecesPerUnit: 15,
+    threadSize: '',
+    unit: 'Cone',
+    piecesPerUnit: 1,
     threadPattern: 'Kantha',
-    globalThreadMetric: 15,
+    threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
+    globalThreadMetric: 15, // Explicit PDF Default (Page 12)
+    boxes: [],
+    coneSizes: [],
+    placements: [],
+    articlePlacements: [],
     maxBuffer: '',
     hsnCode: '',
-    description: 'Specialised thread for Kantha embroidery & stitching',
+    description: '',
     active: true
   },
   {
     id: 'ACC-THR-02',
     name: 'Couching Pattern Thread',
     category: 'Thread',
-    unit: 'Box',
-    piecesPerUnit: 15,
+    threadSize: '',
+    unit: 'Cone',
+    piecesPerUnit: 1,
     threadPattern: 'Couching',
-    globalThreadMetric: 15,
+    threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
+    globalThreadMetric: 15, // Explicit PDF Default (Page 12)
+    boxes: [],
+    coneSizes: [],
+    placements: [],
+    articlePlacements: [],
     maxBuffer: '',
     hsnCode: '',
-    description: 'Heavy cord thread for decorative couching work',
+    description: '',
     active: true
   },
   {
     id: 'ACC-THR-03',
     name: 'Standard Stitching Thread',
     category: 'Thread',
-    unit: 'Box',
-    piecesPerUnit: 15,
+    threadSize: '',
+    unit: 'Reel',
+    piecesPerUnit: 1,
     threadPattern: 'Stitching',
-    threadPerPiece: 60,
+    threadPerPiece: 60, // Explicit PDF Default (Page 13)
+    boxes: [],
+    coneSizes: [],
+    stitchingArticles: [],
+    consumptionPer100Pcs: {},
     maxBuffer: '',
     hsnCode: '',
-    description: '40/2 general garment sewing & stitching thread',
+    description: '',
     active: true
   },
   {
     id: 'ACC-THR-04',
     name: 'Overlock Thread',
     category: 'Thread',
+    threadSize: '',
     unit: 'Cone',
     piecesPerUnit: 1,
     threadPattern: 'Stitching',
-    threadPerPiece: 45,
+    threadPerPiece: 60, // Explicit PDF Default (Page 13)
+    boxes: [],
+    coneSizes: [],
+    stitchingArticles: [],
+    consumptionPer100Pcs: {},
     maxBuffer: '',
     hsnCode: '',
-    description: 'Multi-filament overlock & serging cone thread',
+    description: '',
     active: true
   },
 
@@ -1099,13 +1122,34 @@ export const getStoredAccessoriesMaster = () => {
       if (idx === -1) {
         list.push(seed);
       } else {
-        list[idx] = {
-          ...seed,
-          ...list[idx],
-          name: seed.name,
-          category: seed.category,
-          active: list[idx].active !== false
-        };
+        if (seed.category === 'Thread') {
+          // Purge old prefilled dummy values from previous runs
+          const hasOldDummySize = list[idx].threadSize === '40/2' || list[idx].threadSize === '30/2';
+          const hasOldDummyBoxes = Array.isArray(list[idx].boxes) && list[idx].boxes.length > 0 && String(list[idx].boxes[0]?.metersPerReel) === '400';
+          const hasOldDummyArticles = Array.isArray(list[idx].stitchingArticles) && list[idx].stitchingArticles.length === 2 && list[idx].stitchingArticles[0] === 'Kurta';
+          list[idx] = {
+            ...seed,
+            ...list[idx],
+            threadSize: hasOldDummySize ? '' : (list[idx].threadSize || ''),
+            boxes: hasOldDummyBoxes ? [] : (list[idx].boxes || []),
+            coneSizes: (list[idx].coneSizes && list[idx].coneSizes.length === 2 && list[idx].coneSizes[0] === '5000 m') ? [] : (list[idx].coneSizes || []),
+            placements: (list[idx].placements && list[idx].placements.length >= 3 && list[idx].placements[0] === 'Sleeves') ? [] : (list[idx].placements || []),
+            articlePlacements: (list[idx].articlePlacements && list[idx].articlePlacements[0]?.article === 'Kurta') ? [] : (list[idx].articlePlacements || []),
+            stitchingArticles: hasOldDummyArticles ? [] : (list[idx].stitchingArticles || []),
+            consumptionPer100Pcs: (list[idx].consumptionPer100Pcs && list[idx].consumptionPer100Pcs['Kurta'] === 6000) ? {} : (list[idx].consumptionPer100Pcs || {}),
+            name: seed.name,
+            category: seed.category,
+            active: list[idx].active !== false
+          };
+        } else {
+          list[idx] = {
+            ...seed,
+            ...list[idx],
+            name: seed.name,
+            category: seed.category,
+            active: list[idx].active !== false
+          };
+        }
       }
     });
 

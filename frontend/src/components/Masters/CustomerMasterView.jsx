@@ -403,7 +403,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                   </span>
                   Add New Customer
                 </h5>
-                <p className="text-muted small mb-0">Create customer master record inline (Section 2.2)</p>
+                <p className="text-muted small mb-0">Create customer master record inline</p>
               </div>
               <button type="button" className="btn-close" onClick={onCloseInline}></button>
             </div>
@@ -552,7 +552,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
           <div>
             <h4 className="fw-bold text-dark mb-0 fs-18">Customer Master</h4>
             <p className="text-muted small mb-0">
-              Route 1 (Section 2) &bull; B2B Retailers, Distributors, Direct Buyers & Online Platforms
+              B2B Retailers, Distributors, Direct Buyers &amp; Online Platforms
             </p>
           </div>
         </div>

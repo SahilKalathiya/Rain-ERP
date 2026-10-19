@@ -1,0 +1,520 @@
+RaindropGarments
+Route 1 — Sales Order Masters
+Final Approval & Detailed Requirements Document
+
+-- 1 of 22 --
+
+1. Overview & Scope
+This document covers Route 1 — the Sales Order Masters that sit underneath the Order Creation module:
+Customer, Color, Article, Size (Series + Size), and Accessories (including the Thread sub-system and the two
+new Thread support masters). It is organised the same way as the Raw Material Procurement module
+document: every master has its own complete Data Structure table first, listing every field explicitly, followed
+immediately by that master's own Functional Points. Edge cases and validations are covered section by
+section afterwards, and the rules that apply across the whole portal — view mode, section-wise editing, audit
+history, column filters, and global search — are collected once in a Global Points section at the end, in the
+same structure and formatting already used for Route 2, since they apply here unchanged.
+In scope:
+• Customer, Color, Article, and Size (Series + Size) masters
+• Accessories Master, covering Buttons, Lace, Tassel, Dori, Elastic, Beads & Sequins, and Thread
+• The Thread sub-system: base thread fields plus the six Thread Patterns (Kantha, Couching, Stitching,
+Embroidery, Button Tacking, Handwork)
+• Two new masters: Thread Sizes (packaging/units, with the procurement suggestion engine) and Thread
+Brand & Color Code
+• Visual interface mockups for the Dori and Thread (Kantha/Couching) consumption flows
+Out of scope for this document:
+• The Order Creation Module's own workflow — this remains exactly as shown in the recorded
+demonstration video; only the master data feeding it is documented here (see Section 9).
+• Raw Material Procurement (Route 2) — documented separately.
+2. Customer Master
+2.1 Data Structure
+Field Type Mandatory Notes
+Customer ID Auto (system generated) Auto Primary key, sequential
+Customer Name Text Yes Auto-capitalised word by word
+Customer Type Dropdown Yes B2B Retailer / Distributor / Direct
+Customer / Online Platform
+Phone Number Number, 10 digit No
+Email Address Email No Format validated
+Address Text (multiline) No
+City Text No
+
+-- 2 of 22 --
+
+Field Type Mandatory Notes
+State Dropdown No
+GSTIN Text, 15 characters No Format validated when entered
+Active Status Checkbox Yes Default: checked
+Notes Text (multiline) No
+Created By / Created Date Auto Auto
+Last Modified By / Date Auto Auto Feeds the Activity History — Section 11.4
+2.2 Functional Points
+• Full CRUD: Create, View, Edit, Delete, and Activate/Deactivate.
+• After saving, the customer record is created and immediately available in every lookup that references
+customers (e.g. Order Creation).
+• Can be created inline (“+ New”) from any transaction screen that references a Customer.
+
+-- 3 of 22 --
+
+3. Color Master
+3.1 Data Structure
+Field Type Mandatory Notes
+Color ID Auto (system generated) Auto Primary key, sequential
+Color Name Text Yes Auto-capitalised
+Hex Code Text, 6-character hex Yes Selected via the color picker, or
+searched/typed directly
+Pantone Code Text No
+Active Status Checkbox Yes Default: checked
+Created By / Created Date Auto Auto
+Last Modified By / Date Auto Auto Feeds the Activity History — Section 11.4
+3.2 Functional Points
+• Adding a color opens a Color Picker dialog: users can select visually, pick from a set of standard colors
+for quick selection, or search/select using a HEX code directly.
+• Saved colors display in an attractive card layout, not a plain list — each card visually shows the selected
+color as a swatch alongside its name.
+• Cards support Edit and Delete directly.
+• The overall interface should be simple, modern, and visually appealing — this master is one of the more
+visible, frequently-used screens.
+4. Article Master
+4.1 Data Structure
+Field Type Mandatory Notes
+Article ID Auto (system generated) Auto Primary key, sequential
+Article Name Text Yes Auto-capitalised, e.g. “Kurta”
+Emoji / Icon Emoji picker (predefined or
+custom) Yes Displayed on the article's tile
+Sort Order Number No Determines display priority in the Order
+Detail Form
+Description Text (multiline) No
+Active Status Checkbox Yes Default: checked
+
+-- 4 of 22 --
+
+Field Type Mandatory Notes
+Created By / Created Date Auto Auto
+Last Modified By / Date Auto Auto Feeds the Activity History — Section 11.4
+4.2 Functional Points
+• Articles are field-staff facing, so the selection screen shows small clickable cards/tiles — each showing
+its emoji/icon and name (e.g. 👕Kurta, 👖Pajama, 🧥Jacket) — rather than a plain list, for quick visual
+identification.
+• Only the most frequently used articles are visible initially, ordered by Sort Order; any remaining articles
+stay hidden behind an “Others” tile and only appear once that is clicked.
+• A dedicated “Add New Article” card sits alongside the article tiles; clicking it opens a popup to create a
+new article (Article Name, Emoji Picker, Sort Order, Description, Active Status).
+• After saving, the new article is stored in the Article Master and becomes immediately available in the
+selection list — no page refresh required.
+
+-- 5 of 22 --
+
+5. Size Master
+Different products use different sizing systems — Numeric, Roman, or Alphabetic (S, M, L, XL) — so sizes are
+organised first by Size Series, with each series holding its own set of Size records.
+5.1 Data Structure
+Field Type Mandatory Notes
+Series ID Auto (system generated) Auto Primary key, sequential
+Series Name Text Yes e.g. “Alphabetic”, “Numeric”,
+“Roman”
+Display Order Number, drag-and-drop reorderable Auto Set by dragging series into place
+Active Status Checkbox Yes Default: checked
+Field Type Mandatory Notes
+Size ID Auto (system generated) Auto Primary key, sequential
+Series Reference — Size Series Auto The series this size belongs to
+Size Name Text Yes e.g. “S”, “32”, “XL”
+Display Name Text No What's shown to the user, if
+different from Size Name
+Description Text (multiline) No
+5.2 Functional Points
+• Users can reorder Size Series by drag-and-drop.
+• Each Size Series can hold unlimited Size records, added via an “Add More Size” option.
+
+-- 6 of 22 --
+
+6. Accessories Master — Overview
+Creating an accessory always starts the same way — an Accessory Name, then an Accessory Category. The
+Category selected then dynamically changes the rest of the form to show only the fields relevant to that
+category. The available categories are: Buttons, Lace, Tassels, Dori, Thread, Elastic, and Beads & Sequins.
+Each is documented as its own module below, with its own Data Structure and Functional Points, since each
+has a genuinely different configuration shape.
+Field Type Mandatory
+Accessory ID Auto (system generated) Auto
+Accessory Name Text Yes
+Accessory Category Dropdown — Buttons / Lace / Tassels / Dori / Thread / Elastic
+/ Beads & Sequins Yes
+6.1 Button Configuration
+Field Type Mandatory Notes
+Unit Dropdown — Piece / Meter / Packet / Box / Cone /
+Kilogram / Dozen / Gross Yes
+Pieces Per Unit Number Yes Defaults to 1, editable
+Button Variants (Sizes) Repeatable text, e.g. 18L, 20L, 22L Yes Add More / Delete
+Button Colors Repeatable, reference — Color Master or free text Yes Add / Delete
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+• Configuration is unchanged from the previous agreement: multiple sizes and multiple colors can be
+maintained per button accessory, each independently addable and removable.
+6.2 Lace Configuration
+Field Type Mandatory Notes
+Lace Size Text, manually entered Yes
+e.g. “18 mm”, “2 cm” —
+free text so any unit style
+can be typed
+Unit Dropdown Yes
+
+-- 7 of 22 --
+
+Field Type Mandatory Notes
+Pieces Per Unit Number Yes
+Default Shrinkage (%) Decimal No
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+6.3 Tassel Configuration
+Field Type Mandatory Notes
+Unit Dropdown Yes
+Pieces Per Unit Number Yes
+Tassel Type Dropdown — Ready Made / Job Work Yes Drives the fields below
+Maximum Buffer Decimal No Shown for both types
+HSN Code Text / Number No Shown for both types
+Description Text (multiline) No Shown for both types
+Active Status Checkbox Yes Shown for both types
+Tassel Size (Job Work only) Repeatable row — Size + Thread Consumption Conditional Only shown when Tassel
+Type = Job Work
+• Configuration is unchanged from the previous agreement.
+• If Ready Made is selected, only Maximum Buffer, HSN Code, Description, and Active Status appear.
+• If Job Work is selected, an additional repeatable Size / Thread Consumption row set appears, with Add
+More and Remove Row controls.
+
+-- 8 of 22 --
+
+6.4 Dori (Drawstring) Configuration
+Field Type Mandatory Notes
+Required Size Text Yes Displayed as soon as Dori is
+selected as the category
+Unit Dropdown Yes Displayed alongside
+Required Size
+Fabric Quality (per fabric entry) Reference — Fabric Master Yes Step 1 of the one-time fabric
+entry flow
+Width Size(s) (per fabric entry) Multi-select Yes Step 2 — one or more widths
+chosen per fabric
+Consumption per Width Decimal (cm), one box per selected width Yes Step 3 — generated
+automatically; see 6.4.1
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+• When Dori is selected, the Required Size and Unit fields display immediately.
+• A fabric entry section opens by default (Fabric Entry #1) — the user is not required to click anything to
+start it.
+• Step 1: select the Fabric Quality for this entry.
+• Step 2: choose the Width Size(s) for that fabric via a multi-select dropdown or an equivalent user-friendly
+chip-style input.
+• Step 3: if two or more width sizes are selected, an individual manual text box (in centimetres) generates
+automatically for each chosen width, to record fabric consumption per metre of Dori for that specific
+width.
+• “Add More Fabric” repeats Steps 1–3 for a new fabric, so more than one fabric/width/consumption
+combination can be recorded against the same Dori accessory.
+
+-- 9 of 22 --
+
+6.5 Elastic Configuration
+Field Type Mandatory Notes
+Associated Fabric Reference — Fabric Master Yes
+Required Size Text Yes
+Unit Dropdown Yes
+Fabric Consumption Decimal Yes
+e.g. how much Elastic is
+required per 1 metre of
+fabric
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+• Follows the same configuration pattern as Dori: Associated Fabric, Required Size, Unit, and Fabric
+Consumption, with Add More / Delete support for multiple entries.
+6.6 Beads & Sequins Configuration
+Field Type Mandatory Notes
+Associated Fabric Reference — Fabric Master Yes
+Required Size Text Yes
+Unit Dropdown Yes
+Fabric Consumption Decimal Yes
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+• Identical pattern to Dori and Elastic: Associated Fabric, Required Size, Unit, and Fabric Consumption, with
+Add More / Delete support.
+
+-- 10 of 22 --
+
+7. Thread Configuration
+Thread is the most involved accessory category: a shared base configuration, followed by one of six Thread
+Patterns, each with its own consumption logic. For every internal dropdown in this section that is not fetched
+dynamically from another master, an “Other” option is always available — selecting it unlocks a manual text
+input.
+7.1 Base Thread Configuration — Data Structure
+Field Type Mandatory Notes
+Size Text / Dropdown with “Other” Yes
+Unit Dropdown with “Other” Yes
+Pieces Per Unit Number Yes
+Thread Pattern Dropdown — Kantha / Couching / Stitching /
+Embroidery / Button Tacking / Handwork Yes
+Drives the
+pattern-specific fields
+below
+Maximum Buffer Decimal No Common field
+HSN Code Text / Number No Common field
+Description Text (multiline) No Common field
+Active Status Checkbox Yes Common field
+7.2 Kantha Pattern
+Field Type Mandatory Notes
+Thread Per Stitch Decimal (metres) Yes
+Default 15 m, editable —
+metres of thread required
+for one metre of stitching
+Available Boxes — Reels Per Box Number No Each box = 6000 m; Add
+More supported
+Available Boxes — Metres Per
+Reel Number No Paired with Reels Per Box
+Available Cone Sizes Repeatable, e.g. 5000 m, 10000 m No
+Available Placements Repeatable chips/buttons, e.g. Sleeves, Front,
+Back No
+Some predefined, others
+maintained via
+Manufacturing Defaults
+Article Reference — Article Master Yes
+Top of the Article →
+Placement → Thread Line
+chain
+Placement (per Article) Text, manual entry Yes e.g. “Sleeves”; multiple
+
+-- 11 of 22 --
+
+Field Type Mandatory Notes
+placements per article
+Thread Required (per Placement) Decimal (metres) Yes Entered per placement line
+• Thread Per Stitch defaults to 15 metres and remains editable.
+• Available Boxes are configured as Reels Per Box × Metres Per Reel, each box totalling 6000 metres; Add
+More is supported for additional box configurations.
+• Available Cone Sizes and Available Placements are both repeatable — placements may appear as
+clickable buttons or selectable chips, and some values may be predefined while others are maintained
+through Manufacturing Defaults.
+• The Article → Placement → Thread Line chain works as: select the Article, define a Placement (manual
+text, e.g. “Sleeves”) with additional placements addable under the same article, and enter the Thread
+required per line (metres) for every placement added.
+• “Add More” at the top level adds an entirely new Article → Placement → Thread Line block.
+• A one-time Global Thread Stitching Metric asks for “Thread required for 1 metre of stitching” for
+Kantha/Couching (manual entry, metres) — this is separate from, and in addition to, the per-placement
+Thread Required values.
+
+-- 12 of 22 --
+
+7.3 Couching Pattern
+Configuration is identical to Kantha (Section 7.2) — the same Thread Per Stitch default, the same Available
+Boxes / Cone Sizes / Placements structure, and the same Article → Placement → Thread Line chain with its
+own “Add More” and shared one-time Global Thread Stitching Metric.
+7.4 Stitching Pattern
+Field Type Mandatory Notes
+Thread Per Piece Decimal (metres) Yes
+Default 60 m, editable
+— auto-populates the
+BOM Quantity per
+Piece
+Available Boxes — Reels Per Box /
+Metres Per Reel Number No Same structure as
+Kantha
+Available Cone Sizes Repeatable No
+Article(s) Reference — Article Master, multi-select Yes e.g. Kurta, Pant
+Thread Consumption per 100 Pieces
+(per Article) Decimal (metres) Yes One box opens per
+selected article
+• Instead of Thread Per Stitch, Stitching asks for Thread Per Piece, defaulting to 60 metres and remaining
+editable; this value automatically populates the BOM Quantity per Piece but can still be changed.
+• Targeted Articles (e.g. Kurta, Pant) are chosen via a multi-select; for each selected article, a manual input
+box dynamically opens to record Thread Consumption per 100 Pieces, strictly in metres.
+• Available Boxes, Reels Per Box, Metres Per Reel, and Available Cone Sizes follow the same structure as
+Kantha/Couching.
+7.5 Embroidery, Button Tacking & Handwork
+• Embroidery: no additional measurements are required.
+• Button Tacking: no special measurements are required; the BOM only records that this process is
+required, along with optional remarks.
+• Handwork: behaves the same as Button Tacking — only the process requirement is recorded.
+
+-- 13 of 22 --
+
+8. New Master Additions for Threads
+Two new masters are introduced specifically to enable intelligent thread ordering and automatic procurement
+calculations.
+8.1 Thread Sizes Master (Packaging & Units)
+Field Type Mandatory Notes
+Thread Size ID Auto (system generated) Auto Primary key, sequential
+Brand Name Reference or free text Yes Select or enter
+Packaging Type Dropdown — Reel / Cone / Other Yes “Other” opens a manual text
+box
+Number of Pieces per Box Number Yes
+Thread Length per Piece Decimal (metres) Yes e.g. 20 m per Reel, or 500 m
+per Cone
+Box Size / Box Capacity Number / Decimal No Supports the procurement
+suggestion engine below
+Cones Number No
+Active Status Checkbox Yes Default: checked
+• Flow: select/enter Brand Name → select Packaging Type (Reel, Cone, or a custom type via “Other”) →
+enter Number of Pieces per Box → enter Thread Length per Piece.
+• Intelligent Procurement Suggestion Engine: when creating a thread purchase requirement during a Sales
+Order, the system evaluates the total thread consumption (in metres) and dynamically suggests all
+possible, optimal purchase combinations — for example, “Order 6 boxes of 15-reels (totalling 1,100
+metres)” or “Order 2 Cones of 600 metres.” Users can pick the best suggestion directly when placing the
+order.
+8.2 Thread Brand & Color Code Master
+Field Type Mandatory Notes
+Brand & Color ID Auto (system generated) Auto Primary key, sequential
+Brand Name Reference or free text Yes
+Color Number Text / Number Yes
+Color Code Hex code, manual entry or color picker Yes See picker behaviour below
+
+-- 14 of 22 --
+
+Field Type Mandatory Notes
+Color Preview Auto (visual swatch) Auto Small colored square shown
+next to the code/number
+Active Status Checkbox Yes Default: checked
+• Color Code supports both manual hex/code input and an interactive visual Color Picker popup.
+• Upon selecting a color, a small colored square preview box displays immediately in the same row, next to
+the code/number, for quick visual identification.
+
+-- 15 of 22 --
+
+9. Order Creation Module
+The Order Creation Module's workflow remains exactly as explained in the recorded demonstration video — it
+is not being redesigned or re-documented here. The functional changes and enhancements discussed in
+previous meetings are incorporated into that same workflow, without changing the overall business process.
+This module consumes the masters documented in Sections 2–8 above (Customer, Color, Article, Size, and
+Accessories/Thread).
+
+-- 16 of 22 --
+
+10. Visual Interface Mockups
+The client asked for a clean, intuitive visual breakdown of the two most complex configuration flows — Dori
+and Thread (Kantha/Couching) consumption — so both technical and non-technical stakeholders can confirm
+the intended user experience before development starts. These are wireframes: plain boxes are ordinary fields,
+dashed amber boxes are sections that generate or open dynamically based on a previous selection, and the
+green/blue rounded boxes are action buttons. Like the flow charts elsewhere in this document, every shape
+here is a native Word object — click to select, double-click to edit its wording, or drag to move or resize.
+10.1 Dori Accessory — One-Time Fabric Entry Flow
+
+-- 17 of 22 --
+
+10.2 Thread (Kantha / Couching) — Article → Placement → Thread Flow
+
+-- 18 of 22 --
+
+11. Global Points — Apply Across the Whole Portal
+These rules are not specific to any one master above — they are the standing behaviour for every screen and
+every record in this portal, already established for Route 2 and carried over here unchanged, in the same
+structure and formatting.
+11.1 Global Search Bar
+A static global search bar sits at the top-right corner of the portal at all times, for platform-wide searching
+across records — customers, colors, articles, sizes, accessories, and threads alike.
+11.2 View Mode by Default, with Section-wise Edit
+• Once any record is saved, it always opens in a read-only View Mode by default — never straight into an
+editable form.
+• A saved record's View screen is split into logical sections, each with its own independent Edit button, so
+one section can be unlocked and changed without disturbing the rest of the record.
+• Alongside the section-level controls, the complete page still offers an overall Save and Edit, for when the
+whole record is being handled at once.
+11.3 Column-wise Filters on Every Table
+On top of the header of every table listing saved records — customers, colors, articles, sizes, and accessories
+— each column has its own filter/search control, so users can narrow the list by any column, not only by the
+global search bar.
+11.4 Activity History & Audit Trail
+Every transactional module maintains a detailed Activity History (Master modules are optional, but
+recommended here given how frequently these masters are edited). Whenever a record is created, edited,
+updated, approved, rejected, deleted, or restored, the system captures the complete activity automatically,
+recording:
+• Date and time of the activity
+• User name and role
+• Type of activity (Create, Edit, Update, Delete, Approval, Rejection, Restore, etc.)
+• Module name, and record name/number
+• Field(s) modified, previous value, and updated value
+• Remarks (if applicable)
+• IP address / device information (optional, for future implementation)
+History is shown in an easy-to-read timeline / activity-log format on each record, so any user can immediately
+see who did what, to which field, from what value to what value, and when.
+
+-- 19 of 22 --
+
+11.5 Field-Level Editability & Section-wise Saving
+• Each major section of a record carries its own Save, Edit, Cancel, and Delete controls, so one section can
+be saved while others are still being worked on.
+• Every master supports full Create, View, Edit, Delete, and Activate/Deactivate.
+• Every master provides a “Create New” option wherever it is referenced from a transaction screen, so a
+new master record can be created without leaving the page in progress; new records become available in
+the relevant lookup lists immediately, with no page refresh needed.
+11.6 Interface Standards
+• Every screen should be attractive, professional, interactive, responsive, properly aligned, and easy to
+understand and operate — a modern ERP look, not a traditional data-entry form.
+• Number fields carry no spinner arrows and start blank with a placeholder example, never a default 0.
+• Free-text fields auto-capitalise the first letter of each word as the user types.
+12. Validations, Edge Cases & Challenges
+Covered section by section, in the same order as the masters above.
+12.1 Customer, Color, Article, Size
+• A Customer's GSTIN, if entered, must pass format validation before save.
+• A Color's Hex Code must be a valid 6-character hex value regardless of whether it was picked visually or
+typed/searched.
+• Deleting or deactivating an Article, Color, or Size already used on an existing Sales Order must not remove
+or break that historical reference — it should simply stop appearing in new-record selections.
+• An Article's Sort Order change must immediately reflect in both the card/tile display and the Order Detail
+Form without requiring a rebuild of the article list.
+• Reordering Size Series via drag-and-drop must persist immediately and reflect in every screen that lists
+series in order (not just the master screen itself).
+12.2 Accessories — General
+• Switching Accessory Category after some fields are already filled in must not silently carry over values
+that don't apply to the new category (e.g. Tassel Type fields left behind after switching to Lace).
+• The four common fields (Maximum Buffer, HSN Code, Description, Active Status) must behave identically
+across every category — any category-specific logic should never touch these.
+
+-- 20 of 22 --
+
+12.3 Dori, Elastic, Beads & Sequins
+• Removing a width from the multi-select after its consumption box already has a value must remove that
+box (and its value) cleanly, without leaving an orphaned field or silently keeping the value against a width
+that's no longer selected.
+• Selecting a single width should not generate a box — per the rule, boxes only auto-generate once two or
+more widths are selected; the single-width case still needs its own consumption entry point (via the same
+Step 3 area) so a Dori entry with only one width is not left without a way to record consumption.
+• Each “Add More Fabric” block (Fabric Quality → Width(s) → Consumption) must be independently
+editable and deletable without disturbing other fabric blocks already saved against the same
+Dori/Elastic/Beads accessory.
+12.4 Thread — Base & Patterns
+• Changing the Thread Pattern after some pattern-specific fields are filled in must not carry incompatible
+data across (e.g. Thread Per Piece from Stitching should not silently populate Thread Per Stitch if the
+user switches to Kantha).
+• Selecting “Other” on any internal (non-master-driven) dropdown must unlock its manual text field, and that
+typed value must save and display correctly wherever the dropdown's value is shown elsewhere.
+• Kantha and Couching must be built from one shared configuration definition, not duplicated separately,
+so a fix or change to one does not have to be manually repeated in the other.
+• The one-time Global Thread Stitching Metric is entered once and applies to both Kantha and Couching —
+it must not be asked for again per Article Block.
+• An Article → Placement → Thread Line block, once added, must be independently editable and
+removable without disturbing other Article blocks under the same accessory.
+• Stitching's Thread Per Piece auto-populates the BOM Quantity per Piece, but a manual edit to that BOM
+value afterwards must not be silently overwritten if Thread Per Piece is changed again later — the two
+need a clear rule for which one wins.
+
+-- 21 of 22 --
+
+12.5 New Thread Masters
+• The Procurement Suggestion Engine must account for partial-box and partial-cone scenarios (e.g. a
+requirement that doesn't divide evenly into whole boxes or cones) and present the closest sensible
+combinations rather than only exact matches.
+• A Thread Size record's Packaging Type of “Other” must still work correctly inside the suggestion engine —
+a custom packaging type should not be silently excluded from suggested combinations.
+• A Color Code entered manually (not via the picker) must still generate the same colored-square preview
+as one chosen visually — the preview cannot depend on which entry method was used.
+13. Deferred / Out of Scope
+• IP address / device information capture in the Activity History — optional, for future implementation.
+• Redesigning the Order Creation Module's workflow — it remains exactly as shown in the recorded
+demonstration video.
+• Manufacturing Defaults for thread Placements — referenced here as a source for some placement values,
+but its own configuration is documented separately.
+
+-- 22 of 22 --
+
