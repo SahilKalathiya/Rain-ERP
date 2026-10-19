@@ -28827,7 +28827,7 @@
       tasselType: "Ready Made",
       jobWorkRows: [],
       // Dori / Elastic / Beads & Sequins
-      fabricRows: [],
+      fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }],
       fabricEntries: [],
       // Thread
       sizeValue: "",
@@ -28894,7 +28894,13 @@
         placements: acc.placements || acc.availablePlacements || [],
         processRemarks: acc.processRemarks || "",
         jobWorkRows: acc.jobWorkRows || [],
-        fabricRows: acc.fabricRows || acc.fabricEntries || [],
+        fabricRows: acc.fabricRows && acc.fabricRows.length > 0 ? acc.fabricRows : acc.fabricEntries && acc.fabricEntries.length > 0 ? acc.fabricEntries : [{
+          fabricName: acc.fabricName || acc.fabricQuality || FABRIC_QUALITIES[0],
+          fabricQuality: acc.fabricQuality || acc.fabricName || FABRIC_QUALITIES[0],
+          size: acc.doriRequiredSize || acc.requiredSize || acc.size || "",
+          unit: acc.unit || "Meter",
+          consumption: acc.fabricConsumption || acc.consumption || ""
+        }],
         buttonSizesList: szList,
         buttonColorsList: clList,
         variants: acc.variants || szList,
@@ -29201,7 +29207,8 @@
             setFormData({
               ...formData,
               category: cat,
-              unit: CONTINUOUS_UNITS.includes(cat) ? "Meter" : "Piece"
+              unit: CONTINUOUS_UNITS.includes(cat) ? "Meter" : "Piece",
+              fabricRows: !formData.fabricRows || formData.fabricRows.length === 0 ? [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }] : formData.fabricRows
             });
           },
           style: { height: "42px", borderRadius: "8px" }
@@ -29505,7 +29512,7 @@
             onChange: (newTags) => setFormData({ ...formData, coneSizes: newTags }),
             placeholder: "Type a value, press Enter"
           }
-        ))), showPlacements && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement(
+        )), showPlacements && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mt-3" }, /* @__PURE__ */ import_react14.default.createElement(
           TagInput,
           {
             label: "Available placements",
@@ -29513,7 +29520,7 @@
             onChange: (newTags) => setFormData({ ...formData, placements: newTags }),
             placeholder: "Type a value, press Enter"
           }
-        ), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted mt-1", style: { fontSize: "12px" } }, "e.g. Sleeves, Front, Back \u2014 some may be predefined via Manufacturing Defaults.")), formData.threadPattern === "Embroidery" && /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted mb-3", style: { fontSize: "12.5px" } }, "No additional measurements required for Embroidery."), showProcessOnly && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("p", { className: "form-text text-muted mb-2", style: { fontSize: "12.5px" } }, "No special measurements required \u2014 the BOM only records that this process is required."), /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Remarks (optional)"), /* @__PURE__ */ import_react14.default.createElement(
+        ), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted mt-1", style: { fontSize: "12px" } }, "e.g. Sleeves, Front, Back \u2014 some may be predefined via Manufacturing Defaults."))), formData.threadPattern === "Embroidery" && /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted mb-3", style: { fontSize: "12.5px" } }, "No additional measurements required for Embroidery."), showProcessOnly && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("p", { className: "form-text text-muted mb-2", style: { fontSize: "12.5px" } }, "No special measurements required \u2014 the BOM only records that this process is required."), /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Remarks (optional)"), /* @__PURE__ */ import_react14.default.createElement(
           "input",
           {
             type: "text",
@@ -29524,86 +29531,105 @@
             style: { height: "42px", borderRadius: "8px" }
           }
         )));
-      })(), (formData.category === "Dori" || formData.category === "Elastic" || formData.category === "Beads & Sequins") && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-semibold text-dark small mb-2" }, "Fabric consumption (e.g. how much is needed per 1 m of fabric):"), (formData.fabricRows || []).map((r, i) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Associated fabric"), /* @__PURE__ */ import_react14.default.createElement(
-        "select",
-        {
-          className: "form-select form-select-sm",
-          value: r.fabricName || r.fabricQuality || FABRIC_QUALITIES[0],
-          onChange: (e) => {
-            const updated = [...formData.fabricRows || []];
-            updated[i] = { ...updated[i], fabricName: e.target.value, fabricQuality: e.target.value };
-            setFormData({ ...formData, fabricRows: updated });
+      })(), (formData.category === "Dori" || formData.category === "Elastic" || formData.category === "Beads & Sequins") && (() => {
+        const currentFabricRows = formData.fabricRows && formData.fabricRows.length > 0 ? formData.fabricRows : [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }];
+        return /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fw-semibold text-dark small mb-2" }, "Fabric consumption (e.g. how much is needed per 1 m of fabric):"), currentFabricRows.map((r, i, arr) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Associated fabric"), /* @__PURE__ */ import_react14.default.createElement(
+          "select",
+          {
+            className: "form-select form-select-sm",
+            value: r.fabricName || r.fabricQuality || FABRIC_QUALITIES[0],
+            onChange: (e) => {
+              const updated = [...currentFabricRows];
+              updated[i] = { ...updated[i], fabricName: e.target.value, fabricQuality: e.target.value };
+              setFormData({ ...formData, fabricRows: updated });
+            },
+            style: { height: "36px", borderRadius: "6px" }
           },
-          style: { height: "36px", borderRadius: "6px" }
-        },
-        FABRIC_QUALITIES.map((fq) => /* @__PURE__ */ import_react14.default.createElement("option", { key: fq, value: fq }, fq))
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Required size"), /* @__PURE__ */ import_react14.default.createElement(
-        "input",
-        {
-          type: "text",
-          className: "form-control form-control-sm",
-          value: r.size || "",
-          onChange: (e) => {
-            const updated = [...formData.fabricRows || []];
-            updated[i] = { ...updated[i], size: e.target.value };
-            setFormData({ ...formData, fabricRows: updated });
-          },
-          style: { height: "36px", borderRadius: "6px" }
-        }
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
-        "select",
-        {
-          className: "form-select form-select-sm",
-          value: r.unit || "Meter",
-          onChange: (e) => {
-            const updated = [...formData.fabricRows || []];
-            updated[i] = { ...updated[i], unit: e.target.value };
-            setFormData({ ...formData, fabricRows: updated });
-          },
-          style: { height: "36px", borderRadius: "6px" }
-        },
-        ACCESSORY_UNITS.map((u) => /* @__PURE__ */ import_react14.default.createElement("option", { key: u, value: u }, u))
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Consumption / 1m fabric"), /* @__PURE__ */ import_react14.default.createElement(
-        "input",
-        {
-          type: "number",
-          className: "form-control form-control-sm",
-          value: r.consumption ?? "",
-          onChange: (e) => {
-            const updated = [...formData.fabricRows || []];
-            updated[i] = { ...updated[i], consumption: e.target.value };
-            setFormData({ ...formData, fabricRows: updated });
-          },
-          style: { height: "36px", borderRadius: "6px" }
-        }
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-1 pb-1 text-end" }, /* @__PURE__ */ import_react14.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-sm btn-link text-danger p-0 text-decoration-none",
-          onClick: () => {
-            const updated = (formData.fabricRows || []).filter((_, idx) => idx !== i);
-            setFormData({ ...formData, fabricRows: updated });
+          FABRIC_QUALITIES.map((fq) => /* @__PURE__ */ import_react14.default.createElement("option", { key: fq, value: fq }, fq))
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Required size"), /* @__PURE__ */ import_react14.default.createElement(
+          "input",
+          {
+            type: "text",
+            className: "form-control form-control-sm",
+            placeholder: "e.g. 40",
+            value: r.size || "",
+            onChange: (e) => {
+              const updated = [...currentFabricRows];
+              updated[i] = { ...updated[i], size: e.target.value };
+              setFormData({ ...formData, fabricRows: updated });
+            },
+            style: { height: "36px", borderRadius: "6px" }
           }
-        },
-        "Remove"
-      )))), /* @__PURE__ */ import_react14.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold",
-          onClick: () => {
-            setFormData({
-              ...formData,
-              fabricRows: [
-                ...formData.fabricRows || [],
-                { fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }
-              ]
-            });
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
+          "select",
+          {
+            className: "form-select form-select-sm",
+            value: r.unit || "Meter",
+            onChange: (e) => {
+              const updated = [...currentFabricRows];
+              updated[i] = { ...updated[i], unit: e.target.value };
+              setFormData({ ...formData, fabricRows: updated });
+            },
+            style: { height: "36px", borderRadius: "6px" }
+          },
+          ACCESSORY_UNITS.map((u) => /* @__PURE__ */ import_react14.default.createElement("option", { key: u, value: u }, u))
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted mb-1", style: { fontSize: "11.5px" } }, "Consumption / 1m fabric"), /* @__PURE__ */ import_react14.default.createElement(
+          "input",
+          {
+            type: "number",
+            className: "form-control form-control-sm",
+            placeholder: "0.00",
+            value: r.consumption ?? "",
+            onChange: (e) => {
+              const updated = [...currentFabricRows];
+              updated[i] = { ...updated[i], consumption: e.target.value };
+              setFormData({ ...formData, fabricRows: updated });
+            },
+            style: { height: "36px", borderRadius: "6px" }
           }
-        },
-        "+ Add more"
-      )), !["Button", "Buttons", "Lace", "Tassel", "Tassels", "Thread", "Dori", "Elastic", "Beads & Sequins"].includes(formData.category) && /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-3 mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-7" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-1 pb-1 text-end" }, arr.length > 1 ? /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-link text-danger p-0 text-decoration-none",
+            onClick: () => {
+              const updated = currentFabricRows.filter((_, idx) => idx !== i);
+              setFormData({ ...formData, fabricRows: updated });
+            }
+          },
+          "Remove"
+        ) : /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-link text-muted p-0 text-decoration-none",
+            title: "Clear row",
+            onClick: () => {
+              setFormData({
+                ...formData,
+                fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }]
+              });
+            }
+          },
+          "Clear"
+        )))), /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold",
+            onClick: () => {
+              setFormData({
+                ...formData,
+                fabricRows: [
+                  ...currentFabricRows,
+                  { fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: "", unit: "Meter", consumption: "" }
+                ]
+              });
+            }
+          },
+          "+ Add more"
+        ));
+      })(), !["Button", "Buttons", "Lace", "Tassel", "Tassels", "Thread", "Dori", "Elastic", "Beads & Sequins"].includes(formData.category) && /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-3 mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-7" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
         "select",
         {
           className: "form-select",

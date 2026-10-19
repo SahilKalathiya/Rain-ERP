@@ -333,7 +333,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     jobWorkRows: [],
 
     // Dori / Elastic / Beads & Sequins
-    fabricRows: [],
+    fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }],
     fabricEntries: [],
 
     // Thread
@@ -416,7 +416,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
       jobWorkRows: acc.jobWorkRows || [],
-      fabricRows: acc.fabricRows || acc.fabricEntries || [],
+      fabricRows: (acc.fabricRows && acc.fabricRows.length > 0)
+        ? acc.fabricRows
+        : (acc.fabricEntries && acc.fabricEntries.length > 0
+          ? acc.fabricEntries
+          : [{
+              fabricName: acc.fabricName || acc.fabricQuality || FABRIC_QUALITIES[0],
+              fabricQuality: acc.fabricQuality || acc.fabricName || FABRIC_QUALITIES[0],
+              size: acc.doriRequiredSize || acc.requiredSize || acc.size || '',
+              unit: acc.unit || 'Meter',
+              consumption: acc.fabricConsumption || acc.consumption || ''
+            }]),
       buttonSizesList: szList,
       buttonColorsList: clList,
       variants: acc.variants || szList,
@@ -803,7 +813,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           setFormData({
                             ...formData,
                             category: cat,
-                            unit: CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece'
+                            unit: CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece',
+                            fabricRows: (!formData.fabricRows || formData.fabricRows.length === 0)
+                              ? [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }]
+                              : formData.fabricRows
                           });
                         }}
                         style={{ height: '42px', borderRadius: '8px' }}
@@ -1240,20 +1253,20 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 placeholder="Type a value, press Enter"
                               />
                             </div>
-                          </div>
-                        )}
 
-                        {showPlacements && (
-                          <div className="mb-3">
-                            <TagInput
-                              label="Available placements"
-                              tags={formData.placements || []}
-                              onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
-                              placeholder="Type a value, press Enter"
-                            />
-                            <div className="form-text text-muted mt-1" style={{ fontSize: '12px' }}>
-                              e.g. Sleeves, Front, Back — some may be predefined via Manufacturing Defaults.
-                            </div>
+                            {showPlacements && (
+                              <div className="mt-3">
+                                <TagInput
+                                  label="Available placements"
+                                  tags={formData.placements || []}
+                                  onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
+                                  placeholder="Type a value, press Enter"
+                                />
+                                <div className="form-text text-muted mt-1" style={{ fontSize: '12px' }}>
+                                  e.g. Sleeves, Front, Back — some may be predefined via Manufacturing Defaults.
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         {formData.threadPattern === 'Embroidery' && (
@@ -1285,106 +1298,130 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     {/* ============================================================== */}
                   {/* CATEGORY 5: DORI / ELASTIC / BEADS & SEQUINS (SCREENSHOT 3)     */}
                   {/* ============================================================== */}
-                  {(formData.category === 'Dori' || formData.category === 'Elastic' || formData.category === 'Beads & Sequins') && (
-                    <div className="mb-3">
-                      <div className="fw-semibold text-dark small mb-2">
-                        Fabric consumption (e.g. how much is needed per 1 m of fabric):
-                      </div>
-                      {(formData.fabricRows || []).map((r, i) => (
-                        <div key={i} className="row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border">
-                          <div className="col-md-4">
-                            <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Associated fabric</label>
-                            <select
-                              className="form-select form-select-sm"
-                              value={r.fabricName || r.fabricQuality || FABRIC_QUALITIES[0]}
-                              onChange={(e) => {
-                                const updated = [...(formData.fabricRows || [])];
-                                updated[i] = { ...updated[i], fabricName: e.target.value, fabricQuality: e.target.value };
-                                setFormData({ ...formData, fabricRows: updated });
-                              }}
-                              style={{ height: '36px', borderRadius: '6px' }}
-                            >
-                              {FABRIC_QUALITIES.map((fq) => (
-                                <option key={fq} value={fq}>{fq}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-md-2">
-                            <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Required size</label>
-                            <input
-                              type="text"
-                              className="form-control form-control-sm"
-                              value={r.size || ''}
-                              onChange={(e) => {
-                                const updated = [...(formData.fabricRows || [])];
-                                updated[i] = { ...updated[i], size: e.target.value };
-                                setFormData({ ...formData, fabricRows: updated });
-                              }}
-                              style={{ height: '36px', borderRadius: '6px' }}
-                            />
-                          </div>
-                          <div className="col-md-2">
-                            <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Unit</label>
-                            <select
-                              className="form-select form-select-sm"
-                              value={r.unit || 'Meter'}
-                              onChange={(e) => {
-                                const updated = [...(formData.fabricRows || [])];
-                                updated[i] = { ...updated[i], unit: e.target.value };
-                                setFormData({ ...formData, fabricRows: updated });
-                              }}
-                              style={{ height: '36px', borderRadius: '6px' }}
-                            >
-                              {ACCESSORY_UNITS.map((u) => (
-                                <option key={u} value={u}>{u}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-md-3">
-                            <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Consumption / 1m fabric</label>
-                            <input
-                              type="number"
-                              className="form-control form-control-sm"
-                              value={r.consumption ?? ''}
-                              onChange={(e) => {
-                                const updated = [...(formData.fabricRows || [])];
-                                updated[i] = { ...updated[i], consumption: e.target.value };
-                                setFormData({ ...formData, fabricRows: updated });
-                              }}
-                              style={{ height: '36px', borderRadius: '6px' }}
-                            />
-                          </div>
-                          <div className="col-md-1 pb-1 text-end">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                              onClick={() => {
-                                const updated = (formData.fabricRows || []).filter((_, idx) => idx !== i);
-                                setFormData({ ...formData, fabricRows: updated });
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                  {(formData.category === 'Dori' || formData.category === 'Elastic' || formData.category === 'Beads & Sequins') && (() => {
+                    const currentFabricRows = (formData.fabricRows && formData.fabricRows.length > 0)
+                      ? formData.fabricRows
+                      : [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }];
+
+                    return (
+                      <div className="mb-3">
+                        <div className="fw-semibold text-dark small mb-2">
+                          Fabric consumption (e.g. how much is needed per 1 m of fabric):
                         </div>
-                      ))}
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            fabricRows: [
-                              ...(formData.fabricRows || []),
-                              { fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }
-                            ]
-                          });
-                        }}
-                      >
-                        + Add more
-                      </button>
-                    </div>
-                  )}
+                        {currentFabricRows.map((r, i, arr) => (
+                          <div key={i} className="row g-2 align-items-end mb-2 p-2.5 bg-light rounded-3 border">
+                            <div className="col-md-4">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Associated fabric</label>
+                              <select
+                                className="form-select form-select-sm"
+                                value={r.fabricName || r.fabricQuality || FABRIC_QUALITIES[0]}
+                                onChange={(e) => {
+                                  const updated = [...currentFabricRows];
+                                  updated[i] = { ...updated[i], fabricName: e.target.value, fabricQuality: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              >
+                                {FABRIC_QUALITIES.map((fq) => (
+                                  <option key={fq} value={fq}>{fq}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-md-2">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Required size</label>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="e.g. 40"
+                                value={r.size || ''}
+                                onChange={(e) => {
+                                  const updated = [...currentFabricRows];
+                                  updated[i] = { ...updated[i], size: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              />
+                            </div>
+                            <div className="col-md-2">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Unit</label>
+                              <select
+                                className="form-select form-select-sm"
+                                value={r.unit || 'Meter'}
+                                onChange={(e) => {
+                                  const updated = [...currentFabricRows];
+                                  updated[i] = { ...updated[i], unit: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              >
+                                {ACCESSORY_UNITS.map((u) => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-md-3">
+                              <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Consumption / 1m fabric</label>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                placeholder="0.00"
+                                value={r.consumption ?? ''}
+                                onChange={(e) => {
+                                  const updated = [...currentFabricRows];
+                                  updated[i] = { ...updated[i], consumption: e.target.value };
+                                  setFormData({ ...formData, fabricRows: updated });
+                                }}
+                                style={{ height: '36px', borderRadius: '6px' }}
+                              />
+                            </div>
+                            <div className="col-md-1 pb-1 text-end">
+                              {arr.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                  onClick={() => {
+                                    const updated = currentFabricRows.filter((_, idx) => idx !== i);
+                                    setFormData({ ...formData, fabricRows: updated });
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                                  title="Clear row"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      fabricRows: [{ fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }]
+                                    });
+                                  }}
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              fabricRows: [
+                                ...currentFabricRows,
+                                { fabricName: FABRIC_QUALITIES[0], fabricQuality: FABRIC_QUALITIES[0], size: '', unit: 'Meter', consumption: '' }
+                              ]
+                            });
+                          }}
+                        >
+                          + Add more
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* ============================================================== */}
                   {/* OTHER CATEGORIES (HOOK, ZIPPER, LABEL, PACKAGING, OTHER)       */}

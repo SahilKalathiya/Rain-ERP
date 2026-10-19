@@ -9,19 +9,37 @@ const BASE_DIR = __dirname;
 const REACT_DIR = path.join(BASE_DIR, 'Rain ERP', 'preclinic.dreamstechnologies.com', 'react');
 const SITE_DIR = path.join(BASE_DIR, 'Rain ERP', 'preclinic.dreamstechnologies.com');
 
-// Auto-compile React src to bundle on launch
+// Auto-compile React src to bundle on launch and watch for changes
+function buildBundle() {
+  try {
+    const esbuild = require('esbuild');
+    esbuild.buildSync({
+      entryPoints: [path.join(BASE_DIR, 'frontend', 'src', 'main.jsx')],
+      bundle: true,
+      outfile: path.join(REACT_DIR, 'assets', 'index-DX-E0Odo.js'),
+      loader: { '.jsx': 'jsx', '.js': 'jsx' },
+      define: { 'process.env.NODE_ENV': '"production"' }
+    });
+    console.log('[Auto-Build] React bundle compiled successfully.');
+  } catch (e) {
+    console.error('[Auto-Build Error]', e);
+  }
+}
+buildBundle();
+
 try {
-  const esbuild = require('esbuild');
-  esbuild.buildSync({
-    entryPoints: [path.join(BASE_DIR, 'frontend', 'src', 'main.jsx')],
-    bundle: true,
-    outfile: path.join(REACT_DIR, 'assets', 'index-DX-E0Odo.js'),
-    loader: { '.jsx': 'jsx', '.js': 'jsx' },
-    define: { 'process.env.NODE_ENV': '"production"' }
+  let debounceTimer = null;
+  fs.watch(path.join(BASE_DIR, 'frontend', 'src'), { recursive: true }, (eventType, filename) => {
+    if (filename && (filename.endsWith('.js') || filename.endsWith('.jsx') || filename.endsWith('.css'))) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log(`[Watch] File changed: ${filename}, rebuilding bundle...`);
+        buildBundle();
+      }, 300);
+    }
   });
-  console.log('[Auto-Build] React bundle compiled successfully with Module 1.');
-} catch (e) {
-  console.error('[Auto-Build Error]', e);
+} catch (err) {
+  console.warn('[Watch Warning]', err.message);
 }
 
 const MIME_TYPES = {
