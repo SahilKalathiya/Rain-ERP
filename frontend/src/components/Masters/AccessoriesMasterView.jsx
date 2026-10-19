@@ -87,7 +87,7 @@ const getCategoryColor = (cat) => {
 };
 
 const THREAD_SIZE_OPTIONS = ['40/2', '30/2', '20/2', '20/3', '120s', 'Tex 40', 'Ticket 120'];
-const THREAD_UNIT_OPTIONS = ['Cone', 'Reel', 'Meter', 'Box', 'Kilogram', 'Dozen', 'Gross'];
+const THREAD_UNIT_OPTIONS = ['Meter', 'Cone', 'Reel', 'Box', 'Kilogram', 'Dozen', 'Gross'];
 
 const THREAD_PATTERNS = [
   'Stitching',
@@ -336,7 +336,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     id: isInline ? `ACC-${Date.now().toString().slice(-4)}` : '',
     name: '',
     category: cat,
-    unit: CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece',
+    unit: cat === 'Thread' ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
     piecesPerUnit: 1,
     maxBuffer: '',
     hsnCode: '',
@@ -374,7 +374,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     threadPattern: '',
     threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
     threadPerPiece: 60,  // Explicit PDF Default (Page 13)
-    boxes: [],
+    boxes: [{ reelsPerBox: '', metersPerReel: '' }],
     coneSizes: [],
     placements: [],
     articlePlacements: [],
@@ -452,7 +452,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       fabricPerMeterLace: acc.fabricPerMeterLace || '',
       sizeValue: acc.sizeValue !== undefined ? acc.sizeValue : (acc.threadSize ? parseFloat(acc.threadSize) || '' : ''),
       sizeUnit: acc.sizeUnit || 'mm',
-      unit: acc.unit || (CONTINUOUS_UNITS.includes(acc.category) ? 'Meter' : 'Piece'),
+      unit: acc.unit || (acc.category === 'Thread' ? 'Meter' : (CONTINUOUS_UNITS.includes(acc.category) ? 'Meter' : 'Piece')),
       piecesPerUnit: acc.piecesPerUnit !== undefined && acc.piecesPerUnit !== '' ? acc.piecesPerUnit : 1,
       threadPattern: acc.threadPattern || '',
       threadSize: acc.threadSize || acc.size || '',
@@ -463,7 +463,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
       threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15,
       threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : 60,
-      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : []),
+      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
       coneSizes: acc.coneSizes || [],
       placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
@@ -520,7 +520,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       laceSize: formData.laceSizeValue ? `${formData.laceSizeValue} ${formData.laceSizeUnit || 'mm'}` : (formData.laceSize || ''),
       threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
       threadSizeCustom: formData.threadSizeCustom || '',
-      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' ? 'Meter' : 'Piece'))),
+      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' || formData.category === 'Thread' ? 'Meter' : 'Piece'))),
       unitCustom: formData.unitCustom || '',
       piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
       threadPattern: formData.threadPattern || 'Stitching',
@@ -530,7 +530,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       articlePlacements: formData.articlePlacements || [],
       stitchingArticles: formData.stitchingArticles || [],
       consumptionPer100Pcs: formData.consumptionPer100Pcs || {},
-      boxesConfig: formData.boxes || formData.boxesConfig || [],
+      boxesConfig: (formData.boxes || []).filter(b => b && (b.reelsPerBox || b.metersPerReel)),
+      boxes: (formData.boxes || []).filter(b => b && (b.reelsPerBox || b.metersPerReel)),
       doriRequiredSize: formData.doriRequiredSize || formData.size || '',
       doriUnit: formData.doriUnit || formData.unit || 'Meter',
       doriFabricEntries: formData.doriFabricEntries || [],
@@ -883,13 +884,16 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           setFormData({
                             ...formData,
                             category: cat,
-                            unit: cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece'),
+                            unit: cat === 'Thread' ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
                             fabricRows: (!formData.fabricRows || formData.fabricRows.length === 0)
                               ? [{ fabricName: '', fabricQuality: '', size: '', unit: cat === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: '' }]
                               : formData.fabricRows,
                             doriFabricEntries: (!formData.doriFabricEntries || formData.doriFabricEntries.length === 0)
                               ? [{ fabricQuality: '', widthSizes: [], consumptions: {} }]
-                              : formData.doriFabricEntries
+                              : formData.doriFabricEntries,
+                            boxes: (!formData.boxes || formData.boxes.length === 0)
+                              ? [{ reelsPerBox: '', metersPerReel: '' }]
+                              : formData.boxes
                           });
                         }}
                         style={{ height: '42px', borderRadius: '8px' }}
@@ -908,30 +912,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {/* ============================================================== */}
                   {(formData.category === 'Button' || formData.category === 'Buttons') && (
                     <>
-                      <div className="row g-3 mb-3">
-                        <div className="col-md-7">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
-                          <select
-                            className="form-select"
-                            value={formData.unit || 'Piece'}
-                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          >
-                            {ACCESSORY_UNITS.map((u) => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="col-md-5">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Pieces per unit</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            value={formData.piecesPerUnit ?? 1}
-                            onChange={(e) => setFormData({ ...formData, piecesPerUnit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          />
-                        </div>
+                      <div className="mb-3">
+                        <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
+                        <select
+                          className="form-select"
+                          value={formData.unit || 'Piece'}
+                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                          style={{ height: '42px', borderRadius: '8px' }}
+                        >
+                          {ACCESSORY_UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="mb-3">
                         <TagInput
@@ -1047,30 +1039,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {/* ============================================================== */}
                   {(formData.category === 'Tassel' || formData.category === 'Tassels') && (
                     <>
-                      <div className="row g-3 mb-3">
-                        <div className="col-md-7">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
-                          <select
-                            className="form-select"
-                            value={formData.unit || 'Piece'}
-                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          >
-                            {ACCESSORY_UNITS.map((u) => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="col-md-5">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Pieces per unit</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            value={formData.piecesPerUnit ?? 1}
-                            onChange={(e) => setFormData({ ...formData, piecesPerUnit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          />
-                        </div>
+                      <div className="mb-3">
+                        <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
+                        <select
+                          className="form-select"
+                          value={formData.unit || 'Piece'}
+                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                          style={{ height: '42px', borderRadius: '8px' }}
+                        >
+                          {ACCESSORY_UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                       </div>
 
                       <div className="mb-3">
@@ -1169,151 +1149,60 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             <span>Base Thread Configuration</span>
                           </div>
 
-                          <div className="row g-3 mb-2.5">
-                            {/* Size / Count (Text / Dropdown with Other - Mandatory: Yes) */}
-                            <div className="col-md-4">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Size / Count <span className="text-danger">*</span>
-                              </label>
-                              {isCustomThreadSize ? (
-                                <div className="input-group input-group-sm">
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm bg-white fw-bold"
-                                    placeholder="Type custom size / count..."
-                                    autoFocus
-                                    value={formData.threadSizeCustom ?? (formData.threadSize === 'Other' ? '' : formData.threadSize)}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setFormData({ ...formData, threadSizeCustom: val, threadSize: val });
-                                    }}
-                                    style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-2.5"
-                                    onClick={() => {
-                                      setIsCustomThreadSize(false);
-                                      setFormData({ ...formData, threadSize: '', threadSizeCustom: '' });
-                                    }}
-                                    title="Switch back to dropdown list"
-                                    style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
-                                  >
-                                    <i className="ti ti-chevron-down"></i>
-                                  </button>
-                                </div>
-                              ) : (
-                                <select
-                                  className="form-select form-select-sm"
-                                  value={THREAD_SIZE_OPTIONS.includes(formData.threadSize) || (threadSizes || []).some(ts => {
-                                    const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
-                                    return ts.id === formData.threadSize || label === formData.threadSize;
-                                  }) ? formData.threadSize : ''}
+                          <div className="mb-2.5">
+                            {/* Unit (Dropdown with Other - Default: Meter) */}
+                            <label className="form-label fw-semibold text-dark small mb-1">
+                              Unit <span className="text-danger">*</span>
+                            </label>
+                            {isCustomThreadUnit ? (
+                              <div className="input-group input-group-sm">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm bg-white fw-bold"
+                                  placeholder="Type custom unit..."
+                                  autoFocus
+                                  value={formData.unitCustom ?? (formData.unit === 'Other' ? '' : (formData.unit || 'Meter'))}
                                   onChange={(e) => {
                                     const val = e.target.value;
-                                    if (val === 'Other') {
-                                      setIsCustomThreadSize(true);
-                                      setFormData({ ...formData, threadSize: '', threadSizeCustom: '' });
-                                    } else {
-                                      setIsCustomThreadSize(false);
-                                      setFormData({ ...formData, threadSize: val, threadSizeCustom: '' });
-                                    }
+                                    setFormData({ ...formData, unitCustom: val, unit: val });
                                   }}
-                                  style={{ height: '38px', borderRadius: '7px' }}
-                                >
-                                  <option value="">-- Select Size / Count --</option>
-                                  {threadSizes && threadSizes.length > 0 && (
-                                    <optgroup label="From Thread Sizes Master">
-                                      {threadSizes.map((ts) => {
-                                        const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
-                                        return (
-                                          <option key={ts.id || label} value={label}>{label}</option>
-                                        );
-                                      })}
-                                    </optgroup>
-                                  )}
-                                  <optgroup label="Standard Sizes / Counts">
-                                    {THREAD_SIZE_OPTIONS.map((sz) => (
-                                      <option key={sz} value={sz}>{sz}</option>
-                                    ))}
-                                  </optgroup>
-                                  <option value="Other">Other (Custom Size)...</option>
-                                </select>
-                              )}
-                            </div>
-
-                            {/* Unit (Dropdown with Other - Mandatory: Yes) */}
-                            <div className="col-md-4">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Unit <span className="text-danger">*</span>
-                              </label>
-                              {isCustomThreadUnit ? (
-                                <div className="input-group input-group-sm">
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm bg-white fw-bold"
-                                    placeholder="Type custom unit..."
-                                    autoFocus
-                                    value={formData.unitCustom ?? (formData.unit === 'Other' ? '' : formData.unit)}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setFormData({ ...formData, unitCustom: val, unit: val });
-                                    }}
-                                    style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-2.5"
-                                    onClick={() => {
-                                      setIsCustomThreadUnit(false);
-                                      setFormData({ ...formData, unit: '', unitCustom: '' });
-                                    }}
-                                    title="Switch back to dropdown list"
-                                    style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
-                                  >
-                                    <i className="ti ti-chevron-down"></i>
-                                  </button>
-                                </div>
-                              ) : (
-                                <select
-                                  className="form-select form-select-sm"
-                                  value={THREAD_UNIT_OPTIONS.includes(formData.unit) ? formData.unit : ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === 'Other') {
-                                      setIsCustomThreadUnit(true);
-                                      setFormData({ ...formData, unit: '', unitCustom: '' });
-                                    } else {
-                                      setIsCustomThreadUnit(false);
-                                      setFormData({ ...formData, unit: val, unitCustom: '' });
-                                    }
+                                  style={{ height: '38px', borderRadius: '7px 0 0 7px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary d-flex align-items-center justify-content-center px-2.5"
+                                  onClick={() => {
+                                    setIsCustomThreadUnit(false);
+                                    setFormData({ ...formData, unit: 'Meter', unitCustom: '' });
                                   }}
-                                  style={{ height: '38px', borderRadius: '7px' }}
+                                  title="Switch back to dropdown list"
+                                  style={{ borderRadius: '0 7px 7px 0', borderColor: '#cbd5e1' }}
                                 >
-                                  <option value="">-- Select Unit --</option>
-                                  {THREAD_UNIT_OPTIONS.map((u) => (
-                                    <option key={u} value={u}>{u}</option>
-                                  ))}
-                                  <option value="Other">Other (Custom Unit)...</option>
-                                </select>
-                              )}
-                            </div>
-
-                            {/* Pieces Per Unit (Number - Mandatory: Yes) */}
-                            <div className="col-md-4">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Pieces Per Unit <span className="text-danger">*</span>
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                className="form-control form-control-sm fw-bold"
-                                value={formData.piecesPerUnit ?? 1}
-                                placeholder="1"
-                                onChange={(e) => setFormData({ ...formData, piecesPerUnit: parseInt(e.target.value, 10) || 1 })}
+                                  <i className="ti ti-chevron-down"></i>
+                                </button>
+                              </div>
+                            ) : (
+                              <select
+                                className="form-select form-select-sm"
+                                value={formData.unit || 'Meter'}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === 'Other') {
+                                    setIsCustomThreadUnit(true);
+                                    setFormData({ ...formData, unit: '', unitCustom: '' });
+                                  } else {
+                                    setIsCustomThreadUnit(false);
+                                    setFormData({ ...formData, unit: val, unitCustom: '' });
+                                  }
+                                }}
                                 style={{ height: '38px', borderRadius: '7px' }}
-                              />
-                            </div>
+                              >
+                                {THREAD_UNIT_OPTIONS.map((u) => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                                <option value="Other">Other (Custom Unit)...</option>
+                              </select>
+                            )}
                           </div>
 
                           {/* Thread Pattern (Dropdown - Mandatory: Yes, drives pattern-specific fields below) */}
@@ -1388,12 +1277,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   Reels Per Box &times; Metres Per Reel
                                 </span>
                               </div>
-                              {(!formData.boxes || formData.boxes.length === 0) ? (
-                                <div className="text-muted small py-2 mb-2" style={{ fontSize: '12px' }}>
-                                  No box configurations added. Click &quot;+ Add Box Configuration&quot; below if you use boxed packaging (e.g. 15 reels &times; 400m).
-                                </div>
-                              ) : (
-                                formData.boxes.map((b, i, arr) => {
+                              {(() => {
+                                const boxList = (formData.boxes && formData.boxes.length > 0)
+                                  ? formData.boxes
+                                  : [{ reelsPerBox: '', metersPerReel: '' }];
+                                return boxList.map((b, i, arr) => {
                                   const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
                                   return (
                                     <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
@@ -1436,7 +1324,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                           className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
                                           onClick={() => {
                                             const updated = arr.filter((_, idx) => idx !== i);
-                                            setFormData({ ...formData, boxes: updated });
+                                            setFormData({
+                                              ...formData,
+                                              boxes: updated.length ? updated : [{ reelsPerBox: '', metersPerReel: '' }]
+                                            });
                                           }}
                                         >
                                           <i className="ti ti-trash"></i>
@@ -1444,14 +1335,16 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       </div>
                                     </div>
                                   );
-                                })
-                              )}
+                                });
+                              })()}
                               <button
                                 type="button"
                                 className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
                                 style={{ fontSize: '12px' }}
                                 onClick={() => {
-                                  const current = formData.boxes || [];
+                                  const current = (formData.boxes && formData.boxes.length > 0)
+                                    ? formData.boxes
+                                    : [{ reelsPerBox: '', metersPerReel: '' }];
                                   setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
                                 }}
                               >
@@ -1713,12 +1606,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   Reels Per Box &times; Metres Per Reel
                                 </span>
                               </div>
-                              {(!formData.boxes || formData.boxes.length === 0) ? (
-                                <div className="text-muted small py-2 mb-2" style={{ fontSize: '12px' }}>
-                                  No box configurations added. Click &quot;+ Add Box Configuration&quot; below if you use boxed packaging (e.g. 15 reels &times; 400m).
-                                </div>
-                              ) : (
-                                formData.boxes.map((b, i, arr) => {
+                              {(() => {
+                                const boxList = (formData.boxes && formData.boxes.length > 0)
+                                  ? formData.boxes
+                                  : [{ reelsPerBox: '', metersPerReel: '' }];
+                                return boxList.map((b, i, arr) => {
                                   const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
                                   return (
                                     <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
@@ -1761,7 +1653,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                           className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
                                           onClick={() => {
                                             const updated = arr.filter((_, idx) => idx !== i);
-                                            setFormData({ ...formData, boxes: updated });
+                                            setFormData({
+                                              ...formData,
+                                              boxes: updated.length ? updated : [{ reelsPerBox: '', metersPerReel: '' }]
+                                            });
                                           }}
                                         >
                                           <i className="ti ti-trash"></i>
@@ -1769,14 +1664,16 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       </div>
                                     </div>
                                   );
-                                })
-                              )}
+                                });
+                              })()}
                               <button
                                 type="button"
                                 className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
                                 style={{ fontSize: '12px' }}
                                 onClick={() => {
-                                  const current = formData.boxes || [];
+                                  const current = (formData.boxes && formData.boxes.length > 0)
+                                    ? formData.boxes
+                                    : [{ reelsPerBox: '', metersPerReel: '' }];
                                   setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
                                 }}
                               >
@@ -2781,7 +2678,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     </span>
                   </div>
                   <div className="text-muted small mt-1">
-                    Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'} ({selectedAccessory.piecesPerUnit || 1} pcs/unit)
+                    Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` (${selectedAccessory.piecesPerUnit || 1} pcs/unit)`}
                   </div>
                 </div>
               </div>
@@ -2863,7 +2760,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         />
                       </div>
                       <div className="row g-2">
-                        <div className="col-6">
+                        <div className={!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) ? 'col-6' : 'col-12'}>
                           <label className="form-label small fw-semibold text-muted">Unit</label>
                           <input
                             type="text"
@@ -2872,15 +2769,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             onChange={(e) => setSectionFormData({ ...sectionFormData, unit: e.target.value })}
                           />
                         </div>
-                        <div className="col-6">
-                          <label className="form-label small fw-semibold text-muted">Pieces Per Unit</label>
-                          <input
-                            type="number"
-                            className="form-control form-control-sm"
-                            value={sectionFormData.piecesPerUnit || ''}
-                            onChange={(e) => setSectionFormData({ ...sectionFormData, piecesPerUnit: parseInt(e.target.value) || 1 })}
-                          />
-                        </div>
+                        {!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) && (
+                          <div className="col-6">
+                            <label className="form-label small fw-semibold text-muted">Pieces Per Unit</label>
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              value={sectionFormData.piecesPerUnit || ''}
+                              onChange={(e) => setSectionFormData({ ...sectionFormData, piecesPerUnit: parseInt(e.target.value) || 1 })}
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="form-check form-switch mt-1">
                         <input
@@ -2912,9 +2811,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         </span>
                       </div>
                       <div>
-                        <div className="text-muted small">Unit & Pieces</div>
+                        <div className="text-muted small">{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) ? 'Unit & Pieces' : 'Unit'}</div>
                         <div className="fw-semibold text-dark">
-                          {selectedAccessory.unit || 'Piece'} &bull; {selectedAccessory.piecesPerUnit || 1} pcs per unit
+                          {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` • ${selectedAccessory.piecesPerUnit || 1} pcs per unit`}
                         </div>
                       </div>
                     </div>
@@ -3154,19 +3053,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {selectedAccessory.category === 'Thread' && (
                     <div className="d-flex flex-column gap-3">
                       <div className="row g-2">
-                        <div className="col-4">
-                          <div className="text-muted small">Size / Count</div>
-                          <span className="badge bg-light text-dark border px-2.5 py-1 font-monospace fw-bold">
-                            {selectedAccessory.threadSize || selectedAccessory.size || '-'}
-                          </span>
-                        </div>
-                        <div className="col-4">
+                        <div className="col-12">
                           <div className="text-muted small">Ordering Unit</div>
-                          <div className="fw-semibold text-dark small">{selectedAccessory.unit || 'Cone'}</div>
-                        </div>
-                        <div className="col-4">
-                          <div className="text-muted small">Pieces Per Unit</div>
-                          <div className="fw-bold text-dark small">{selectedAccessory.piecesPerUnit || 1}</div>
+                          <div className="fw-semibold text-dark small">{selectedAccessory.unit || 'Meter'}</div>
                         </div>
                       </div>
 
