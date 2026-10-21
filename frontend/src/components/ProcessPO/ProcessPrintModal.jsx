@@ -10,7 +10,137 @@ export default function ProcessPrintModal({ type = 'PO', data, onClose }) {
   const isChallan = type === 'CHALLAN';
 
   const handlePrint = () => {
-    window.print();
+    const printElem = document.getElementById('printable-process-doc');
+    if (!printElem) {
+      window.print();
+      return;
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${isChallan ? `Challan_${data.challan_number || data.id}` : `Purchase_Order_${data.po_number || data.id}`}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 8mm 10mm 8mm 10mm;
+            }
+            *, *::before, *::after {
+              box-sizing: border-box;
+            }
+            body {
+              background: #ffffff !important;
+              color: #000000 !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+              font-size: 12px !important;
+              line-height: 1.4 !important;
+              margin: 0 !important;
+              padding: 6px !important;
+            }
+            .border { border: 1px solid #111827 !important; }
+            .border-bottom { border-bottom: 1px solid #111827 !important; }
+            .border-top { border-top: 1px solid #111827 !important; }
+            .border-end { border-right: 1px solid #111827 !important; }
+            .border-dark { border-color: #111827 !important; }
+            .p-3 { padding: 12px !important; }
+            .p-4 { padding: 16px !important; }
+            .pt-1 { padding-top: 4px !important; }
+            .pt-2 { padding-top: 8px !important; }
+            .pt-4 { padding-top: 18px !important; }
+            .pb-2 { padding-bottom: 8px !important; }
+            .pe-3 { padding-right: 12px !important; }
+            .ps-3 { padding-left: 12px !important; }
+            .mb-0 { margin-bottom: 0 !important; }
+            .mb-1 { margin-bottom: 4px !important; }
+            .mb-2 { margin-bottom: 8px !important; }
+            .mb-3 { margin-bottom: 12px !important; }
+            .mt-1 { margin-top: 4px !important; }
+            .mt-3 { margin-top: 14px !important; }
+            .row { display: flex; flex-wrap: wrap; margin-right: -8px; margin-left: -8px; }
+            .col-4 { flex: 0 0 33.3333%; max-width: 33.3333%; padding: 0 8px; }
+            .col-5 { flex: 0 0 41.6666%; max-width: 41.6666%; padding: 0 8px; }
+            .col-6 { flex: 0 0 50%; max-width: 50%; padding: 0 8px; }
+            .col-7 { flex: 0 0 58.3333%; max-width: 58.3333%; padding: 0 8px; }
+            .col-8 { flex: 0 0 66.6666%; max-width: 66.6666%; padding: 0 8px; }
+            .text-end { text-align: right !important; }
+            .text-center { text-align: center !important; }
+            .fw-bold { font-weight: 700 !important; }
+            .fw-black { font-weight: 900 !important; }
+            .text-uppercase { text-transform: uppercase !important; }
+            .text-muted { color: #475569 !important; }
+            .text-danger { color: #dc2626 !important; }
+            .text-primary { color: #2563eb !important; }
+            .badge {
+              display: inline-block;
+              padding: 3px 8px;
+              font-size: 11px;
+              font-weight: 700;
+              border-radius: 4px;
+              background-color: #1e293b !important;
+              color: #ffffff !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              margin-bottom: 12px;
+              font-size: 11px !important;
+            }
+            th, td {
+              border: 1px solid #111827 !important;
+              padding: 5px 7px !important;
+            }
+            thead th {
+              background-color: #f1f5f9 !important;
+              font-weight: 700 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            tfoot tr {
+              background-color: #f8fafc !important;
+              font-weight: 700 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${printElem.innerHTML}
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      try {
+        iframe.contentWindow.print();
+      } catch (e) {
+        window.print();
+      }
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch (e) {}
+      }, 2000);
+    }, 250);
   };
 
   return (

@@ -14593,21 +14593,30 @@
 
   // frontend/src/components/Sidebar/Sidebar.jsx
   function Sidebar({ currentRoute = "/orders", onNavigate }) {
-    const [openMenus, setOpenMenus] = (0, import_react.useState)({
-      "Processing (Dye/Print)": true,
-      "Procurement": true,
-      "Masters": false
-    });
-    import_react.default.useEffect(() => {
-      if (currentRoute.startsWith("/process") || currentRoute.startsWith("/job-work")) {
-        setOpenMenus((prev) => ({ ...prev, "Processing (Dye/Print)": true }));
+    const [openMenus, setOpenMenus] = (0, import_react.useState)(() => {
+      try {
+        const saved = localStorage.getItem("erp_sidebar_open_menus");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
       }
-    }, [currentRoute]);
+      return {
+        "Processing (Dye/Print)": false,
+        "Procurement": false,
+        "Masters": false
+      };
+    });
     const toggleSubmenu = (label) => {
-      setOpenMenus((prev) => ({
-        ...prev,
-        [label]: !prev[label]
-      }));
+      setOpenMenus((prev) => {
+        const next = {
+          ...prev,
+          [label]: !prev[label]
+        };
+        try {
+          localStorage.setItem("erp_sidebar_open_menus", JSON.stringify(next));
+        } catch (e) {
+        }
+        return next;
+      });
     };
     return /* @__PURE__ */ import_react.default.createElement(
       "aside",
@@ -44425,7 +44434,135 @@
     if (!data) return null;
     const isChallan = type === "CHALLAN";
     const handlePrint = () => {
-      window.print();
+      const printElem = document.getElementById("printable-process-doc");
+      if (!printElem) {
+        window.print();
+        return;
+      }
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${isChallan ? `Challan_${data.challan_number || data.id}` : `Purchase_Order_${data.po_number || data.id}`}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 8mm 10mm 8mm 10mm;
+            }
+            *, *::before, *::after {
+              box-sizing: border-box;
+            }
+            body {
+              background: #ffffff !important;
+              color: #000000 !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+              font-size: 12px !important;
+              line-height: 1.4 !important;
+              margin: 0 !important;
+              padding: 6px !important;
+            }
+            .border { border: 1px solid #111827 !important; }
+            .border-bottom { border-bottom: 1px solid #111827 !important; }
+            .border-top { border-top: 1px solid #111827 !important; }
+            .border-end { border-right: 1px solid #111827 !important; }
+            .border-dark { border-color: #111827 !important; }
+            .p-3 { padding: 12px !important; }
+            .p-4 { padding: 16px !important; }
+            .pt-1 { padding-top: 4px !important; }
+            .pt-2 { padding-top: 8px !important; }
+            .pt-4 { padding-top: 18px !important; }
+            .pb-2 { padding-bottom: 8px !important; }
+            .pe-3 { padding-right: 12px !important; }
+            .ps-3 { padding-left: 12px !important; }
+            .mb-0 { margin-bottom: 0 !important; }
+            .mb-1 { margin-bottom: 4px !important; }
+            .mb-2 { margin-bottom: 8px !important; }
+            .mb-3 { margin-bottom: 12px !important; }
+            .mt-1 { margin-top: 4px !important; }
+            .mt-3 { margin-top: 14px !important; }
+            .row { display: flex; flex-wrap: wrap; margin-right: -8px; margin-left: -8px; }
+            .col-4 { flex: 0 0 33.3333%; max-width: 33.3333%; padding: 0 8px; }
+            .col-5 { flex: 0 0 41.6666%; max-width: 41.6666%; padding: 0 8px; }
+            .col-6 { flex: 0 0 50%; max-width: 50%; padding: 0 8px; }
+            .col-7 { flex: 0 0 58.3333%; max-width: 58.3333%; padding: 0 8px; }
+            .col-8 { flex: 0 0 66.6666%; max-width: 66.6666%; padding: 0 8px; }
+            .text-end { text-align: right !important; }
+            .text-center { text-align: center !important; }
+            .fw-bold { font-weight: 700 !important; }
+            .fw-black { font-weight: 900 !important; }
+            .text-uppercase { text-transform: uppercase !important; }
+            .text-muted { color: #475569 !important; }
+            .text-danger { color: #dc2626 !important; }
+            .text-primary { color: #2563eb !important; }
+            .badge {
+              display: inline-block;
+              padding: 3px 8px;
+              font-size: 11px;
+              font-weight: 700;
+              border-radius: 4px;
+              background-color: #1e293b !important;
+              color: #ffffff !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              margin-bottom: 12px;
+              font-size: 11px !important;
+            }
+            th, td {
+              border: 1px solid #111827 !important;
+              padding: 5px 7px !important;
+            }
+            thead th {
+              background-color: #f1f5f9 !important;
+              font-weight: 700 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            tfoot tr {
+              background-color: #f8fafc !important;
+              font-weight: 700 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${printElem.innerHTML}
+        </body>
+      </html>
+    `);
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.print();
+        } catch (e) {
+          window.print();
+        }
+        setTimeout(() => {
+          try {
+            document.body.removeChild(iframe);
+          } catch (e) {
+          }
+        }, 2e3);
+      }, 250);
     };
     return /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1060 }, tabIndex: "-1" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal-content shadow-lg border-0" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal-header bg-dark text-white d-flex justify-content-between align-items-center py-2" }, /* @__PURE__ */ import_react42.default.createElement("h6", { className: "modal-title mb-0 fw-bold" }, /* @__PURE__ */ import_react42.default.createElement("i", { className: "ti ti-printer me-2" }), isChallan ? `Challan Print \u2014 #${data.challan_number || data.id}` : `Purchase Order Print \u2014 #${data.po_number || data.id}`), /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("button", { className: "btn btn-sm btn-primary me-2", onClick: handlePrint }, /* @__PURE__ */ import_react42.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF"), /* @__PURE__ */ import_react42.default.createElement("button", { className: "btn btn-sm btn-outline-light", onClick: onClose }, /* @__PURE__ */ import_react42.default.createElement("i", { className: "ti ti-x" })))), /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal-body p-4 bg-white", id: "printable-process-doc" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "border border-dark p-3 mb-3" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "row align-items-center border-bottom border-dark pb-2 mb-2" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-7" }, /* @__PURE__ */ import_react42.default.createElement("h4", { className: "fw-black text-uppercase tracking-wider mb-0", style: { letterSpacing: "1px" } }, "RAINDROP"), /* @__PURE__ */ import_react42.default.createElement("small", { className: "text-muted d-block", style: { fontSize: "11px" } }, "H1-40, RIICO Industrial Area, Mansarovar, Jaipur - 302020", /* @__PURE__ */ import_react42.default.createElement("br", null), "Ph: +91 9829059529 | GSTIN: 08BZJPD0890G1ZD")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-5 text-end" }, /* @__PURE__ */ import_react42.default.createElement("span", { className: "badge bg-dark text-white px-3 py-1 fs-6 text-uppercase" }, isChallan ? "JOB CHALLAN" : "PURCHASE ORDER (JOB WORK)"), /* @__PURE__ */ import_react42.default.createElement("div", { className: "mt-1 fw-bold fs-5 text-danger" }, isChallan ? `CH-NO: ${data.challan_number || data.id}` : `PO NO: ${data.po_number || data.id}`), /* @__PURE__ */ import_react42.default.createElement("div", { className: "small text-muted" }, "Date: ", data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]))), /* @__PURE__ */ import_react42.default.createElement("div", { className: "row mb-3", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-6 border-end border-dark pe-3" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "text-muted small" }, "To (M/s):"), /* @__PURE__ */ import_react42.default.createElement("div", { className: "fw-bold fs-6 text-dark" }, data.vendor_name || "Raju Dyeing (Krishna Dyeing)"), /* @__PURE__ */ import_react42.default.createElement("div", { className: "text-muted small" }, "Job Issue for Dyeing / Processing")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-6 ps-3" }, isChallan ? /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Linked PO(s):"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", { className: "text-primary" }, Array.isArray(data.linked_pos) ? data.linked_pos.join(", ") : "PPO-7611, PPO-7612, PPO-7613")), /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Folding Notation:"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", null, data.folding_notation || "L100")), /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Total Bales / Rolls:"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", null, data.total_bales || 1, " Bale (", data.total_pieces || 7, " Pcs)"))) : /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Sales Order:"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", null, data.linked_sales_order_id || "Standalone PO (General Stock)")), /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Styles:"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", null, Array.isArray(data.style_names) ? data.style_names.join(", ") : data.style_name || "Graphic Boota Kurta")), /* @__PURE__ */ import_react42.default.createElement("div", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "text-muted" }, "Expected Delivery:"), " ", /* @__PURE__ */ import_react42.default.createElement("strong", null, data.delivery_date || "Within 14 Days"))))), /* @__PURE__ */ import_react42.default.createElement("table", { className: "table table-bordered border-dark table-sm mb-3", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react42.default.createElement("thead", { className: "table-light border-dark text-center" }, isChallan ? /* @__PURE__ */ import_react42.default.createElement("tr", null, /* @__PURE__ */ import_react42.default.createElement("th", { style: { width: "40px" } }, "S.No."), /* @__PURE__ */ import_react42.default.createElement("th", null, "Bale / Roll No"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Particulars / Fabric Quality"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Invoice Ref"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Folding"), /* @__PURE__ */ import_react42.default.createElement("th", { className: "text-end" }, "Meters")) : /* @__PURE__ */ import_react42.default.createElement("tr", null, /* @__PURE__ */ import_react42.default.createElement("th", { style: { width: "40px" } }, "S.No."), /* @__PURE__ */ import_react42.default.createElement("th", null, "Particulars (Fabric & Quality)"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Style / Article"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react42.default.createElement("th", null, "Width"), /* @__PURE__ */ import_react42.default.createElement("th", { className: "text-end" }, "Mtrs"), /* @__PURE__ */ import_react42.default.createElement("th", { className: "text-end" }, "Rate/m"), /* @__PURE__ */ import_react42.default.createElement("th", { className: "text-end" }, "Amount (\u20B9)"))), /* @__PURE__ */ import_react42.default.createElement("tbody", null, isChallan ? (data.items || []).map((item, idx) => /* @__PURE__ */ import_react42.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-center" }, idx + 1), /* @__PURE__ */ import_react42.default.createElement("td", { className: "fw-bold" }, item.bale_roll_no), /* @__PURE__ */ import_react42.default.createElement("td", null, item.fabric_name), /* @__PURE__ */ import_react42.default.createElement("td", null, item.color_name), /* @__PURE__ */ import_react42.default.createElement("td", null, item.invoice_no || "INV-MS-0091"), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-center" }, item.folding || "L100"), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end fw-bold" }, Number(item.dispatched_meters || item.meters || 0).toFixed(2)))) : (data.items || []).map((item, idx) => /* @__PURE__ */ import_react42.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-center" }, idx + 1), /* @__PURE__ */ import_react42.default.createElement("td", { className: "fw-bold" }, item.fabric_name, " (", item.width, '")'), /* @__PURE__ */ import_react42.default.createElement("td", null, item.style_name, " - ", item.article_name), /* @__PURE__ */ import_react42.default.createElement("td", null, /* @__PURE__ */ import_react42.default.createElement("span", { className: "badge border me-1", style: { backgroundColor: item.color_hex || "#eee", color: "#000" } }, "\u25CF"), item.color_name), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-center" }, item.width, '"'), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end fw-bold" }, Number(item.quantity_meters || 0).toFixed(2)), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end" }, "\u20B9", Number(item.dyeing_rate || 12).toFixed(2)), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end fw-bold" }, "\u20B9", Number(item.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 }))))), /* @__PURE__ */ import_react42.default.createElement("tfoot", null, /* @__PURE__ */ import_react42.default.createElement("tr", { className: "fw-bold border-top border-dark table-light" }, /* @__PURE__ */ import_react42.default.createElement("td", { colSpan: isChallan ? 6 : 5, className: "text-end text-uppercase" }, "Grand Total:"), /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end fs-6 text-dark" }, isChallan ? `${Number(data.grand_total_meters || 2418.8).toFixed(2)} Mtrs` : `${Number(data.total_meters || 0).toFixed(2)} Mtrs`), !isChallan && /* @__PURE__ */ import_react42.default.createElement("td", { className: "text-end fs-6 text-primary" }, "\u20B9", Number(data.total_estimated_cost || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 }))))), /* @__PURE__ */ import_react42.default.createElement("div", { className: "row border-top border-dark pt-2 mb-3", style: { fontSize: "11px" } }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-8" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "fw-bold text-uppercase" }, "Terms & Conditions:"), /* @__PURE__ */ import_react42.default.createElement("p", { className: "mb-0 text-muted" }, data.terms || "1. Goods delivered must be strictly as per sample and specification within stipulated date.\n2. Any variation in shade or quality must be reported immediately."), data.remarks && /* @__PURE__ */ import_react42.default.createElement("div", { className: "mt-1 text-dark" }, /* @__PURE__ */ import_react42.default.createElement("strong", null, "Remarks:"), " ", data.remarks)), /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-4 text-end" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "text-muted small" }, "Total Pieces: ", /* @__PURE__ */ import_react42.default.createElement("strong", null, data.total_pieces || data.items?.length || 1, " Pcs")))), /* @__PURE__ */ import_react42.default.createElement("div", { className: "row pt-4 mt-3 border-top border-dark text-center", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react42.default.createElement("div", { style: { height: "35px" } }), /* @__PURE__ */ import_react42.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Receiver's Signature"), /* @__PURE__ */ import_react42.default.createElement("small", { className: "text-muted" }, data.receiver_signature || "(Vendor Representative)")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react42.default.createElement("div", { style: { height: "35px" }, className: "fw-bold text-primary" }, data.created_by || "Saksham Garg"), /* @__PURE__ */ import_react42.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Prepared By / Logged User"), /* @__PURE__ */ import_react42.default.createElement("small", { className: "text-muted" }, "Raindrop Procurement Desk")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react42.default.createElement("div", { style: { height: "35px" }, className: "fw-bold" }, data.company_representative || "Anurag"), /* @__PURE__ */ import_react42.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "For RAINDROP (Authorised Signatory)"), /* @__PURE__ */ import_react42.default.createElement("small", { className: "text-muted" }, "Company Representative"))))), /* @__PURE__ */ import_react42.default.createElement("div", { className: "modal-footer bg-light py-2" }, /* @__PURE__ */ import_react42.default.createElement("button", { type: "button", className: "btn btn-secondary btn-sm", onClick: onClose }, "Close"), /* @__PURE__ */ import_react42.default.createElement("button", { type: "button", className: "btn btn-primary btn-sm", onClick: handlePrint }, /* @__PURE__ */ import_react42.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF")))));
   }

@@ -5,25 +5,30 @@ import { navigationMenu } from './menuConfig';
  * Sidebar Navigation Component - Matches Authentic Preclinic / Rain Drop ERP Theme
  */
 export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
-  // Submenus state: open Processing and Procurement by default
-  const [openMenus, setOpenMenus] = useState({
-    'Processing (Dye/Print)': true,
-    'Procurement': true,
-    'Masters': false
+  // Submenus state: load from localStorage if previously toggled, otherwise closed by default
+  const [openMenus, setOpenMenus] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erp_sidebar_open_menus');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      'Processing (Dye/Print)': false,
+      'Procurement': false,
+      'Masters': false
+    };
   });
 
-  // Keep Processing menu expanded whenever user is on a process route
-  React.useEffect(() => {
-    if (currentRoute.startsWith('/process') || currentRoute.startsWith('/job-work')) {
-      setOpenMenus(prev => ({ ...prev, 'Processing (Dye/Print)': true }));
-    }
-  }, [currentRoute]);
-
   const toggleSubmenu = (label) => {
-    setOpenMenus((prev) => ({
-      ...prev,
-      [label]: !prev[label]
-    }));
+    setOpenMenus((prev) => {
+      const next = {
+        ...prev,
+        [label]: !prev[label]
+      };
+      try {
+        localStorage.setItem('erp_sidebar_open_menus', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
 
   return (
