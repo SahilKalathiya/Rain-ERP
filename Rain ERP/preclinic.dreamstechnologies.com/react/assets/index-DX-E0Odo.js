@@ -41450,31 +41450,31 @@
           "button",
           {
             type: "button",
-            className: "btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs",
+            className: "btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs",
             onClick: addItemRow
           },
           /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-plus fs-14" }),
-          /* @__PURE__ */ import_react35.default.createElement("span", null, "+ Add Line Item")
+          /* @__PURE__ */ import_react35.default.createElement("span", null, "Add Line Item")
         )
       ),
-      /* @__PURE__ */ import_react35.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react35.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react35.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #e2e8f0" } }, /* @__PURE__ */ import_react35.default.createElement("tr", { className: "text-secondary fw-semibold" }, /* @__PURE__ */ import_react35.default.createElement("th", { className: "text-center py-2.5", style: { width: "40px" } }, "#"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { minWidth: "220px" } }, "Style & Base Fabric"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "160px", minWidth: "160px" } }, "Color Shade"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "100px" }, className: "text-center" }, "Article"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Width"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "115px" }, className: "text-end text-primary" }, "Metres *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "105px" }, className: "text-end text-info" }, "Pieces *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "95px" }, className: "text-end" }, "Fab Rate (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "125px" }, className: "text-end" }, "Dye Rate (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "95px" }, className: "text-end" }, "Total/m (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "120px" }, className: "text-end text-success" }, "Total Amount (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "70px" }, className: "text-center" }, "Swatch"), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "45px" }, className: "text-center" }, "Action"))), /* @__PURE__ */ import_react35.default.createElement("tbody", null, items.map((item, idx) => /* @__PURE__ */ import_react35.default.createElement("tr", { key: item.id || idx }, /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center fw-bold text-muted" }, idx + 1), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+      /* @__PURE__ */ import_react35.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react35.default.createElement("table", { className: "table table-bordered align-middle mb-0", style: { borderColor: "#dee2e6", fontSize: "13px" } }, /* @__PURE__ */ import_react35.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react35.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: "600", letterSpacing: "0.04em", textTransform: "uppercase" } }, /* @__PURE__ */ import_react35.default.createElement("th", { className: "text-center py-2", style: { width: "38px", border: "1px solid #dee2e6" } }, "#"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { minWidth: "220px", border: "1px solid #dee2e6", padding: "8px 10px" } }, "Style & Base Fabric *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "165px", minWidth: "165px", border: "1px solid #dee2e6", padding: "8px 8px" } }, "Color Shade *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "90px", border: "1px solid #dee2e6", padding: "8px 6px" }, className: "text-center" }, "Article"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "80px", border: "1px solid #dee2e6", padding: "8px 6px" }, className: "text-center" }, "Width"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "115px", border: "1px solid #dee2e6", padding: "8px 8px" }, className: "text-end text-primary" }, "Metres *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "105px", border: "1px solid #dee2e6", padding: "8px 8px" }, className: "text-end text-dark" }, "Pieces *"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "95px", border: "1px solid #dee2e6", padding: "8px 6px" }, className: "text-end" }, "Fab Rate (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "120px", border: "1px solid #dee2e6", padding: "8px 6px" }, className: "text-end" }, "Dye Rate (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "95px", border: "1px solid #dee2e6", padding: "8px 8px" }, className: "text-end" }, "Total/m (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "120px", border: "1px solid #dee2e6", padding: "8px 10px" }, className: "text-end text-success" }, "Total Amount (\u20B9)"), /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "65px", border: "1px solid #dee2e6", padding: "8px 4px" }, className: "text-center" }, "Swatch"), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("th", { style: { width: "45px", border: "1px solid #dee2e6", padding: "8px 4px" }, className: "text-center" }, "Action"))), /* @__PURE__ */ import_react35.default.createElement("tbody", null, items.map((item, idx) => /* @__PURE__ */ import_react35.default.createElement("tr", { key: item.id || idx }, /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center fw-bold text-muted", style: { border: "1px solid #dee2e6", verticalAlign: "middle" } }, idx + 1), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "text",
-          className: "form-control form-control-sm fw-semibold fs-12 mb-1",
+          className: "form-control form-control-sm fw-medium fs-12 mb-1 bg-white",
           placeholder: "Style Name",
           value: item.style_name || selectedStyle || "",
           disabled: isReadOnly,
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "32px" },
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "30px", padding: "3px 8px" },
           onChange: (e) => handleItemChange(idx, "style_name", e.target.value)
         }
       ), /* @__PURE__ */ import_react35.default.createElement(
         "select",
         {
-          className: "form-select form-select-sm fs-12",
+          className: "form-select form-select-sm fs-12 bg-white",
           value: item.fabric_id,
           disabled: isReadOnly,
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "34px" },
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "30px", padding: "2px 8px" },
           onChange: (e) => {
             const f = availableFabrics.find((fab) => fab.id === e.target.value);
             if (f) {
@@ -41488,49 +41488,64 @@
             }
           }
         },
-        /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "-- Select Fabric --"),
+        /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "-- Select Fabric Quality --"),
         availableFabrics.map((fab) => /* @__PURE__ */ import_react35.default.createElement("option", { key: fab.id, value: fab.id }, fab.name))
-      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { minWidth: "160px" } }, /* @__PURE__ */ import_react35.default.createElement(
-        "select",
+      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle", minWidth: "165px" } }, /* @__PURE__ */ import_react35.default.createElement(
+        "div",
         {
-          className: "form-select form-select-sm fs-12",
-          value: item.color_name,
-          disabled: isReadOnly,
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "34px" },
-          onChange: (e) => {
-            const colVal = e.target.value;
-            const c = availableColors.find((col) => col.name === colVal);
-            handleItemChange(idx, "color_name", colVal);
-            if (c) handleItemChange(idx, "color_hex", c.hex);
-            else handleItemChange(idx, "color_hex", "#cbd5e1");
-          }
+          className: "d-flex align-items-center bg-white border",
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "0 8px" }
         },
-        /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "-- Select Color --"),
-        availableColors.map((col) => /* @__PURE__ */ import_react35.default.createElement("option", { key: col.id, value: col.name }, col.name))
-      ), item.color_name && /* @__PURE__ */ import_react35.default.createElement("div", { className: "d-flex align-items-center gap-1.5 mt-1" }, /* @__PURE__ */ import_react35.default.createElement(
-        "span",
-        {
-          className: "rounded-circle border shadow-xs",
-          style: { width: "12px", height: "12px", backgroundColor: item.color_hex || "#cbd5e1", flexShrink: 0 }
-        }
-      ), /* @__PURE__ */ import_react35.default.createElement("span", { className: "text-secondary fs-11 fw-medium" }, item.color_name))), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+        /* @__PURE__ */ import_react35.default.createElement(
+          "span",
+          {
+            style: {
+              width: "14px",
+              height: "14px",
+              borderRadius: "3px",
+              backgroundColor: item.color_hex || "#cbd5e1",
+              border: "1px solid rgba(0,0,0,0.2)",
+              flexShrink: 0,
+              marginRight: "8px"
+            }
+          }
+        ),
+        /* @__PURE__ */ import_react35.default.createElement(
+          "select",
+          {
+            className: "border-0 p-0 fs-13 bg-transparent text-dark fw-medium w-100",
+            style: { outline: "none", boxShadow: "none", height: "100%", cursor: "pointer" },
+            value: item.color_name,
+            disabled: isReadOnly,
+            onChange: (e) => {
+              const colVal = e.target.value;
+              const c = availableColors.find((col) => col.name === colVal);
+              handleItemChange(idx, "color_name", colVal);
+              if (c) handleItemChange(idx, "color_hex", c.hex);
+              else handleItemChange(idx, "color_hex", "#cbd5e1");
+            }
+          },
+          /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "Select Color..."),
+          availableColors.map((col) => /* @__PURE__ */ import_react35.default.createElement("option", { key: col.id, value: col.name }, col.name))
+        )
+      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 6px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "text",
-          className: "form-control form-control-sm text-center fs-12 px-1",
-          placeholder: "e.g. Kurta",
+          className: "form-control form-control-sm text-center bg-white fs-13",
+          placeholder: "Kurta",
           value: item.article_name || "",
           disabled: isReadOnly,
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "34px" },
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "4px 6px" },
           onChange: (e) => handleItemChange(idx, "article_name", e.target.value)
         }
-      )), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 6px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "select",
         {
-          className: "form-select form-select-sm text-center fs-12 px-1",
+          className: "form-select form-select-sm text-center bg-white fs-13",
           value: item.width || "48",
           disabled: isReadOnly,
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "34px" },
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "4px 6px" },
           onChange: (e) => {
             handleItemChange(idx, "width", e.target.value);
             applyRecommendedDyeingRate(idx);
@@ -41539,49 +41554,49 @@
         /* @__PURE__ */ import_react35.default.createElement("option", { value: "44" }, '44"'),
         /* @__PURE__ */ import_react35.default.createElement("option", { value: "48" }, '48"'),
         /* @__PURE__ */ import_react35.default.createElement("option", { value: "58" }, '58"')
-      )), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "number",
-          step: "0.01",
+          step: "any",
           placeholder: "0.00",
-          className: "form-control form-control-sm text-end fw-bold fs-13 px-1.5",
-          style: { borderColor: "#3b82f6", color: "#1d4ed8", borderRadius: "6px", height: "34px" },
+          className: "form-control form-control-sm text-end fw-semibold text-primary bg-white fs-13",
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "4px 8px" },
           value: item.quantity_meters,
           disabled: isReadOnly,
           onChange: (e) => handleItemChange(idx, "quantity_meters", e.target.value)
         }
-      ), item.quantity_meters > 0 && /* @__PURE__ */ import_react35.default.createElement("small", { className: "text-muted d-block text-end fs-10 mt-0.5" }, "Shrink: ", item.raw_fabric_meters, "m")), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+      ), parseFloat(item.quantity_meters) > 0 && /* @__PURE__ */ import_react35.default.createElement("div", { className: "text-muted text-end fs-10 mt-0.5", style: { whiteSpace: "nowrap" } }, "Shrink: ", item.raw_fabric_meters, "m")), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "number",
           placeholder: "0",
-          className: "form-control form-control-sm text-end fw-bold fs-13 px-1.5",
-          style: { borderColor: "#06b6d4", color: "#0e7490", borderRadius: "6px", height: "34px" },
+          className: "form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13",
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "4px 8px" },
           value: item.quantity_pieces,
           disabled: isReadOnly,
           onChange: (e) => handleItemChange(idx, "quantity_pieces", e.target.value)
         }
-      ), item.quantity_pieces > 0 && /* @__PURE__ */ import_react35.default.createElement("small", { className: "text-muted d-block text-end fs-10 mt-0.5" }, "@2.60m/pc")), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement(
+      ), parseInt(item.quantity_pieces, 10) > 0 && /* @__PURE__ */ import_react35.default.createElement("div", { className: "text-muted text-end fs-10 mt-0.5", style: { whiteSpace: "nowrap" } }, "@2.60m/pc")), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 6px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "number",
-          step: "0.5",
+          step: "any",
           placeholder: "0.00",
-          className: "form-control form-control-sm text-end fs-12 px-1",
-          style: { borderColor: "#cbd5e1", borderRadius: "6px", height: "34px" },
+          className: "form-control form-control-sm text-end bg-white fs-13",
+          style: { borderColor: "#cbd5e1", borderRadius: "4px", height: "34px", padding: "4px 8px" },
           value: item.fabric_rate,
           disabled: isReadOnly,
           onChange: (e) => handleItemChange(idx, "fabric_rate", e.target.value)
         }
-      )), /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react35.default.createElement(
+      )), /* @__PURE__ */ import_react35.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "6px 6px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "input-group input-group-sm flex-nowrap", style: { minWidth: "105px" } }, /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "number",
-          step: "0.5",
+          step: "any",
           placeholder: "0.00",
-          className: "form-control text-end fs-12 px-1",
-          style: { borderColor: "#cbd5e1", height: "34px" },
+          className: "form-control form-control-sm text-end bg-white fs-13",
+          style: { borderColor: "#cbd5e1", borderRadius: isReadOnly ? "4px" : "4px 0 0 4px", height: "34px", padding: "4px 6px" },
           value: item.dyeing_rate,
           disabled: isReadOnly,
           onChange: (e) => handleItemChange(idx, "dyeing_rate", e.target.value)
@@ -41590,18 +41605,19 @@
         "button",
         {
           type: "button",
-          className: "btn btn-outline-warning btn-sm px-1.5",
-          title: "Auto-recommend dyeing rate for width",
+          className: "btn btn-light border border-start-0 px-2 d-flex align-items-center justify-content-center",
+          style: { borderColor: "#cbd5e1", height: "34px", borderRadius: "0 4px 4px 0" },
+          title: "Auto-calculate dyeing rate for width",
           onClick: () => applyRecommendedDyeingRate(idx)
         },
-        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-sparkles text-amber-600" })
-      ))), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end fw-semibold text-dark fs-13" }, "\u20B9", Number(item.total_actual_cost || 0).toFixed(2)), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end fw-bold text-success fs-13" }, "\u20B9", Number(item.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center" }, item.sample_photo ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "position-relative d-inline-block" }, /* @__PURE__ */ import_react35.default.createElement(
+        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-sparkles text-amber-500 fs-14" })
+      ))), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end fw-semibold text-dark fs-13", style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle" } }, "\u20B9", Number(item.total_actual_cost || 0).toFixed(2)), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end fw-bold text-success fs-13", style: { border: "1px solid #dee2e6", padding: "6px 8px", verticalAlign: "middle" } }, "\u20B9", Number(item.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center", style: { border: "1px solid #dee2e6", padding: "6px 4px", verticalAlign: "middle" } }, item.sample_photo ? /* @__PURE__ */ import_react35.default.createElement("div", { className: "position-relative d-inline-block" }, /* @__PURE__ */ import_react35.default.createElement(
         "img",
         {
           src: item.sample_photo,
           alt: "Sample",
           className: "rounded border shadow-xs",
-          style: { width: "34px", height: "34px", objectFit: "cover" }
+          style: { width: "32px", height: "32px", objectFit: "cover" }
         }
       ), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement(
         "button",
@@ -41612,7 +41628,7 @@
           onClick: () => handleItemChange(idx, "sample_photo", null)
         },
         "\xD7"
-      )) : !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("label", { className: "btn btn-light btn-xs border mb-0 text-primary", style: { cursor: "pointer" } }, /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-camera" }), /* @__PURE__ */ import_react35.default.createElement(
+      )) : !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("label", { className: "btn btn-light btn-xs border mb-0 text-primary", style: { cursor: "pointer", padding: "4px 8px" } }, /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-camera" }), /* @__PURE__ */ import_react35.default.createElement(
         "input",
         {
           type: "file",
@@ -41620,7 +41636,7 @@
           className: "d-none",
           onChange: (e) => handlePhotoUpload(idx, e)
         }
-      ))), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react35.default.createElement(
+      ))), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center", style: { border: "1px solid #dee2e6", padding: "6px 4px", verticalAlign: "middle" } }, /* @__PURE__ */ import_react35.default.createElement(
         "button",
         {
           type: "button",
@@ -41630,7 +41646,7 @@
           title: "Delete Item"
         },
         /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-trash fs-16" })
-      ))))), /* @__PURE__ */ import_react35.default.createElement("tfoot", { style: { background: "#f8fafc", borderTop: "2px solid #e2e8f0" } }, /* @__PURE__ */ import_react35.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: 5, className: "text-end text-uppercase text-secondary py-3 fs-12" }, "Grand Totals:"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-primary fs-14 py-3" }, Number(totalMeters).toFixed(2), " m"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-info fs-14 py-3" }, totalPieces, " pcs"), /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: 3, className: "text-end text-secondary py-3 fs-12" }, "Total Job Work Value:"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-success fs-15 py-3" }, "\u20B9", Number(grandTotalCost).toLocaleString("en-IN", { minimumFractionDigits: 2 })), /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: !isReadOnly ? 2 : 1 }))))))
+      ))))), /* @__PURE__ */ import_react35.default.createElement("tfoot", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react35.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: 5, className: "text-end text-uppercase text-secondary py-2.5 fs-12", style: { border: "1px solid #dee2e6" } }, "Grand Totals:"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-primary fs-13 py-2.5", style: { border: "1px solid #dee2e6" } }, Number(totalMeters).toFixed(2), " m"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-dark fs-13 py-2.5", style: { border: "1px solid #dee2e6" } }, totalPieces, " pcs"), /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: 3, className: "text-end text-secondary py-2.5 fs-12", style: { border: "1px solid #dee2e6" } }, "Total Job Work Value:"), /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-end text-success fs-14 py-2.5", style: { border: "1px solid #dee2e6" } }, "\u20B9", Number(grandTotalCost).toLocaleString("en-IN", { minimumFractionDigits: 2 })), /* @__PURE__ */ import_react35.default.createElement("td", { colSpan: !isReadOnly ? 2 : 1, style: { border: "1px solid #dee2e6" } }))))))
     ), /* @__PURE__ */ import_react35.default.createElement(
       "div",
       {

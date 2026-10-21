@@ -792,60 +792,56 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
               {!isReadOnly && (
                 <button
                   type="button"
-                  className="btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
+                  className="btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
                   onClick={addItemRow}
                 >
                   <i className="ti ti-plus fs-14"></i>
-                  <span>+ Add Line Item</span>
+                  <span>Add Line Item</span>
                 </button>
               )}
             </div>
 
             <div className="p-0">
               <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
-                  <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                    <tr className="text-secondary fw-semibold">
-                      <th className="text-center py-2.5" style={{ width: '40px' }}>#</th>
-                      <th style={{ minWidth: '220px' }}>Style & Base Fabric</th>
-                      <th style={{ width: '160px', minWidth: '160px' }}>Color Shade</th>
-                      <th style={{ width: '100px' }} className="text-center">Article</th>
-                      <th style={{ width: '85px' }} className="text-center">Width</th>
-                      <th style={{ width: '115px' }} className="text-end text-primary">
-                        Metres *
-                      </th>
-                      <th style={{ width: '105px' }} className="text-end text-info">
-                        Pieces *
-                      </th>
-                      <th style={{ width: '95px' }} className="text-end">Fab Rate (₹)</th>
-                      <th style={{ width: '125px' }} className="text-end">Dye Rate (₹)</th>
-                      <th style={{ width: '95px' }} className="text-end">Total/m (₹)</th>
-                      <th style={{ width: '120px' }} className="text-end text-success">Total Amount (₹)</th>
-                      <th style={{ width: '70px' }} className="text-center">Swatch</th>
-                      {!isReadOnly && <th style={{ width: '45px' }} className="text-center">Action</th>}
+                <table className="table table-bordered align-middle mb-0" style={{ borderColor: '#dee2e6', fontSize: '13px' }}>
+                  <thead style={{ background: '#f8fafc' }}>
+                    <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      <th className="text-center py-2" style={{ width: '38px', border: '1px solid #dee2e6' }}>#</th>
+                      <th style={{ minWidth: '220px', border: '1px solid #dee2e6', padding: '8px 10px' }}>Style & Base Fabric *</th>
+                      <th style={{ width: '165px', minWidth: '165px', border: '1px solid #dee2e6', padding: '8px 8px' }}>Color Shade *</th>
+                      <th style={{ width: '90px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-center">Article</th>
+                      <th style={{ width: '80px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-center">Width</th>
+                      <th style={{ width: '115px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-primary">Metres *</th>
+                      <th style={{ width: '105px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-dark">Pieces *</th>
+                      <th style={{ width: '95px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Fab Rate (₹)</th>
+                      <th style={{ width: '120px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Dye Rate (₹)</th>
+                      <th style={{ width: '95px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end">Total/m (₹)</th>
+                      <th style={{ width: '120px', border: '1px solid #dee2e6', padding: '8px 10px' }} className="text-end text-success">Total Amount (₹)</th>
+                      <th style={{ width: '65px', border: '1px solid #dee2e6', padding: '8px 4px' }} className="text-center">Swatch</th>
+                      {!isReadOnly && <th style={{ width: '45px', border: '1px solid #dee2e6', padding: '8px 4px' }} className="text-center">Action</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, idx) => (
                       <tr key={item.id || idx}>
-                        <td className="text-center fw-bold text-muted">{idx + 1}</td>
+                        <td className="text-center fw-bold text-muted" style={{ border: '1px solid #dee2e6', verticalAlign: 'middle' }}>{idx + 1}</td>
                         
                         {/* Style & Fabric */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
                           <input
                             type="text"
-                            className="form-control form-control-sm fw-semibold fs-12 mb-1"
+                            className="form-control form-control-sm fw-medium fs-12 mb-1 bg-white"
                             placeholder="Style Name"
                             value={item.style_name || selectedStyle || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '32px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '30px', padding: '3px 8px' }}
                             onChange={(e) => handleItemChange(idx, 'style_name', e.target.value)}
                           />
                           <select
-                            className="form-select form-select-sm fs-12"
+                            className="form-select form-select-sm fs-12 bg-white"
                             value={item.fabric_id}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '34px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '30px', padding: '2px 8px' }}
                             onChange={(e) => {
                               const f = availableFabrics.find(fab => fab.id === e.target.value);
                               if (f) {
@@ -859,64 +855,71 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                               }
                             }}
                           >
-                            <option value="">-- Select Fabric --</option>
+                            <option value="">-- Select Fabric Quality --</option>
                             {availableFabrics.map(fab => (
                               <option key={fab.id} value={fab.id}>{fab.name}</option>
                             ))}
                           </select>
                         </td>
 
-                        {/* Color Shade - Spacious with NO text cutting */}
-                        <td style={{ minWidth: '160px' }}>
-                          <select
-                            className="form-select form-select-sm fs-12"
-                            value={item.color_name}
-                            disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '34px' }}
-                            onChange={(e) => {
-                              const colVal = e.target.value;
-                              const c = availableColors.find(col => col.name === colVal);
-                              handleItemChange(idx, 'color_name', colVal);
-                              if (c) handleItemChange(idx, 'color_hex', c.hex);
-                              else handleItemChange(idx, 'color_hex', '#cbd5e1');
-                            }}
+                        {/* Color Shade - Integrated box, swatch on left, full clear text, NO cut-off */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle', minWidth: '165px' }}>
+                          <div
+                            className="d-flex align-items-center bg-white border"
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '0 8px' }}
                           >
-                            <option value="">-- Select Color --</option>
-                            {availableColors.map(col => (
-                              <option key={col.id} value={col.name}>{col.name}</option>
-                            ))}
-                          </select>
-                          {item.color_name && (
-                            <div className="d-flex align-items-center gap-1.5 mt-1">
-                              <span
-                                className="rounded-circle border shadow-xs"
-                                style={{ width: '12px', height: '12px', backgroundColor: item.color_hex || '#cbd5e1', flexShrink: 0 }}
-                              ></span>
-                              <span className="text-secondary fs-11 fw-medium">{item.color_name}</span>
-                            </div>
-                          )}
+                            <span
+                              style={{
+                                width: '14px',
+                                height: '14px',
+                                borderRadius: '3px',
+                                backgroundColor: item.color_hex || '#cbd5e1',
+                                border: '1px solid rgba(0,0,0,0.2)',
+                                flexShrink: 0,
+                                marginRight: '8px'
+                              }}
+                            />
+                            <select
+                              className="border-0 p-0 fs-13 bg-transparent text-dark fw-medium w-100"
+                              style={{ outline: 'none', boxShadow: 'none', height: '100%', cursor: 'pointer' }}
+                              value={item.color_name}
+                              disabled={isReadOnly}
+                              onChange={(e) => {
+                                const colVal = e.target.value;
+                                const c = availableColors.find(col => col.name === colVal);
+                                handleItemChange(idx, 'color_name', colVal);
+                                if (c) handleItemChange(idx, 'color_hex', c.hex);
+                                else handleItemChange(idx, 'color_hex', '#cbd5e1');
+                              }}
+                            >
+                              <option value="">Select Color...</option>
+                              {availableColors.map(col => (
+                                <option key={col.id} value={col.name}>{col.name}</option>
+                              ))}
+                            </select>
+                          </div>
                         </td>
 
                         {/* Article */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
                           <input
                             type="text"
-                            className="form-control form-control-sm text-center fs-12 px-1"
-                            placeholder="e.g. Kurta"
+                            className="form-control form-control-sm text-center bg-white fs-13"
+                            placeholder="Kurta"
                             value={item.article_name || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '34px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 6px' }}
                             onChange={(e) => handleItemChange(idx, 'article_name', e.target.value)}
                           />
                         </td>
 
                         {/* Width */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
                           <select
-                            className="form-select form-select-sm text-center fs-12 px-1"
+                            className="form-select form-select-sm text-center bg-white fs-13"
                             value={item.width || '48'}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '34px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 6px' }}
                             onChange={(e) => {
                               handleItemChange(idx, 'width', e.target.value);
                               applyRecommendedDyeingRate(idx);
@@ -929,65 +932,65 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                         </td>
 
                         {/* Metres */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
                           <input
                             type="number"
-                            step="0.01"
+                            step="any"
                             placeholder="0.00"
-                            className="form-control form-control-sm text-end fw-bold fs-13 px-1.5"
-                            style={{ borderColor: '#3b82f6', color: '#1d4ed8', borderRadius: '6px', height: '34px' }}
+                            className="form-control form-control-sm text-end fw-semibold text-primary bg-white fs-13"
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px' }}
                             value={item.quantity_meters}
                             disabled={isReadOnly}
                             onChange={(e) => handleItemChange(idx, 'quantity_meters', e.target.value)}
                           />
-                          {item.quantity_meters > 0 && (
-                            <small className="text-muted d-block text-end fs-10 mt-0.5">
+                          {parseFloat(item.quantity_meters) > 0 && (
+                            <div className="text-muted text-end fs-10 mt-0.5" style={{ whiteSpace: 'nowrap' }}>
                               Shrink: {item.raw_fabric_meters}m
-                            </small>
+                            </div>
                           )}
                         </td>
 
                         {/* Pieces */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
                           <input
                             type="number"
                             placeholder="0"
-                            className="form-control form-control-sm text-end fw-bold fs-13 px-1.5"
-                            style={{ borderColor: '#06b6d4', color: '#0e7490', borderRadius: '6px', height: '34px' }}
+                            className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13"
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px' }}
                             value={item.quantity_pieces}
                             disabled={isReadOnly}
                             onChange={(e) => handleItemChange(idx, 'quantity_pieces', e.target.value)}
                           />
-                          {item.quantity_pieces > 0 && (
-                            <small className="text-muted d-block text-end fs-10 mt-0.5">
+                          {parseInt(item.quantity_pieces, 10) > 0 && (
+                            <div className="text-muted text-end fs-10 mt-0.5" style={{ whiteSpace: 'nowrap' }}>
                               @2.60m/pc
-                            </small>
+                            </div>
                           )}
                         </td>
 
                         {/* Fab Rate */}
-                        <td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
                           <input
                             type="number"
-                            step="0.5"
+                            step="any"
                             placeholder="0.00"
-                            className="form-control form-control-sm text-end fs-12 px-1"
-                            style={{ borderColor: '#cbd5e1', borderRadius: '6px', height: '34px' }}
+                            className="form-control form-control-sm text-end bg-white fs-13"
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px' }}
                             value={item.fabric_rate}
                             disabled={isReadOnly}
                             onChange={(e) => handleItemChange(idx, 'fabric_rate', e.target.value)}
                           />
                         </td>
 
-                        {/* Dyeing Rate with Auto Recommend */}
-                        <td>
-                          <div className="input-group input-group-sm">
+                        {/* Dyeing Rate with Auto Recommend - Inline connected input group */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
+                          <div className="input-group input-group-sm flex-nowrap" style={{ minWidth: '105px' }}>
                             <input
                               type="number"
-                              step="0.5"
+                              step="any"
                               placeholder="0.00"
-                              className="form-control text-end fs-12 px-1"
-                              style={{ borderColor: '#cbd5e1', height: '34px' }}
+                              className="form-control form-control-sm text-end bg-white fs-13"
+                              style={{ borderColor: '#cbd5e1', borderRadius: isReadOnly ? '4px' : '4px 0 0 4px', height: '34px', padding: '4px 6px' }}
                               value={item.dyeing_rate}
                               disabled={isReadOnly}
                               onChange={(e) => handleItemChange(idx, 'dyeing_rate', e.target.value)}
@@ -995,35 +998,36 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             {!isReadOnly && (
                               <button
                                 type="button"
-                                className="btn btn-outline-warning btn-sm px-1.5"
-                                title="Auto-recommend dyeing rate for width"
+                                className="btn btn-light border border-start-0 px-2 d-flex align-items-center justify-content-center"
+                                style={{ borderColor: '#cbd5e1', height: '34px', borderRadius: '0 4px 4px 0' }}
+                                title="Auto-calculate dyeing rate for width"
                                 onClick={() => applyRecommendedDyeingRate(idx)}
                               >
-                                <i className="ti ti-sparkles text-amber-600"></i>
+                                <i className="ti ti-sparkles text-amber-500 fs-14"></i>
                               </button>
                             )}
                           </div>
                         </td>
 
                         {/* Total per Metre */}
-                        <td className="text-end fw-semibold text-dark fs-13">
+                        <td className="text-end fw-semibold text-dark fs-13" style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
                           ₹{Number(item.total_actual_cost || 0).toFixed(2)}
                         </td>
 
                         {/* Line Total Amount */}
-                        <td className="text-end fw-bold text-success fs-13">
+                        <td className="text-end fw-bold text-success fs-13" style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
                           ₹{Number(item.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
 
                         {/* Swatch Photo */}
-                        <td className="text-center">
+                        <td className="text-center" style={{ border: '1px solid #dee2e6', padding: '6px 4px', verticalAlign: 'middle' }}>
                           {item.sample_photo ? (
                             <div className="position-relative d-inline-block">
                               <img
                                 src={item.sample_photo}
                                 alt="Sample"
                                 className="rounded border shadow-xs"
-                                style={{ width: '34px', height: '34px', objectFit: 'cover' }}
+                                style={{ width: '32px', height: '32px', objectFit: 'cover' }}
                               />
                               {!isReadOnly && (
                                 <button
@@ -1038,7 +1042,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             </div>
                           ) : (
                             !isReadOnly && (
-                              <label className="btn btn-light btn-xs border mb-0 text-primary" style={{ cursor: 'pointer' }}>
+                              <label className="btn btn-light btn-xs border mb-0 text-primary" style={{ cursor: 'pointer', padding: '4px 8px' }}>
                                 <i className="ti ti-camera"></i>
                                 <input
                                   type="file"
@@ -1053,7 +1057,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
 
                         {/* Delete Row */}
                         {!isReadOnly && (
-                          <td className="text-center">
+                          <td className="text-center" style={{ border: '1px solid #dee2e6', padding: '6px 4px', verticalAlign: 'middle' }}>
                             <button
                               type="button"
                               className="btn btn-link text-danger p-0"
@@ -1070,24 +1074,24 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   </tbody>
                   
                   {/* Totals Footer Bar */}
-                  <tfoot style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
+                  <tfoot style={{ background: '#f8fafc' }}>
                     <tr className="fw-bold">
-                      <td colSpan={5} className="text-end text-uppercase text-secondary py-3 fs-12">
+                      <td colSpan={5} className="text-end text-uppercase text-secondary py-2.5 fs-12" style={{ border: '1px solid #dee2e6' }}>
                         Grand Totals:
                       </td>
-                      <td className="text-end text-primary fs-14 py-3">
+                      <td className="text-end text-primary fs-13 py-2.5" style={{ border: '1px solid #dee2e6' }}>
                         {Number(totalMeters).toFixed(2)} m
                       </td>
-                      <td className="text-end text-info fs-14 py-3">
+                      <td className="text-end text-dark fs-13 py-2.5" style={{ border: '1px solid #dee2e6' }}>
                         {totalPieces} pcs
                       </td>
-                      <td colSpan={3} className="text-end text-secondary py-3 fs-12">
+                      <td colSpan={3} className="text-end text-secondary py-2.5 fs-12" style={{ border: '1px solid #dee2e6' }}>
                         Total Job Work Value:
                       </td>
-                      <td className="text-end text-success fs-15 py-3">
+                      <td className="text-end text-success fs-14 py-2.5" style={{ border: '1px solid #dee2e6' }}>
                         ₹{Number(grandTotalCost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td colSpan={!isReadOnly ? 2 : 1}></td>
+                      <td colSpan={!isReadOnly ? 2 : 1} style={{ border: '1px solid #dee2e6' }}></td>
                     </tr>
                   </tfoot>
                 </table>
