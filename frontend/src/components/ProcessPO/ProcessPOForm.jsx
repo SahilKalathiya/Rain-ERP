@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { initialVendors, initialFabrics } from '../../data/procurementData';
+import { initialVendors, initialFabrics, initialColors } from '../../data/procurementData';
+import { initialArticles } from '../../data/salesOrderData';
 import VendorMasterView from '../Procurement/VendorMasterView';
 import FabricMasterView from '../Procurement/FabricMasterView';
+import AddColorModal from '../Procurement/AddColorModal';
 
 /**
  * ProcessPOForm - Clean, intuitive, enterprise-grade creation & edit form for Module 3 Process PO
@@ -9,6 +11,8 @@ import FabricMasterView from '../Procurement/FabricMasterView';
  * Clear Sales Order Reference with zero truncation.
  * Simple, standard Style selection.
  * Clean Vendor selector with "+ New" vendor creation.
+ * Article rendered from Article Master with dropdown selection.
+ * Color with "+ New" modal creation integrated with Color Master.
  * Spacious Fabric, Color and Width dropdowns with zero text cutting or arrow collision.
  */
 export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false }) {
@@ -79,17 +83,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     { id: 'FAB-003', name: 'Cotton Cambric 60*60', widths: ['44', '58'], defaultRate: 42.00, shrinkage: 3.5 }
   ];
 
-  const availableColors = [
-    { id: 'COL-001', name: 'Beige', hex: '#F5F5DC' },
-    { id: 'COL-002', name: 'Off White', hex: '#FAF9F6' },
-    { id: 'COL-003', name: 'Dusty Rose', hex: '#DCAE96' },
-    { id: 'COL-004', name: 'Sky Blue', hex: '#87CEEB' },
-    { id: 'COL-005', name: 'Sage Green', hex: '#9DC183' },
-    { id: 'COL-006', name: 'Mustard Yellow', hex: '#E1AD01' },
-    { id: 'COL-007', name: 'Navy Blue', hex: '#000080' },
-    { id: 'COL-008', name: 'Maroon', hex: '#800000' }
-  ];
-
   // Master lists with dynamic "+ New" addition
   const [vendorList, setVendorList] = useState(initialVendors);
   const [fabricList, setFabricList] = useState(() => {
@@ -110,9 +103,81 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     return list;
   });
 
+  // Color Master list initialized with initialColors and localStorage persistence
+  const [colorList, setColorList] = useState(() => {
+    let list = [...initialColors];
+    try {
+      const s = localStorage.getItem('raindrop_colors_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        parsed.forEach(c => {
+          if (!list.some(existing => existing.id === c.id || existing.name?.toLowerCase() === c.name?.toLowerCase())) {
+            list.push(c);
+          }
+        });
+      }
+    } catch (e) {}
+    return list;
+  });
+
+  // Article Master list initialized with initialArticles
+  const [articleList, setArticleList] = useState(() => {
+    const list = [...initialArticles];
+    const extras = [
+      { id: 'ART-007', name: 'Anarkali Gown' },
+      { id: 'ART-008', name: 'Kurta Set' }
+    ];
+    extras.forEach(ext => {
+      if (!list.some(a => a.name.toLowerCase() === ext.name.toLowerCase())) {
+        list.push(ext);
+      }
+    });
+    return list;
+  });
+
   // Modals for inline creation
   const [showInlineVendorModal, setShowInlineVendorModal] = useState(false);
   const [showInlineFabricModal, setShowInlineFabricModal] = useState(false);
+  const [showInlineColorModal, setShowInlineColorModal] = useState(false);
+  const [activeColorRowIndex, setActiveColorRowIndex] = useState(null);
+
+  const handleOpenNewColorModal = (rowIndex = null) => {
+    setActiveColorRowIndex(rowIndex);
+    setShowInlineColorModal(true);
+  };
+
+  const handleNewColorCreated = (newColor) => {
+    if (!newColor) return;
+    setColorList(prev => {
+      if (prev.some(c => c.name.toLowerCase() === newColor.name.toLowerCase())) return prev;
+      return [newColor, ...prev];
+    });
+
+    try {
+      const s = localStorage.getItem('raindrop_colors_v1');
+      const existing = s ? JSON.parse(s) : [];
+      if (!existing.some(c => c.name?.toLowerCase() === newColor.name?.toLowerCase())) {
+        localStorage.setItem('raindrop_colors_v1', JSON.stringify([newColor, ...existing]));
+      }
+    } catch (e) {}
+
+    let targetIdx = activeColorRowIndex;
+    if (targetIdx === null || targetIdx === undefined || !items[targetIdx]) {
+      const emptyIdx = items.findIndex(it => !it.color_name);
+      targetIdx = emptyIdx >= 0 ? emptyIdx : 0;
+    }
+
+    if (items[targetIdx]) {
+      const updated = [...items];
+      updated[targetIdx].color_id = newColor.id || '';
+      updated[targetIdx].color_name = newColor.name;
+      updated[targetIdx].color_hex = newColor.hex || '#cbd5e1';
+      setItems(updated);
+    }
+
+    setShowInlineColorModal(false);
+    setActiveColorRowIndex(null);
+  };
 
   // Quick instruction presets for fast addition to terms
   const instructionPresets = [
@@ -192,7 +257,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
   // Find currently selected order details (null if unselected)
   const currentSelectedOrder = availableSalesOrders.find(o => o.id === linkedOrderId) || null;
 
-  // When order changes, suggest brand and style
+  // When order changes, suggest brand, style and article
   const handleSelectOrder = (orderId) => {
     setLinkedOrderId(orderId);
     const ord = availableSalesOrders.find(o => o.id === orderId);
@@ -200,9 +265,10 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
       setCustomerBrandName(ord.brand || '');
       setDeliveryDate(ord.deliveryDate || '');
       setSelectedStyle(ord.style || '');
-      if (items.length > 0 && !items[0].style_name) {
+      if (items.length > 0) {
         const updated = [...items];
-        updated[0].style_name = ord.style;
+        if (!updated[0].style_name) updated[0].style_name = ord.style;
+        if (ord.article && !updated[0].article_name) updated[0].article_name = ord.article;
         setItems(updated);
       }
     }
@@ -861,13 +927,27 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                           )}
                         </div>
                       </th>
-                      <th style={{ width: '190px', minWidth: '190px', border: '1px solid #dee2e6', padding: '8px 8px' }}>Color Shade *</th>
-                      <th style={{ width: '90px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-center">Article</th>
+                      <th style={{ width: '200px', minWidth: '200px', border: '1px solid #dee2e6', padding: '8px 8px' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span>COLOR SHADE *</span>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
+                              onClick={() => handleOpenNewColorModal(null)}
+                              title="Add new color to master"
+                            >
+                              + New
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                      <th style={{ width: '110px', minWidth: '110px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-start">Article</th>
                       <th style={{ width: '105px', minWidth: '105px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-start">Width</th>
                       <th style={{ width: '115px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-primary">Metres *</th>
                       <th style={{ width: '105px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-dark">Pieces *</th>
-                      <th style={{ width: '95px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Fab Rate (₹)</th>
-                      <th style={{ width: '120px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Dye Rate (₹)</th>
+                      <th style={{ width: '110px', minWidth: '110px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Fab Rate (₹)</th>
+                      <th style={{ width: '110px', minWidth: '110px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Dye Rate (₹)</th>
                       <th style={{ width: '95px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end">Total/m (₹)</th>
                       <th style={{ width: '120px', border: '1px solid #dee2e6', padding: '8px 10px' }} className="text-end text-success">Total Amount (₹)</th>
                       <th style={{ width: '65px', border: '1px solid #dee2e6', padding: '8px 4px' }} className="text-center">Swatch</th>
@@ -916,7 +996,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                         </td>
 
                         {/* Color Shade - Full width, swatch on left, zero cut-off */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '8px 10px', verticalAlign: 'middle', minWidth: '190px' }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '8px 10px', verticalAlign: 'middle', minWidth: '200px' }}>
                           <div
                             className="d-flex align-items-center bg-white border"
                             style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '0 8px' }}
@@ -939,31 +1019,41 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                               disabled={isReadOnly}
                               onChange={(e) => {
                                 const colVal = e.target.value;
-                                const c = availableColors.find(col => col.name === colVal);
+                                const c = colorList.find(col => col.name === colVal);
                                 handleItemChange(idx, 'color_name', colVal);
-                                if (c) handleItemChange(idx, 'color_hex', c.hex);
-                                else handleItemChange(idx, 'color_hex', '#cbd5e1');
+                                if (c) {
+                                  handleItemChange(idx, 'color_id', c.id || '');
+                                  handleItemChange(idx, 'color_hex', c.hex || '#cbd5e1');
+                                } else {
+                                  handleItemChange(idx, 'color_id', '');
+                                  handleItemChange(idx, 'color_hex', '#cbd5e1');
+                                }
                               }}
                             >
                               <option value="">Select Color...</option>
-                              {availableColors.map(col => (
-                                <option key={col.id} value={col.name}>{col.name}</option>
+                              {colorList.map(col => (
+                                <option key={col.id || col.name} value={col.name}>{col.name}</option>
                               ))}
                             </select>
                           </div>
                         </td>
 
-                        {/* Article */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm text-center bg-white fs-13"
-                            placeholder="Kurta"
+                        {/* Article - Rendered from Article Master Data */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle', width: '110px', minWidth: '110px' }}>
+                          <select
+                            className="form-select form-select-sm text-start bg-white fs-13"
                             value={item.article_name || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 6px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', paddingLeft: '8px', paddingRight: '20px', fontSize: '13px' }}
                             onChange={(e) => handleItemChange(idx, 'article_name', e.target.value)}
-                          />
+                          >
+                            <option value="">Select...</option>
+                            {articleList.map((art) => (
+                              <option key={art.id || art.name} value={art.name}>
+                                {art.name}
+                              </option>
+                            ))}
+                          </select>
                         </td>
 
                         {/* Width - NOT auto-filled, left aligned, zero arrow overlap */}
@@ -1024,45 +1114,32 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                           )}
                         </td>
 
-                        {/* Fab Rate */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
+                        {/* Fab Rate - Wide and legible with zero truncation */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle', width: '110px', minWidth: '110px' }}>
                           <input
                             type="number"
                             step="any"
                             placeholder="0.00"
                             className="form-control form-control-sm text-end bg-white fs-13"
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px', width: '100%', minWidth: '85px', fontSize: '13px' }}
                             value={item.fabric_rate}
                             disabled={isReadOnly}
                             onChange={(e) => handleItemChange(idx, 'fabric_rate', e.target.value)}
                           />
                         </td>
 
-                        {/* Dyeing Rate with Auto Recommend - Inline connected input group */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
-                          <div className="input-group input-group-sm flex-nowrap" style={{ minWidth: '105px' }}>
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0.00"
-                              className="form-control form-control-sm text-end bg-white fs-13"
-                              style={{ borderColor: '#cbd5e1', borderRadius: isReadOnly ? '4px' : '4px 0 0 4px', height: '34px', padding: '4px 6px' }}
-                              value={item.dyeing_rate}
-                              disabled={isReadOnly}
-                              onChange={(e) => handleItemChange(idx, 'dyeing_rate', e.target.value)}
-                            />
-                            {!isReadOnly && (
-                              <button
-                                type="button"
-                                className="btn btn-light border border-start-0 px-2 d-flex align-items-center justify-content-center"
-                                style={{ borderColor: '#cbd5e1', height: '34px', borderRadius: '0 4px 4px 0' }}
-                                title="Auto-calculate dyeing rate for width"
-                                onClick={() => applyRecommendedDyeingRate(idx)}
-                              >
-                                <i className="ti ti-sparkles text-amber-500 fs-14"></i>
-                              </button>
-                            )}
-                          </div>
+                        {/* Dyeing Rate - Clean numeric input with auto-recommendation on Width change and direct manual editing */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle', width: '110px', minWidth: '110px' }}>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            className="form-control form-control-sm text-end bg-white fs-13"
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 8px', width: '100%', minWidth: '85px', fontSize: '13px' }}
+                            value={item.dyeing_rate}
+                            disabled={isReadOnly}
+                            onChange={(e) => handleItemChange(idx, 'dyeing_rate', e.target.value)}
+                          />
                         </td>
 
                         {/* Total per Metre */}
@@ -1325,6 +1402,24 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
               }
             }
             setShowInlineFabricModal(false);
+          }}
+        />
+      )}
+
+      {/* Inline Modal: Color Master Creation (Matches Image 2) */}
+      {showInlineColorModal && (
+        <AddColorModal
+          colors={colorList}
+          onSave={(newColor) => {
+            handleNewColorCreated(newColor);
+          }}
+          onClose={(newColor) => {
+            setShowInlineColorModal(false);
+            if (newColor) {
+              handleNewColorCreated(newColor);
+            } else {
+              setActiveColorRowIndex(null);
+            }
           }}
         />
       )}
