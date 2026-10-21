@@ -40940,9 +40940,9 @@
       "Stock Cambric Plain"
     ];
     const initialFabricMasters = [
-      { id: "FAB-001", name: "100x100 Voile (Grey)", widths: ["44", "48", "58"], defaultRate: 25, shrinkage: 4 },
-      { id: "FAB-002", name: "Rayon 14kg Liva", widths: ["44", "48", "58"], defaultRate: 30, shrinkage: 5 },
-      { id: "FAB-003", name: "Cotton Cambric 60*60", widths: ["44", "58"], defaultRate: 42, shrinkage: 3.5 }
+      { id: "FAB-001", name: "100x100 Voile (Grey)", widths: ["44", "48", "58"], defaultRate: "", shrinkage: 4 },
+      { id: "FAB-002", name: "Rayon 14kg Liva", widths: ["44", "48", "58"], defaultRate: "", shrinkage: 5 },
+      { id: "FAB-003", name: "Cotton Cambric 60*60", widths: ["44", "58"], defaultRate: "", shrinkage: 3.5 }
     ];
     const [vendorList, setVendorList] = (0, import_react35.useState)(initialVendors);
     const [fabricList, setFabricList] = (0, import_react35.useState)(() => {
@@ -40954,7 +40954,7 @@
               id: f.id,
               name: f.qualityName || f.name,
               widths: f.widths || ["44", "48", "58"],
-              defaultRate: 25,
+              defaultRate: "",
               shrinkage: f.defaultShrinkage || 4
             });
           }
@@ -41582,7 +41582,8 @@
               updateItem(idx, {
                 fabric_id: f.id,
                 fabric_name: f.name || f.qualityName,
-                fabric_rate: f.defaultRate !== void 0 && f.defaultRate !== null ? f.defaultRate : ""
+                fabric_rate: ""
+                // BLANK as requested! Never auto-fill fabric rate
               });
             } else {
               updateItem(idx, {
@@ -41862,7 +41863,7 @@
               id: newFabric.id,
               name: newFabric.qualityName || newFabric.name,
               widths: newFabric.widths || ["44", "48", "58"],
-              defaultRate: 25,
+              defaultRate: "",
               shrinkage: newFabric.defaultShrinkage || 4
             };
             setFabricList((prev) => [formatted, ...prev]);
@@ -41870,6 +41871,7 @@
               const updated = [...items];
               updated[0].fabric_id = formatted.id;
               updated[0].fabric_name = formatted.name;
+              updated[0].fabric_rate = "";
               setItems(updated);
             }
           }
@@ -41880,7 +41882,7 @@
               id: newCreatedFabric.id,
               name: newCreatedFabric.qualityName || newCreatedFabric.name,
               widths: newCreatedFabric.widths || ["44", "48", "58"],
-              defaultRate: 25,
+              defaultRate: "",
               shrinkage: newCreatedFabric.defaultShrinkage || 4
             };
             setFabricList((prev) => [formatted, ...prev]);
@@ -41888,6 +41890,7 @@
               const updated = [...items];
               updated[0].fabric_id = formatted.id;
               updated[0].fabric_name = formatted.name;
+              updated[0].fabric_rate = "";
               setItems(updated);
             }
           }

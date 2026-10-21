@@ -78,9 +78,9 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
   ];
 
   const initialFabricMasters = [
-    { id: 'FAB-001', name: '100x100 Voile (Grey)', widths: ['44', '48', '58'], defaultRate: 25.00, shrinkage: 4.0 },
-    { id: 'FAB-002', name: 'Rayon 14kg Liva', widths: ['44', '48', '58'], defaultRate: 30.00, shrinkage: 5.0 },
-    { id: 'FAB-003', name: 'Cotton Cambric 60*60', widths: ['44', '58'], defaultRate: 42.00, shrinkage: 3.5 }
+    { id: 'FAB-001', name: '100x100 Voile (Grey)', widths: ['44', '48', '58'], defaultRate: '', shrinkage: 4.0 },
+    { id: 'FAB-002', name: 'Rayon 14kg Liva', widths: ['44', '48', '58'], defaultRate: '', shrinkage: 5.0 },
+    { id: 'FAB-003', name: 'Cotton Cambric 60*60', widths: ['44', '58'], defaultRate: '', shrinkage: 3.5 }
   ];
 
   // Master lists with dynamic "+ New" addition
@@ -94,7 +94,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
             id: f.id,
             name: f.qualityName || f.name,
             widths: f.widths || ['44', '48', '58'],
-            defaultRate: 25.00,
+            defaultRate: '',
             shrinkage: f.defaultShrinkage || 4.0
           });
         }
@@ -978,7 +978,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                                 updateItem(idx, {
                                   fabric_id: f.id,
                                   fabric_name: f.name || f.qualityName,
-                                  fabric_rate: (f.defaultRate !== undefined && f.defaultRate !== null) ? f.defaultRate : ''
+                                  fabric_rate: '' // BLANK as requested! Never auto-fill fabric rate
                                 });
                               } else {
                                 updateItem(idx, {
@@ -1373,7 +1373,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                 id: newFabric.id,
                 name: newFabric.qualityName || newFabric.name,
                 widths: newFabric.widths || ['44', '48', '58'],
-                defaultRate: 25.00,
+                defaultRate: '',
                 shrinkage: newFabric.defaultShrinkage || 4.0
               };
               setFabricList(prev => [formatted, ...prev]);
@@ -1381,6 +1381,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                 const updated = [...items];
                 updated[0].fabric_id = formatted.id;
                 updated[0].fabric_name = formatted.name;
+                updated[0].fabric_rate = '';
                 setItems(updated);
               }
             }
@@ -1391,7 +1392,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                 id: newCreatedFabric.id,
                 name: newCreatedFabric.qualityName || newCreatedFabric.name,
                 widths: newCreatedFabric.widths || ['44', '48', '58'],
-                defaultRate: 25.00,
+                defaultRate: '',
                 shrinkage: newCreatedFabric.defaultShrinkage || 4.0
               };
               setFabricList(prev => [formatted, ...prev]);
@@ -1399,6 +1400,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                 const updated = [...items];
                 updated[0].fabric_id = formatted.id;
                 updated[0].fabric_name = formatted.name;
+                updated[0].fabric_rate = '';
                 setItems(updated);
               }
             }
