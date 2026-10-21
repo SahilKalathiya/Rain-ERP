@@ -42327,7 +42327,7 @@
 
   // frontend/src/components/ProcessPO/ProcessChallanForm.jsx
   var import_react37 = __toESM(require_react());
-  function ProcessChallanForm({ availablePOs = [], onSave, onCancel, initialChallan }) {
+  function ProcessChallanForm({ availablePOs = [], onSave, onCancel, initialChallan, onRecordReturn }) {
     const isEditing = Boolean(initialChallan && initialChallan.id);
     const [challanNumber, setChallanNumber] = (0, import_react37.useState)(
       initialChallan?.challan_number || `CH-${Math.floor(4e3 + Math.random() * 1e3)}`
@@ -42456,8 +42456,8 @@
     };
     const grandTotalMeters = items.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
     const poLinkStatus = isEmergencyDispatch || selectedPOs.length === 0 ? "Pending PO Link" : "Linked";
-    const handleSubmit = (e) => {
-      e.preventDefault();
+    const handleSubmit = (e, andRecordReturn = false) => {
+      if (e && e.preventDefault) e.preventDefault();
       if (!isEmergencyDispatch && selectedPOs.length === 0) {
         alert("Please select at least one Process PO or switch to Emergency Dispatch.");
         return;
@@ -42493,7 +42493,7 @@
         created_at: initialChallan?.created_at || (/* @__PURE__ */ new Date()).toISOString(),
         items
       };
-      onSave(challanPayload);
+      onSave(challanPayload, andRecordReturn);
     };
     return /* @__PURE__ */ import_react37.default.createElement("div", { className: "card shadow-sm border-0 mb-4", style: { borderRadius: "10px" } }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react37.default.createElement(
       "div",
@@ -42502,7 +42502,29 @@
         style: { width: "38px", height: "38px", background: "#4f46e5" }
       },
       /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-truck fs-18" })
-    ), /* @__PURE__ */ import_react37.default.createElement("div", null, /* @__PURE__ */ import_react37.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react37.default.createElement("h5", { className: "card-title mb-0 fw-bold text-dark fs-16" }, isEditing ? `Edit Challan #${challanNumber}` : "Create New Challan"), /* @__PURE__ */ import_react37.default.createElement("span", { className: `badge fs-11 ${poLinkStatus === "Linked" ? "bg-success-subtle text-success border border-success-subtle" : "bg-danger-subtle text-danger border border-danger-subtle"}` }, poLinkStatus === "Linked" ? "Linked" : "Pending PO Link")), /* @__PURE__ */ import_react37.default.createElement("span", { className: "text-muted fs-12" }, "Fabric Dispatch to Processing Vendor"))), /* @__PURE__ */ import_react37.default.createElement(
+    ), /* @__PURE__ */ import_react37.default.createElement("div", null, /* @__PURE__ */ import_react37.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react37.default.createElement("h5", { className: "card-title mb-0 fw-bold text-dark fs-16" }, isEditing ? `Edit Challan #${challanNumber}` : "Create New Challan"), /* @__PURE__ */ import_react37.default.createElement("span", { className: `badge fs-11 ${poLinkStatus === "Linked" ? "bg-success-subtle text-success border border-success-subtle" : "bg-danger-subtle text-danger border border-danger-subtle"}` }, poLinkStatus === "Linked" ? "Linked" : "Pending PO Link")), /* @__PURE__ */ import_react37.default.createElement("span", { className: "text-muted fs-12" }, "Fabric Dispatch to Processing Vendor"))), /* @__PURE__ */ import_react37.default.createElement("div", { className: "d-flex align-items-center gap-2" }, onRecordReturn && /* @__PURE__ */ import_react37.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-success btn-sm d-flex align-items-center gap-1.5 shadow-xs",
+        title: "Record vendor delivery return when goods arrive back from dyeing",
+        onClick: () => {
+          const currentData = {
+            id: initialChallan?.id || `PCH-${challanNumber}`,
+            challan_number: challanNumber,
+            vendor_id: vendorId,
+            vendor_name: vendorName,
+            linked_pos: selectedPOs,
+            grand_total_meters: grandTotalMeters,
+            folding_notation: foldingNotation,
+            items
+          };
+          onRecordReturn(currentData);
+        }
+      },
+      /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-receipt-refund fs-14" }),
+      /* @__PURE__ */ import_react37.default.createElement("span", null, "Inward Return \u2192")
+    ), /* @__PURE__ */ import_react37.default.createElement(
       "button",
       {
         type: "button",
@@ -42511,7 +42533,7 @@
       },
       /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-x me-1" }),
       " Close"
-    )), /* @__PURE__ */ import_react37.default.createElement("form", { onSubmit: handleSubmit }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "card-body p-4" }, /* @__PURE__ */ import_react37.default.createElement(
+    ))), /* @__PURE__ */ import_react37.default.createElement("form", { onSubmit: handleSubmit }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "card-body p-4" }, /* @__PURE__ */ import_react37.default.createElement(
       "div",
       {
         className: "card mb-4 shadow-none",
@@ -42799,11 +42821,21 @@
       "button",
       {
         type: "submit",
-        className: "btn btn-primary btn-sm px-4 shadow-sm",
-        style: { background: "#4f46e5", borderColor: "#4f46e5" }
+        className: "btn btn-outline-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
       },
-      /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-device-floppy me-1" }),
-      " Save Challan"
+      /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-device-floppy fs-14" }),
+      /* @__PURE__ */ import_react37.default.createElement("span", null, "Save Challan")
+    ), /* @__PURE__ */ import_react37.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-sm px-3.5 shadow-sm d-flex align-items-center gap-1.5",
+        style: { background: "#4f46e5", borderColor: "#4f46e5" },
+        title: "Save challan and proceed to record vendor return when goods arrive back",
+        onClick: (e) => handleSubmit(e, true)
+      },
+      /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-receipt-refund fs-14" }),
+      /* @__PURE__ */ import_react37.default.createElement("span", null, "Save & Inward Return (GRN) \u2192")
     )))));
   }
 
@@ -44252,7 +44284,7 @@
       setActiveTab("challans");
       setShowChallanForm(true);
     };
-    const handleSaveChallan = (challanData) => {
+    const handleSaveChallan = (challanData, andRecordReturn = false) => {
       let updated;
       const existingIndex = challans.findIndex((c) => c.id === challanData.id);
       if (existingIndex >= 0) {
@@ -44275,19 +44307,36 @@
       }
       setShowChallanForm(false);
       setEditingChallan(null);
+      if (andRecordReturn) {
+        handleRecordReturnFromChallan(challanData);
+      }
     };
     const handlePrintChallan = (challan) => {
       setPrintModalConfig({ type: "CHALLAN", data: challan });
     };
     const handleRecordReturnFromChallan = (challan) => {
+      const defaultPieces = challan.items && challan.items.length > 0 ? challan.items.map((it, idx) => ({
+        id: idx + 1,
+        piece_no: idx + 1,
+        meters: it.dispatched_meters || it.original_piece_meters || 100,
+        color_name: it.color_name || "Standard",
+        folding: it.folding || "Fold 100"
+      })) : [
+        { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: "Standard", folding: "Fold 100" }
+      ];
       setEditingReturn({
-        vendor_id: challan.vendor_id,
-        vendor_name: challan.vendor_name,
-        linked_challan_id: challan.id,
-        linked_po_id: challan.linked_pos?.[0] || "PPO-7611"
+        vendor_id: challan.vendor_id || "",
+        vendor_name: challan.vendor_name || "",
+        linked_challan_id: challan.challan_number || challan.id,
+        linked_po_id: challan.linked_pos?.[0] || "PPO-7611",
+        fabric_quality: challan.items?.[0]?.fabric_name || "100x100 Voile (Grey)",
+        width: "48",
+        folding_standard: challan.folding_notation || "Fold 100",
+        vendor_declared_meters: challan.grand_total_meters || defaultPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0),
+        vendor_declared_pieces: defaultPieces.length,
+        pieces: defaultPieces
       });
-      if (onNavigate) onNavigate("/process-return");
-      else setActiveTab("returns");
+      setActiveTab("returns");
       setShowReturnForm(true);
     };
     const handleSaveReturn = (returnData) => {
@@ -44361,6 +44410,7 @@
         availablePOs: pos,
         initialChallan: editingChallan,
         onSave: handleSaveChallan,
+        onRecordReturn: handleRecordReturnFromChallan,
         onCancel: () => {
           setShowChallanForm(false);
           setEditingChallan(null);

@@ -169,7 +169,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   // 2. Process Challan Handlers
-  const handleSaveChallan = (challanData) => {
+  const handleSaveChallan = (challanData, andRecordReturn = false) => {
     let updated;
     const existingIndex = challans.findIndex(c => c.id === challanData.id);
     if (existingIndex >= 0) {
@@ -195,6 +195,11 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     setShowChallanForm(false);
     setEditingChallan(null);
+
+    // If requested, immediately transition to Record Inward Return
+    if (andRecordReturn) {
+      handleRecordReturnFromChallan(challanData);
+    }
   };
 
   const handlePrintChallan = (challan) => {
@@ -202,14 +207,31 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   const handleRecordReturnFromChallan = (challan) => {
+    const defaultPieces = challan.items && challan.items.length > 0
+      ? challan.items.map((it, idx) => ({
+          id: idx + 1,
+          piece_no: idx + 1,
+          meters: it.dispatched_meters || it.original_piece_meters || 100,
+          color_name: it.color_name || 'Standard',
+          folding: it.folding || 'Fold 100'
+        }))
+      : [
+          { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: 'Fold 100' }
+        ];
+
     setEditingReturn({
-      vendor_id: challan.vendor_id,
-      vendor_name: challan.vendor_name,
-      linked_challan_id: challan.id,
-      linked_po_id: challan.linked_pos?.[0] || 'PPO-7611'
+      vendor_id: challan.vendor_id || '',
+      vendor_name: challan.vendor_name || '',
+      linked_challan_id: challan.challan_number || challan.id,
+      linked_po_id: challan.linked_pos?.[0] || 'PPO-7611',
+      fabric_quality: challan.items?.[0]?.fabric_name || '100x100 Voile (Grey)',
+      width: '48',
+      folding_standard: challan.folding_notation || 'Fold 100',
+      vendor_declared_meters: challan.grand_total_meters || defaultPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0),
+      vendor_declared_pieces: defaultPieces.length,
+      pieces: defaultPieces
     });
-    if (onNavigate) onNavigate('/process-return');
-    else setActiveTab('returns');
+    setActiveTab('returns');
     setShowReturnForm(true);
   };
 
@@ -317,6 +339,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             availablePOs={pos}
             initialChallan={editingChallan}
             onSave={handleSaveChallan}
+            onRecordReturn={handleRecordReturnFromChallan}
             onCancel={() => {
               setShowChallanForm(false);
               setEditingChallan(null);

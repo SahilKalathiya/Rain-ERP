@@ -7,7 +7,7 @@ import { initialVendors } from '../../data/procurementData';
  * Zero pre-filled dummy data on new creation
  * Single '+' button icon for adding stock rolls
  */
-export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel, initialChallan }) {
+export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel, initialChallan, onRecordReturn }) {
   const isEditing = Boolean(initialChallan && initialChallan.id);
 
   // Field 1: Challan Number (Auto unique)
@@ -174,8 +174,8 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
   // Field 11: PO Link Status
   const poLinkStatus = isEmergencyDispatch || selectedPOs.length === 0 ? 'Pending PO Link' : 'Linked';
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (e, andRecordReturn = false) => {
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!isEmergencyDispatch && selectedPOs.length === 0) {
       alert('Please select at least one Process PO or switch to Emergency Dispatch.');
@@ -216,7 +216,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
       items
     };
 
-    onSave(challanPayload);
+    onSave(challanPayload, andRecordReturn);
   };
 
   return (
@@ -247,13 +247,38 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
           </div>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-light btn-sm border text-secondary px-3"
-          onClick={onCancel}
-        >
-          <i className="ti ti-x me-1"></i> Close
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          {onRecordReturn && (
+            <button
+              type="button"
+              className="btn btn-outline-success btn-sm d-flex align-items-center gap-1.5 shadow-xs"
+              title="Record vendor delivery return when goods arrive back from dyeing"
+              onClick={() => {
+                const currentData = {
+                  id: initialChallan?.id || `PCH-${challanNumber}`,
+                  challan_number: challanNumber,
+                  vendor_id: vendorId,
+                  vendor_name: vendorName,
+                  linked_pos: selectedPOs,
+                  grand_total_meters: grandTotalMeters,
+                  folding_notation: foldingNotation,
+                  items
+                };
+                onRecordReturn(currentData);
+              }}
+            >
+              <i className="ti ti-receipt-refund fs-14"></i>
+              <span>Inward Return →</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-light btn-sm border text-secondary px-3"
+            onClick={onCancel}
+          >
+            <i className="ti ti-x me-1"></i> Close
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -720,10 +745,20 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
             </button>
             <button
               type="submit"
-              className="btn btn-primary btn-sm px-4 shadow-sm"
-              style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+              className="btn btn-outline-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
             >
-              <i className="ti ti-device-floppy me-1"></i> Save Challan
+              <i className="ti ti-device-floppy fs-14"></i>
+              <span>Save Challan</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm px-3.5 shadow-sm d-flex align-items-center gap-1.5"
+              style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+              title="Save challan and proceed to record vendor return when goods arrive back"
+              onClick={(e) => handleSubmit(e, true)}
+            >
+              <i className="ti ti-receipt-refund fs-14"></i>
+              <span>Save &amp; Inward Return (GRN) →</span>
             </button>
           </div>
         </div>
