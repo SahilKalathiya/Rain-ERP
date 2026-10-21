@@ -40704,20 +40704,117 @@
     });
     const totalMeters = pos.reduce((acc, po) => acc + (parseFloat(po.total_meters) || 0), 0);
     const totalCost = pos.reduce((acc, po) => acc + (parseFloat(po.total_estimated_cost) || 0), 0);
-    return /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm bg-primary text-white p-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 text-uppercase fw-bold" }, "Active Process POs"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold" }, pos.length)), /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-file-invoice fs-1 opacity-50" })), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 mt-2 d-block" }, "Job work dyeing & finishing"))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm bg-dark text-white p-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 text-uppercase fw-bold" }, "Total Fabric Ordered"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold" }, Number(totalMeters).toFixed(1), " m")), /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-ruler-2 fs-1 opacity-50" })), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 mt-2 d-block" }, "Across all active styles"))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm bg-success text-white p-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 text-uppercase fw-bold" }, "Total Estimated Value"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold" }, "\u20B9", Number(totalCost).toLocaleString("en-IN", { maximumFractionDigits: 0 }))), /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-cash fs-1 opacity-50" })), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 mt-2 d-block" }, "Fabric + Dyeing total"))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm bg-info text-white p-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 text-uppercase fw-bold" }, "Primary Job Vendor"), /* @__PURE__ */ import_react34.default.createElement("h4", { className: "mb-0 fw-bold text-truncate", style: { maxWidth: "160px" } }, "Raju Dyeing")), /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-building-factory-2 fs-1 opacity-50" })), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-white-50 mt-2 d-block" }, "Mansarovar Industrial Area")))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-grow-1", style: { maxWidth: "600px" } }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "input-group-text bg-light border-end-0" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-search text-muted" })), /* @__PURE__ */ import_react34.default.createElement(
+    const primaryVendor = pos.length > 0 ? pos[0].vendor_name?.split("(")[0]?.trim() || "Raju Dyeing" : "None";
+    return /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react34.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Active Process POs"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, pos.length)), /* @__PURE__ */ import_react34.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(79, 70, 229, 0.1)",
+            color: "#4f46e5"
+          }
+        },
+        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-file-invoice fs-22" })
+      )),
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-circle-check text-success fs-13" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "Dyeing & processing orders"))
+    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react34.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Total Fabric Ordered"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, Number(totalMeters).toFixed(1), " ", /* @__PURE__ */ import_react34.default.createElement("span", { className: "fs-14 fw-medium text-muted" }, "m"))), /* @__PURE__ */ import_react34.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(2, 132, 199, 0.1)",
+            color: "#0284c7"
+          }
+        },
+        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-ruler-2 fs-22" })
+      )),
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-layers-intersect text-primary fs-13" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "Across all active styles"))
+    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react34.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Total Estimated Value"), /* @__PURE__ */ import_react34.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, "\u20B9", Number(totalCost).toLocaleString("en-IN", { maximumFractionDigits: 0 }))), /* @__PURE__ */ import_react34.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(16, 185, 129, 0.1)",
+            color: "#059669"
+          }
+        },
+        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-cash fs-22" })
+      )),
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-trending-up text-success fs-13" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "Fabric + Dyeing total cost"))
+    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react34.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react34.default.createElement("div", null, /* @__PURE__ */ import_react34.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Primary Vendor"), /* @__PURE__ */ import_react34.default.createElement("h4", { className: "mb-0 fw-bold text-dark mt-1 fs-20 text-truncate", style: { maxWidth: "170px" } }, primaryVendor)), /* @__PURE__ */ import_react34.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(139, 92, 246, 0.1)",
+            color: "#8b5cf6"
+          }
+        },
+        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-building-factory-2 fs-22" })
+      )),
+      /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-map-pin text-secondary fs-13" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "Surat Industrial Hub"))
+    ))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "card border-0 shadow-sm", style: { borderRadius: "12px", overflow: "hidden" } }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-grow-1", style: { maxWidth: "600px" } }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "input-group-text bg-light border-end-0 text-muted" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-search fs-14" })), /* @__PURE__ */ import_react34.default.createElement(
       "input",
       {
         type: "text",
-        className: "form-control border-start-0",
-        placeholder: "Search PO number, style name, vendor, brand...",
+        className: "form-control border-start-0 fs-13",
+        placeholder: "Search PO number, style name, vendor...",
         value: searchTerm,
         onChange: (e) => setSearchTerm(e.target.value)
       }
     )), /* @__PURE__ */ import_react34.default.createElement(
       "select",
       {
-        className: "form-select form-select-sm",
-        style: { width: "160px" },
+        className: "form-select form-select-sm fs-13",
+        style: { width: "160px", borderColor: "#cbd5e1" },
         value: statusFilter,
         onChange: (e) => setStatusFilter(e.target.value)
       },
@@ -40726,41 +40823,61 @@
       /* @__PURE__ */ import_react34.default.createElement("option", { value: "Sent to Vendor" }, "Sent to Vendor"),
       /* @__PURE__ */ import_react34.default.createElement("option", { value: "Partially Dispatched" }, "Partially Dispatched"),
       /* @__PURE__ */ import_react34.default.createElement("option", { value: "Completed" }, "Completed")
-    )), /* @__PURE__ */ import_react34.default.createElement("button", { className: "btn btn-primary btn-sm px-3 shadow-sm", onClick: onNewPO }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-plus me-1" }), " + New Process PO")), /* @__PURE__ */ import_react34.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react34.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react34.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react34.default.createElement("tr", null, /* @__PURE__ */ import_react34.default.createElement("th", null, "PO Number"), /* @__PURE__ */ import_react34.default.createElement("th", null, "Date"), /* @__PURE__ */ import_react34.default.createElement("th", null, "Vendor (Job Worker)"), /* @__PURE__ */ import_react34.default.createElement("th", null, "Style(s) Bundled"), /* @__PURE__ */ import_react34.default.createElement("th", null, "Order Link"), /* @__PURE__ */ import_react34.default.createElement("th", { className: "text-end" }, "Mtrs Ordered"), /* @__PURE__ */ import_react34.default.createElement("th", { className: "text-end" }, "Pcs"), /* @__PURE__ */ import_react34.default.createElement("th", { className: "text-end" }, "Amount (\u20B9)"), /* @__PURE__ */ import_react34.default.createElement("th", { className: "text-center" }, "Status"), /* @__PURE__ */ import_react34.default.createElement("th", { className: "text-end" }, "Actions"))), /* @__PURE__ */ import_react34.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("tr", null, /* @__PURE__ */ import_react34.default.createElement("td", { colSpan: 10, className: "text-center py-4 text-muted" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-inbox fs-1 d-block mb-2" }), "No Process POs found matching your criteria.")) : filtered.map((po) => {
-      const isStandalone = !po.linked_sales_order_id;
-      let badgeClass = "bg-secondary";
-      if (po.status === "Sent to Vendor") badgeClass = "bg-info text-dark";
-      if (po.status === "Partially Dispatched") badgeClass = "bg-warning text-dark";
-      if (po.status === "Completed") badgeClass = "bg-success";
-      return /* @__PURE__ */ import_react34.default.createElement("tr", { key: po.id }, /* @__PURE__ */ import_react34.default.createElement("td", { className: "fw-bold text-primary" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-light text-primary border me-1" }, "#", po.po_number || po.id)), /* @__PURE__ */ import_react34.default.createElement("td", null, po.date), /* @__PURE__ */ import_react34.default.createElement("td", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "fw-semibold text-dark" }, po.vendor_name), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-muted" }, po.customer_brand_name || "Raindrop")), /* @__PURE__ */ import_react34.default.createElement("td", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "fw-medium" }, Array.isArray(po.style_names) ? po.style_names.join(", ") : po.style_name || "-"), po.number_of_styles > 1 && /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-light text-dark border", style: { fontSize: "10px" } }, po.number_of_styles, " Styles Bundled")), /* @__PURE__ */ import_react34.default.createElement("td", null, isStandalone ? /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-light text-muted border" }, "Standalone Stock") : /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle" }, po.linked_sales_order_id)), /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end fw-bold" }, Number(po.total_meters || 0).toFixed(2), " m"), /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end" }, po.total_pieces || "-"), /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end fw-bold text-dark" }, "\u20B9", Number(po.total_estimated_cost || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })), /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: `badge ${badgeClass}` }, po.status)), /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "btn-group btn-group-sm" }, /* @__PURE__ */ import_react34.default.createElement(
-        "button",
+    )), /* @__PURE__ */ import_react34.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5 rounded-2",
+        style: { background: "#4f46e5", borderColor: "#4f46e5" },
+        onClick: onNewPO
+      },
+      /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-plus fs-14" }),
+      /* @__PURE__ */ import_react34.default.createElement("span", { className: "fw-semibold" }, "New Process PO")
+    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react34.default.createElement("table", { className: "table table-hover align-middle mb-0 w-100", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react34.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react34.default.createElement("tr", { className: "text-secondary fw-semibold" }, /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" } }, "PO & Date"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "170px" } }, "Vendor"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "160px" } }, "Style(s)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-center" }, "Order Link"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "110px" }, className: "text-end" }, "Quantity"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-end" }, "Amount (\u20B9)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Status"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "90px" }, className: "text-end" }, "Actions"))), /* @__PURE__ */ import_react34.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("tr", null, /* @__PURE__ */ import_react34.default.createElement("td", { colSpan: 8, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-inbox fs-32 d-block mb-2 text-muted opacity-50" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "No Process Purchase Orders found matching criteria."))) : filtered.map((po) => {
+      let badgeClass = "bg-secondary text-white";
+      if (po.status === "Sent to Vendor") badgeClass = "bg-primary-subtle text-primary border border-primary-subtle";
+      if (po.status === "Partially Dispatched") badgeClass = "bg-warning-subtle text-warning border border-warning-subtle";
+      if (po.status === "Completed") badgeClass = "bg-success-subtle text-success border border-success-subtle";
+      if (po.status === "Draft") badgeClass = "bg-light text-secondary border";
+      return /* @__PURE__ */ import_react34.default.createElement(
+        "tr",
         {
-          type: "button",
-          className: "btn btn-outline-secondary",
-          title: "View / Edit Details",
-          onClick: () => onViewPO(po)
+          key: po.id,
+          onClick: () => onViewPO(po),
+          style: { cursor: "pointer" },
+          className: "transition-all",
+          title: "Click row to open and view/edit details"
         },
-        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-eye" })
-      ), /* @__PURE__ */ import_react34.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-outline-primary",
-          title: "Print PO Paper Slip",
-          onClick: () => onPrintPO(po)
-        },
-        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-printer" })
-      ), /* @__PURE__ */ import_react34.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-outline-danger",
-          title: "Issue Process Challan",
-          onClick: () => onCreateChallanFromPO(po)
-        },
-        /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-truck-delivery" })
-      ))));
-    }))))));
+        /* @__PURE__ */ import_react34.default.createElement("td", null, /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle font-monospace fw-bold fs-12" }, "#", po.po_number || po.id), /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11 mt-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-calendar fs-12" }), /* @__PURE__ */ import_react34.default.createElement("span", null, po.date))),
+        /* @__PURE__ */ import_react34.default.createElement("td", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "fw-semibold text-dark fs-13" }, po.vendor_name), /* @__PURE__ */ import_react34.default.createElement("small", { className: "text-muted fs-11" }, po.customer_brand_name || "Raindrop Signature")),
+        /* @__PURE__ */ import_react34.default.createElement("td", null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "fw-medium text-dark fs-12.5 text-truncate", style: { maxWidth: "180px" } }, po.style_names?.[0] || "\u2014"), po.style_names && po.style_names.length > 1 && /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-light text-secondary border fs-10 mt-0.5" }, "+", po.style_names.length - 1, " more bundled")),
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-center" }, po.linked_sales_order_id ? /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-indigo-subtle text-primary border border-indigo-200 fs-11 font-monospace" }, po.linked_sales_order_id) : /* @__PURE__ */ import_react34.default.createElement("span", { className: "badge bg-light text-muted border fs-11" }, "Stock PO")),
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "fw-bold text-dark fs-13" }, Number(po.total_meters || 0).toFixed(1), " m"), /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11" }, po.total_pieces || 0, " pcs")),
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end fw-bold text-dark fs-13" }, "\u20B9", Number(po.total_estimated_cost || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })),
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: `badge rounded-pill fs-11 fw-semibold ${badgeClass}` }, po.status)),
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-1" }, /* @__PURE__ */ import_react34.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-outline-secondary btn-sm p-1 rounded-2",
+            style: { width: "28px", height: "28px" },
+            title: "Print Paper Format",
+            onClick: () => onPrintPO(po)
+          },
+          /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-printer fs-14" })
+        ), /* @__PURE__ */ import_react34.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-outline-primary btn-sm p-1 rounded-2",
+            style: { width: "28px", height: "28px" },
+            title: "View / Edit PO",
+            onClick: () => onViewPO(po)
+          },
+          /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-eye fs-14" })
+        )))
+      );
+    })))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "card-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center text-muted fs-12" }, /* @__PURE__ */ import_react34.default.createElement("span", null, "Showing ", /* @__PURE__ */ import_react34.default.createElement("strong", null, filtered.length), " of ", /* @__PURE__ */ import_react34.default.createElement("strong", null, pos.length), " records"), /* @__PURE__ */ import_react34.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-pointer text-primary" }), " Click any row to view & edit full PO details"))));
   }
 
   // frontend/src/components/ProcessPO/ProcessPOForm.jsx
