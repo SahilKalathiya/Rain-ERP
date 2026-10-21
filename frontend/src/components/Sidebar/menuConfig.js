@@ -27,7 +27,7 @@ export const navigationMenu = [
         open: true,
         submenu: [
           { label: 'Purchase Orders', link: '/process-po' },
-          { label: 'Job Challans (Dispatch)', link: '/process-challan' },
+          { label: 'Challans', link: '/process-challan' },
           { label: 'Record Inward (GRN)', link: '/process-return' },
           { label: 'QC & Lot Division', link: '/process-qc' },
           { label: 'Live Tracking & Open Bales', link: '/process-tracking' }

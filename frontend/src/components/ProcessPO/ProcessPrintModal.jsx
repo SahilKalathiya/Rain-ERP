@@ -20,7 +20,7 @@ export default function ProcessPrintModal({ type = 'PO', data, onClose }) {
           <div className="modal-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
             <h6 className="modal-title mb-0 fw-bold">
               <i className="ti ti-printer me-2"></i>
-              {isChallan ? `Job Challan Print — #${data.challan_number || data.id}` : `Process Purchase Order Print — #${data.po_number || data.id}`}
+              {isChallan ? `Challan Print — #${data.challan_number || data.id}` : `Purchase Order Print — #${data.po_number || data.id}`}
             </h6>
             <div>
               <button className="btn btn-sm btn-primary me-2" onClick={handlePrint}>

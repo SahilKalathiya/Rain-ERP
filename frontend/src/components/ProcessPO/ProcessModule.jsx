@@ -190,8 +190,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         <div>
           <h4 className="fw-bold text-dark mb-1">
             <i className="ti ti-building-factory-2 me-2 text-primary"></i>
-            {activeTab === 'pos' && 'Purchase Orders (Job Work Processing)'}
-            {activeTab === 'challans' && 'Job Challans (Fabric Dispatch to Vendor)'}
+            {activeTab === 'pos' && 'Purchase Orders (Processing)'}
+            {activeTab === 'challans' && 'Challans (Fabric Dispatch to Vendor)'}
             {activeTab === 'returns' && 'Vendor Returns (Inbound Processing GRN)'}
             {activeTab === 'qc' && 'Quality Control & Lot Splitting'}
             {activeTab === 'tracking' && 'Live Tracking & Open Bales Pool'}

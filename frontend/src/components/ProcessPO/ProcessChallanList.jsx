@@ -31,7 +31,7 @@ export default function ProcessChallanList({ challans = [], onNewChallan, onPrin
         </div>
 
         <button className="btn btn-danger btn-sm px-3 shadow-sm" onClick={onNewChallan}>
-          <i className="ti ti-truck-delivery me-1"></i> + New Job Challan (Dispatch)
+          <i className="ti ti-truck-delivery me-1"></i> + New Challan
         </button>
       </div>
 
@@ -41,7 +41,7 @@ export default function ProcessChallanList({ challans = [], onNewChallan, onPrin
             <tr>
               <th>Challan No</th>
               <th>Dispatch Date</th>
-              <th>Job Work Vendor</th>
+              <th>Vendor</th>
               <th>Linked POs</th>
               <th>Stock Rolls/Bales</th>
               <th>Folding</th>
@@ -55,7 +55,7 @@ export default function ProcessChallanList({ challans = [], onNewChallan, onPrin
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={10} className="text-center py-4 text-muted">
-                  No Job Challans found.
+                  No Challans found.
                 </td>
               </tr>
             ) : (
