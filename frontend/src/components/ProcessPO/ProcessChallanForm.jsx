@@ -49,14 +49,34 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
   // Field 6 & 7: Stock Bales / Rolls (Zero pre-filled dummy rows: starts empty [])
   const [items, setItems] = useState(initialChallan?.items || []);
 
-  // Auto-carry Vendor and Styles when PO is selected
+  // Sync when initialChallan prop changes or loads
+  useEffect(() => {
+    if (initialChallan) {
+      if (initialChallan.challan_number) setChallanNumber(initialChallan.challan_number);
+      if (initialChallan.date) setDate(initialChallan.date);
+      if (initialChallan.linked_pos) setSelectedPOs(initialChallan.linked_pos);
+      if (initialChallan.vendor_id) setVendorId(initialChallan.vendor_id);
+      if (initialChallan.vendor_name) setVendorName(initialChallan.vendor_name);
+      if (initialChallan.styles_info) setStylesInfo(initialChallan.styles_info);
+      if (initialChallan.customer_brand) setCustomerBrand(initialChallan.customer_brand);
+      if (initialChallan.folding_notation) setFoldingNotation(initialChallan.folding_notation);
+      if (initialChallan.remarks) setRemarks(initialChallan.remarks);
+      if (initialChallan.company_representative) setCompanyRep(initialChallan.company_representative);
+      if (initialChallan.receiver_signature) setReceiverSignature(initialChallan.receiver_signature);
+      if (initialChallan.items && initialChallan.items.length > 0) setItems(initialChallan.items);
+    }
+  }, [initialChallan]);
+
+  // Auto-carry Vendor, Styles, and Stock items when PO is selected
   useEffect(() => {
     if (!isEmergencyDispatch && selectedPOs.length > 0) {
-      const selectedPOObjects = availablePOs.filter(p => selectedPOs.includes(p.id));
+      const selectedPOObjects = availablePOs.filter(p =>
+        selectedPOs.some(id => id === p.id || id === p.po_number || id === `PPO-${p.po_number}` || String(id).includes(p.po_number) || String(p.id).includes(id))
+      );
       if (selectedPOObjects.length > 0) {
         const firstPO = selectedPOObjects[0];
-        setVendorId(firstPO.vendor_id || '');
-        setVendorName(firstPO.vendor_name || '');
+        setVendorId(prev => prev || firstPO.vendor_id || '');
+        setVendorName(prev => prev || firstPO.vendor_name || '');
 
         const allStyles = [];
         selectedPOObjects.forEach(p => {
@@ -67,7 +87,43 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
           }
         });
         setStylesInfo(allStyles);
-        setCustomerBrand(firstPO.customer_brand_name || '');
+        setCustomerBrand(prev => prev || firstPO.customer_brand_name || '');
+
+        // Auto-populate items if currently empty
+        setItems(prevItems => {
+          if (prevItems && prevItems.length > 0) return prevItems;
+          const autoItems = [];
+          selectedPOObjects.forEach(p => {
+            if (p.items && p.items.length > 0) {
+              p.items.forEach((it, idx) => {
+                autoItems.push({
+                  id: Date.now() + idx,
+                  bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-${String.fromCharCode(65 + idx)}`,
+                  fabric_name: it.fabric_name || p.fabric_quality || '100x100 Voile (Grey)',
+                  color_name: it.color_name || 'Standard',
+                  invoice_no: 'INV-MS-0091',
+                  original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(p.total_meters) || 100,
+                  dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(p.total_meters) || 100,
+                  is_partial_cut: false,
+                  folding: foldingNotation || 'L100'
+                });
+              });
+            } else if (p.total_meters) {
+              autoItems.push({
+                id: Date.now(),
+                bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-A`,
+                fabric_name: p.fabric_quality || '100x100 Voile (Grey)',
+                color_name: 'Standard',
+                invoice_no: 'INV-MS-0091',
+                original_piece_meters: parseFloat(p.total_meters) || 100,
+                dispatched_meters: parseFloat(p.total_meters) || 100,
+                is_partial_cut: false,
+                folding: foldingNotation || 'L100'
+              });
+            }
+          });
+          return autoItems;
+        });
       }
     } else if (isEmergencyDispatch) {
       setStylesInfo([]);
@@ -253,7 +309,9 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
                 ) : (
                   <div className="d-flex flex-wrap gap-2">
                     {availablePOs.map((po) => {
-                      const isSelected = selectedPOs.includes(po.id);
+                      const isSelected = selectedPOs.some(
+                        id => id === po.id || id === po.po_number || id === `PPO-${po.po_number}` || String(id).includes(po.po_number) || String(po.id).includes(id)
+                      );
                       return (
                         <button
                           type="button"

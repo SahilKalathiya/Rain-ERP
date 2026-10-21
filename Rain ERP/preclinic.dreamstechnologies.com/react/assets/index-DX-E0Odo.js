@@ -42349,12 +42349,30 @@
     const [receiverSignature, setReceiverSignature] = (0, import_react37.useState)(initialChallan?.receiver_signature || "");
     const [items, setItems] = (0, import_react37.useState)(initialChallan?.items || []);
     (0, import_react37.useEffect)(() => {
+      if (initialChallan) {
+        if (initialChallan.challan_number) setChallanNumber(initialChallan.challan_number);
+        if (initialChallan.date) setDate(initialChallan.date);
+        if (initialChallan.linked_pos) setSelectedPOs(initialChallan.linked_pos);
+        if (initialChallan.vendor_id) setVendorId(initialChallan.vendor_id);
+        if (initialChallan.vendor_name) setVendorName(initialChallan.vendor_name);
+        if (initialChallan.styles_info) setStylesInfo(initialChallan.styles_info);
+        if (initialChallan.customer_brand) setCustomerBrand(initialChallan.customer_brand);
+        if (initialChallan.folding_notation) setFoldingNotation(initialChallan.folding_notation);
+        if (initialChallan.remarks) setRemarks(initialChallan.remarks);
+        if (initialChallan.company_representative) setCompanyRep(initialChallan.company_representative);
+        if (initialChallan.receiver_signature) setReceiverSignature(initialChallan.receiver_signature);
+        if (initialChallan.items && initialChallan.items.length > 0) setItems(initialChallan.items);
+      }
+    }, [initialChallan]);
+    (0, import_react37.useEffect)(() => {
       if (!isEmergencyDispatch && selectedPOs.length > 0) {
-        const selectedPOObjects = availablePOs.filter((p) => selectedPOs.includes(p.id));
+        const selectedPOObjects = availablePOs.filter(
+          (p) => selectedPOs.some((id) => id === p.id || id === p.po_number || id === `PPO-${p.po_number}` || String(id).includes(p.po_number) || String(p.id).includes(id))
+        );
         if (selectedPOObjects.length > 0) {
           const firstPO = selectedPOObjects[0];
-          setVendorId(firstPO.vendor_id || "");
-          setVendorName(firstPO.vendor_name || "");
+          setVendorId((prev) => prev || firstPO.vendor_id || "");
+          setVendorName((prev) => prev || firstPO.vendor_name || "");
           const allStyles = [];
           selectedPOObjects.forEach((p) => {
             if (Array.isArray(p.style_names)) {
@@ -42364,7 +42382,41 @@
             }
           });
           setStylesInfo(allStyles);
-          setCustomerBrand(firstPO.customer_brand_name || "");
+          setCustomerBrand((prev) => prev || firstPO.customer_brand_name || "");
+          setItems((prevItems) => {
+            if (prevItems && prevItems.length > 0) return prevItems;
+            const autoItems = [];
+            selectedPOObjects.forEach((p) => {
+              if (p.items && p.items.length > 0) {
+                p.items.forEach((it, idx) => {
+                  autoItems.push({
+                    id: Date.now() + idx,
+                    bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-${String.fromCharCode(65 + idx)}`,
+                    fabric_name: it.fabric_name || p.fabric_quality || "100x100 Voile (Grey)",
+                    color_name: it.color_name || "Standard",
+                    invoice_no: "INV-MS-0091",
+                    original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(p.total_meters) || 100,
+                    dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(p.total_meters) || 100,
+                    is_partial_cut: false,
+                    folding: foldingNotation || "L100"
+                  });
+                });
+              } else if (p.total_meters) {
+                autoItems.push({
+                  id: Date.now(),
+                  bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-A`,
+                  fabric_name: p.fabric_quality || "100x100 Voile (Grey)",
+                  color_name: "Standard",
+                  invoice_no: "INV-MS-0091",
+                  original_piece_meters: parseFloat(p.total_meters) || 100,
+                  dispatched_meters: parseFloat(p.total_meters) || 100,
+                  is_partial_cut: false,
+                  folding: foldingNotation || "L100"
+                });
+              }
+            });
+            return autoItems;
+          });
         }
       } else if (isEmergencyDispatch) {
         setStylesInfo([]);
@@ -42484,7 +42536,9 @@
         }
       ), /* @__PURE__ */ import_react37.default.createElement("label", { className: "form-check-label fs-12 fw-semibold text-danger", htmlFor: "emergencySwitch" }, "Emergency Dispatch (No PO)"))),
       isEmergencyDispatch ? /* @__PURE__ */ import_react37.default.createElement("div", { className: "alert alert-danger py-2 px-3 mb-0 fs-12 d-flex align-items-center gap-2 rounded-2" }, /* @__PURE__ */ import_react37.default.createElement("i", { className: "ti ti-alert-triangle fs-16" }), /* @__PURE__ */ import_react37.default.createElement("span", null, /* @__PURE__ */ import_react37.default.createElement("strong", null, "Emergency Dispatch (Pending PO Link):"), " Goods will leave godown immediately without a PO. You can link a PO retrospectively.")) : /* @__PURE__ */ import_react37.default.createElement("div", null, /* @__PURE__ */ import_react37.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Select Process PO(s) ", /* @__PURE__ */ import_react37.default.createElement("span", { className: "text-danger" }, "*")), availablePOs.length === 0 ? /* @__PURE__ */ import_react37.default.createElement("div", { className: "text-muted fs-12 p-2.5 bg-white border rounded" }, "No active Process POs found.") : /* @__PURE__ */ import_react37.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, availablePOs.map((po) => {
-        const isSelected = selectedPOs.includes(po.id);
+        const isSelected = selectedPOs.some(
+          (id) => id === po.id || id === po.po_number || id === `PPO-${po.po_number}` || String(id).includes(po.po_number) || String(po.id).includes(id)
+        );
         return /* @__PURE__ */ import_react37.default.createElement(
           "button",
           {
@@ -44093,15 +44147,19 @@
     const [showReturnForm, setShowReturnForm] = (0, import_react43.useState)(false);
     const [editingReturn, setEditingReturn] = (0, import_react43.useState)(null);
     const [printModalConfig, setPrintModalConfig] = (0, import_react43.useState)(null);
+    const lastRouteRef = import_react43.default.useRef(currentRoute);
     (0, import_react43.useEffect)(() => {
-      if (initialTab) {
-        setActiveTab(initialTab);
-        setShowPOForm(false);
-        setEditingPO(null);
-        setShowChallanForm(false);
-        setEditingChallan(null);
-        setShowReturnForm(false);
-        setEditingReturn(null);
+      if (lastRouteRef.current !== currentRoute) {
+        lastRouteRef.current = currentRoute;
+        if (initialTab) {
+          setActiveTab(initialTab);
+          setShowPOForm(false);
+          setEditingPO(null);
+          setShowChallanForm(false);
+          setEditingChallan(null);
+          setShowReturnForm(false);
+          setEditingReturn(null);
+        }
       }
     }, [initialTab, currentRoute]);
     const handleSavePO = (poData, andCreateChallan = false) => {
@@ -44129,26 +44187,69 @@
       setPrintModalConfig({ type: "PO", data: po });
     };
     const handleCreateChallanFromPO = (po) => {
-      setEditingChallan({
-        vendor_id: po.vendor_id,
-        vendor_name: po.vendor_name,
-        linked_pos: [po.id || `PPO-${po.po_number}`],
-        customer_brand: po.customer_brand_name || "",
-        styles_info: po.style_names || [],
-        items: po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
-          id: Date.now() + idx,
-          bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-${String.fromCharCode(65 + idx)}`,
-          fabric_name: it.fabric_name,
-          color_name: it.color_name,
+      const chNo = `${Math.floor(4e3 + Math.random() * 1e3)}`;
+      const challanId = `PCH-${chNo}`;
+      const poRef = po.id || (po.po_number ? `PPO-${po.po_number}` : `PPO-${chNo}`);
+      const challanItems = po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
+        id: Date.now() + idx,
+        bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-${String.fromCharCode(65 + idx)}`,
+        fabric_name: it.fabric_name || po.fabric_quality || "100x100 Voile (Grey)",
+        color_name: it.color_name || "Standard",
+        invoice_no: "INV-MS-0091",
+        original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
+        dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
+        is_partial_cut: false,
+        folding: "L100"
+      })) : [
+        {
+          id: Date.now(),
+          bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-A`,
+          fabric_name: po.fabric_quality || "100x100 Voile (Grey)",
+          color_name: "Standard",
           invoice_no: "INV-MS-0091",
-          original_piece_meters: it.quantity_meters,
-          dispatched_meters: it.quantity_meters,
+          original_piece_meters: parseFloat(po.total_meters) || 100,
+          dispatched_meters: parseFloat(po.total_meters) || 100,
           is_partial_cut: false,
           folding: "L100"
-        })) : []
+        }
+      ];
+      const grandTotal = challanItems.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
+      const generatedChallan = {
+        id: challanId,
+        challan_number: chNo,
+        date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        vendor_id: po.vendor_id || "VEND-0003",
+        vendor_name: po.vendor_name || "Raju Dyeing (Krishna Dyeing)",
+        linked_pos: [poRef],
+        styles_info: po.style_names || [],
+        customer_brand: po.customer_brand_name || "Raindrop Signature",
+        po_link_status: "Linked",
+        admin_alert_triggered: false,
+        folding_notation: "L100",
+        total_bales: 1,
+        total_pieces: challanItems.length,
+        grand_total_meters: Number(grandTotal.toFixed(2)),
+        remarks: `Dispatch Challan for PO #${po.po_number || po.id}`,
+        receiver_signature: "",
+        company_representative: "Saksham Garg",
+        status: "Dispatched",
+        created_by: "Saksham Garg",
+        created_at: (/* @__PURE__ */ new Date()).toISOString(),
+        items: challanItems
+      };
+      const updatedChallans = [generatedChallan, ...challans.filter((c) => c.id !== challanId)];
+      setChallans(updatedChallans);
+      saveStoredProcessChallans(updatedChallans);
+      const updatedPOs = pos.map((p) => {
+        if (p.id === po.id || p.po_number === po.po_number) {
+          return { ...p, status: "Sent to Vendor" };
+        }
+        return p;
       });
-      if (onNavigate) onNavigate("/process-challan");
-      else setActiveTab("challans");
+      setPos(updatedPOs);
+      saveStoredProcessPOs(updatedPOs);
+      setEditingChallan(generatedChallan);
+      setActiveTab("challans");
       setShowChallanForm(true);
     };
     const handleSaveChallan = (challanData) => {

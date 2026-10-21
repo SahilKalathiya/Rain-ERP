@@ -44,16 +44,21 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   // Print Modal state
   const [printModalConfig, setPrintModalConfig] = useState(null); // { type: 'PO' | 'CHALLAN', data }
 
-  // Sync activeTab whenever user clicks a different link in the sidebar
+  const lastRouteRef = React.useRef(currentRoute);
+
+  // Sync activeTab only when route changes from an external sidebar link click
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-      setShowPOForm(false);
-      setEditingPO(null);
-      setShowChallanForm(false);
-      setEditingChallan(null);
-      setShowReturnForm(false);
-      setEditingReturn(null);
+    if (lastRouteRef.current !== currentRoute) {
+      lastRouteRef.current = currentRoute;
+      if (initialTab) {
+        setActiveTab(initialTab);
+        setShowPOForm(false);
+        setEditingPO(null);
+        setShowChallanForm(false);
+        setEditingChallan(null);
+        setShowReturnForm(false);
+        setEditingReturn(null);
+      }
     }
   }, [initialTab, currentRoute]);
 
@@ -88,26 +93,78 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   const handleCreateChallanFromPO = (po) => {
-    setEditingChallan({
-      vendor_id: po.vendor_id,
-      vendor_name: po.vendor_name,
-      linked_pos: [po.id || `PPO-${po.po_number}`],
-      customer_brand: po.customer_brand_name || '',
-      styles_info: po.style_names || [],
-      items: po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
-        id: Date.now() + idx,
-        bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-${String.fromCharCode(65 + idx)}`,
-        fabric_name: it.fabric_name,
-        color_name: it.color_name,
+    const chNo = `${Math.floor(4000 + Math.random() * 1000)}`;
+    const challanId = `PCH-${chNo}`;
+    const poRef = po.id || (po.po_number ? `PPO-${po.po_number}` : `PPO-${chNo}`);
+
+    const challanItems = po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
+      id: Date.now() + idx,
+      bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-${String.fromCharCode(65 + idx)}`,
+      fabric_name: it.fabric_name || po.fabric_quality || '100x100 Voile (Grey)',
+      color_name: it.color_name || 'Standard',
+      invoice_no: 'INV-MS-0091',
+      original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
+      dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
+      is_partial_cut: false,
+      folding: 'L100'
+    })) : [
+      {
+        id: Date.now(),
+        bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-A`,
+        fabric_name: po.fabric_quality || '100x100 Voile (Grey)',
+        color_name: 'Standard',
         invoice_no: 'INV-MS-0091',
-        original_piece_meters: it.quantity_meters,
-        dispatched_meters: it.quantity_meters,
+        original_piece_meters: parseFloat(po.total_meters) || 100,
+        dispatched_meters: parseFloat(po.total_meters) || 100,
         is_partial_cut: false,
         folding: 'L100'
-      })) : []
+      }
+    ];
+
+    const grandTotal = challanItems.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
+
+    const generatedChallan = {
+      id: challanId,
+      challan_number: chNo,
+      date: new Date().toISOString().split('T')[0],
+      vendor_id: po.vendor_id || 'VEND-0003',
+      vendor_name: po.vendor_name || 'Raju Dyeing (Krishna Dyeing)',
+      linked_pos: [poRef],
+      styles_info: po.style_names || [],
+      customer_brand: po.customer_brand_name || 'Raindrop Signature',
+      po_link_status: 'Linked',
+      admin_alert_triggered: false,
+      folding_notation: 'L100',
+      total_bales: 1,
+      total_pieces: challanItems.length,
+      grand_total_meters: Number(grandTotal.toFixed(2)),
+      remarks: `Dispatch Challan for PO #${po.po_number || po.id}`,
+      receiver_signature: '',
+      company_representative: 'Saksham Garg',
+      status: 'Dispatched',
+      created_by: 'Saksham Garg',
+      created_at: new Date().toISOString(),
+      items: challanItems
+    };
+
+    // 1. Immediately create and save the Challan record
+    const updatedChallans = [generatedChallan, ...challans.filter(c => c.id !== challanId)];
+    setChallans(updatedChallans);
+    saveStoredProcessChallans(updatedChallans);
+
+    // 2. Update linked PO status to 'Sent to Vendor'
+    const updatedPOs = pos.map(p => {
+      if (p.id === po.id || p.po_number === po.po_number) {
+        return { ...p, status: 'Sent to Vendor' };
+      }
+      return p;
     });
-    if (onNavigate) onNavigate('/process-challan');
-    else setActiveTab('challans');
+    setPos(updatedPOs);
+    saveStoredProcessPOs(updatedPOs);
+
+    // 3. Switch directly to Challan Tab with the created challan open
+    setEditingChallan(generatedChallan);
+    setActiveTab('challans');
     setShowChallanForm(true);
   };
 
