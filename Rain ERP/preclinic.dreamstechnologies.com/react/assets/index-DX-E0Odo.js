@@ -44111,46 +44111,312 @@
   // frontend/src/components/ProcessPO/ProcessTrackingDashboard.jsx
   var import_react41 = __toESM(require_react());
   function ProcessTrackingDashboard({ pos = [], challans = [], returns = [], openBales = [] }) {
-    const trackingRows = [
-      {
-        order_id: "ORD-2026-001",
-        style_name: "Graphic Boota Kurta",
-        fabric_name: "100x100 Voile (Grey)",
-        color_name: "Off White",
-        required_meters: 1046.45,
-        sent_meters: 1065.5,
-        // Challan 4903 Roll 12304
-        received_meters: 1006.2,
-        // Return 2196
-        pending_at_vendor: 59.3,
-        status: "Fulfilled / In QC"
-      },
-      {
-        order_id: "ORD-2026-001",
-        style_name: "Graphic Boota Kurta",
-        fabric_name: "100x100 Voile (Grey)",
-        color_name: "Beige",
-        required_meters: 546,
-        sent_meters: 539.8,
-        // Rolls 2376 A-F
-        received_meters: 471.4,
-        // Return 2196 Beige pieces
-        pending_at_vendor: 68.4,
-        status: "Partial Return"
-      },
-      {
-        order_id: "ORD-2026-002",
-        style_name: "Stock Cambric Plain",
-        fabric_name: "Cotton Cambric 60*60",
-        color_name: "Dusty Rose",
-        required_meters: 918.66,
-        sent_meters: 887.6,
-        received_meters: 0,
-        pending_at_vendor: 887.6,
-        status: "Out for Processing"
+    const [searchTerm, setSearchTerm] = (0, import_react41.useState)("");
+    const [statusFilter, setStatusFilter] = (0, import_react41.useState)("ALL");
+    const trackingMap = {};
+    pos.forEach((po) => {
+      const orderId = po.linked_sales_order_id || "Stock PO";
+      const styleName = po.style_names?.[0] || "General Style";
+      if (po.items && po.items.length > 0) {
+        po.items.forEach((it) => {
+          const fab = it.fabric_name || "100x100 Voile (Grey)";
+          const col = it.color_name || "Standard";
+          const key = `${orderId}__${fab}__${col}`;
+          if (!trackingMap[key]) {
+            trackingMap[key] = {
+              order_id: orderId,
+              style_name: styleName,
+              fabric_name: fab,
+              color_name: col,
+              vendor_name: po.vendor_name || "Vendor",
+              required_meters: 0,
+              sent_meters: 0,
+              received_meters: 0,
+              linked_po_ids: [],
+              linked_challan_ids: [],
+              linked_return_ids: []
+            };
+          }
+          const reqMtrs = parseFloat(it.raw_fabric_meters) || parseFloat(it.quantity_meters) || 0;
+          trackingMap[key].required_meters += reqMtrs;
+          const poRef = po.po_number || po.id;
+          if (poRef && !trackingMap[key].linked_po_ids.includes(poRef)) {
+            trackingMap[key].linked_po_ids.push(poRef);
+          }
+        });
+      } else {
+        const fab = po.fabric_quality || "100x100 Voile (Grey)";
+        const key = `${orderId}__${fab}__Standard`;
+        if (!trackingMap[key]) {
+          trackingMap[key] = {
+            order_id: orderId,
+            style_name: styleName,
+            fabric_name: fab,
+            color_name: "Standard",
+            vendor_name: po.vendor_name || "Vendor",
+            required_meters: 0,
+            sent_meters: 0,
+            received_meters: 0,
+            linked_po_ids: [],
+            linked_challan_ids: [],
+            linked_return_ids: []
+          };
+        }
+        trackingMap[key].required_meters += parseFloat(po.total_meters) || 0;
+        const poRef = po.po_number || po.id;
+        if (poRef && !trackingMap[key].linked_po_ids.includes(poRef)) {
+          trackingMap[key].linked_po_ids.push(poRef);
+        }
       }
-    ];
-    return /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm p-3 bg-white border-start border-4 border-primary" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "small text-muted text-uppercase fw-bold" }, "Total Fabric Required"), /* @__PURE__ */ import_react41.default.createElement("h4", { className: "fw-bold text-dark mt-1" }, "2,511.11 m"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Total across 3 Order Batches"))), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm p-3 bg-white border-start border-4 border-danger" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "small text-muted text-uppercase fw-bold" }, "Sent to Vendors (Dispatched)"), /* @__PURE__ */ import_react41.default.createElement("h4", { className: "fw-bold text-danger mt-1" }, "2,492.90 m"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Challans issued & handed over"))), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm p-3 bg-white border-start border-4 border-success" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "small text-muted text-uppercase fw-bold" }, "Received from Process (GRN)"), /* @__PURE__ */ import_react41.default.createElement("h4", { className: "fw-bold text-success mt-1" }, "1,477.60 m"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Inward received & piece verified"))), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm p-3 bg-white border-start border-4 border-warning" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "small text-muted text-uppercase fw-bold" }, "Pending At Vendors"), /* @__PURE__ */ import_react41.default.createElement("h4", { className: "fw-bold text-warning-emphasis mt-1" }, "1,015.30 m"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Currently sitting at dye houses")))), /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm mb-4" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h6", { className: "card-title mb-0 fw-bold text-dark" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-chart-arrows-vertical me-2 text-primary" }), "Order-Wise Fabric Processing Tracking Grid (Section 7)"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Recalculates live as POs, Challans, and Returns are added")), /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-light text-muted border" }, "Live Sync Active")), /* @__PURE__ */ import_react41.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react41.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react41.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react41.default.createElement("tr", null, /* @__PURE__ */ import_react41.default.createElement("th", null, "Order Reference"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Style Name"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end" }, "Required (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end text-danger" }, "Sent / Dispatched (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end text-success" }, "Received Back (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end text-warning-emphasis" }, "Pending at Vendor (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-center" }, "Tracking Status"))), /* @__PURE__ */ import_react41.default.createElement("tbody", null, trackingRows.map((row, idx) => /* @__PURE__ */ import_react41.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react41.default.createElement("td", { className: "fw-bold text-primary" }, row.order_id), /* @__PURE__ */ import_react41.default.createElement("td", null, row.style_name), /* @__PURE__ */ import_react41.default.createElement("td", null, row.fabric_name), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-light text-dark border me-1" }, "\u25CF"), row.color_name), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold" }, row.required_meters.toFixed(2)), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-danger" }, row.sent_meters.toFixed(2)), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-success" }, row.received_meters.toFixed(2)), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-warning-emphasis" }, row.pending_at_vendor.toFixed(2)), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle" }, row.status)))))))), /* @__PURE__ */ import_react41.default.createElement("div", { className: "card border-0 shadow-sm" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h6", { className: "card-title mb-0 fw-bold text-dark" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-archive me-2 text-secondary" }), "Open Bales Pool (Grey / Unprocessed Fabric Returned by Vendors - Section 5.3)"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted" }, "Unutilised fabric returned without specific original bale ID")), /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-secondary text-white" }, openBales.length, " Open Bales")), /* @__PURE__ */ import_react41.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react41.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react41.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react41.default.createElement("tr", null, /* @__PURE__ */ import_react41.default.createElement("th", null, "Bale ID"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Source Inbound GRN"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Target Vendor Purchase Invoice"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end" }, "Returned Length"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end" }, "Available Balance"), /* @__PURE__ */ import_react41.default.createElement("th", null, "Status"))), /* @__PURE__ */ import_react41.default.createElement("tbody", null, openBales.map((b) => /* @__PURE__ */ import_react41.default.createElement("tr", { key: b.id }, /* @__PURE__ */ import_react41.default.createElement("td", { className: "fw-bold text-secondary" }, b.id), /* @__PURE__ */ import_react41.default.createElement("td", null, b.return_id), /* @__PURE__ */ import_react41.default.createElement("td", null, b.fabric_name), /* @__PURE__ */ import_react41.default.createElement("td", null, b.original_vendor_invoice_ref), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold" }, b.returned_meters.toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-success" }, b.remaining_meters.toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle" }, b.status)))))))));
+    });
+    challans.forEach((ch) => {
+      const chNo = ch.challan_number || ch.id;
+      if (ch.items && ch.items.length > 0) {
+        ch.items.forEach((it) => {
+          let matchedKey = Object.keys(trackingMap).find((k) => {
+            const item = trackingMap[k];
+            return ch.linked_pos && ch.linked_pos.some((pId) => item.linked_po_ids.some((lp) => String(pId).includes(String(lp)) || String(lp).includes(String(pId)))) || item.fabric_name.toLowerCase().includes((it.fabric_name || "").toLowerCase()) && item.color_name.toLowerCase().includes((it.color_name || "").toLowerCase());
+          });
+          if (!matchedKey) {
+            matchedKey = `Direct__${it.fabric_name || "Fabric"}__${it.color_name || "Color"}`;
+            trackingMap[matchedKey] = {
+              order_id: ch.linked_pos?.[0] || "Direct Dispatch",
+              style_name: ch.styles_info?.[0] || "Standard Style",
+              fabric_name: it.fabric_name || "Fabric",
+              color_name: it.color_name || "Standard",
+              vendor_name: ch.vendor_name || "Vendor",
+              required_meters: parseFloat(it.dispatched_meters) || 0,
+              sent_meters: 0,
+              received_meters: 0,
+              linked_po_ids: ch.linked_pos || [],
+              linked_challan_ids: [],
+              linked_return_ids: []
+            };
+          }
+          trackingMap[matchedKey].sent_meters += parseFloat(it.dispatched_meters) || 0;
+          if (chNo && !trackingMap[matchedKey].linked_challan_ids.includes(chNo)) {
+            trackingMap[matchedKey].linked_challan_ids.push(chNo);
+          }
+        });
+      } else {
+        const matchedKey = Object.keys(trackingMap).find((k) => {
+          const item = trackingMap[k];
+          return ch.linked_pos && ch.linked_pos.some((pId) => item.linked_po_ids.some((lp) => String(pId).includes(String(lp)) || String(lp).includes(String(pId))));
+        });
+        if (matchedKey) {
+          trackingMap[matchedKey].sent_meters += parseFloat(ch.grand_total_meters) || 0;
+          if (chNo && !trackingMap[matchedKey].linked_challan_ids.includes(chNo)) {
+            trackingMap[matchedKey].linked_challan_ids.push(chNo);
+          }
+        }
+      }
+    });
+    returns.forEach((ret) => {
+      const retNo = ret.vendor_external_challan_no ? `Ret #${ret.vendor_external_challan_no}` : ret.id;
+      const matchedKey = Object.keys(trackingMap).find((k) => {
+        const item = trackingMap[k];
+        return ret.linked_po_id && item.linked_po_ids.some((lp) => String(ret.linked_po_id).includes(String(lp)) || String(lp).includes(String(ret.linked_po_id))) || ret.linked_challan_id && item.linked_challan_ids.some((lc) => String(ret.linked_challan_id).includes(String(lc)) || String(lc).includes(String(ret.linked_challan_id))) || item.fabric_name.toLowerCase().includes((ret.fabric_quality || "").toLowerCase());
+      });
+      if (matchedKey) {
+        trackingMap[matchedKey].received_meters += parseFloat(ret.total_meters) || 0;
+        if (!trackingMap[matchedKey].linked_return_ids.includes(retNo)) {
+          trackingMap[matchedKey].linked_return_ids.push(retNo);
+        }
+      }
+    });
+    const computedRows = Object.values(trackingMap).map((row) => {
+      const pendingAtVendor = Math.max(0, row.sent_meters - row.received_meters);
+      let status = "Planned";
+      let statusClass = "bg-secondary-subtle text-secondary border";
+      if (row.received_meters >= row.sent_meters && row.sent_meters > 0) {
+        status = "Fully Received (In QC)";
+        statusClass = "bg-success-subtle text-success border border-success-subtle";
+      } else if (row.received_meters > 0) {
+        status = "Partial Return";
+        statusClass = "bg-primary-subtle text-primary border border-primary-subtle";
+      } else if (row.sent_meters > 0) {
+        status = "Out for Processing";
+        statusClass = "bg-warning-subtle text-warning-emphasis border border-warning-subtle";
+      } else if (row.required_meters > 0) {
+        status = "PO Issued / Pending Dispatch";
+        statusClass = "bg-info-subtle text-info-emphasis border border-info-subtle";
+      }
+      return {
+        ...row,
+        pending_at_vendor: pendingAtVendor,
+        status,
+        statusClass
+      };
+    });
+    const filteredRows = computedRows.filter((r) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = r.order_id.toLowerCase().includes(term) || r.style_name.toLowerCase().includes(term) || r.fabric_name.toLowerCase().includes(term) || r.color_name.toLowerCase().includes(term) || r.vendor_name.toLowerCase().includes(term);
+      const matchesStatus = statusFilter === "ALL" || r.status.includes(statusFilter);
+      return matchesSearch && matchesStatus;
+    });
+    const totalRequired = computedRows.reduce((acc, r) => acc + r.required_meters, 0);
+    const totalSent = computedRows.reduce((acc, r) => acc + r.sent_meters, 0);
+    const totalReceived = computedRows.reduce((acc, r) => acc + r.received_meters, 0);
+    const totalPendingAtVendor = computedRows.reduce((acc, r) => acc + r.pending_at_vendor, 0);
+    return /* @__PURE__ */ import_react41.default.createElement("div", { className: "process-tracking-container" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: { background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Total Fabric Required"), /* @__PURE__ */ import_react41.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, totalRequired.toLocaleString("en-IN", { maximumFractionDigits: 1 }), " m")), /* @__PURE__ */ import_react41.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: { width: "42px", height: "42px", background: "rgba(79, 70, 229, 0.1)", color: "#4f46e5" }
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-ruler-2 fs-22" })
+      )),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-file-text text-primary fs-13" }), /* @__PURE__ */ import_react41.default.createElement("span", null, "Total from ", pos.length, " Process POs"))
+    )), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: { background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Sent to Vendors (Dispatched)"), /* @__PURE__ */ import_react41.default.createElement("h3", { className: "mb-0 fw-bold text-danger mt-1 fs-24" }, totalSent.toLocaleString("en-IN", { maximumFractionDigits: 1 }), " m")), /* @__PURE__ */ import_react41.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: { width: "42px", height: "42px", background: "rgba(239, 68, 68, 0.1)", color: "#dc2626" }
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-truck-delivery fs-22" })
+      )),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-check text-danger fs-13" }), /* @__PURE__ */ import_react41.default.createElement("span", null, "Dispatched via ", challans.length, " Challans"))
+    )), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: { background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Received from Process (GRN)"), /* @__PURE__ */ import_react41.default.createElement("h3", { className: "mb-0 fw-bold text-success mt-1 fs-24" }, totalReceived.toLocaleString("en-IN", { maximumFractionDigits: 1 }), " m")), /* @__PURE__ */ import_react41.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: { width: "42px", height: "42px", background: "rgba(16, 185, 129, 0.1)", color: "#059669" }
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-receipt-refund fs-22" })
+      )),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-success-subtle text-success fs-10 px-1.5 py-0.5 rounded" }, totalSent > 0 ? Math.round(totalReceived / totalSent * 100) : 0, "% Process Yield"))
+    )), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: { background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Pending At Vendors"), /* @__PURE__ */ import_react41.default.createElement("h3", { className: "mb-0 fw-bold text-warning-emphasis mt-1 fs-24" }, totalPendingAtVendor.toLocaleString("en-IN", { maximumFractionDigits: 1 }), " m")), /* @__PURE__ */ import_react41.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: { width: "42px", height: "42px", background: "rgba(245, 158, 11, 0.1)", color: "#d97706" }
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-clock-pause fs-22" })
+      )),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-building-factory text-warning fs-13" }), /* @__PURE__ */ import_react41.default.createElement("span", null, "Currently at processing dye houses"))
+    ))), /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border mb-3 shadow-sm",
+        style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "p-3 d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-2", style: { flex: "1 1 500px" } }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "input-group input-group-sm", style: { width: "280px" } }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "input-group-text bg-white border-end-0 text-muted", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-search fs-14" })), /* @__PURE__ */ import_react41.default.createElement(
+        "input",
+        {
+          type: "text",
+          className: "form-control bg-white border-start-0 fs-13",
+          placeholder: "Search order, style, fabric, color...",
+          style: { borderColor: "#cbd5e1", height: "36px" },
+          value: searchTerm,
+          onChange: (e) => setSearchTerm(e.target.value)
+        }
+      ), searchTerm && /* @__PURE__ */ import_react41.default.createElement(
+        "button",
+        {
+          className: "btn btn-white border border-start-0 text-muted",
+          type: "button",
+          style: { borderColor: "#cbd5e1" },
+          onClick: () => setSearchTerm("")
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-x fs-12" })
+      )), /* @__PURE__ */ import_react41.default.createElement(
+        "select",
+        {
+          className: "form-select form-select-sm bg-white fs-13",
+          style: { width: "180px", height: "36px", borderColor: "#cbd5e1" },
+          value: statusFilter,
+          onChange: (e) => setStatusFilter(e.target.value)
+        },
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "ALL" }, "All Statuses"),
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "Planned" }, "Planned"),
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "Out for Processing" }, "Out for Processing"),
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "Partial Return" }, "Partial Return"),
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "Fully Received" }, "Fully Received")
+      )), /* @__PURE__ */ import_react41.default.createElement("div", { className: "text-muted fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-success-subtle text-success fs-11 px-2 py-1 rounded" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-refresh me-1" }), " Live Auto-Recalculating")))
+    ), /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border shadow-sm mb-4",
+        style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff", overflow: "hidden" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "px-3 py-2.5 bg-light border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h6", { className: "card-title mb-0 fw-bold text-dark fs-14" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-chart-arrows-vertical me-2 text-primary" }), "Order-Wise Fabric Processing Tracking Grid (Section 7)"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-11" }, "Recalculates automatically as POs, Challans, and Returns are added across the system.")), /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-white text-secondary border fs-11" }, filteredRows.length, " Active Tracking Batches")),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react41.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react41.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react41.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: "600", letterSpacing: "0.04em", textTransform: "uppercase" } }, /* @__PURE__ */ import_react41.default.createElement("th", { className: "py-2.5 ps-3", style: { width: "130px" } }, "Order Ref"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { minWidth: "160px" } }, "Style Name"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { minWidth: "170px" } }, "Fabric Quality"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { width: "120px" } }, "Color Shade"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "120px" } }, "Required (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "130px", color: "#dc2626" } }, "Sent / Challan (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "130px", color: "#059669" } }, "Received (m)"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "140px", color: "#b45309" } }, "Pending at Vendor"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-center", style: { width: "160px" } }, "Pipeline Progress"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-center pe-3", style: { width: "140px" } }, "Status"))), /* @__PURE__ */ import_react41.default.createElement("tbody", null, filteredRows.length === 0 ? /* @__PURE__ */ import_react41.default.createElement("tr", null, /* @__PURE__ */ import_react41.default.createElement("td", { colSpan: 10, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react41.default.createElement(
+        "div",
+        {
+          className: "rounded-circle d-flex align-items-center justify-content-center mb-2",
+          style: { width: "48px", height: "48px", background: "#f1f5f9", color: "#94a3b8" }
+        },
+        /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-chart-bar fs-24" })
+      ), /* @__PURE__ */ import_react41.default.createElement("span", { className: "fw-semibold text-dark fs-14" }, "No Active Fabric Batches"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-12 mt-1" }, "Create a Process PO or Process Challan to start live tracking.")))) : filteredRows.map((row, idx) => {
+        const percentComplete = row.sent_meters > 0 ? Math.min(100, Math.round(row.received_meters / row.sent_meters * 100)) : 0;
+        return /* @__PURE__ */ import_react41.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react41.default.createElement("td", { className: "ps-3 py-3" }, /* @__PURE__ */ import_react41.default.createElement(
+          "span",
+          {
+            className: "badge font-monospace fw-bold px-2 py-1",
+            style: {
+              background: "rgba(79, 70, 229, 0.08)",
+              color: "#4338ca",
+              border: "1px solid rgba(79, 70, 229, 0.2)",
+              fontSize: "11.5px"
+            }
+          },
+          row.order_id
+        ), row.linked_po_ids.length > 0 && /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-10 d-block mt-0.5" }, "PO #", row.linked_po_ids.join(", #"))), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("div", { className: "fw-bold text-dark fs-13" }, row.style_name), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-11" }, row.vendor_name)), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("div", { className: "fw-semibold text-dark fs-13" }, row.fabric_name)), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react41.default.createElement(
+          "span",
+          {
+            className: "rounded-circle",
+            style: {
+              width: "10px",
+              height: "10px",
+              background: row.color_name.toLowerCase().includes("beige") ? "#f5f5dc" : row.color_name.toLowerCase().includes("white") ? "#fafafa" : row.color_name.toLowerCase().includes("rose") ? "#ffe4e1" : "#cbd5e1",
+              border: "1px solid rgba(0,0,0,0.2)"
+            }
+          }
+        ), /* @__PURE__ */ import_react41.default.createElement("span", { className: "fw-medium text-dark fs-13" }, row.color_name))), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-dark fs-13" }, Number(row.required_meters).toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold fs-13", style: { color: "#dc2626" } }, Number(row.sent_meters).toFixed(2), " m", row.linked_challan_ids.length > 0 && /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-10 d-block" }, "Challan #", row.linked_challan_ids.join(", #"))), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold fs-13", style: { color: "#059669" } }, Number(row.received_meters).toFixed(2), " m", row.linked_return_ids.length > 0 && /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-10 d-block" }, row.linked_return_ids.join(", "))), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold fs-13", style: { color: "#b45309" } }, Number(row.pending_at_vendor).toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex flex-column gap-1" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex justify-content-between align-items-center fs-11 text-muted" }, /* @__PURE__ */ import_react41.default.createElement("span", null, percentComplete, "% Recv"), /* @__PURE__ */ import_react41.default.createElement("span", null, Number(row.received_meters).toFixed(0), " / ", Number(row.sent_meters).toFixed(0), "m")), /* @__PURE__ */ import_react41.default.createElement("div", { className: "progress", style: { height: "6px", background: "#f1f5f9" } }, /* @__PURE__ */ import_react41.default.createElement(
+          "div",
+          {
+            className: "progress-bar",
+            role: "progressbar",
+            style: {
+              width: `${percentComplete}%`,
+              background: percentComplete === 100 ? "#10b981" : "#4f46e5"
+            }
+          }
+        )))), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-center pe-3" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: `badge rounded-pill px-2.5 py-1 fs-11 fw-semibold ${row.statusClass}` }, row.status)));
+      }))))
+    ), /* @__PURE__ */ import_react41.default.createElement(
+      "div",
+      {
+        className: "card border shadow-sm",
+        style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff", overflow: "hidden" }
+      },
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "px-3 py-2.5 bg-light border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h6", { className: "card-title mb-0 fw-bold text-dark fs-14" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-archive me-2 text-secondary" }), "Open Bales Pool (Grey / Unprocessed Fabric Returned by Vendors - Section 5.3)"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-11" }, "Unutilised uncut grey fabric returned alongside dyed goods, stored as Open Bales linked to purchase invoices.")), /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-secondary text-white fs-11" }, openBales.length, " Open Bales Available")),
+      /* @__PURE__ */ import_react41.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react41.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react41.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react41.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: "600", letterSpacing: "0.04em", textTransform: "uppercase" } }, /* @__PURE__ */ import_react41.default.createElement("th", { className: "py-2.5 ps-3", style: { width: "130px" } }, "Bale ID"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { width: "140px" } }, "Source Return"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { minWidth: "180px" } }, "Fabric Quality"), /* @__PURE__ */ import_react41.default.createElement("th", { style: { minWidth: "220px" } }, "Target Purchase Invoice"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "130px" } }, "Returned Metres"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-end", style: { width: "140px" } }, "Available Balance"), /* @__PURE__ */ import_react41.default.createElement("th", { className: "text-center pe-3", style: { width: "120px" } }, "Stock Status"))), /* @__PURE__ */ import_react41.default.createElement("tbody", null, openBales.length === 0 ? /* @__PURE__ */ import_react41.default.createElement("tr", null, /* @__PURE__ */ import_react41.default.createElement("td", { colSpan: 7, className: "text-center py-4 text-muted" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "fs-13" }, "No Open Bales recorded yet. Open Bales are logged when grey fabric is returned in Inward GRN."))) : openBales.map((b) => /* @__PURE__ */ import_react41.default.createElement("tr", { key: b.id }, /* @__PURE__ */ import_react41.default.createElement("td", { className: "ps-3 py-2.5 fw-bold font-monospace text-secondary" }, b.id), /* @__PURE__ */ import_react41.default.createElement("td", null, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-light text-dark border px-2 py-1 fs-11 font-monospace" }, b.return_id)), /* @__PURE__ */ import_react41.default.createElement("td", { className: "fw-semibold text-dark" }, b.fabric_name), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-muted fs-12" }, b.original_vendor_invoice_ref), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-dark fs-13" }, Number(b.returned_meters).toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-end fw-bold text-success fs-13" }, Number(b.remaining_meters).toFixed(2), " m"), /* @__PURE__ */ import_react41.default.createElement("td", { className: "text-center pe-3" }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 fs-11" }, b.status || "Available in Godown")))))))
+    ));
   }
 
   // frontend/src/components/ProcessPO/ProcessPrintModal.jsx
