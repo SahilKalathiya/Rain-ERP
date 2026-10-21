@@ -15,7 +15,7 @@ import AddColorModal from '../Procurement/AddColorModal';
  * Color with "+ New" modal creation integrated with Color Master.
  * Spacious Fabric, Color and Width dropdowns with zero text cutting or arrow collision.
  */
-export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false }) {
+export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false, onCreateChallan }) {
   const isEditingExisting = Boolean(initialPO && initialPO.id);
   const [isReadOnly, setIsReadOnly] = useState(readOnlyDefault);
 
@@ -371,8 +371,8 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
   const totalPieces = items.reduce((acc, it) => acc + (parseInt(it.quantity_pieces, 10) || 0), 0);
   const grandTotalCost = items.reduce((acc, it) => acc + (parseFloat(it.total_amount) || 0), 0);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (e, andCreateChallan = false) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!vendorId) {
       alert('Please select a Vendor.');
       return;
@@ -407,7 +407,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
       created_by: initialPO?.created_by || 'Saksham Garg',
       created_at: initialPO?.created_at || new Date().toISOString()
     };
-    onSave(poPayload);
+    onSave(poPayload, andCreateChallan);
   };
 
   return (
@@ -456,10 +456,22 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
 
         {/* Action Controls */}
         <div className="d-flex align-items-center gap-2">
-          {isReadOnly ? (
+          {isReadOnly && (
             <button
               type="button"
               className="btn btn-primary btn-sm px-3 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+              style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+              title="Issue Process Challan to physically dispatch fabric for this PO"
+              onClick={() => onCreateChallan && onCreateChallan(initialPO)}
+            >
+              <i className="ti ti-truck-delivery fs-15"></i>
+              <span>+ Create Challan</span>
+            </button>
+          )}
+          {isReadOnly ? (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
               onClick={() => setIsReadOnly(false)}
             >
               <i className="ti ti-edit fs-15"></i>
@@ -1320,19 +1332,42 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           <div className="d-flex gap-2">
             <button
               type="button"
-              className="btn btn-light border px-4 rounded-2 text-secondary"
+              className="btn btn-light border px-3 rounded-2 text-secondary fs-13"
               onClick={onCancel}
             >
               Cancel
             </button>
             {!isReadOnly && (
+              <>
+                <button
+                  type="submit"
+                  className="btn btn-outline-primary px-3.5 rounded-2 d-flex align-items-center gap-1.5 fs-13"
+                  title="Save PO to list (Status: Draft)"
+                >
+                  <i className="ti ti-device-floppy fs-15"></i>
+                  <span>Save PO</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary px-3.5 rounded-2 shadow-sm d-flex align-items-center gap-1.5 fs-13"
+                  style={{ background: '#4f46e5', border: 'none' }}
+                  title="Save PO and proceed immediately to allocate rolls & issue Process Challan"
+                  onClick={(e) => handleSubmit(e, true)}
+                >
+                  <i className="ti ti-truck-delivery fs-15"></i>
+                  <span>Save &amp; Create Dispatch Challan →</span>
+                </button>
+              </>
+            )}
+            {isReadOnly && (
               <button
-                type="submit"
-                className="btn btn-primary px-4 rounded-2 shadow-sm d-flex align-items-center gap-2"
+                type="button"
+                className="btn btn-primary px-4 rounded-2 shadow-sm d-flex align-items-center gap-1.5 fs-13"
                 style={{ background: '#4f46e5', border: 'none' }}
+                onClick={() => onCreateChallan && onCreateChallan(initialPO)}
               >
-                <i className="ti ti-device-floppy fs-16"></i>
-                <span className="fw-semibold">Save Process PO</span>
+                <i className="ti ti-truck-delivery fs-15"></i>
+                <span>Dispatch Fabric (Create Challan) →</span>
               </button>
             )}
           </div>

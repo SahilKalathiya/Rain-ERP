@@ -58,7 +58,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   }, [initialTab, currentRoute]);
 
   // 1. Process PO Handlers
-  const handleSavePO = (poData) => {
+  const handleSavePO = (poData, andCreateChallan = false) => {
     let updated;
     const existingIndex = pos.findIndex(p => p.id === poData.id);
     if (existingIndex >= 0) {
@@ -71,6 +71,11 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     saveStoredProcessPOs(updated);
     setShowPOForm(false);
     setEditingPO(null);
+
+    // If requested, immediately open Process Challan dispatch form for this PO
+    if (andCreateChallan) {
+      handleCreateChallanFromPO(poData);
+    }
   };
 
   const handleViewPO = (po) => {
@@ -86,10 +91,12 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setEditingChallan({
       vendor_id: po.vendor_id,
       vendor_name: po.vendor_name,
-      linked_pos: [po.id],
-      items: po.items?.map((it, idx) => ({
-        id: idx + 1,
-        bale_roll_no: `Roll 2376-${String.fromCharCode(65 + idx)}`,
+      linked_pos: [po.id || `PPO-${po.po_number}`],
+      customer_brand: po.customer_brand_name || '',
+      styles_info: po.style_names || [],
+      items: po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
+        id: Date.now() + idx,
+        bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-${String.fromCharCode(65 + idx)}`,
         fabric_name: it.fabric_name,
         color_name: it.color_name,
         invoice_no: 'INV-MS-0091',
@@ -97,7 +104,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         dispatched_meters: it.quantity_meters,
         is_partial_cut: false,
         folding: 'L100'
-      }))
+      })) : []
     });
     if (onNavigate) onNavigate('/process-challan');
     else setActiveTab('challans');
@@ -116,6 +123,19 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     }
     setChallans(updated);
     saveStoredProcessChallans(updated);
+
+    // Update status of linked PO(s) to 'Sent to Vendor' (Section 4.2)
+    if (challanData.linked_pos && challanData.linked_pos.length > 0) {
+      const updatedPOs = pos.map(p => {
+        if (challanData.linked_pos.includes(p.id) || challanData.linked_pos.includes(p.po_number) || challanData.linked_pos.includes(`PPO-${p.po_number}`)) {
+          return { ...p, status: 'Sent to Vendor' };
+        }
+        return p;
+      });
+      setPos(updatedPOs);
+      saveStoredProcessPOs(updatedPOs);
+    }
+
     setShowChallanForm(false);
     setEditingChallan(null);
   };
@@ -217,6 +237,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setShowPOForm(false);
               setEditingPO(null);
             }}
+            onCreateChallan={handleCreateChallanFromPO}
             readOnlyDefault={Boolean(editingPO)}
           />
         ) : (

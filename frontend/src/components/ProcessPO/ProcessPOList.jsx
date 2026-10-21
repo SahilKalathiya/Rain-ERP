@@ -243,7 +243,7 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                 <th style={{ width: '110px' }} className="text-end">Quantity</th>
                 <th style={{ width: '120px' }} className="text-end">Amount (₹)</th>
                 <th style={{ width: '130px' }} className="text-center">Status</th>
-                <th style={{ width: '90px' }} className="text-end">Actions</th>
+                <th style={{ width: '175px' }} className="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -334,7 +334,23 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
 
                       {/* Actions with stopPropagation */}
                       <td className="text-end" onClick={(e) => e.stopPropagation()}>
-                        <div className="d-flex align-items-center justify-content-end gap-1">
+                        <div className="d-flex align-items-center justify-content-end gap-1.5">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs"
+                            style={{
+                              background: '#4f46e5',
+                              borderColor: '#4f46e5',
+                              fontSize: '11.5px',
+                              height: '28px',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Dispatch fabric to vendor via Process Challan (Next Step in PDF)"
+                            onClick={() => onCreateChallanFromPO && onCreateChallanFromPO(po)}
+                          >
+                            <i className="ti ti-truck-delivery fs-13"></i>
+                            <span className="fw-semibold">+ Challan</span>
+                          </button>
                           <button
                             type="button"
                             className="btn btn-outline-secondary btn-sm p-1 rounded-2"

@@ -40833,7 +40833,7 @@
       },
       /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-plus fs-14" }),
       /* @__PURE__ */ import_react34.default.createElement("span", { className: "fw-semibold" }, "New Process PO")
-    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react34.default.createElement("table", { className: "table table-hover align-middle mb-0 w-100", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react34.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react34.default.createElement("tr", { className: "text-secondary fw-semibold" }, /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" } }, "PO & Date"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "170px" } }, "Vendor"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "160px" } }, "Style(s)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-center" }, "Order Link"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "110px" }, className: "text-end" }, "Quantity"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-end" }, "Amount (\u20B9)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Status"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "90px" }, className: "text-end" }, "Actions"))), /* @__PURE__ */ import_react34.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("tr", null, /* @__PURE__ */ import_react34.default.createElement("td", { colSpan: 8, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-inbox fs-32 d-block mb-2 text-muted opacity-50" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "No Process Purchase Orders found matching criteria."))) : filtered.map((po) => {
+    )), /* @__PURE__ */ import_react34.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react34.default.createElement("table", { className: "table table-hover align-middle mb-0 w-100", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react34.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react34.default.createElement("tr", { className: "text-secondary fw-semibold" }, /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" } }, "PO & Date"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "170px" } }, "Vendor"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { minWidth: "160px" } }, "Style(s)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-center" }, "Order Link"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "110px" }, className: "text-end" }, "Quantity"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "120px" }, className: "text-end" }, "Amount (\u20B9)"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Status"), /* @__PURE__ */ import_react34.default.createElement("th", { style: { width: "175px" }, className: "text-end" }, "Actions"))), /* @__PURE__ */ import_react34.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react34.default.createElement("tr", null, /* @__PURE__ */ import_react34.default.createElement("td", { colSpan: 8, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-inbox fs-32 d-block mb-2 text-muted opacity-50" }), /* @__PURE__ */ import_react34.default.createElement("span", null, "No Process Purchase Orders found matching criteria."))) : filtered.map((po) => {
       let badgeClass = "bg-secondary text-white";
       if (po.status === "Sent to Vendor") badgeClass = "bg-primary-subtle text-primary border border-primary-subtle";
       if (po.status === "Partially Dispatched") badgeClass = "bg-warning-subtle text-warning border border-warning-subtle";
@@ -40855,7 +40855,24 @@
         /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "fw-bold text-dark fs-13" }, Number(po.total_meters || 0).toFixed(1), " m"), /* @__PURE__ */ import_react34.default.createElement("div", { className: "text-muted fs-11" }, po.total_pieces || 0, " pcs")),
         /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end fw-bold text-dark fs-13" }, "\u20B9", Number(po.total_estimated_cost || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })),
         /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react34.default.createElement("span", { className: `badge rounded-pill fs-11 fw-semibold ${badgeClass}` }, po.status)),
-        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-1" }, /* @__PURE__ */ import_react34.default.createElement(
+        /* @__PURE__ */ import_react34.default.createElement("td", { className: "text-end", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-1.5" }, /* @__PURE__ */ import_react34.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-primary btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs",
+            style: {
+              background: "#4f46e5",
+              borderColor: "#4f46e5",
+              fontSize: "11.5px",
+              height: "28px",
+              whiteSpace: "nowrap"
+            },
+            title: "Dispatch fabric to vendor via Process Challan (Next Step in PDF)",
+            onClick: () => onCreateChallanFromPO && onCreateChallanFromPO(po)
+          },
+          /* @__PURE__ */ import_react34.default.createElement("i", { className: "ti ti-truck-delivery fs-13" }),
+          /* @__PURE__ */ import_react34.default.createElement("span", { className: "fw-semibold" }, "+ Challan")
+        ), /* @__PURE__ */ import_react34.default.createElement(
           "button",
           {
             type: "button",
@@ -40882,7 +40899,7 @@
 
   // frontend/src/components/ProcessPO/ProcessPOForm.jsx
   var import_react35 = __toESM(require_react());
-  function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false }) {
+  function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false, onCreateChallan }) {
     const isEditingExisting = Boolean(initialPO && initialPO.id);
     const [isReadOnly, setIsReadOnly] = (0, import_react35.useState)(readOnlyDefault);
     const availableSalesOrders = [
@@ -41185,8 +41202,8 @@
     const totalMeters = items.reduce((acc, it) => acc + (parseFloat(it.quantity_meters) || 0), 0);
     const totalPieces = items.reduce((acc, it) => acc + (parseInt(it.quantity_pieces, 10) || 0), 0);
     const grandTotalCost = items.reduce((acc, it) => acc + (parseFloat(it.total_amount) || 0), 0);
-    const handleSubmit = (e) => {
-      e.preventDefault();
+    const handleSubmit = (e, andCreateChallan = false) => {
+      if (e && e.preventDefault) e.preventDefault();
       if (!vendorId) {
         alert("Please select a Vendor.");
         return;
@@ -41220,7 +41237,7 @@
         created_by: initialPO?.created_by || "Saksham Garg",
         created_at: initialPO?.created_at || (/* @__PURE__ */ new Date()).toISOString()
       };
-      onSave(poPayload);
+      onSave(poPayload, andCreateChallan);
     };
     return /* @__PURE__ */ import_react35.default.createElement("div", { className: "card shadow-sm border mb-4", style: { borderRadius: "12px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react35.default.createElement(
       "div",
@@ -41241,11 +41258,22 @@
         },
         /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-file-invoice fs-22" })
       ), /* @__PURE__ */ import_react35.default.createElement("div", null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react35.default.createElement("h5", { className: "card-title mb-0 fw-bold text-dark fs-18" }, isEditingExisting ? isReadOnly ? `Process PO #${poNumber} (View Mode)` : `Edit Process PO #${poNumber}` : "Create Process Purchase Order (Job Work)"), /* @__PURE__ */ import_react35.default.createElement("span", { className: `badge rounded-pill px-2.5 py-1 fs-11 fw-bold ${initialPO?.status === "Approved" ? "bg-success-subtle text-success border border-success-subtle" : initialPO?.status === "Partial Dispatched" ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-amber-subtle text-warning border border-warning-subtle"}` }, initialPO?.status || "Draft")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "text-muted fs-12 mt-0.5 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react35.default.createElement("span", null, "Job Work Dyeing & Processing"), /* @__PURE__ */ import_react35.default.createElement("span", null, "\u2022"), /* @__PURE__ */ import_react35.default.createElement("span", { className: "fw-semibold text-primary" }, isOrderLinked && linkedOrderId ? `Linked to ${linkedOrderId}` : isOrderLinked ? "Order Linking (Optional)" : "Standalone Stock PO")))),
-      /* @__PURE__ */ import_react35.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isReadOnly ? /* @__PURE__ */ import_react35.default.createElement(
+      /* @__PURE__ */ import_react35.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isReadOnly && /* @__PURE__ */ import_react35.default.createElement(
         "button",
         {
           type: "button",
           className: "btn btn-primary btn-sm px-3 rounded-2 shadow-xs d-flex align-items-center gap-1.5",
+          style: { background: "#4f46e5", borderColor: "#4f46e5" },
+          title: "Issue Process Challan to physically dispatch fabric for this PO",
+          onClick: () => onCreateChallan && onCreateChallan(initialPO)
+        },
+        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-truck-delivery fs-15" }),
+        /* @__PURE__ */ import_react35.default.createElement("span", null, "+ Create Challan")
+      ), isReadOnly ? /* @__PURE__ */ import_react35.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5",
           onClick: () => setIsReadOnly(false)
         },
         /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-edit fs-15" }),
@@ -41817,19 +41845,40 @@
         "button",
         {
           type: "button",
-          className: "btn btn-light border px-4 rounded-2 text-secondary",
+          className: "btn btn-light border px-3 rounded-2 text-secondary fs-13",
           onClick: onCancel
         },
         "Cancel"
-      ), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement(
+      ), !isReadOnly && /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement(
         "button",
         {
           type: "submit",
-          className: "btn btn-primary px-4 rounded-2 shadow-sm d-flex align-items-center gap-2",
-          style: { background: "#4f46e5", border: "none" }
+          className: "btn btn-outline-primary px-3.5 rounded-2 d-flex align-items-center gap-1.5 fs-13",
+          title: "Save PO to list (Status: Draft)"
         },
-        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-device-floppy fs-16" }),
-        /* @__PURE__ */ import_react35.default.createElement("span", { className: "fw-semibold" }, "Save Process PO")
+        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-device-floppy fs-15" }),
+        /* @__PURE__ */ import_react35.default.createElement("span", null, "Save PO")
+      ), /* @__PURE__ */ import_react35.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-primary px-3.5 rounded-2 shadow-sm d-flex align-items-center gap-1.5 fs-13",
+          style: { background: "#4f46e5", border: "none" },
+          title: "Save PO and proceed immediately to allocate rolls & issue Process Challan",
+          onClick: (e) => handleSubmit(e, true)
+        },
+        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-truck-delivery fs-15" }),
+        /* @__PURE__ */ import_react35.default.createElement("span", null, "Save & Create Dispatch Challan \u2192")
+      )), isReadOnly && /* @__PURE__ */ import_react35.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-primary px-4 rounded-2 shadow-sm d-flex align-items-center gap-1.5 fs-13",
+          style: { background: "#4f46e5", border: "none" },
+          onClick: () => onCreateChallan && onCreateChallan(initialPO)
+        },
+        /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-truck-delivery fs-15" }),
+        /* @__PURE__ */ import_react35.default.createElement("span", null, "Dispatch Fabric (Create Challan) \u2192")
       ))
     )), showInlineVendorModal && /* @__PURE__ */ import_react35.default.createElement(
       VendorMasterView,
@@ -44055,7 +44104,7 @@
         setEditingReturn(null);
       }
     }, [initialTab, currentRoute]);
-    const handleSavePO = (poData) => {
+    const handleSavePO = (poData, andCreateChallan = false) => {
       let updated;
       const existingIndex = pos.findIndex((p) => p.id === poData.id);
       if (existingIndex >= 0) {
@@ -44068,6 +44117,9 @@
       saveStoredProcessPOs(updated);
       setShowPOForm(false);
       setEditingPO(null);
+      if (andCreateChallan) {
+        handleCreateChallanFromPO(poData);
+      }
     };
     const handleViewPO = (po) => {
       setEditingPO(po);
@@ -44080,10 +44132,12 @@
       setEditingChallan({
         vendor_id: po.vendor_id,
         vendor_name: po.vendor_name,
-        linked_pos: [po.id],
-        items: po.items?.map((it, idx) => ({
-          id: idx + 1,
-          bale_roll_no: `Roll 2376-${String.fromCharCode(65 + idx)}`,
+        linked_pos: [po.id || `PPO-${po.po_number}`],
+        customer_brand: po.customer_brand_name || "",
+        styles_info: po.style_names || [],
+        items: po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
+          id: Date.now() + idx,
+          bale_roll_no: `Roll-${Math.floor(2e3 + Math.random() * 1e3)}-${String.fromCharCode(65 + idx)}`,
           fabric_name: it.fabric_name,
           color_name: it.color_name,
           invoice_no: "INV-MS-0091",
@@ -44091,7 +44145,7 @@
           dispatched_meters: it.quantity_meters,
           is_partial_cut: false,
           folding: "L100"
-        }))
+        })) : []
       });
       if (onNavigate) onNavigate("/process-challan");
       else setActiveTab("challans");
@@ -44108,6 +44162,16 @@
       }
       setChallans(updated);
       saveStoredProcessChallans(updated);
+      if (challanData.linked_pos && challanData.linked_pos.length > 0) {
+        const updatedPOs = pos.map((p) => {
+          if (challanData.linked_pos.includes(p.id) || challanData.linked_pos.includes(p.po_number) || challanData.linked_pos.includes(`PPO-${p.po_number}`)) {
+            return { ...p, status: "Sent to Vendor" };
+          }
+          return p;
+        });
+        setPos(updatedPOs);
+        saveStoredProcessPOs(updatedPOs);
+      }
       setShowChallanForm(false);
       setEditingChallan(null);
     };
@@ -44175,6 +44239,7 @@
           setShowPOForm(false);
           setEditingPO(null);
         },
+        onCreateChallan: handleCreateChallanFromPO,
         readOnlyDefault: Boolean(editingPO)
       }
     ) : /* @__PURE__ */ import_react43.default.createElement(
