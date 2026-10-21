@@ -13,57 +13,49 @@ import { initialVendors } from '../../data/procurementData';
 export default function ProcessReturnForm({ availablePOs = [], availableChallans = [], onSave, onCancel, initialReturn }) {
   const isEditing = Boolean(initialReturn);
 
-  const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || 'VEND-0003');
-  const [vendorName, setVendorName] = useState(initialReturn?.vendor_name || 'Raju Dyeing (Krishna Dyeing)');
-  const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '2196');
-  const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || '2026-08-27');
-  const [vendorInvoiceNo, setVendorInvoiceNo] = useState(initialReturn?.vendor_invoice_no || 'INV-RD-8841');
-  const [vendorInvoiceValue, setVendorInvoiceValue] = useState(initialReturn?.vendor_invoice_value || '17731.20');
+  const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || (initialVendors[0]?.id || ''));
+  const [vendorName, setVendorName] = useState(initialReturn?.vendor_name || (initialVendors[0]?.name || ''));
+  const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '');
+  const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || new Date().toISOString().split('T')[0]);
+  const [vendorInvoiceNo, setVendorInvoiceNo] = useState(initialReturn?.vendor_invoice_no || '');
+  const [vendorInvoiceValue, setVendorInvoiceValue] = useState(initialReturn?.vendor_invoice_value || '');
   
-  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || 'PPO-7611');
-  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || 'PCH-4903');
+  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || (availablePOs[0]?.id || ''));
+  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || (availableChallans[0]?.id || ''));
   const [receivedDate, setReceivedDate] = useState(initialReturn?.received_date || new Date().toISOString().split('T')[0]);
   
-  const [fabricQuality, setFabricQuality] = useState(initialReturn?.fabric_quality || '100x100 Voile Solid Dye');
+  const [fabricQuality, setFabricQuality] = useState(initialReturn?.fabric_quality || '');
   const [width, setWidth] = useState(initialReturn?.width || '48');
-  const [weight, setWeight] = useState(initialReturn?.weight || '122.5');
+  const [weight, setWeight] = useState(initialReturn?.weight || '');
   const [foldingStandard, setFoldingStandard] = useState(initialReturn?.folding_standard || 'Fold 100');
   
   // Stated vs Entered Validation (Section 5.2)
-  const [vendorDeclaredMeters, setVendorDeclaredMeters] = useState(initialReturn?.vendor_declared_meters || 1477.60);
-  const [vendorDeclaredPieces, setVendorDeclaredPieces] = useState(initialReturn?.vendor_declared_pieces || 13);
+  const [vendorDeclaredMeters, setVendorDeclaredMeters] = useState(initialReturn?.vendor_declared_meters || '');
+  const [vendorDeclaredPieces, setVendorDeclaredPieces] = useState(initialReturn?.vendor_declared_pieces || '');
   
   // Dedicated Grey Fabric Return Section (Section 5.3)
-  const [greyFabricReturned, setGreyFabricReturned] = useState(initialReturn?.grey_fabric_returned_meters || 40.00);
-  const [targetInvoiceForGrey, setTargetInvoiceForGrey] = useState('INV-MS-0091 (M.S. Textiles - Largest Balance)');
+  const [greyFabricReturned, setGreyFabricReturned] = useState(initialReturn?.grey_fabric_returned_meters || '');
+  const [targetInvoiceForGrey, setTargetInvoiceForGrey] = useState(initialReturn?.target_invoice_for_grey || 'INV-MS-0091 (M.S. Textiles - Largest Balance)');
 
   // Collapsible Transport Section (Section 5.2)
-  const [showTransport, setShowTransport] = useState(false);
-  const [lrNumber, setLrNumber] = useState(initialReturn?.transport_details?.lr_number || 'LR-SURAT-9981');
-  const [lrDate, setLrDate] = useState(initialReturn?.transport_details?.lr_date || '2026-08-27');
-  const [transporterName, setTransporterName] = useState(initialReturn?.transport_details?.transporter_name || 'Local Auto Tempo (Surat)');
-  const [vehicleNo, setVehicleNo] = useState(initialReturn?.transport_details?.vehicle_no || 'GJ-05-BX-4120');
+  const [showTransport, setShowTransport] = useState(Boolean(initialReturn?.transport_details?.lr_number));
+  const [lrNumber, setLrNumber] = useState(initialReturn?.transport_details?.lr_number || '');
+  const [lrDate, setLrDate] = useState(initialReturn?.transport_details?.lr_date || new Date().toISOString().split('T')[0]);
+  const [transporterName, setTransporterName] = useState(initialReturn?.transport_details?.transporter_name || '');
+  const [vehicleNo, setVehicleNo] = useState(initialReturn?.transport_details?.vehicle_no || '');
 
   // Piece-Wise Grid Data
-  const [pieces, setPieces] = useState(initialReturn?.pieces || [
-    { id: 1, piece_no: 1, meters: 104.10, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 2, piece_no: 2, meters: 107.00, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 3, piece_no: 3, meters: 108.50, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 4, piece_no: 4, meters: 104.15, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 5, piece_no: 5, meters: 104.85, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 6, piece_no: 6, meters: 153.00, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 7, piece_no: 7, meters: 109.35, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 8, piece_no: 8, meters: 104.40, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 9, piece_no: 9, meters: 100.00, color_name: 'Off White', folding: 'Fold 100' },
-    { id: 10, piece_no: 10, meters: 63.10, color_name: 'Beige', folding: 'Fold 100' },
-    { id: 11, piece_no: 11, meters: 104.10, color_name: 'Beige', folding: 'Fold 100' },
-    { id: 12, piece_no: 12, meters: 184.60, color_name: 'Beige', folding: 'Fold 100' },
-    { id: 13, piece_no: 13, meters: 119.60, color_name: 'Beige', folding: 'Fold 100' }
-  ]);
+  const [pieces, setPieces] = useState(
+    initialReturn?.pieces && initialReturn.pieces.length > 0
+      ? initialReturn.pieces
+      : [
+          { id: 1, piece_no: 1, meters: '', color_name: '', folding: 'Fold 100' }
+        ]
+  );
 
   const handlePieceMeterChange = (index, value) => {
     const updated = [...pieces];
-    updated[index].meters = parseFloat(value) || 0;
+    updated[index].meters = value;
     setPieces(updated);
   };
 
@@ -73,8 +65,8 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
       {
         id: Date.now(),
         piece_no: pieces.length + 1,
-        meters: 100.00,
-        color_name: 'Beige',
+        meters: '',
+        color_name: pieces[pieces.length - 1]?.color_name || '',
         folding: foldingStandard
       }
     ]);
@@ -87,7 +79,7 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
   };
 
   const calculatedTotalMeters = pieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
-  const isMeterMismatch = Math.abs(calculatedTotalMeters - parseFloat(vendorDeclaredMeters || 0)) > 0.05;
+  const isMeterMismatch = vendorDeclaredMeters && Math.abs(calculatedTotalMeters - parseFloat(vendorDeclaredMeters || 0)) > 0.05;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -98,7 +90,7 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
     }
 
     const returnPayload = {
-      id: initialReturn?.id || `PRN-${externalChallanNo}`,
+      id: initialReturn?.id || (externalChallanNo ? `PRN-${externalChallanNo}` : `PRN-${Date.now().toString().slice(-4)}`),
       vendor_id: vendorId,
       vendor_name: vendorName,
       vendor_external_challan_no: externalChallanNo,
@@ -135,26 +127,39 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
   };
 
   return (
-    <div className="card shadow-sm border-0 mb-4">
-      <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-        <div>
-          <h5 className="card-title mb-0 fw-bold text-dark">
-            <i className="ti ti-receipt-refund me-2 text-primary"></i>
-            {isEditing ? `Edit Vendor Return #${externalChallanNo}` : 'Record Vendor Return / Inbound Processing GRN'}
-          </h5>
-          <small className="text-muted">
-            Internal Series: <strong className="text-primary">Job Work</strong> (Distinct from Raw Material GRN)
-          </small>
+    <div className="card shadow-sm border mb-4" style={{ borderRadius: '12px', borderColor: '#e2e8f0', background: '#ffffff' }}>
+      <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center" style={{ borderRadius: '12px 12px 0 0' }}>
+        <div className="d-flex align-items-center gap-2.5">
+          <div
+            className="rounded-3 d-flex align-items-center justify-content-center shadow-xs"
+            style={{ width: '40px', height: '40px', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5' }}
+          >
+            <i className="ti ti-receipt-refund fs-22"></i>
+          </div>
+          <div>
+            <h5 className="card-title mb-0 fw-bold text-dark fs-16">
+              {isEditing ? `Edit Vendor Return #${externalChallanNo || initialReturn?.id}` : 'Record Inward Return / Inbound Processing GRN'}
+            </h5>
+            <small className="text-muted fs-12">
+              Internal Series: <strong className="text-primary">Job Work</strong> (Distinct from Raw Material GRN)
+            </small>
+          </div>
         </div>
-        <button type="button" className="btn btn-light btn-sm border" onClick={onCancel}>
-          <i className="ti ti-x me-1"></i> Close
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3"
+          style={{ borderRadius: '8px' }}
+          onClick={onCancel}
+        >
+          <i className="ti ti-arrow-left fs-14"></i>
+          <span>Back to Returns</span>
         </button>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4">
           {/* Section 1: Vendor & Document Identification */}
-          <div className="row g-3 mb-4 p-3 rounded border bg-light">
+          <div className="row g-3 mb-4 p-3 rounded border bg-light" style={{ borderColor: '#e2e8f0' }}>
             <div className="col-md-3">
               <label className="form-label small fw-bold">Job Work Vendor *</label>
               <select
@@ -214,9 +219,20 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
                 value={linkedPoId}
                 onChange={(e) => setLinkedPoId(e.target.value)}
               >
-                <option value="PPO-7611">PO #7611 (Beige - 525m)</option>
-                <option value="PPO-7612">PO #7612 (Off White - 1006m)</option>
-                <option value="PPO-7613">PO #7613 (Cambric - 887m)</option>
+                <option value="">-- Select Linked PO --</option>
+                {availablePOs && availablePOs.length > 0 ? (
+                  availablePOs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.id} ({p.fabric_quality || p.vendor_name || 'Process PO'})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="PPO-7611">PO #7611 (Beige - 525m)</option>
+                    <option value="PPO-7612">PO #7612 (Off White - 1006m)</option>
+                    <option value="PPO-7613">PO #7613 (Cambric - 887m)</option>
+                  </>
+                )}
               </select>
             </div>
           </div>

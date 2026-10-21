@@ -11,6 +11,7 @@ import ProcessPOList from './ProcessPOList';
 import ProcessPOForm from './ProcessPOForm';
 import ProcessChallanList from './ProcessChallanList';
 import ProcessChallanForm from './ProcessChallanForm';
+import ProcessReturnList from './ProcessReturnList';
 import ProcessReturnForm from './ProcessReturnForm';
 import ProcessQCView from './ProcessQCView';
 import ProcessTrackingDashboard from './ProcessTrackingDashboard';
@@ -273,73 +274,20 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             }}
           />
         ) : (
-          <div className="card border-0 shadow-sm">
-            <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="card-title mb-0 fw-bold text-dark">Vendor Returns History (Inbound Job Work GRN)</h6>
-                <small className="text-muted">Processed fabric received back from dye houses</small>
-              </div>
-              <button
-                className="btn btn-primary btn-sm px-3 shadow-sm"
-                onClick={() => {
-                  setEditingReturn(null);
-                  setShowReturnForm(true);
-                }}
-              >
-                <i className="ti ti-plus me-1"></i> + Record Vendor Return
-              </button>
-            </div>
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
-                <thead className="table-light">
-                  <tr>
-                    <th>Return Ref</th>
-                    <th>Vendor</th>
-                    <th>Vendor Ext. Challan #</th>
-                    <th>Received Date</th>
-                    <th>Fabric Quality</th>
-                    <th>Pieces (Thans)</th>
-                    <th className="text-end">Total Metres</th>
-                    <th className="text-end">Grey Returned</th>
-                    <th className="text-center">Status</th>
-                    <th className="text-end">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {returns.map((r) => (
-                    <tr key={r.id}>
-                      <td className="fw-bold text-primary">{r.id}</td>
-                      <td>{r.vendor_name}</td>
-                      <td>
-                        <span className="badge bg-light text-dark border">Challan #{r.vendor_external_challan_no}</span>
-                      </td>
-                      <td>{r.received_date}</td>
-                      <td>{r.fabric_quality} ({r.width}")</td>
-                      <td>{r.total_pieces} thans</td>
-                      <td className="text-end fw-bold text-success">{Number(r.total_meters).toFixed(2)} m</td>
-                      <td className="text-end text-muted">{r.grey_fabric_returned_meters > 0 ? `${r.grey_fabric_returned_meters} m` : '-'}</td>
-                      <td className="text-center">
-                        <span className="badge bg-success-subtle text-success border border-success-subtle">
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="text-end">
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary btn-sm"
-                          onClick={() => {
-                            setActiveTab('qc');
-                          }}
-                        >
-                          <i className="ti ti-checklist me-1"></i> Inspect in QC
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ProcessReturnList
+            returns={returns}
+            onNewReturn={() => {
+              setEditingReturn(null);
+              setShowReturnForm(true);
+            }}
+            onEditReturn={(record) => {
+              setEditingReturn(record);
+              setShowReturnForm(true);
+            }}
+            onInspectInQC={(record) => {
+              setActiveTab('qc');
+            }}
+          />
         )
       )}
 
