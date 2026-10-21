@@ -505,5 +505,183 @@ INSERT INTO accessory_masters (id, name, category, unit, pieces_per_unit, max_bu
 ('ACC-005', 'Braided Waist Elastic 1 inch', 'Elastic', 'Meter', 1, 5.00, '56041000', '{"fabric_consumption": 0.85, "unit": "Meter"}', TRUE),
 ('ACC-006', 'Vardhman Kantha Embroidery Thread', 'Thread', 'Meter', 1, 10.00, '52041100', '{"thread_pattern": "Kantha", "thread_per_stitch": 15.0, "global_stitching_metric": 15.0, "boxes": [{"reels_per_box": 15, "metres_per_reel": 400}]}', TRUE)
 ON DUPLICATE KEY UPDATE name=name;
+-- =======================================================
+-- MODULE 3: PROCESS PO — JOB WORK PROCUREMENT MODULE
+-- =======================================================
 
+-- 22. PROCESS PURCHASE ORDERS (Header)
+CREATE TABLE IF NOT EXISTS process_pos (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. PPO-7611
+  po_number VARCHAR(50) NOT NULL UNIQUE,
+  date DATE NOT NULL,
+  issue_date DATE,
+  vendor_id VARCHAR(30) NOT NULL,
+  vendor_name VARCHAR(150) NOT NULL,
+  linked_sales_order_id VARCHAR(30),
+  style_names JSON, -- Array of style names
+  number_of_styles INT DEFAULT 1,
+  customer_brand_name VARCHAR(150),
+  delivery_date DATE,
+  terms TEXT,
+  total_meters DECIMAL(12,2) DEFAULT 0.00,
+  total_pieces DECIMAL(12,2) DEFAULT 0.00,
+  total_estimated_cost DECIMAL(12,2) DEFAULT 0.00,
+  status VARCHAR(50) DEFAULT 'Draft', -- Draft, Sent to Vendor, Partially Dispatched, Fully Dispatched, Completed, Cancelled
+  created_by VARCHAR(100) DEFAULT 'Saksham Garg',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON UPDATE CASCADE
+);
 
+-- 23. PROCESS PO LINE ITEMS
+CREATE TABLE IF NOT EXISTS process_po_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  process_po_id VARCHAR(30) NOT NULL,
+  style_name VARCHAR(100),
+  fabric_id VARCHAR(30) NOT NULL,
+  fabric_name VARCHAR(150) NOT NULL,
+  color_id VARCHAR(30),
+  color_name VARCHAR(100) NOT NULL,
+  article_id VARCHAR(30),
+  article_name VARCHAR(100),
+  width VARCHAR(20) NOT NULL,
+  quantity_meters DECIMAL(12,2) NOT NULL,
+  quantity_pieces DECIMAL(12,2) NOT NULL,
+  consumption_per_piece DECIMAL(8,2) DEFAULT 2.60,
+  shrinkage_percent DECIMAL(5,2) DEFAULT 4.00,
+  raw_fabric_meters DECIMAL(12,2) NOT NULL,
+  fabric_rate DECIMAL(10,2) NOT NULL,
+  dyeing_rate DECIMAL(10,2) NOT NULL,
+  total_actual_cost DECIMAL(10,2) NOT NULL,
+  total_amount DECIMAL(12,2) NOT NULL,
+  remarks TEXT,
+  sample_photo MEDIUMTEXT,
+  status VARCHAR(50) DEFAULT 'Not Ordered', -- Not Ordered, Partially Ordered, Already Ordered
+  dispatched_meters DECIMAL(12,2) DEFAULT 0.00,
+  received_meters DECIMAL(12,2) DEFAULT 0.00,
+  FOREIGN KEY (process_po_id) REFERENCES process_pos(id) ON DELETE CASCADE
+);
+
+-- 24. PROCESS CHALLANS (Dispatch to Job Work Vendor)
+CREATE TABLE IF NOT EXISTS process_challans (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. PCH-4903
+  challan_number VARCHAR(50) NOT NULL UNIQUE,
+  date DATE NOT NULL,
+  vendor_id VARCHAR(30) NOT NULL,
+  vendor_name VARCHAR(150) NOT NULL,
+  linked_pos JSON, -- ["PPO-7611", "PPO-7612", "PPO-7613"]
+  styles_info JSON,
+  po_link_status VARCHAR(50) DEFAULT 'Linked', -- Linked, Pending PO Link
+  admin_alert_triggered BOOLEAN DEFAULT FALSE,
+  folding_notation VARCHAR(50) DEFAULT 'L100',
+  total_bales INT DEFAULT 0,
+  total_pieces INT DEFAULT 0,
+  grand_total_meters DECIMAL(12,2) DEFAULT 0.00,
+  remarks TEXT,
+  receiver_signature VARCHAR(100),
+  company_representative VARCHAR(100) DEFAULT 'Anurag',
+  status VARCHAR(50) DEFAULT 'Dispatched', -- Dispatched, Partially Returned, Fully Returned, Cancelled
+  created_by VARCHAR(100) DEFAULT 'Saksham Garg',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON UPDATE CASCADE
+);
+
+-- 25. PROCESS CHALLAN LINE ITEMS
+CREATE TABLE IF NOT EXISTS process_challan_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  challan_id VARCHAR(30) NOT NULL,
+  po_id VARCHAR(30),
+  fabric_name VARCHAR(150) NOT NULL,
+  color_name VARCHAR(100) NOT NULL,
+  invoice_no VARCHAR(100),
+  bale_roll_no VARCHAR(100) NOT NULL,
+  is_partial_cut BOOLEAN DEFAULT FALSE,
+  original_piece_meters DECIMAL(10,2),
+  dispatched_meters DECIMAL(10,2) NOT NULL,
+  folding VARCHAR(50) DEFAULT 'L100',
+  remarks VARCHAR(255),
+  FOREIGN KEY (challan_id) REFERENCES process_challans(id) ON DELETE CASCADE
+);
+
+-- 26. PROCESS RETURNS / INBOUND GRN (Vendor Returns Processed Fabric)
+CREATE TABLE IF NOT EXISTS process_returns (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. PRN-2196
+  vendor_id VARCHAR(30) NOT NULL,
+  vendor_name VARCHAR(150) NOT NULL,
+  vendor_external_challan_no VARCHAR(100) NOT NULL,
+  vendor_challan_date DATE NOT NULL,
+  vendor_invoice_no VARCHAR(100),
+  vendor_invoice_date DATE,
+  vendor_invoice_value DECIMAL(12,2),
+  internal_series VARCHAR(50) DEFAULT 'Job Work', -- Job Work, Selling
+  linked_po_id VARCHAR(30) NOT NULL,
+  linked_challan_id VARCHAR(30) NOT NULL,
+  received_date DATE NOT NULL,
+  fabric_quality VARCHAR(150) NOT NULL,
+  width VARCHAR(20),
+  weight DECIMAL(8,2),
+  folding_standard VARCHAR(50) DEFAULT 'Fold 100',
+  total_pieces INT DEFAULT 0,
+  total_meters DECIMAL(12,2) DEFAULT 0.00,
+  vendor_declared_pieces INT,
+  vendor_declared_meters DECIMAL(12,2),
+  grey_fabric_returned_meters DECIMAL(10,2) DEFAULT 0.00,
+  transport_details JSON,
+  status VARCHAR(50) DEFAULT 'Received', -- Received, QC In Progress, QC Completed
+  created_by VARCHAR(100) DEFAULT 'Saksham Garg',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON UPDATE CASCADE
+);
+
+-- 27. PROCESS RETURN PIECES (Piece-Wise Meterage Breakdown)
+CREATE TABLE IF NOT EXISTS process_return_pieces (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  return_id VARCHAR(30) NOT NULL,
+  piece_no INT NOT NULL,
+  meters DECIMAL(10,2) NOT NULL,
+  color_name VARCHAR(100),
+  folding VARCHAR(50) DEFAULT 'Fold 100',
+  qc_status VARCHAR(50) DEFAULT 'Pending', -- Pending, Accepted, Rejected - Reprocess, Rejected - Scrap
+  FOREIGN KEY (return_id) REFERENCES process_returns(id) ON DELETE CASCADE
+);
+
+-- 28. OPEN BALES (Unprocessed Grey Fabric Returns)
+CREATE TABLE IF NOT EXISTS open_bales (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. OB-0001
+  return_id VARCHAR(30) NOT NULL,
+  fabric_id VARCHAR(30),
+  fabric_name VARCHAR(150) NOT NULL,
+  original_vendor_invoice_ref VARCHAR(100) NOT NULL,
+  returned_meters DECIMAL(10,2) NOT NULL,
+  remaining_meters DECIMAL(10,2) NOT NULL,
+  audit_trail JSON,
+  status VARCHAR(50) DEFAULT 'Available',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (return_id) REFERENCES process_returns(id) ON DELETE CASCADE
+);
+
+-- 29. PROCESS QC RECORDS (Quality Control & Lot Splitting)
+CREATE TABLE IF NOT EXISTS process_qc_records (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. PQC-0001
+  return_id VARCHAR(30) NOT NULL,
+  piece_id INT NOT NULL,
+  piece_no INT NOT NULL,
+  original_length DECIMAL(10,2) NOT NULL,
+  qc_outcome VARCHAR(50) NOT NULL, -- Accepted, Full Rejection
+  rejection_action VARCHAR(50), -- Reprocess, Scrap
+  reprocessing_challan_id VARCHAR(30),
+  reprocessing_loop_status VARCHAR(50) DEFAULT 'Cleared', -- In Loop, Cleared
+  division_type VARCHAR(50) DEFAULT 'None', -- None, Piece Division, Lot Division
+  piece_splits JSON, -- [{ piece_suffix: "A", meters: 30.00 }, { piece_suffix: "B", meters: 33.10 }]
+  lot_batch_id VARCHAR(50), -- Batch 1, Batch 2
+  paper_qc_report_photo MEDIUMTEXT,
+  adjusted_yield INT,
+  color_fastness VARCHAR(20) DEFAULT 'Pass', -- Pass, Fail
+  color_fastness_proof_photo MEDIUMTEXT,
+  inspector_name VARCHAR(100) DEFAULT 'Priya Sharma',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (return_id) REFERENCES process_returns(id) ON DELETE CASCADE
+);

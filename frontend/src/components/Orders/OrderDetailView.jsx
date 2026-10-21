@@ -3153,7 +3153,7 @@ export default function OrderDetailView({
                       onTriggerProcurement('QC Batch', order);
                     }
                   } else {
-                    setToastMessage(`${item.stage} હજુ બનેલ નથી (Under Development)`);
+                    setToastMessage(`${item.stage} is under development`);
                     setShowToast(true);
                     setTimeout(() => setShowToast(false), 3000);
                   }

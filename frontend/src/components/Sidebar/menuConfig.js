@@ -12,13 +12,25 @@ export const navigationMenu = [
       {
         label: 'Procurement',
         icon: 'ti ti-shopping-cart',
-        open: true,
+        open: false,
         submenu: [
           { label: 'Purchase Orders', link: '/procurement-pos' },
           { label: 'Goods Receipt (GRN)', link: '/goods-inward' },
           { label: 'Quality Check (QC)', link: '/quality-batches' },
           { label: 'Stock Pool', link: '/stock-pool' },
           { label: 'Rejected Stock Pool', link: '/rejected-stock' }
+        ]
+      },
+      {
+        label: 'Processing (Dye/Print)',
+        icon: 'ti ti-building-factory-2',
+        open: true,
+        submenu: [
+          { label: 'Purchase Orders', link: '/process-po' },
+          { label: 'Job Challans (Dispatch)', link: '/process-challan' },
+          { label: 'Record Inward (GRN)', link: '/process-return' },
+          { label: 'QC & Lot Division', link: '/process-qc' },
+          { label: 'Live Tracking & Open Bales', link: '/process-tracking' }
         ]
       },
       {

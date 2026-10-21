@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const procurementRoutes = require('./routes/procurementRoutes');
 const salesMastersRoutes = require('./routes/salesMastersRoutes');
 const salesOrderRoutes = require('./routes/salesOrderRoutes');
+const processRoutes = require('./routes/processRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/procurement', procurementRoutes);
 app.use('/api/masters', salesMastersRoutes);
 app.use('/api/orders', salesOrderRoutes);
+app.use('/api/process', processRoutes);
 
 // Root and API Info Route
 app.get('/', (req, res) => {

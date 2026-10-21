@@ -5,12 +5,19 @@ import { navigationMenu } from './menuConfig';
  * Sidebar Navigation Component - Matches Authentic Preclinic / Rain Drop ERP Theme
  */
 export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
-  // Submenus state: open Sales Order Masters by default
+  // Submenus state: open Processing and Procurement by default
   const [openMenus, setOpenMenus] = useState({
-    'Sales Order Masters': true,
-    'Procurement Workflow': true,
-    'Procurement Masters': false
+    'Processing (Dye/Print)': true,
+    'Procurement': true,
+    'Masters': false
   });
+
+  // Keep Processing menu expanded whenever user is on a process route
+  React.useEffect(() => {
+    if (currentRoute.startsWith('/process') || currentRoute.startsWith('/job-work')) {
+      setOpenMenus(prev => ({ ...prev, 'Processing (Dye/Print)': true }));
+    }
+  }, [currentRoute]);
 
   const toggleSubmenu = (label) => {
     setOpenMenus((prev) => ({
@@ -126,7 +133,12 @@ export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
                                 (sub.link === '/rejected-stock' && currentRoute.startsWith('/rejected-stock')) ||
                                 (sub.link === '/vendors' && currentRoute.startsWith('/vendors')) ||
                                 (sub.link === '/fabrics' && currentRoute.startsWith('/fabrics')) ||
-                                (sub.link === '/transporters' && currentRoute.startsWith('/transporters'));
+                                (sub.link === '/transporters' && currentRoute.startsWith('/transporters')) ||
+                                (sub.link === '/process-po' && (currentRoute === '/process-po' || currentRoute.startsWith('/processing/pos') || currentRoute === '/process')) ||
+                                (sub.link === '/process-challan' && currentRoute.startsWith('/process-challan')) ||
+                                (sub.link === '/process-return' && (currentRoute.startsWith('/process-return') || currentRoute.includes('inward'))) ||
+                                (sub.link === '/process-qc' && currentRoute.startsWith('/process-qc')) ||
+                                (sub.link === '/process-tracking' && currentRoute.startsWith('/process-tracking'));
 
                               return (
                                 <li key={subIdx}>

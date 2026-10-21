@@ -8,6 +8,7 @@ import SizeMasterView from './components/Masters/SizeMasterView';
 import AccessoriesMasterView from './components/Masters/AccessoriesMasterView';
 import ColorMasterView from './components/Masters/ColorMasterView';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
+import ProcessModule from './components/ProcessPO/ProcessModule';
 import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
 
@@ -144,7 +145,24 @@ export default function App() {
       return <ColorMasterView />;
     }
 
-    // 4. Route 2 Raw Material Procurement Dashboard
+    // 4. Module 3: Process PO & Job Work Module
+    if (currentRoute.startsWith('/process') || currentRoute.startsWith('/job-work')) {
+      let processTab = 'pos';
+      if (currentRoute.includes('challan')) processTab = 'challans';
+      else if (currentRoute.includes('return') || currentRoute.includes('inward')) processTab = 'returns';
+      else if (currentRoute.includes('qc') || currentRoute.includes('quality')) processTab = 'qc';
+      else if (currentRoute.includes('tracking') || currentRoute.includes('bale')) processTab = 'tracking';
+
+      return (
+        <ProcessModule
+          initialTab={processTab}
+          currentRoute={currentRoute}
+          onNavigate={handleRouteNavigate}
+        />
+      );
+    }
+
+    // 5. Route 2 Raw Material Procurement Dashboard
     let submodule = 'overview';
     if (currentRoute.startsWith('/procurement-pos') || currentRoute.startsWith('/po')) {
       submodule = 'pos';
