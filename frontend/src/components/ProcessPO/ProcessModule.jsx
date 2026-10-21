@@ -250,6 +250,10 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setEditingChallan(null);
               setShowChallanForm(true);
             }}
+            onEditChallan={(challan) => {
+              setEditingChallan(challan);
+              setShowChallanForm(true);
+            }}
             onPrintChallan={handlePrintChallan}
             onRecordReturnFromChallan={handleRecordReturnFromChallan}
           />

@@ -41915,44 +41915,362 @@
 
   // frontend/src/components/ProcessPO/ProcessChallanList.jsx
   var import_react36 = __toESM(require_react());
-  function ProcessChallanList({ challans = [], onNewChallan, onPrintChallan, onRecordReturnFromChallan }) {
+  function ProcessChallanList({
+    challans = [],
+    onNewChallan,
+    onEditChallan,
+    onPrintChallan,
+    onRecordReturnFromChallan
+  }) {
     const [searchTerm, setSearchTerm] = (0, import_react36.useState)("");
+    const [statusFilter, setStatusFilter] = (0, import_react36.useState)("ALL");
+    const [vendorFilter, setVendorFilter] = (0, import_react36.useState)("ALL");
     const filtered = challans.filter((c) => {
       const term = searchTerm.toLowerCase();
-      return c.challan_number && c.challan_number.toLowerCase().includes(term) || c.vendor_name && c.vendor_name.toLowerCase().includes(term) || c.company_representative && c.company_representative.toLowerCase().includes(term);
-    });
-    return /* @__PURE__ */ import_react36.default.createElement("div", { className: "card border-0 shadow-sm" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2", style: { maxWidth: "400px" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "input-group-text bg-light border-end-0" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-search text-muted" })), /* @__PURE__ */ import_react36.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control border-start-0",
-        placeholder: "Search Challan #, vendor, representative...",
-        value: searchTerm,
-        onChange: (e) => setSearchTerm(e.target.value)
-      }
-    ))), /* @__PURE__ */ import_react36.default.createElement("button", { className: "btn btn-danger btn-sm px-3 shadow-sm", onClick: onNewChallan }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-truck-delivery me-1" }), " + New Challan")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react36.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react36.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("th", null, "Challan No"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Dispatch Date"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Vendor"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Linked POs"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Stock Rolls/Bales"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Folding"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Dispatched Mtrs"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center" }, "PO Link Status"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Authorised By"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Actions"))), /* @__PURE__ */ import_react36.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 10, className: "text-center py-4 text-muted" }, "No Challans found.")) : filtered.map((c) => {
+      const matchesSearch = c.challan_number && c.challan_number.toLowerCase().includes(term) || c.vendor_name && c.vendor_name.toLowerCase().includes(term) || c.company_representative && c.company_representative.toLowerCase().includes(term) || Array.isArray(c.linked_pos) && c.linked_pos.some((p) => p.toLowerCase().includes(term));
       const isEmergency = c.po_link_status === "Pending PO Link";
-      return /* @__PURE__ */ import_react36.default.createElement("tr", { key: c.id }, /* @__PURE__ */ import_react36.default.createElement("td", { className: "fw-bold text-danger" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-danger border me-1" }, "#", c.challan_number || c.id)), /* @__PURE__ */ import_react36.default.createElement("td", null, c.date), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "fw-semibold text-dark" }, c.vendor_name), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted" }, c.remarks || "Job Issue for Dyeing")), /* @__PURE__ */ import_react36.default.createElement("td", null, Array.isArray(c.linked_pos) && c.linked_pos.length > 0 ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex flex-wrap gap-1" }, c.linked_pos.map((p, i) => /* @__PURE__ */ import_react36.default.createElement("span", { key: i, className: "badge bg-primary-subtle text-primary border", style: { fontSize: "10px" } }, p))) : /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-danger text-white" }, "None (Emergency)")), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("strong", null, c.total_bales || 1, " Bale"), " (", c.total_pieces || c.items?.length || 7, " Pcs)"), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted" }, c.items?.[0]?.bale_roll_no || "Roll 12304")), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-dark border" }, c.folding_notation || "L100")), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-bold text-danger fs-6" }, Number(c.grand_total_meters || 0).toFixed(2), " m"), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isEmergency ? /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-danger text-white border border-danger" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-alert-triangle me-1" }), " Pending PO Link") : /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-check me-1" }), " Linked")), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "fw-medium text-dark" }, c.company_representative || "Anurag"), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted" }, "Signatory")), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "btn-group btn-group-sm" }, /* @__PURE__ */ import_react36.default.createElement(
+      const matchesStatus = statusFilter === "ALL" || statusFilter === "LINKED" && !isEmergency || statusFilter === "EMERGENCY" && isEmergency;
+      const matchesVendor = vendorFilter === "ALL" || c.vendor_name && c.vendor_name.includes(vendorFilter);
+      return matchesSearch && matchesStatus && matchesVendor;
+    });
+    const totalMeters = challans.reduce((acc, c) => acc + (parseFloat(c.grand_total_meters) || 0), 0);
+    const totalBales = challans.reduce((acc, c) => acc + (parseInt(c.total_bales, 10) || 1), 0);
+    const linkedCount = challans.filter((c) => c.po_link_status !== "Pending PO Link").length;
+    const uniqueVendors = Array.from(new Set(challans.map((c) => c.vendor_name).filter(Boolean)));
+    const handleRowClick = (challan) => {
+      if (onEditChallan) {
+        onEditChallan(challan);
+      }
+    };
+    return /* @__PURE__ */ import_react36.default.createElement("div", { className: "process-challan-container" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Total Challans"), /* @__PURE__ */ import_react36.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, challans.length)), /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(79, 70, 229, 0.1)",
+            color: "#4f46e5"
+          }
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-truck-delivery fs-22" })
+      )),
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-circle-check text-success fs-13" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Fabric dispatch records"))
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Dispatched Fabric"), /* @__PURE__ */ import_react36.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, Number(totalMeters).toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), " ", /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-14 fw-medium text-muted" }, "m"))), /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(2, 132, 199, 0.1)",
+            color: "#0284c7"
+          }
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-ruler-2 fs-22" })
+      )),
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-layers-linked text-info fs-13" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Out for dyeing / processing"))
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "Total Dispatched Bales"), /* @__PURE__ */ import_react36.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, totalBales)), /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(217, 119, 6, 0.1)",
+            color: "#d97706"
+          }
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-package fs-22" })
+      )),
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-box text-warning fs-13" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Allocated from Warehouse"))
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border-0 shadow-sm p-3 h-100",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex justify-content-between align-items-start" }, /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-secondary text-uppercase fw-bold fs-11", style: { letterSpacing: "0.05em" } }, "PO Link Compliance"), /* @__PURE__ */ import_react36.default.createElement("h3", { className: "mb-0 fw-bold text-dark mt-1 fs-24" }, challans.length > 0 ? Math.round(linkedCount / challans.length * 100) : 100, "%")), /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
+          style: {
+            width: "42px",
+            height: "42px",
+            background: "rgba(16, 185, 129, 0.1)",
+            color: "#059669"
+          }
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-link fs-22" })
+      )),
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "text-muted fs-11 mt-2 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success fs-10 px-1.5 py-0.5 rounded" }, linkedCount, " Linked"), challans.length - linkedCount > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-danger-subtle text-danger fs-10 px-1.5 py-0.5 rounded" }, challans.length - linkedCount, " Emergency"))
+    ))), /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border mb-3 shadow-sm",
+        style: {
+          borderRadius: "10px",
+          borderColor: "#e2e8f0",
+          background: "#ffffff"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-2", style: { flex: "1 1 500px" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "input-group input-group-sm", style: { width: "280px" } }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "input-group-text bg-white border-end-0 text-muted", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-search fs-14" })), /* @__PURE__ */ import_react36.default.createElement(
+        "input",
+        {
+          type: "text",
+          className: "form-control bg-white border-start-0 fs-13",
+          placeholder: "Search Challan #, vendor, PO...",
+          style: { borderColor: "#cbd5e1", height: "36px" },
+          value: searchTerm,
+          onChange: (e) => setSearchTerm(e.target.value)
+        }
+      ), searchTerm && /* @__PURE__ */ import_react36.default.createElement(
         "button",
         {
+          className: "btn btn-white border border-start-0 text-muted",
           type: "button",
-          className: "btn btn-outline-primary",
-          title: "Print Physical Challan Paper Slip",
-          onClick: () => onPrintChallan(c)
+          style: { borderColor: "#cbd5e1" },
+          onClick: () => setSearchTerm("")
         },
-        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-printer" })
-      ), /* @__PURE__ */ import_react36.default.createElement(
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-x fs-12" })
+      )), /* @__PURE__ */ import_react36.default.createElement(
+        "select",
+        {
+          className: "form-select form-select-sm bg-white fs-13",
+          style: { width: "160px", height: "36px", borderColor: "#cbd5e1" },
+          value: statusFilter,
+          onChange: (e) => setStatusFilter(e.target.value)
+        },
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "ALL" }, "All Link Status"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "LINKED" }, "Linked to PO"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "EMERGENCY" }, "Emergency (No PO)")
+      ), uniqueVendors.length > 0 && /* @__PURE__ */ import_react36.default.createElement(
+        "select",
+        {
+          className: "form-select form-select-sm bg-white fs-13",
+          style: { width: "180px", height: "36px", borderColor: "#cbd5e1" },
+          value: vendorFilter,
+          onChange: (e) => setVendorFilter(e.target.value)
+        },
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "ALL" }, "All Vendors"),
+        uniqueVendors.map((v, i) => /* @__PURE__ */ import_react36.default.createElement("option", { key: i, value: v }, v.split("(")[0].trim()))
+      )), /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement(
         "button",
         {
-          type: "button",
-          className: "btn btn-outline-success",
-          title: "Record Vendor Inbound Return against this Challan",
-          onClick: () => onRecordReturnFromChallan(c)
+          className: "btn btn-primary btn-sm px-3.5 shadow-sm d-flex align-items-center gap-1.5",
+          style: {
+            background: "#4f46e5",
+            borderColor: "#4f46e5",
+            height: "36px",
+            borderRadius: "8px",
+            fontWeight: "600"
+          },
+          onClick: onNewChallan
         },
-        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-receipt-refund" }),
-        " Inward Return"
-      ))));
-    })))));
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-truck-delivery fs-15" }),
+        /* @__PURE__ */ import_react36.default.createElement("span", null, "+ New Challan")
+      )))
+    ), /* @__PURE__ */ import_react36.default.createElement(
+      "div",
+      {
+        className: "card border shadow-sm",
+        style: {
+          borderRadius: "10px",
+          borderColor: "#e2e8f0",
+          background: "#ffffff",
+          overflow: "hidden"
+        }
+      },
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "px-3 py-2 bg-light border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-info-circle text-primary fs-14" }), /* @__PURE__ */ import_react36.default.createElement("span", null, /* @__PURE__ */ import_react36.default.createElement("strong", null, "Tip:"), " Click on any row bar to view and edit full Challan dispatch details.")), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-secondary fs-12 fw-medium" }, "Showing ", filtered.length, " of ", challans.length, " challans")),
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react36.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react36.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react36.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: "600", letterSpacing: "0.04em", textTransform: "uppercase" } }, /* @__PURE__ */ import_react36.default.createElement("th", { className: "py-2.5 ps-3", style: { width: "120px" } }, "Challan No"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { width: "110px" } }, "Dispatch Date"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { minWidth: "180px" } }, "Vendor"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { minWidth: "130px" } }, "Linked POs"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { minWidth: "130px" } }, "Stock Rolls/Bales"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { width: "80px" } }, "Folding"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end", style: { width: "130px" } }, "Dispatched Mtrs"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center", style: { width: "120px" } }, "Link Status"), /* @__PURE__ */ import_react36.default.createElement("th", { style: { width: "130px" } }, "Authorised By"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end pe-3", style: { width: "140px" } }, "Actions"))), /* @__PURE__ */ import_react36.default.createElement("tbody", null, filtered.length === 0 ? /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 10, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "rounded-circle d-flex align-items-center justify-content-center mb-2",
+          style: { width: "48px", height: "48px", background: "#f1f5f9", color: "#94a3b8" }
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-truck fs-24" })
+      ), /* @__PURE__ */ import_react36.default.createElement("span", { className: "fw-semibold text-dark fs-14" }, "No Challans Found"), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fs-12 mt-1" }, "Try adjusting your search or create a new Challan.")))) : filtered.map((c) => {
+        const isEmergency = c.po_link_status === "Pending PO Link";
+        return /* @__PURE__ */ import_react36.default.createElement(
+          "tr",
+          {
+            key: c.id || c.challan_number,
+            onClick: () => handleRowClick(c),
+            style: {
+              cursor: "pointer",
+              transition: "background-color 0.15s ease"
+            },
+            title: "Click anywhere to view / edit this Challan"
+          },
+          /* @__PURE__ */ import_react36.default.createElement("td", { className: "ps-3 py-3" }, /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              className: "badge font-monospace fw-bold px-2 py-1.5",
+              style: {
+                background: "rgba(79, 70, 229, 0.08)",
+                color: "#4338ca",
+                border: "1px solid rgba(79, 70, 229, 0.2)",
+                fontSize: "12px"
+              }
+            },
+            "#",
+            c.challan_number || c.id
+          )),
+          /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-secondary fw-medium" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-calendar text-muted fs-13" }), /* @__PURE__ */ import_react36.default.createElement("span", null, c.date))),
+          /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "fw-bold text-dark fs-13" }, c.vendor_name?.split("(")[0]?.trim() || c.vendor_name), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fs-11 d-block text-truncate", style: { maxWidth: "220px" } }, c.remarks || "Job Issue for Dyeing")),
+          /* @__PURE__ */ import_react36.default.createElement("td", null, Array.isArray(c.linked_pos) && c.linked_pos.length > 0 ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex flex-wrap gap-1" }, c.linked_pos.map((p, i) => /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              key: i,
+              className: "badge px-1.5 py-1",
+              style: {
+                background: "rgba(2, 132, 199, 0.1)",
+                color: "#0369a1",
+                border: "1px solid rgba(2, 132, 199, 0.2)",
+                fontSize: "11px",
+                fontWeight: "600"
+              }
+            },
+            p
+          ))) : /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              className: "badge px-2 py-1",
+              style: {
+                background: "rgba(239, 68, 68, 0.1)",
+                color: "#dc2626",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                fontSize: "11px"
+              }
+            },
+            "Emergency (No PO)"
+          )),
+          /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "fw-semibold text-dark fs-13" }, c.total_bales || 1, " Bale", " ", /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-muted fw-normal fs-11" }, "(", c.total_pieces || c.items?.length || 7, " Pcs)")), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fs-11" }, c.items?.[0]?.bale_roll_no ? `Roll: ${c.items[0].bale_roll_no}` : "Roll 12304")),
+          /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              className: "badge bg-light text-dark border px-2 py-1 font-monospace",
+              style: { borderColor: "#cbd5e1", fontSize: "11px" }
+            },
+            c.folding_notation || "L100"
+          )),
+          /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-bold fs-14", style: { color: "#4f46e5" } }, Number(c.grand_total_meters || 0).toFixed(2), " m"),
+          /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isEmergency ? /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              className: "badge px-2.5 py-1 rounded-pill",
+              style: {
+                background: "rgba(245, 158, 11, 0.1)",
+                color: "#b45309",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                fontSize: "11px",
+                fontWeight: "600"
+              }
+            },
+            /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-alert-triangle me-1" }),
+            " Pending Link"
+          ) : /* @__PURE__ */ import_react36.default.createElement(
+            "span",
+            {
+              className: "badge px-2.5 py-1 rounded-pill",
+              style: {
+                background: "rgba(16, 185, 129, 0.1)",
+                color: "#047857",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                fontSize: "11px",
+                fontWeight: "600"
+              }
+            },
+            /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-check me-1" }),
+            " Linked"
+          )),
+          /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "fw-medium text-dark fs-13" }, c.company_representative || "Anurag"), /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fs-11" }, "Signatory")),
+          /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end pe-3" }, /* @__PURE__ */ import_react36.default.createElement(
+            "div",
+            {
+              className: "d-inline-flex align-items-center gap-1.5",
+              onClick: (e) => e.stopPropagation()
+            },
+            /* @__PURE__ */ import_react36.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-light btn-sm p-1.5 rounded-2 text-dark border shadow-xs",
+                title: "Open & Edit Challan Details",
+                style: { borderColor: "#cbd5e1" },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  handleRowClick(c);
+                }
+              },
+              /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-pencil fs-14" })
+            ),
+            /* @__PURE__ */ import_react36.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-light btn-sm p-1.5 rounded-2 text-primary border shadow-xs",
+                title: "Print Physical Challan Slip",
+                style: { borderColor: "#cbd5e1" },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onPrintChallan && onPrintChallan(c);
+                }
+              },
+              /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-printer fs-14" })
+            ),
+            /* @__PURE__ */ import_react36.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-outline-success btn-sm px-2 py-1 rounded-2 shadow-xs d-flex align-items-center gap-1 fs-12 fw-semibold",
+                title: "Record Vendor Inbound Return against this Challan",
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onRecordReturnFromChallan && onRecordReturnFromChallan(c);
+                }
+              },
+              /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-receipt-refund fs-13" }),
+              /* @__PURE__ */ import_react36.default.createElement("span", null, "Inward Return")
+            )
+          ))
+        );
+      }))))
+    ));
   }
 
   // frontend/src/components/ProcessPO/ProcessChallanForm.jsx
@@ -43154,6 +43472,10 @@
         challans,
         onNewChallan: () => {
           setEditingChallan(null);
+          setShowChallanForm(true);
+        },
+        onEditChallan: (challan) => {
+          setEditingChallan(challan);
           setShowChallanForm(true);
         },
         onPrintChallan: handlePrintChallan,
