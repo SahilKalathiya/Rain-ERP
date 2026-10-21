@@ -289,74 +289,70 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     }
   };
 
-  // Recalculate row mathematics on field changes
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
-    const item = { ...newItems[index], [field]: value };
+  // Functional atomic update: guarantees latest state, zero race conditions, and automatic recalculations
+  const updateItem = (index, updates) => {
+    setItems((prevItems) => {
+      return prevItems.map((currItem, i) => {
+        if (i !== index) return currItem;
 
-    const consumption = parseFloat(item.consumption_per_piece) || 2.60;
-    const shrinkage = parseFloat(item.shrinkage_percent) || 4.00;
+        const item = { ...currItem, ...updates };
 
-    // 1. Bi-directional calculation: Metres <-> Pieces
-    if (field === 'quantity_meters') {
-      const meters = parseFloat(value) || 0;
-      item.quantity_pieces = (meters > 0 && consumption > 0) ? Math.floor(meters / consumption) : '';
-      item.raw_fabric_meters = meters > 0 ? Number((meters * (1 + shrinkage / 100)).toFixed(2)) : 0;
-    } else if (field === 'quantity_pieces') {
-      const pieces = parseInt(value, 10) || 0;
-      const calculatedMeters = pieces > 0 ? Number((pieces * consumption).toFixed(2)) : '';
-      item.quantity_meters = calculatedMeters;
-      item.raw_fabric_meters = calculatedMeters > 0 ? Number((calculatedMeters * (1 + shrinkage / 100)).toFixed(2)) : 0;
-    } else if (field === 'consumption_per_piece') {
-      const c = parseFloat(value) || 2.60;
-      const m = parseFloat(item.quantity_meters) || 0;
-      if (m > 0 && c > 0) {
-        item.quantity_pieces = Math.floor(m / c);
-      }
-    }
+        const consumption = parseFloat(item.consumption_per_piece) || 2.60;
+        const shrinkage = parseFloat(item.shrinkage_percent) || 4.00;
 
-    // 2. Cost calculations
-    const fabRate = parseFloat(item.fabric_rate) || 0;
-    const dyeingRate = parseFloat(item.dyeing_rate) || 0;
-    const totalUnitCost = fabRate + dyeingRate;
-    item.total_actual_cost = Number(totalUnitCost.toFixed(2));
+        // 1. Bi-directional calculation: Metres <-> Pieces
+        if ('quantity_meters' in updates) {
+          const meters = parseFloat(updates.quantity_meters) || 0;
+          item.quantity_pieces = (meters > 0 && consumption > 0) ? Math.floor(meters / consumption) : '';
+          item.raw_fabric_meters = meters > 0 ? Number((meters * (1 + shrinkage / 100)).toFixed(2)) : 0;
+        } else if ('quantity_pieces' in updates) {
+          const pieces = parseInt(updates.quantity_pieces, 10) || 0;
+          const calculatedMeters = pieces > 0 ? Number((pieces * consumption).toFixed(2)) : '';
+          item.quantity_meters = calculatedMeters;
+          item.raw_fabric_meters = calculatedMeters > 0 ? Number((calculatedMeters * (1 + shrinkage / 100)).toFixed(2)) : 0;
+        } else if ('consumption_per_piece' in updates) {
+          const c = parseFloat(updates.consumption_per_piece) || 2.60;
+          const m = parseFloat(item.quantity_meters) || 0;
+          if (m > 0 && c > 0) {
+            item.quantity_pieces = Math.floor(m / c);
+          }
+        }
 
-    const totalMtrs = parseFloat(item.quantity_meters) || 0;
-    item.total_amount = Number((totalMtrs * totalUnitCost).toFixed(2));
+        // 2. Auto-recommend dyeing rate when width is selected or updated
+        if ('width' in updates) {
+          const w = updates.width;
+          if (w === '44') item.dyeing_rate = 10.00;
+          else if (w === '48') item.dyeing_rate = 12.00;
+          else if (w === '58') item.dyeing_rate = 15.00;
+        }
 
-    newItems[index] = item;
-    setItems(newItems);
+        // 3. Cost calculations
+        const fabRate = parseFloat(item.fabric_rate) || 0;
+        const dyeingRate = parseFloat(item.dyeing_rate) || 0;
+        const totalUnitCost = fabRate + dyeingRate;
+        item.total_actual_cost = Number(totalUnitCost.toFixed(2));
+
+        const totalMtrs = parseFloat(item.quantity_meters) || 0;
+        item.total_amount = Number((totalMtrs * totalUnitCost).toFixed(2));
+
+        return item;
+      });
+    });
   };
 
-  // Auto-recommend dyeing rate based on width (only when width is selected)
-  const applyRecommendedDyeingRate = (index, customWidth = null) => {
-    const newItems = [...items];
-    const item = newItems[index];
-    const w = customWidth || item.width;
-    if (!w) return;
-
-    let recommended = 12.00;
-    if (w === '44') recommended = 10.00;
-    else if (w === '48') recommended = 12.00;
-    else if (w === '58') recommended = 15.00;
-
-    item.dyeing_rate = recommended;
-    const fabRate = parseFloat(item.fabric_rate) || 0;
-    const totalUnitCost = fabRate + recommended;
-    item.total_actual_cost = Number(totalUnitCost.toFixed(2));
-    const totalMtrs = parseFloat(item.quantity_meters) || 0;
-    item.total_amount = Number((totalMtrs * totalUnitCost).toFixed(2));
-    setItems(newItems);
+  const handleItemChange = (index, field, value) => {
+    updateItem(index, { [field]: value });
   };
 
   const addItemRow = () => {
-    setItems([...items, createEmptyRow(selectedStyle)]);
+    setItems(prevItems => [...prevItems, createEmptyRow(selectedStyle)]);
   };
 
   const removeItemRow = (index) => {
-    if (items.length <= 1) return;
-    const newItems = items.filter((_, idx) => idx !== index);
-    setItems(newItems);
+    setItems(prevItems => {
+      if (prevItems.length <= 1) return prevItems;
+      return prevItems.filter((_, idx) => idx !== index);
+    });
   };
 
   const handlePhotoUpload = (index, e) => {
@@ -972,19 +968,24 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                           />
                           <select
                             className="form-select form-select-sm fs-13 bg-white"
-                            value={item.fabric_id}
+                            value={item.fabric_id || ''}
                             disabled={isReadOnly}
                             style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 24px 4px 10px', fontSize: '13px', lineHeight: '1.4' }}
                             onChange={(e) => {
-                              const f = fabricList.find(fab => fab.id === e.target.value);
+                              const fId = e.target.value;
+                              const f = fabricList.find(fab => fab.id === fId);
                               if (f) {
-                                handleItemChange(idx, 'fabric_id', f.id);
-                                handleItemChange(idx, 'fabric_name', f.name || f.qualityName);
-                                handleItemChange(idx, 'fabric_rate', f.defaultRate || '');
+                                updateItem(idx, {
+                                  fabric_id: f.id,
+                                  fabric_name: f.name || f.qualityName,
+                                  fabric_rate: (f.defaultRate !== undefined && f.defaultRate !== null) ? f.defaultRate : ''
+                                });
                               } else {
-                                handleItemChange(idx, 'fabric_id', '');
-                                handleItemChange(idx, 'fabric_name', '');
-                                handleItemChange(idx, 'fabric_rate', '');
+                                updateItem(idx, {
+                                  fabric_id: '',
+                                  fabric_name: '',
+                                  fabric_rate: ''
+                                });
                               }
                             }}
                           >
@@ -1015,18 +1016,23 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             <select
                               className="border-0 p-0 fs-13 bg-transparent text-dark fw-medium w-100"
                               style={{ outline: 'none', boxShadow: 'none', height: '100%', cursor: 'pointer' }}
-                              value={item.color_name}
+                              value={item.color_name || ''}
                               disabled={isReadOnly}
                               onChange={(e) => {
                                 const colVal = e.target.value;
                                 const c = colorList.find(col => col.name === colVal);
-                                handleItemChange(idx, 'color_name', colVal);
                                 if (c) {
-                                  handleItemChange(idx, 'color_id', c.id || '');
-                                  handleItemChange(idx, 'color_hex', c.hex || '#cbd5e1');
+                                  updateItem(idx, {
+                                    color_id: c.id || '',
+                                    color_name: c.name,
+                                    color_hex: c.hex || '#cbd5e1'
+                                  });
                                 } else {
-                                  handleItemChange(idx, 'color_id', '');
-                                  handleItemChange(idx, 'color_hex', '#cbd5e1');
+                                  updateItem(idx, {
+                                    color_id: '',
+                                    color_name: colVal,
+                                    color_hex: '#cbd5e1'
+                                  });
                                 }
                               }}
                             >
@@ -1045,7 +1051,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             value={item.article_name || ''}
                             disabled={isReadOnly}
                             style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', paddingLeft: '8px', paddingRight: '20px', fontSize: '13px' }}
-                            onChange={(e) => handleItemChange(idx, 'article_name', e.target.value)}
+                            onChange={(e) => updateItem(idx, { article_name: e.target.value })}
                           >
                             <option value="">Select...</option>
                             {articleList.map((art) => (
@@ -1063,12 +1069,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             value={item.width || ''}
                             disabled={isReadOnly}
                             style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', paddingLeft: '8px', paddingRight: '24px' }}
-                            onChange={(e) => {
-                              handleItemChange(idx, 'width', e.target.value);
-                              if (e.target.value) {
-                                applyRecommendedDyeingRate(idx, e.target.value);
-                              }
-                            }}
+                            onChange={(e) => updateItem(idx, { width: e.target.value })}
                           >
                             <option value="">Select...</option>
                             <option value="44">44"</option>
