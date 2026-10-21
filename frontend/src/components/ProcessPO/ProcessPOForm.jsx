@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { initialVendors } from '../../data/procurementData';
+import { initialVendors, initialFabrics } from '../../data/procurementData';
+import VendorMasterView from '../Procurement/VendorMasterView';
+import FabricMasterView from '../Procurement/FabricMasterView';
 
 /**
  * ProcessPOForm - Clean, intuitive, enterprise-grade creation & edit form for Module 3 Process PO
  * All pre-filled dummy data removed: starts completely clean and blank for new entries.
  * Clear Sales Order Reference with zero truncation.
- * Simple, standard Style selection without confusing priority hierarchies.
- * Removed Section 3.1 technical disclaimer notes.
+ * Simple, standard Style selection.
+ * Clean Vendor selector with "+ New" vendor creation.
+ * Spacious Fabric, Color and Width dropdowns with zero text cutting or arrow collision.
  */
 export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDefault = false }) {
   const isEditingExisting = Boolean(initialPO && initialPO.id);
@@ -70,7 +73,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     'Stock Cambric Plain'
   ];
 
-  const availableFabrics = [
+  const initialFabricMasters = [
     { id: 'FAB-001', name: '100x100 Voile (Grey)', widths: ['44', '48', '58'], defaultRate: 25.00, shrinkage: 4.0 },
     { id: 'FAB-002', name: 'Rayon 14kg Liva', widths: ['44', '48', '58'], defaultRate: 30.00, shrinkage: 5.0 },
     { id: 'FAB-003', name: 'Cotton Cambric 60*60', widths: ['44', '58'], defaultRate: 42.00, shrinkage: 3.5 }
@@ -87,6 +90,30 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     { id: 'COL-008', name: 'Maroon', hex: '#800000' }
   ];
 
+  // Master lists with dynamic "+ New" addition
+  const [vendorList, setVendorList] = useState(initialVendors);
+  const [fabricList, setFabricList] = useState(() => {
+    const list = [...initialFabricMasters];
+    if (initialFabrics && initialFabrics.length > 0) {
+      initialFabrics.forEach(f => {
+        if (!list.some(existing => existing.id === f.id)) {
+          list.push({
+            id: f.id,
+            name: f.qualityName || f.name,
+            widths: f.widths || ['44', '48', '58'],
+            defaultRate: 25.00,
+            shrinkage: f.defaultShrinkage || 4.0
+          });
+        }
+      });
+    }
+    return list;
+  });
+
+  // Modals for inline creation
+  const [showInlineVendorModal, setShowInlineVendorModal] = useState(false);
+  const [showInlineFabricModal, setShowInlineFabricModal] = useState(false);
+
   // Quick instruction presets for fast addition to terms
   const instructionPresets = [
     'Strict Swatch Match Required',
@@ -96,7 +123,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     'Lot Separation for Dye Variance'
   ];
 
-  // Clean empty initial row
+  // Clean empty initial row - Zero pre-filled data! Width is completely blank!
   const createEmptyRow = (customStyle = '') => ({
     id: Date.now() + Math.random(),
     style_name: customStyle || '',
@@ -106,7 +133,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     color_name: '',
     color_hex: '#cbd5e1',
     article_name: '',
-    width: '48',
+    width: '', // BLANK! Not auto-filled!
     quantity_meters: '',
     quantity_pieces: '',
     consumption_per_piece: 2.60,
@@ -142,7 +169,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     initialPO?.linked_sales_order_id || ''
   );
 
-  // Style State - Simple and direct
+  // Style State
   const [selectedStyle, setSelectedStyle] = useState(
     initialPO?.style_names?.[0] || ''
   );
@@ -183,7 +210,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
 
   const handleStyleChange = (styleValue) => {
     setSelectedStyle(styleValue);
-    // Update first item's style if it is blank or matches previous style
     if (items.length > 0 && (!items[0].style_name || items[0].style_name === selectedStyle)) {
       const updated = [...items];
       updated[0].style_name = styleValue;
@@ -236,14 +262,17 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
     setItems(newItems);
   };
 
-  // Auto-recommend dyeing rate based on width
-  const applyRecommendedDyeingRate = (index) => {
+  // Auto-recommend dyeing rate based on width (only when width is selected)
+  const applyRecommendedDyeingRate = (index, customWidth = null) => {
     const newItems = [...items];
     const item = newItems[index];
+    const w = customWidth || item.width;
+    if (!w) return;
+
     let recommended = 12.00;
-    if (item.width === '44') recommended = 10.00;
-    else if (item.width === '48') recommended = 12.00;
-    else if (item.width === '58') recommended = 15.00;
+    if (w === '44') recommended = 10.00;
+    else if (w === '48') recommended = 12.00;
+    else if (w === '58') recommended = 15.00;
 
     item.dyeing_rate = recommended;
     const fabRate = parseFloat(item.fabric_rate) || 0;
@@ -283,7 +312,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!vendorId) {
-      alert('Please select a Job Work Vendor.');
+      alert('Please select a Vendor.');
       return;
     }
 
@@ -399,7 +428,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
         <div className="card-body p-4" style={{ background: '#f8fafc' }}>
 
           {/* ========================================================================= */}
-          {/* SECTION 1: ORDER LINK & STYLE SELECTION (CLEAN, SIMPLE & ATTRACTIVE)       */}
+          {/* SECTION 1: ORDER LINK & STYLE SELECTION                                    */}
           {/* ========================================================================= */}
           <div
             className="card border mb-4 shadow-sm"
@@ -480,7 +509,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
             <div className="p-4">
               <div className="row g-4 align-items-start">
                 
-                {/* Sales Order Reference - Clean, spacious, NO truncation, NOT pre-filled */}
+                {/* Sales Order Reference */}
                 {isOrderLinked ? (
                   <div className="col-lg-6 col-md-12">
                     <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
@@ -507,7 +536,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                       ))}
                     </select>
 
-                    {/* Order Details Badge Card - Only displayed when an order is actively chosen */}
                     {currentSelectedOrder && (
                       <div
                         className="mt-2.5 p-3 rounded-3 d-flex flex-column gap-1.5 border"
@@ -564,7 +592,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   </div>
                 )}
 
-                {/* Style Name - Simple, Clean & Intuitive (Replaces confusing priority hierarchy) */}
+                {/* Style Name */}
                 <div className="col-lg-6 col-md-12">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
                     <span>Style Name</span>
@@ -606,7 +634,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 2: PO HEADER DETAILS & VENDOR ASSIGNMENT                           */}
+          {/* SECTION 2: PO HEADER DETAILS & VENDOR ASSIGNMENT (WITH + NEW VENDOR)      */}
           {/* ========================================================================= */}
           <div
             className="card border mb-4 shadow-sm"
@@ -633,10 +661,10 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
               </div>
               <div>
                 <h6 className="mb-0 fw-bold text-dark fs-14">
-                  2. Purchase Order Details & Processing Vendor
+                  2. Purchase Order Details & Vendor
                 </h6>
                 <p className="text-muted fs-11 mb-0">
-                  Assign job worker factory, specify issue dates and delivery schedule
+                  Assign vendor, specify issue dates and delivery schedule
                 </p>
               </div>
             </div>
@@ -705,11 +733,22 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   />
                 </div>
 
-                {/* Job Work Vendor - Blank by default */}
+                {/* Vendor - Clean ERP style with "+ New" vendor button on the right */}
                 <div className="col-lg-6 col-md-6">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Job Work Vendor <span className="text-danger">*</span>
-                  </label>
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-0">
+                      Vendor <span className="text-danger">*</span>
+                    </label>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
+                        onClick={() => setShowInlineVendorModal(true)}
+                      >
+                        + New
+                      </button>
+                    )}
+                  </div>
                   <select
                     className="form-select form-select-sm bg-white fw-semibold text-dark fs-13"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
@@ -718,16 +757,16 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                     onChange={(e) => {
                       const vId = e.target.value;
                       setVendorId(vId);
-                      const v = initialVendors.find(vend => vend.id === vId);
-                      if (v) setVendorName(`${v.name} (${v.city})`);
+                      const v = vendorList.find(vend => vend.id === vId);
+                      if (v) setVendorName(`${v.name} ${v.city ? `(${v.city})` : ''}`);
                       else setVendorName('');
                     }}
                     required
                   >
-                    <option value="">-- Select Job Work Vendor --</option>
-                    {initialVendors.map(v => (
+                    <option value="">Select a vendor...</option>
+                    {vendorList.map(v => (
                       <option key={v.id} value={v.id}>
-                        {v.name} • {v.city} ({v.type || 'Job Worker'})
+                        {v.name} {v.city ? `(${v.city})` : ''}
                       </option>
                     ))}
                   </select>
@@ -753,7 +792,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 3: FABRIC & PROCESSING LINE ITEMS (POLISHED & SPACIOUS)           */}
+          {/* SECTION 3: FABRIC & PROCESSING LINE ITEMS                                 */}
           {/* ========================================================================= */}
           <div
             className="card border mb-4 shadow-sm"
@@ -807,10 +846,24 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   <thead style={{ background: '#f8fafc' }}>
                     <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                       <th className="text-center py-2" style={{ width: '38px', border: '1px solid #dee2e6' }}>#</th>
-                      <th style={{ minWidth: '220px', border: '1px solid #dee2e6', padding: '8px 10px' }}>Style & Base Fabric *</th>
-                      <th style={{ width: '165px', minWidth: '165px', border: '1px solid #dee2e6', padding: '8px 8px' }}>Color Shade *</th>
+                      <th style={{ minWidth: '270px', border: '1px solid #dee2e6', padding: '8px 10px' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span>STYLE & BASE FABRIC *</span>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
+                              onClick={() => setShowInlineFabricModal(true)}
+                              title="Add new fabric to master"
+                            >
+                              + New
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                      <th style={{ width: '190px', minWidth: '190px', border: '1px solid #dee2e6', padding: '8px 8px' }}>Color Shade *</th>
                       <th style={{ width: '90px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-center">Article</th>
-                      <th style={{ width: '80px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-center">Width</th>
+                      <th style={{ width: '105px', minWidth: '105px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-start">Width</th>
                       <th style={{ width: '115px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-primary">Metres *</th>
                       <th style={{ width: '105px', border: '1px solid #dee2e6', padding: '8px 8px' }} className="text-end text-dark">Pieces *</th>
                       <th style={{ width: '95px', border: '1px solid #dee2e6', padding: '8px 6px' }} className="text-end">Fab Rate (₹)</th>
@@ -826,28 +879,28 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                       <tr key={item.id || idx}>
                         <td className="text-center fw-bold text-muted" style={{ border: '1px solid #dee2e6', verticalAlign: 'middle' }}>{idx + 1}</td>
                         
-                        {/* Style & Fabric */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle' }}>
+                        {/* Style & Base Fabric - Spacious and never sliced vertically */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '8px 10px', verticalAlign: 'middle' }}>
                           <input
                             type="text"
-                            className="form-control form-control-sm fw-medium fs-12 mb-1 bg-white"
+                            className="form-control form-control-sm fw-medium fs-13 mb-1.5 bg-white"
                             placeholder="Style Name"
                             value={item.style_name || selectedStyle || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '30px', padding: '3px 8px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 10px', fontSize: '13px' }}
                             onChange={(e) => handleItemChange(idx, 'style_name', e.target.value)}
                           />
                           <select
-                            className="form-select form-select-sm fs-12 bg-white"
+                            className="form-select form-select-sm fs-13 bg-white"
                             value={item.fabric_id}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '30px', padding: '2px 8px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 24px 4px 10px', fontSize: '13px', lineHeight: '1.4' }}
                             onChange={(e) => {
-                              const f = availableFabrics.find(fab => fab.id === e.target.value);
+                              const f = fabricList.find(fab => fab.id === e.target.value);
                               if (f) {
                                 handleItemChange(idx, 'fabric_id', f.id);
-                                handleItemChange(idx, 'fabric_name', f.name);
-                                handleItemChange(idx, 'fabric_rate', f.defaultRate);
+                                handleItemChange(idx, 'fabric_name', f.name || f.qualityName);
+                                handleItemChange(idx, 'fabric_rate', f.defaultRate || '');
                               } else {
                                 handleItemChange(idx, 'fabric_id', '');
                                 handleItemChange(idx, 'fabric_name', '');
@@ -856,14 +909,14 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                             }}
                           >
                             <option value="">-- Select Fabric Quality --</option>
-                            {availableFabrics.map(fab => (
-                              <option key={fab.id} value={fab.id}>{fab.name}</option>
+                            {fabricList.map(fab => (
+                              <option key={fab.id} value={fab.id}>{fab.name || fab.qualityName}</option>
                             ))}
                           </select>
                         </td>
 
-                        {/* Color Shade - Integrated box, swatch on left, full clear text, NO cut-off */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 8px', verticalAlign: 'middle', minWidth: '165px' }}>
+                        {/* Color Shade - Full width, swatch on left, zero cut-off */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '8px 10px', verticalAlign: 'middle', minWidth: '190px' }}>
                           <div
                             className="d-flex align-items-center bg-white border"
                             style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '0 8px' }}
@@ -913,18 +966,21 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                           />
                         </td>
 
-                        {/* Width */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle' }}>
+                        {/* Width - NOT auto-filled, left aligned, zero arrow overlap */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '6px 6px', verticalAlign: 'middle', width: '105px', minWidth: '105px' }}>
                           <select
-                            className="form-select form-select-sm text-center bg-white fs-13"
-                            value={item.width || '48'}
+                            className="form-select form-select-sm text-start bg-white fs-13"
+                            value={item.width || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 6px' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', paddingLeft: '8px', paddingRight: '24px' }}
                             onChange={(e) => {
                               handleItemChange(idx, 'width', e.target.value);
-                              applyRecommendedDyeingRate(idx);
+                              if (e.target.value) {
+                                applyRecommendedDyeingRate(idx, e.target.value);
+                              }
                             }}
                           >
+                            <option value="">Select...</option>
                             <option value="44">44"</option>
                             <option value="48">48"</option>
                             <option value="58">58"</option>
@@ -1100,7 +1156,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 4: INSTRUCTIONS & TERMS (CLEAN & ELEGANT)                          */}
+          {/* SECTION 4: INSTRUCTIONS & TERMS                                           */}
           {/* ========================================================================= */}
           <div
             className="card border mb-2 shadow-sm"
@@ -1160,7 +1216,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   <textarea
                     className="form-control fs-13"
                     rows="3"
-                    placeholder="Enter vendor job work processing instructions, shrinkage tolerances, colorfastness standards..."
+                    placeholder="Enter vendor processing instructions, shrinkage tolerances, colorfastness standards..."
                     style={{ borderColor: '#cbd5e1', borderRadius: '8px' }}
                     value={terms}
                     disabled={isReadOnly}
@@ -1204,6 +1260,74 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           </div>
         </div>
       </form>
+
+      {/* Inline Modal: Vendor Master Creation */}
+      {showInlineVendorModal && (
+        <VendorMasterView
+          vendors={vendorList}
+          isInline={true}
+          onSaveVendor={(newVendor) => {
+            if (newVendor) {
+              setVendorList(prev => [newVendor, ...prev]);
+              setVendorId(newVendor.id);
+              setVendorName(`${newVendor.name} ${newVendor.city ? `(${newVendor.city})` : ''}`);
+            }
+          }}
+          onCloseInline={(newCreatedVendor) => {
+            if (newCreatedVendor) {
+              setVendorList(prev => [newCreatedVendor, ...prev]);
+              setVendorId(newCreatedVendor.id);
+              setVendorName(`${newCreatedVendor.name} ${newCreatedVendor.city ? `(${newCreatedVendor.city})` : ''}`);
+            }
+            setShowInlineVendorModal(false);
+          }}
+        />
+      )}
+
+      {/* Inline Modal: Fabric Master Creation */}
+      {showInlineFabricModal && (
+        <FabricMasterView
+          fabrics={fabricList}
+          isInline={true}
+          onSaveFabric={(newFabric) => {
+            if (newFabric) {
+              const formatted = {
+                id: newFabric.id,
+                name: newFabric.qualityName || newFabric.name,
+                widths: newFabric.widths || ['44', '48', '58'],
+                defaultRate: 25.00,
+                shrinkage: newFabric.defaultShrinkage || 4.0
+              };
+              setFabricList(prev => [formatted, ...prev]);
+              if (items.length > 0) {
+                const updated = [...items];
+                updated[0].fabric_id = formatted.id;
+                updated[0].fabric_name = formatted.name;
+                setItems(updated);
+              }
+            }
+          }}
+          onCloseInline={(newCreatedFabric) => {
+            if (newCreatedFabric) {
+              const formatted = {
+                id: newCreatedFabric.id,
+                name: newCreatedFabric.qualityName || newCreatedFabric.name,
+                widths: newCreatedFabric.widths || ['44', '48', '58'],
+                defaultRate: 25.00,
+                shrinkage: newCreatedFabric.defaultShrinkage || 4.0
+              };
+              setFabricList(prev => [formatted, ...prev]);
+              if (items.length > 0) {
+                const updated = [...items];
+                updated[0].fabric_id = formatted.id;
+                updated[0].fabric_name = formatted.name;
+                setItems(updated);
+              }
+            }
+            setShowInlineFabricModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
