@@ -2003,6 +2003,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   </div>
                                   <div className="d-flex flex-wrap gap-2">
                                     {(() => {
+                                      if (!fe.fabricQuality) {
+                                        return (
+                                          <span className="text-muted small fst-italic" style={{ fontSize: '12px' }}>
+                                            Please select a Fabric Quality in Step 1 first
+                                          </span>
+                                        );
+                                      }
                                       const availableWidths = getFabricWidths(fe.fabricQuality);
                                       const displayWidths = availableWidths.length > 0 ? availableWidths : STANDARD_WIDTHS;
                                       return displayWidths.map((w) => {

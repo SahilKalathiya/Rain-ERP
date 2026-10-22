@@ -30352,6 +30352,9 @@
               return /* @__PURE__ */ import_react14.default.createElement("option", { key: fq, value: fq }, fq, wLabel);
             })
           )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-1" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted small mb-0 fw-medium" }, "Step 2: Width Size(s) ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), fe.fabricQuality && /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, getFabricWidths(fe.fabricQuality).length > 0 ? `Configured in Master: ${getFabricWidths(fe.fabricQuality).join(", ")}` : "Standard Widths")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, (() => {
+            if (!fe.fabricQuality) {
+              return /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-muted small fst-italic", style: { fontSize: "12px" } }, "Please select a Fabric Quality in Step 1 first");
+            }
             const availableWidths = getFabricWidths(fe.fabricQuality);
             const displayWidths = availableWidths.length > 0 ? availableWidths : STANDARD_WIDTHS;
             return displayWidths.map((w) => {
