@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { resetExampleDataToDefaults } from '../../utils/dataReset';
 
 /**
  * Top Navbar Header Component with Interactive User Profile & Notification Dropdowns
@@ -359,6 +360,24 @@ export default function Header({
                   >
                     <i className="ti ti-help-circle fs-17 text-secondary" style={{ width: '20px', textAlign: 'center' }}></i>
                     <span className="fw-medium text-dark">Help &amp; Support</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-link text-decoration-none text-warning-emphasis d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all"
+                    style={{ width: '100%', textAlign: 'left', transition: 'background-color 0.15s ease' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fffbeb')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to remove all example/test data and restore original defaults?')) {
+                        resetExampleDataToDefaults(true);
+                        setShowProfileDropdown(false);
+                        window.location.reload();
+                      }
+                    }}
+                    title="Remove all test data and restore default seed data"
+                  >
+                    <i className="ti ti-refresh fs-17 text-warning" style={{ width: '20px', textAlign: 'center' }}></i>
+                    <span className="fw-medium text-dark">Reset to Default Data</span>
                   </button>
                 </div>
 

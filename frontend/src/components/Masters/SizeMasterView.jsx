@@ -528,18 +528,6 @@ export default function SizeMasterView() {
               <div className="d-flex align-items-center gap-2">
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline-primary rounded-3 px-2.5 py-1 small fw-semibold d-flex align-items-center gap-1"
-                  onClick={() => {
-                    setActiveSeriesForAddSize(series);
-                    setNewSizeForm({ sizeName: '', displayName: '', description: '' });
-                  }}
-                  title="Add more size to this series"
-                >
-                  <i className="ti ti-plus"></i>
-                  <span>Add Size</span>
-                </button>
-                <button
-                  type="button"
                   className="btn btn-sm btn-light text-secondary p-1.5 rounded-2"
                   title="Edit Series"
                   onClick={() => handleEditSeries(series)}

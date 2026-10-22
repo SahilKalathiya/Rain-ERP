@@ -14769,378 +14769,22 @@
 
   // frontend/src/components/Header/Header.jsx
   var import_react2 = __toESM(require_react());
-  function Header({
-    currentUser = {
-      name: "Saksham Garg",
-      role: "Procurement & Quality Manager",
-      email: "saksham.garg@rainerp.com",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
-    },
-    onNavigate,
-    onOpenAuth,
-    onLogout
-  }) {
-    const [showProfileDropdown, setShowProfileDropdown] = (0, import_react2.useState)(false);
-    const [notificationsEnabled, setNotificationsEnabled] = (0, import_react2.useState)(true);
-    const profileDropdownRef = (0, import_react2.useRef)(null);
-    const [searchGlobalQuery, setSearchGlobalQuery] = (0, import_react2.useState)("");
-    const [isSearchFocused, setIsSearchFocused] = (0, import_react2.useState)(false);
-    (0, import_react2.useEffect)(() => {
-      function handleClickOutside(event) {
-        if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
-          setShowProfileDropdown(false);
-        }
-      }
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-    const searchResults = import_react2.default.useMemo(() => {
-      const q = (searchGlobalQuery || "").trim().toLowerCase();
-      if (!q) return [];
-      const results = [];
-      const getSaved = (key) => {
-        try {
-          const item = localStorage.getItem(key);
-          return item ? JSON.parse(item) : [];
-        } catch (e) {
-          return [];
-        }
-      };
-      const customers = getSaved("erp_customers_v1");
-      customers.forEach((c) => {
-        if ((c.name || "").toLowerCase().includes(q) || (c.id || "").toLowerCase().includes(q) || (c.type || "").toLowerCase().includes(q) || (c.city || "").toLowerCase().includes(q)) {
-          results.push({
-            icon: "\u{1F465}",
-            title: c.name,
-            subtitle: `${c.id} \u2022 ${c.type} \u2022 ${c.city || ""}`,
-            category: "Customer",
-            route: "/customers"
-          });
-        }
-      });
-      const colors = getSaved("erp_colors_master_v1");
-      colors.forEach((col) => {
-        if ((col.name || "").toLowerCase().includes(q) || (col.hexCode || "").toLowerCase().includes(q) || (col.pantoneCode || "").toLowerCase().includes(q)) {
-          results.push({
-            icon: "\u{1F3A8}",
-            title: col.name,
-            subtitle: `${col.id} \u2022 ${col.hexCode} \u2022 ${col.pantoneCode || ""}`,
-            category: "Color",
-            route: "/colors"
-          });
-        }
-      });
-      const articles = getSaved("erp_articles_v1");
-      articles.forEach((art) => {
-        if ((art.name || "").toLowerCase().includes(q) || (art.id || "").toLowerCase().includes(q) || (art.description || "").toLowerCase().includes(q)) {
-          results.push({
-            icon: art.icon || "\u{1F455}",
-            title: art.name,
-            subtitle: `${art.id} \u2022 Priority #${art.sortOrder || "\u2014"}`,
-            category: "Article",
-            route: "/articles"
-          });
-        }
-      });
-      const sizeSeries = getSaved("erp_size_series_v1");
-      sizeSeries.forEach((ser) => {
-        if ((ser.name || "").toLowerCase().includes(q) || (ser.id || "").toLowerCase().includes(q) || (ser.sizes || []).some((sz) => String(sz).toLowerCase().includes(q))) {
-          results.push({
-            icon: "\u{1F4CF}",
-            title: ser.name,
-            subtitle: `${ser.id} \u2022 Sizes: ${(ser.sizes || []).slice(0, 5).join(", ")}...`,
-            category: "Size Series",
-            route: "/sizes"
-          });
-        }
-      });
-      const accessories = getSaved("erp_accessories_master_v1");
-      accessories.forEach((acc) => {
-        if ((acc.name || "").toLowerCase().includes(q) || (acc.id || "").toLowerCase().includes(q) || (acc.category || "").toLowerCase().includes(q) || (acc.threadPattern || "").toLowerCase().includes(q)) {
-          results.push({
-            icon: "\u{1F9F5}",
-            title: acc.name,
-            subtitle: `${acc.id} \u2022 ${acc.category} ${acc.threadPattern ? `(${acc.threadPattern})` : ""}`,
-            category: "Accessory",
-            route: "/accessories"
-          });
-        }
-      });
-      return results.slice(0, 10);
-    }, [searchGlobalQuery]);
-    return /* @__PURE__ */ import_react2.default.createElement("header", { className: "navbar navbar-expand bg-white border-bottom px-4 py-2 sticky-top shadow-none", style: { zIndex: 1040 } }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "container-fluid p-0 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative", style: { width: "420px" } }, /* @__PURE__ */ import_react2.default.createElement(
-      "i",
-      {
-        className: "ti ti-search position-absolute text-muted fs-15",
-        style: {
-          left: "14px",
-          top: "50%",
-          transform: "translateY(-50%)",
-          pointerEvents: "none",
-          zIndex: 2
-        }
-      }
-    ), /* @__PURE__ */ import_react2.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control bg-light fs-13 search-input-integrated",
-        style: {
-          borderRadius: "10px",
-          border: "1px solid #e2e8f0",
-          backgroundColor: "#f8fafc",
-          paddingLeft: "38px",
-          paddingRight: searchGlobalQuery ? "32px" : "14px"
-        },
-        placeholder: "Search across customers, colors, articles, sizes, accessories...",
-        value: searchGlobalQuery,
-        onChange: (e) => setSearchGlobalQuery(e.target.value),
-        onFocus: () => setIsSearchFocused(true)
-      }
-    ), searchGlobalQuery && /* @__PURE__ */ import_react2.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-xs btn-link text-muted position-absolute p-0 text-decoration-none",
-        style: { right: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 3 },
-        onClick: () => {
-          setSearchGlobalQuery("");
-          setIsSearchFocused(false);
-        }
-      },
-      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-x" })
-    ), isSearchFocused && searchGlobalQuery.trim().length > 0 && /* @__PURE__ */ import_react2.default.createElement(
-      "div",
-      {
-        className: "position-absolute start-0 end-0 mt-1 bg-white rounded-3 shadow-xl border overflow-hidden",
-        style: {
-          zIndex: 1060,
-          maxHeight: "380px",
-          overflowY: "auto",
-          borderColor: "#cbd5e1"
-        }
-      },
-      searchResults.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "p-3 text-center text-muted small" }, 'No records found matching "', searchGlobalQuery, '"') : /* @__PURE__ */ import_react2.default.createElement("div", { className: "py-1" }, searchResults.map((item, idx) => /* @__PURE__ */ import_react2.default.createElement(
-        "div",
-        {
-          key: idx,
-          className: "px-3 py-2 border-bottom d-flex align-items-center justify-content-between hover-bg-light cursor-pointer",
-          style: { cursor: "pointer", transition: "background-color 0.15s ease" },
-          onMouseDown: () => {
-            setIsSearchFocused(false);
-            setSearchGlobalQuery("");
-            if (onNavigate) onNavigate(item.route);
-          }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "fs-5" }, item.icon), /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "fw-bold text-dark fs-13" }, item.title), /* @__PURE__ */ import_react2.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, item.subtitle))),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "badge bg-light text-secondary border font-monospace small" }, item.category)
-      )))
-    )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react2.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-primary btn-sm d-flex align-items-center gap-2 rounded-pill px-3 py-1 fs-12 shadow-sm"
-      },
-      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-sparkles fs-13" }),
-      /* @__PURE__ */ import_react2.default.createElement("span", null, "AI Assistance")
-    ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative ms-1", ref: profileDropdownRef }, /* @__PURE__ */ import_react2.default.createElement(
-      "div",
-      {
-        className: "d-flex align-items-center gap-2 cursor-pointer p-1 rounded-pill hover-bg-light transition-all",
-        style: { cursor: "pointer" },
-        onClick: () => {
-          setShowProfileDropdown(!showProfileDropdown);
-        }
-      },
-      /* @__PURE__ */ import_react2.default.createElement(
-        "img",
-        {
-          src: currentUser.avatar,
-          alt: currentUser.name,
-          className: "rounded-circle border",
-          style: { width: "36px", height: "36px", objectFit: "cover" },
-          onError: (e) => {
-            e.target.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces";
-          }
-        }
-      )
-    ), showProfileDropdown && /* @__PURE__ */ import_react2.default.createElement(
-      "div",
-      {
-        className: "position-absolute end-0 mt-2 bg-white rounded-4 shadow-xl border p-3 transition-all",
-        style: {
-          width: "280px",
-          zIndex: 1050,
-          boxShadow: "0 12px 32px rgba(15, 23, 42, 0.15)",
-          borderColor: "#e2e8f0"
-        }
-      },
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-3 pb-3 mb-2 border-bottom text-start" }, /* @__PURE__ */ import_react2.default.createElement(
-        "img",
-        {
-          src: currentUser.avatar,
-          alt: currentUser.name,
-          className: "rounded-circle border shadow-xs",
-          style: { width: "48px", height: "48px", objectFit: "cover" }
-        }
-      ), /* @__PURE__ */ import_react2.default.createElement("div", { style: { minWidth: 0, textAlign: "left" } }, /* @__PURE__ */ import_react2.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-14 text-truncate" }, currentUser.name), /* @__PURE__ */ import_react2.default.createElement("span", { className: "text-secondary fs-12 text-truncate d-block" }, currentUser.role))),
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex flex-column gap-1" }, /* @__PURE__ */ import_react2.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
-          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
-          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
-          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
-          onClick: () => {
-            setShowProfileDropdown(false);
-            if (onNavigate) onNavigate("/profile-settings");
-          }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-user-circle fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Profile Settings")
-      ), /* @__PURE__ */ import_react2.default.createElement(
-        "div",
-        {
-          className: "d-flex align-items-center justify-content-between px-3 py-2 rounded-3 fs-13 transition-all",
-          style: { transition: "background-color 0.15s ease" },
-          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
-          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent"
-        },
-        /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2.5 text-dark", style: { textAlign: "left" } }, /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-bell fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium" }, "Notifications")),
-        /* @__PURE__ */ import_react2.default.createElement("div", { className: "form-check form-switch m-0 d-flex align-items-center" }, /* @__PURE__ */ import_react2.default.createElement(
-          "input",
-          {
-            className: "form-check-input",
-            type: "checkbox",
-            id: "headerNotificationToggle",
-            style: { cursor: "pointer", width: "38px", height: "20px" },
-            checked: notificationsEnabled,
-            onChange: () => setNotificationsEnabled(!notificationsEnabled)
-          }
-        ))
-      ), /* @__PURE__ */ import_react2.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
-          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
-          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
-          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
-          onClick: () => {
-            setShowProfileDropdown(false);
-            if (onNavigate) onNavigate("/dashboard");
-          }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-notes fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Activity Logs")
-      ), /* @__PURE__ */ import_react2.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
-          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
-          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
-          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
-          onClick: () => {
-            setShowProfileDropdown(false);
-            alert("Help & Support: Call +91 98765 43210 or email support@rainerp.com");
-          }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-help-circle fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Help & Support")
-      )),
-      /* @__PURE__ */ import_react2.default.createElement("div", { className: "pt-2 mt-2 border-top" }, /* @__PURE__ */ import_react2.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link text-decoration-none text-danger d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 w-100 text-start transition-all",
-          style: { textAlign: "left", transition: "background-color 0.15s ease" },
-          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#fef2f2",
-          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
-          onClick: () => {
-            setShowProfileDropdown(false);
-            if (onLogout) onLogout();
-          }
-        },
-        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-logout fs-17 text-danger", style: { width: "20px", textAlign: "center" } }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-semibold text-danger" }, "Log Out")
-      ))
-    )))));
-  }
 
-  // frontend/src/components/Orders/OrdersModule.jsx
-  var import_react12 = __toESM(require_react());
-
-  // frontend/src/components/Orders/OrdersListView.jsx
-  var import_react3 = __toESM(require_react());
+  // frontend/src/data/procurementData.js
+  var initialVendors = [];
+  var initialFabrics = [];
+  var initialTransporters = [];
+  var initialPurchaseOrders = [];
+  var initialGRNs = [];
+  var initialQualityChecks = [];
+  var initialRejectedStock = [];
+  var initialAuditLogs = [];
+  var initialColors = [];
 
   // frontend/src/data/salesOrderData.js
-  var initialCustomers = [
-    {
-      id: "CUST-001",
-      name: "Manyavar Trends Retail",
-      type: "B2B Retailer",
-      phone: "9898012345",
-      email: "orders@manyavar.com",
-      address: "Plot 102, Ring Road Industrial Area",
-      city: "Surat",
-      state: "Gujarat",
-      gstin: "24AAACM1234F1Z1",
-      active: true,
-      notes: "Premium festive menswear retailer"
-    },
-    {
-      id: "CUST-002",
-      name: "FabIndia Lifestyle Hub",
-      type: "Distributor",
-      phone: "9822054321",
-      email: "supply@fabindia.net",
-      address: "Unit 44, Phoenix Mills, Lower Parel",
-      city: "Mumbai",
-      state: "Maharashtra",
-      gstin: "27AABCF5678G1Z2",
-      active: true,
-      notes: "Natural organic cotton orders"
-    },
-    {
-      id: "CUST-003",
-      name: "Ethnicity Boutiques",
-      type: "Direct Customer",
-      phone: "9711098765",
-      email: "purchase@ethnicity.co.in",
-      address: "Johari Bazaar, Pink City",
-      city: "Jaipur",
-      state: "Rajasthan",
-      gstin: "08AACCE9012H1Z3",
-      active: true,
-      notes: "Handcrafted prints & ikkat specialist"
-    }
-  ];
-  var initialColors = [
-    { id: "COL-001", name: "Charcoal", hexCode: "#333333", pantoneCode: "PANTONE 19-4008", quarterTag: "Q1", isTrending: true, active: true },
-    { id: "COL-002", name: "Green", hexCode: "#228B22", pantoneCode: "PANTONE 18-6030", quarterTag: "Q1", isTrending: true, active: true },
-    { id: "COL-003", name: "Ivory", hexCode: "#FFFFF0", pantoneCode: "PANTONE 11-0601", quarterTag: "Q2", isTrending: true, active: true },
-    { id: "COL-004", name: "Jamun", hexCode: "#4B0082", pantoneCode: "PANTONE 19-3518", quarterTag: "Q3", isTrending: true, active: true },
-    { id: "COL-005", name: "Lavender", hexCode: "#E6E6FA", pantoneCode: "PANTONE 14-3907", quarterTag: "Q2", isTrending: false, active: true },
-    { id: "COL-006", name: "Maroon", hexCode: "#800000", pantoneCode: "PANTONE 19-1528", quarterTag: "Q4", isTrending: true, active: true },
-    { id: "COL-007", name: "Navy Blue", hexCode: "#000080", pantoneCode: "PANTONE 19-3832", quarterTag: "Q1", isTrending: true, active: true },
-    { id: "COL-008", name: "Pastel Red", hexCode: "#FF6961", pantoneCode: "PANTONE 16-1546", quarterTag: "Q2", isTrending: false, active: true },
-    { id: "COL-009", name: "Rama Green", hexCode: "#20B2AA", pantoneCode: "PANTONE 16-5121", quarterTag: "Q3", isTrending: true, active: true },
-    { id: "COL-010", name: "Rust Light", hexCode: "#B7410E", pantoneCode: "PANTONE 18-1248", quarterTag: "Q4", isTrending: true, active: true },
-    { id: "COL-011", name: "Sea Green", hexCode: "#2E8B57", pantoneCode: "PANTONE 16-5418", quarterTag: "Q1", isTrending: false, active: true },
-    { id: "COL-012", name: "Watermelon", hexCode: "#FC6C85", pantoneCode: "PANTONE 16-1735", quarterTag: "Q2", isTrending: true, active: true },
-    { id: "COL-013", name: "Wine", hexCode: "#722F37", pantoneCode: "PANTONE 19-1815", quarterTag: "Q4", isTrending: true, active: true },
-    { id: "COL-014", name: "Yellow", hexCode: "#FFD700", pantoneCode: "PANTONE 13-0858", quarterTag: "Q3", isTrending: false, active: true }
-  ];
-  var initialArticles = [
-    { id: "ART-001", name: "Kurta", icon: "\u{1F458}", sortOrder: 1, description: "Men & Women Long Tunics / Kurtas", active: true },
-    { id: "ART-002", name: "Pant", icon: "\u{1F456}", sortOrder: 2, description: "Pants, Churidars & Trousers", active: true },
-    { id: "ART-003", name: "Dupatta", icon: "\u{1F380}", sortOrder: 3, description: "Stoles & Chiffon/Mulmul Dupattas", active: true },
-    { id: "ART-004", name: "Jacket", icon: "\u{1F9E5}", sortOrder: 4, description: "Nehru & Modi Cut Waistcoats", active: true },
-    { id: "ART-005", name: "Top", icon: "\u{1F45A}", sortOrder: 5, description: "Short Tunics / Western Tops", active: true },
-    { id: "ART-006", name: "Bottom", icon: "\u{1FA73}", sortOrder: 6, description: "Pants & Palazzos", active: true }
-  ];
+  var initialCustomers = [];
+  var initialColors2 = [];
+  var initialArticles = [];
   var initialSizeSeries = [
     {
       id: "SER-ALPHA",
@@ -15930,219 +15574,7 @@
       active: true
     }
   ];
-  var initialSalesOrders = [
-    {
-      id: "RD-2610-0002",
-      styleName: "kurta",
-      orderDate: "2026-10-12",
-      expectedDelivery: "2026-11-20",
-      priority: "Normal",
-      status: "Draft",
-      stage: "Draft",
-      totalGarments: 200,
-      totalFabricGreige: 0,
-      totalFabricDyed: 0,
-      articles: [
-        {
-          id: "ART-001",
-          name: "Kurta",
-          fabricQuality: "Desizer Flex",
-          avgGarmentLength: "40.00",
-          totalPieces: 200,
-          sourcing: "Greige",
-          shrinkage: 6
-        },
-        {
-          id: "ART-002",
-          name: "Pant",
-          fabricQuality: "Chanderi Silk",
-          avgGarmentLength: "38.00",
-          totalPieces: 200,
-          sourcing: "Greige",
-          shrinkage: 3
-        }
-      ],
-      customerOrders: [
-        { id: "CUST-001", customerName: "Customer 1", selectedColors: ["Charcoal", "Green"], totalPieces: 100 },
-        { id: "CUST-002", customerName: "Customer 2", selectedColors: ["Charcoal", "Green"], totalPieces: 100 }
-      ],
-      fabricConsumptions: [
-        {
-          key: "Kurta_Charcoal",
-          articleName: "Kurta",
-          articleCode: "KURTA",
-          fabricQuality: "Desizer Flex",
-          width: "\u2014",
-          colorName: "Charcoal",
-          colorHex: "#333333",
-          dyedRate: 0,
-          shrinkPct: 6,
-          pcs: 100
-        },
-        {
-          key: "Kurta_Green",
-          articleName: "Kurta",
-          articleCode: "KURTA",
-          fabricQuality: "Desizer Flex",
-          width: "\u2014",
-          colorName: "Green",
-          colorHex: "#228B22",
-          dyedRate: 0,
-          shrinkPct: 6,
-          pcs: 100
-        },
-        {
-          key: "Pant_Charcoal",
-          articleName: "Pant",
-          articleCode: "PANT",
-          fabricQuality: "Chanderi Silk",
-          width: "\u2014",
-          colorName: "Charcoal",
-          colorHex: "#333333",
-          dyedRate: 0,
-          shrinkPct: 3,
-          pcs: 100
-        },
-        {
-          key: "Pant_Green",
-          articleName: "Pant",
-          articleCode: "PANT",
-          fabricQuality: "Chanderi Silk",
-          width: "\u2014",
-          colorName: "Green",
-          colorHex: "#228B22",
-          dyedRate: 0,
-          shrinkPct: 3,
-          pcs: 100
-        }
-      ],
-      createdAt: "2026-10-12 10:00 AM"
-    },
-    {
-      id: "ORD-2026-001",
-      styleName: "Ikkat Black Kurta Set",
-      orderDate: "2026-10-09",
-      expectedDelivery: "2026-11-15",
-      priority: "High",
-      sizeSeriesId: "SER-ALPHA",
-      sizeSeriesName: "Alphabetic Series",
-      status: "Confirmed",
-      stage: "Fabric Dyeing in Progress",
-      totalGarments: 1100,
-      totalFabricGreige: 2460.5,
-      totalFabricDyed: 2100,
-      estimatedCost: 88500,
-      createdBy: "Saksham Garg",
-      createdAt: "2026-10-09 11:30 AM",
-      tracking: {
-        fabricDyeing: { status: "In Progress", sentDate: "2026-10-09", expectedReturn: "2026-10-18", metersSent: 2460.5 },
-        grn: { totalReceived: 1, status: "Bale Entry Verified" },
-        qc: { totalChecks: 1, result: "Passed (Grade A)" }
-      },
-      articles: [
-        {
-          id: "ART-001",
-          name: "Kurta",
-          avgGarmentLength: 42.5,
-          numberOfFabricPieces: 1,
-          fabrics: [
-            { pieceLabel: "Main Body", fabricId: "FAB-001", fabricName: "100/100 Mulmul", width: '44"', shrinkagePercent: 4, bufferPercent: 2, fabricRate: 28.5, dyedRate: 42 }
-          ]
-        },
-        {
-          id: "ART-002",
-          name: "Pant",
-          avgGarmentLength: 38,
-          numberOfFabricPieces: 1,
-          fabrics: [
-            { pieceLabel: "Pant Leg", fabricId: "FAB-002", fabricName: "2.40/20s CF", width: '47"', shrinkagePercent: 3.5, bufferPercent: 2, fabricRate: 35, dyedRate: 52 }
-          ]
-        }
-      ],
-      customers: [
-        { id: "CUST-001", name: "Manyavar Trends Retail", assignedArticles: ["Kurta", "Pant"] },
-        { id: "CUST-002", name: "FabIndia Lifestyle Hub", assignedArticles: ["Kurta"] }
-      ],
-      colors: ["Charcoal", "Green"],
-      matrices: [
-        {
-          groupName: "Kurta & Pant Matching Pair",
-          isUniform: true,
-          ratioUsed: true,
-          ratioString: "1:2:2:1",
-          baseQuantity: 100,
-          quantities: {
-            "Charcoal": { S: 100, M: 200, L: 200, XL: 100, Total: 600 },
-            "Green": { S: 80, M: 160, L: 160, XL: 100, Total: 500 }
-          }
-        }
-      ],
-      fabricConsumptions: [
-        {
-          articleName: "Kurta",
-          fabricName: "100/100 Mulmul",
-          colorName: "Charcoal",
-          width: '44"',
-          consumptionPerGarment: 1.5,
-          pieces: 600,
-          shrinkPercent: 4,
-          totalDyed: 900,
-          totalGreige: 954.7,
-          fabricRate: 28.5,
-          dyedRate: 42
-        },
-        {
-          articleName: "Kurta",
-          fabricName: "100/100 Mulmul",
-          colorName: "Green",
-          width: '44"',
-          consumptionPerGarment: 1.5,
-          pieces: 500,
-          shrinkPercent: 4,
-          totalDyed: 750,
-          totalGreige: 795.6,
-          fabricRate: 28.5,
-          dyedRate: 42
-        },
-        {
-          articleName: "Pant",
-          fabricName: "2.40/20s CF",
-          colorName: "Charcoal",
-          width: '47"',
-          consumptionPerGarment: 1.2,
-          pieces: 600,
-          shrinkPercent: 3.5,
-          totalDyed: 720,
-          totalGreige: 760.3,
-          fabricRate: 35,
-          dyedRate: 52
-        }
-      ],
-      accessories: [
-        {
-          category: "Buttons",
-          varietyName: "Coconut Natural Buttons (18L)",
-          unit: "Piece",
-          appliesTo: ["Kurta"],
-          rows: [
-            {
-              article: "Kurta",
-              articleColor: "All colours",
-              totalGarments: 1100,
-              placement: "",
-              accessoryColor: "",
-              size: "",
-              source: "",
-              reqPerPiece: "",
-              extraPerPack: "",
-              bufferPercent: "",
-              totalQuantity: 0
-            }
-          ]
-        }
-      ]
-    }
-  ];
+  var initialSalesOrders = [];
   var getStoredData = (key, fallback) => {
     try {
       const saved = localStorage.getItem(key);
@@ -16316,7 +15748,370 @@
     setStoredData("erp_thread_brand_colors_v1", data);
   };
 
+  // frontend/src/utils/dataReset.js
+  function resetExampleDataToDefaults(force = false) {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+    const CLEANUP_KEY = "erp_blank_state_clean_v5";
+    if (!force && localStorage.getItem(CLEANUP_KEY) === "true") {
+      return;
+    }
+    try {
+      localStorage.setItem("erp_sales_orders_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_pos_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_vendors_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_fabrics_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_transporters_v1", JSON.stringify([]));
+      localStorage.setItem("erp_customers_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_grns_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_qcs_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_rejected_stock_v1", JSON.stringify([]));
+      localStorage.setItem("erp_open_bales", JSON.stringify([]));
+      localStorage.setItem("raindrop_activity_logs_v1", JSON.stringify([]));
+      localStorage.setItem("raindrop_audit_logs_v1", JSON.stringify([]));
+      localStorage.setItem("erp_size_series_v1", JSON.stringify(initialSizeSeries));
+      localStorage.setItem("raindrop_colors_v1", JSON.stringify(initialColors2));
+      localStorage.setItem("erp_colors_master_v1", JSON.stringify(initialColors2));
+      localStorage.setItem("erp_accessories_master_v1", JSON.stringify(initialAccessoryMasters));
+      localStorage.setItem("erp_articles_v1", JSON.stringify(initialArticles));
+      localStorage.setItem("erp_thread_sizes_v1", JSON.stringify(initialThreadSizes));
+      localStorage.setItem("erp_thread_brand_colors_v1", JSON.stringify(initialThreadBrandColors));
+      localStorage.setItem(CLEANUP_KEY, "true");
+      window.dispatchEvent(new Event("erp_sales_order_updated"));
+      window.dispatchEvent(new Event("erp_size_series_updated"));
+      window.dispatchEvent(new Event("erp_accessories_master_updated"));
+      window.dispatchEvent(new Event("erp_articles_updated"));
+      window.dispatchEvent(new Event("storage"));
+      console.log("[ERP Data Cleanup] Successfully purged all sample POs, Orders, Fabrics and Vendor data.");
+    } catch (err) {
+      console.error("[ERP Data Cleanup Error]", err);
+    }
+  }
+
+  // frontend/src/components/Header/Header.jsx
+  function Header({
+    currentUser = {
+      name: "Saksham Garg",
+      role: "Procurement & Quality Manager",
+      email: "saksham.garg@rainerp.com",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
+    },
+    onNavigate,
+    onOpenAuth,
+    onLogout
+  }) {
+    const [showProfileDropdown, setShowProfileDropdown] = (0, import_react2.useState)(false);
+    const [notificationsEnabled, setNotificationsEnabled] = (0, import_react2.useState)(true);
+    const profileDropdownRef = (0, import_react2.useRef)(null);
+    const [searchGlobalQuery, setSearchGlobalQuery] = (0, import_react2.useState)("");
+    const [isSearchFocused, setIsSearchFocused] = (0, import_react2.useState)(false);
+    (0, import_react2.useEffect)(() => {
+      function handleClickOutside(event) {
+        if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+          setShowProfileDropdown(false);
+        }
+      }
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+    const searchResults = import_react2.default.useMemo(() => {
+      const q = (searchGlobalQuery || "").trim().toLowerCase();
+      if (!q) return [];
+      const results = [];
+      const getSaved = (key) => {
+        try {
+          const item = localStorage.getItem(key);
+          return item ? JSON.parse(item) : [];
+        } catch (e) {
+          return [];
+        }
+      };
+      const customers = getSaved("erp_customers_v1");
+      customers.forEach((c) => {
+        if ((c.name || "").toLowerCase().includes(q) || (c.id || "").toLowerCase().includes(q) || (c.type || "").toLowerCase().includes(q) || (c.city || "").toLowerCase().includes(q)) {
+          results.push({
+            icon: "\u{1F465}",
+            title: c.name,
+            subtitle: `${c.id} \u2022 ${c.type} \u2022 ${c.city || ""}`,
+            category: "Customer",
+            route: "/customers"
+          });
+        }
+      });
+      const colors = getSaved("erp_colors_master_v1");
+      colors.forEach((col) => {
+        if ((col.name || "").toLowerCase().includes(q) || (col.hexCode || "").toLowerCase().includes(q) || (col.pantoneCode || "").toLowerCase().includes(q)) {
+          results.push({
+            icon: "\u{1F3A8}",
+            title: col.name,
+            subtitle: `${col.id} \u2022 ${col.hexCode} \u2022 ${col.pantoneCode || ""}`,
+            category: "Color",
+            route: "/colors"
+          });
+        }
+      });
+      const articles = getSaved("erp_articles_v1");
+      articles.forEach((art) => {
+        if ((art.name || "").toLowerCase().includes(q) || (art.id || "").toLowerCase().includes(q) || (art.description || "").toLowerCase().includes(q)) {
+          results.push({
+            icon: art.icon || "\u{1F455}",
+            title: art.name,
+            subtitle: `${art.id} \u2022 Priority #${art.sortOrder || "\u2014"}`,
+            category: "Article",
+            route: "/articles"
+          });
+        }
+      });
+      const sizeSeries = getSaved("erp_size_series_v1");
+      sizeSeries.forEach((ser) => {
+        if ((ser.name || "").toLowerCase().includes(q) || (ser.id || "").toLowerCase().includes(q) || (ser.sizes || []).some((sz) => String(sz).toLowerCase().includes(q))) {
+          results.push({
+            icon: "\u{1F4CF}",
+            title: ser.name,
+            subtitle: `${ser.id} \u2022 Sizes: ${(ser.sizes || []).slice(0, 5).join(", ")}...`,
+            category: "Size Series",
+            route: "/sizes"
+          });
+        }
+      });
+      const accessories = getSaved("erp_accessories_master_v1");
+      accessories.forEach((acc) => {
+        if ((acc.name || "").toLowerCase().includes(q) || (acc.id || "").toLowerCase().includes(q) || (acc.category || "").toLowerCase().includes(q) || (acc.threadPattern || "").toLowerCase().includes(q)) {
+          results.push({
+            icon: "\u{1F9F5}",
+            title: acc.name,
+            subtitle: `${acc.id} \u2022 ${acc.category} ${acc.threadPattern ? `(${acc.threadPattern})` : ""}`,
+            category: "Accessory",
+            route: "/accessories"
+          });
+        }
+      });
+      return results.slice(0, 10);
+    }, [searchGlobalQuery]);
+    return /* @__PURE__ */ import_react2.default.createElement("header", { className: "navbar navbar-expand bg-white border-bottom px-4 py-2 sticky-top shadow-none", style: { zIndex: 1040 } }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "container-fluid p-0 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative", style: { width: "420px" } }, /* @__PURE__ */ import_react2.default.createElement(
+      "i",
+      {
+        className: "ti ti-search position-absolute text-muted fs-15",
+        style: {
+          left: "14px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          pointerEvents: "none",
+          zIndex: 2
+        }
+      }
+    ), /* @__PURE__ */ import_react2.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control bg-light fs-13 search-input-integrated",
+        style: {
+          borderRadius: "10px",
+          border: "1px solid #e2e8f0",
+          backgroundColor: "#f8fafc",
+          paddingLeft: "38px",
+          paddingRight: searchGlobalQuery ? "32px" : "14px"
+        },
+        placeholder: "Search across customers, colors, articles, sizes, accessories...",
+        value: searchGlobalQuery,
+        onChange: (e) => setSearchGlobalQuery(e.target.value),
+        onFocus: () => setIsSearchFocused(true)
+      }
+    ), searchGlobalQuery && /* @__PURE__ */ import_react2.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-xs btn-link text-muted position-absolute p-0 text-decoration-none",
+        style: { right: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 3 },
+        onClick: () => {
+          setSearchGlobalQuery("");
+          setIsSearchFocused(false);
+        }
+      },
+      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-x" })
+    ), isSearchFocused && searchGlobalQuery.trim().length > 0 && /* @__PURE__ */ import_react2.default.createElement(
+      "div",
+      {
+        className: "position-absolute start-0 end-0 mt-1 bg-white rounded-3 shadow-xl border overflow-hidden",
+        style: {
+          zIndex: 1060,
+          maxHeight: "380px",
+          overflowY: "auto",
+          borderColor: "#cbd5e1"
+        }
+      },
+      searchResults.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "p-3 text-center text-muted small" }, 'No records found matching "', searchGlobalQuery, '"') : /* @__PURE__ */ import_react2.default.createElement("div", { className: "py-1" }, searchResults.map((item, idx) => /* @__PURE__ */ import_react2.default.createElement(
+        "div",
+        {
+          key: idx,
+          className: "px-3 py-2 border-bottom d-flex align-items-center justify-content-between hover-bg-light cursor-pointer",
+          style: { cursor: "pointer", transition: "background-color 0.15s ease" },
+          onMouseDown: () => {
+            setIsSearchFocused(false);
+            setSearchGlobalQuery("");
+            if (onNavigate) onNavigate(item.route);
+          }
+        },
+        /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "fs-5" }, item.icon), /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "fw-bold text-dark fs-13" }, item.title), /* @__PURE__ */ import_react2.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, item.subtitle))),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "badge bg-light text-secondary border font-monospace small" }, item.category)
+      )))
+    )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react2.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-sm d-flex align-items-center gap-2 rounded-pill px-3 py-1 fs-12 shadow-sm"
+      },
+      /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-sparkles fs-13" }),
+      /* @__PURE__ */ import_react2.default.createElement("span", null, "AI Assistance")
+    ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "position-relative ms-1", ref: profileDropdownRef }, /* @__PURE__ */ import_react2.default.createElement(
+      "div",
+      {
+        className: "d-flex align-items-center gap-2 cursor-pointer p-1 rounded-pill hover-bg-light transition-all",
+        style: { cursor: "pointer" },
+        onClick: () => {
+          setShowProfileDropdown(!showProfileDropdown);
+        }
+      },
+      /* @__PURE__ */ import_react2.default.createElement(
+        "img",
+        {
+          src: currentUser.avatar,
+          alt: currentUser.name,
+          className: "rounded-circle border",
+          style: { width: "36px", height: "36px", objectFit: "cover" },
+          onError: (e) => {
+            e.target.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces";
+          }
+        }
+      )
+    ), showProfileDropdown && /* @__PURE__ */ import_react2.default.createElement(
+      "div",
+      {
+        className: "position-absolute end-0 mt-2 bg-white rounded-4 shadow-xl border p-3 transition-all",
+        style: {
+          width: "280px",
+          zIndex: 1050,
+          boxShadow: "0 12px 32px rgba(15, 23, 42, 0.15)",
+          borderColor: "#e2e8f0"
+        }
+      },
+      /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-3 pb-3 mb-2 border-bottom text-start" }, /* @__PURE__ */ import_react2.default.createElement(
+        "img",
+        {
+          src: currentUser.avatar,
+          alt: currentUser.name,
+          className: "rounded-circle border shadow-xs",
+          style: { width: "48px", height: "48px", objectFit: "cover" }
+        }
+      ), /* @__PURE__ */ import_react2.default.createElement("div", { style: { minWidth: 0, textAlign: "left" } }, /* @__PURE__ */ import_react2.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-14 text-truncate" }, currentUser.name), /* @__PURE__ */ import_react2.default.createElement("span", { className: "text-secondary fs-12 text-truncate d-block" }, currentUser.role))),
+      /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex flex-column gap-1" }, /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
+          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
+          onClick: () => {
+            setShowProfileDropdown(false);
+            if (onNavigate) onNavigate("/profile-settings");
+          }
+        },
+        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-user-circle fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Profile Settings")
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "div",
+        {
+          className: "d-flex align-items-center justify-content-between px-3 py-2 rounded-3 fs-13 transition-all",
+          style: { transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent"
+        },
+        /* @__PURE__ */ import_react2.default.createElement("div", { className: "d-flex align-items-center gap-2.5 text-dark", style: { textAlign: "left" } }, /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-bell fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium" }, "Notifications")),
+        /* @__PURE__ */ import_react2.default.createElement("div", { className: "form-check form-switch m-0 d-flex align-items-center" }, /* @__PURE__ */ import_react2.default.createElement(
+          "input",
+          {
+            className: "form-check-input",
+            type: "checkbox",
+            id: "headerNotificationToggle",
+            style: { cursor: "pointer", width: "38px", height: "20px" },
+            checked: notificationsEnabled,
+            onChange: () => setNotificationsEnabled(!notificationsEnabled)
+          }
+        ))
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
+          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
+          onClick: () => {
+            setShowProfileDropdown(false);
+            if (onNavigate) onNavigate("/dashboard");
+          }
+        },
+        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-notes fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Activity Logs")
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link text-decoration-none text-dark d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
+          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f8fafc",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
+          onClick: () => {
+            setShowProfileDropdown(false);
+            alert("Help & Support: Call +91 98765 43210 or email support@rainerp.com");
+          }
+        },
+        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-help-circle fs-17 text-secondary", style: { width: "20px", textAlign: "center" } }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Help & Support")
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link text-decoration-none text-warning-emphasis d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 text-start transition-all",
+          style: { width: "100%", textAlign: "left", transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#fffbeb",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
+          onClick: () => {
+            if (window.confirm("Are you sure you want to remove all example/test data and restore original defaults?")) {
+              resetExampleDataToDefaults(true);
+              setShowProfileDropdown(false);
+              window.location.reload();
+            }
+          },
+          title: "Remove all test data and restore default seed data"
+        },
+        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-refresh fs-17 text-warning", style: { width: "20px", textAlign: "center" } }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-medium text-dark" }, "Reset to Default Data")
+      )),
+      /* @__PURE__ */ import_react2.default.createElement("div", { className: "pt-2 mt-2 border-top" }, /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link text-decoration-none text-danger d-flex align-items-center gap-2.5 px-3 py-2 rounded-3 fs-13 w-100 text-start transition-all",
+          style: { textAlign: "left", transition: "background-color 0.15s ease" },
+          onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#fef2f2",
+          onMouseLeave: (e) => e.currentTarget.style.backgroundColor = "transparent",
+          onClick: () => {
+            setShowProfileDropdown(false);
+            if (onLogout) onLogout();
+          }
+        },
+        /* @__PURE__ */ import_react2.default.createElement("i", { className: "ti ti-logout fs-17 text-danger", style: { width: "20px", textAlign: "center" } }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "fw-semibold text-danger" }, "Log Out")
+      ))
+    )))));
+  }
+
+  // frontend/src/components/Orders/OrdersModule.jsx
+  var import_react12 = __toESM(require_react());
+
   // frontend/src/components/Orders/OrdersListView.jsx
+  var import_react3 = __toESM(require_react());
   function OrdersListView({ orders: propOrders, onNewOrder, onViewOrder, onEditOrder }) {
     const [orders, setOrders] = (0, import_react3.useState)(() => {
       if (propOrders && propOrders.length > 0) return propOrders;
@@ -16391,408 +16186,6 @@
 
   // frontend/src/components/Orders/OrderDetailView.jsx
   var import_react5 = __toESM(require_react());
-
-  // frontend/src/data/procurementData.js
-  var initialVendors = [
-    {
-      id: "VEND-0001",
-      name: "M.S. Textiles",
-      type: "Fabric Supplier",
-      contactPerson: "Mohammad Salim",
-      phone: "9890018629",
-      alternatePhone: "9820018630",
-      email: "m.s.textiles1947@gmail.com",
-      address: "H. No. 416, New Gauripada, Narpoli",
-      city: "Bhiwandi",
-      state: "Maharashtra",
-      gstin: "27AFQPA0986G1ZA",
-      rating: 5,
-      bankName: "Bank of Maharashtra",
-      accountNumber: "60567470510",
-      ifscCode: "MAHB0000025",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "01-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "01-09-2026"
-    },
-    {
-      id: "VEND-0002",
-      name: "Surat Rayon & Silk Mills",
-      type: "Fabric Supplier",
-      contactPerson: "Dinesh Patel",
-      phone: "9825123456",
-      alternatePhone: "",
-      email: "sales@suratrayonmills.com",
-      address: "Plot 42, Ring Road Industrial Estate",
-      city: "Surat",
-      state: "Gujarat",
-      gstin: "24AAACS1234F1Z1",
-      rating: 4,
-      bankName: "State Bank of India",
-      accountNumber: "38921049281",
-      ifscCode: "SBIN0001234",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "05-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "05-09-2026"
-    },
-    {
-      id: "VEND-0003",
-      name: "Krishna Dyeing & Printing",
-      type: "Job Worker",
-      contactPerson: "Ghanshyam Bhai",
-      phone: "9879054321",
-      alternatePhone: "",
-      email: "krishnadyeing@gmail.com",
-      address: "GIDC Pandesara",
-      city: "Surat",
-      state: "Gujarat",
-      gstin: "24BKAPS9876K1Z9",
-      rating: 4,
-      bankName: "HDFC Bank",
-      accountNumber: "50200039281928",
-      ifscCode: "HDFC0000241",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "10-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "10-09-2026"
-    }
-  ];
-  var initialFabrics = [
-    {
-      id: "FAB-0001",
-      qualityName: "Grey Cotton Fabrics (100*100)",
-      fabricType: "Cotton",
-      gsm: 140,
-      widths: ["44", "58"],
-      defaultShrinkage: 3.5,
-      hsnCode: "520811",
-      description: "High quality grey cotton fabric for base printing & dyeing, 100 Taka packing",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "01-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "01-09-2026"
-    },
-    {
-      id: "FAB-0002",
-      qualityName: "Rayon 14kg Liva",
-      fabricType: "Rayon",
-      gsm: 160,
-      widths: ["44", "48", "58"],
-      defaultShrinkage: 4,
-      hsnCode: "540752",
-      description: "Premium heavy rayon fabric for ladies kurtis & tops",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "02-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "02-09-2026"
-    },
-    {
-      id: "FAB-0003",
-      qualityName: "Georgette 60g Micro",
-      fabricType: "Polyester",
-      gsm: 60,
-      widths: ["44"],
-      defaultShrinkage: 1.5,
-      hsnCode: "540772",
-      description: "Lightweight sheer georgette for anarkalis and dupattas",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "03-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "03-09-2026"
-    }
-  ];
-  var initialTransporters = [
-    {
-      id: "TRN-0001",
-      name: "Keshav Freight Carriers",
-      address: "Diggi Malpura Road, Opp. Govt. Sr. Sec. School, Near Todi Pulia, Sanganer, Jaipur - 302029",
-      phone: "9351585097",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "01-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "01-09-2026"
-    },
-    {
-      id: "TRN-0002",
-      name: "Masood Transport Broker",
-      address: "H.No. 416, New Gauri Pada, Bhiwandi",
-      phone: "9890018629",
-      active: true,
-      createdBy: "System Admin",
-      createdDate: "01-09-2026",
-      lastModifiedBy: "System Admin",
-      lastModifiedDate: "01-09-2026"
-    }
-  ];
-  var initialPurchaseOrders = [
-    {
-      id: "PO-0001",
-      date: "01-09-2026",
-      vendorId: "VEND-0001",
-      vendorName: "M.S. Textiles",
-      expectedDeliveryDate: "20-09-2026",
-      bufferAllowed: true,
-      bufferPercent: 5,
-      status: "Partially Received",
-      // Draft / Sent / Partially Received / Completed / Cancelled
-      terms: "Payment within 20 days. Claims for shortage/quality to be notified within 24 hours of receipt.",
-      items: [
-        {
-          id: "item-1",
-          fabricId: "FAB-0001",
-          fabricName: "Grey Cotton Fabrics (100*100)",
-          width: "44",
-          quantity: 10415.25,
-          rate: 25.47,
-          fold: 97,
-          amount: 265276.42
-        }
-      ],
-      totalAmount: 265276.42,
-      createdBy: "Saksham Garg",
-      createdDate: "01-09-2026 10:15 AM",
-      lastModifiedBy: "Saksham Garg",
-      lastModifiedDate: "01-09-2026 10:30 AM"
-    },
-    {
-      id: "PO-0002",
-      date: "15-09-2026",
-      vendorId: "VEND-0002",
-      vendorName: "Surat Rayon & Silk Mills",
-      expectedDeliveryDate: "05-10-2026",
-      bufferAllowed: false,
-      bufferPercent: 0,
-      status: "Sent",
-      terms: "F.O.R. Jaipur godown. Standard packaging in polythene wrap.",
-      items: [
-        {
-          id: "item-2",
-          fabricId: "FAB-0002",
-          fabricName: "Rayon 14kg Liva",
-          width: "44",
-          quantity: 5e3,
-          rate: 42,
-          fold: 100,
-          amount: 21e4
-        }
-      ],
-      totalAmount: 21e4,
-      createdBy: "Saksham Garg",
-      createdDate: "15-09-2026 11:00 AM",
-      lastModifiedBy: "Saksham Garg",
-      lastModifiedDate: "15-09-2026 11:00 AM"
-    }
-  ];
-  var initialGRNs = [
-    {
-      id: "GRN-0001",
-      date: "01-10-2026",
-      linkedPOs: ["PO-0001"],
-      vendorId: "VEND-0001",
-      vendorName: "M.S. Textiles",
-      transporterId: "TRN-0001",
-      transporterName: "Keshav Freight Carriers (LR: 124777)",
-      vendorInvoiceNo: "MST/1360/26-27",
-      vendorInvoiceDate: "01-09-2026",
-      vendorChallanNo: "1360",
-      vendorChallanDate: "01-09-2026",
-      totalBales: 5,
-      declaredTotalMeters: 10415.25,
-      totalMetersEntered: 10415.25,
-      status: "Completed",
-      // Draft / Header Saved / Bale Entry in Progress / Completed
-      excessFlagged: false,
-      adminApprovalNeeded: false,
-      bales: [
-        {
-          baleNo: "Bale 01 (Bale 2840)",
-          piecesCount: 17,
-          totalLength: 1779,
-          pieces: [
-            { pieceNo: "Piece 01", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 02", fabric: "Grey Cotton Fabrics (100*100)", length: 102.5, remarks: "Clean" },
-            { pieceNo: "Piece 03", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 04", fabric: "Grey Cotton Fabrics (100*100)", length: 106, remarks: "Clean" },
-            { pieceNo: "Piece 05", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 06", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 07", fabric: "Grey Cotton Fabrics (100*100)", length: 104.5, remarks: "Clean" },
-            { pieceNo: "Piece 08", fabric: "Grey Cotton Fabrics (100*100)", length: 109, remarks: "Clean" },
-            { pieceNo: "Piece 09", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 10", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 11", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 12", fabric: "Grey Cotton Fabrics (100*100)", length: 102.5, remarks: "Clean" },
-            { pieceNo: "Piece 13", fabric: "Grey Cotton Fabrics (100*100)", length: 103, remarks: "Clean" },
-            { pieceNo: "Piece 14", fabric: "Grey Cotton Fabrics (100*100)", length: 102.5, remarks: "Clean" },
-            { pieceNo: "Piece 15", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 16", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 17", fabric: "Grey Cotton Fabrics (100*100)", length: 102, remarks: "Clean" }
-          ]
-        },
-        {
-          baleNo: "Bale 02 (Bale 2841)",
-          piecesCount: 17,
-          totalLength: 1759,
-          pieces: [
-            { pieceNo: "Piece 01", fabric: "Grey Cotton Fabrics (100*100)", length: 106, remarks: "Clean" },
-            { pieceNo: "Piece 02", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 03", fabric: "Grey Cotton Fabrics (100*100)", length: 103, remarks: "Clean" },
-            { pieceNo: "Piece 04", fabric: "Grey Cotton Fabrics (100*100)", length: 102, remarks: "Clean" },
-            { pieceNo: "Piece 05", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 06", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 07", fabric: "Grey Cotton Fabrics (100*100)", length: 100, remarks: "Clean" },
-            { pieceNo: "Piece 08", fabric: "Grey Cotton Fabrics (100*100)", length: 102, remarks: "Clean" },
-            { pieceNo: "Piece 09", fabric: "Grey Cotton Fabrics (100*100)", length: 103, remarks: "Clean" },
-            { pieceNo: "Piece 10", fabric: "Grey Cotton Fabrics (100*100)", length: 106, remarks: "Clean" },
-            { pieceNo: "Piece 11", fabric: "Grey Cotton Fabrics (100*100)", length: 103, remarks: "Clean" },
-            { pieceNo: "Piece 12", fabric: "Grey Cotton Fabrics (100*100)", length: 105, remarks: "Clean" },
-            { pieceNo: "Piece 13", fabric: "Grey Cotton Fabrics (100*100)", length: 103, remarks: "Clean" },
-            { pieceNo: "Piece 14", fabric: "Grey Cotton Fabrics (100*100)", length: 102, remarks: "Clean" },
-            { pieceNo: "Piece 15", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 16", fabric: "Grey Cotton Fabrics (100*100)", length: 104, remarks: "Clean" },
-            { pieceNo: "Piece 17", fabric: "Grey Cotton Fabrics (100*100)", length: 97, remarks: "Clean" }
-          ]
-        }
-      ],
-      createdBy: "Saksham Garg",
-      createdDate: "01-10-2026 02:30 PM",
-      lastModifiedBy: "Saksham Garg",
-      lastModifiedDate: "01-10-2026 04:00 PM"
-    }
-  ];
-  var initialQualityChecks = [
-    {
-      id: "QC-0001",
-      grnRef: "GRN-0001",
-      inspectionScope: "Whole Shipment",
-      // Whole Shipment / Bale-Level / Piece-Level
-      baleRef: "",
-      pieceRef: "",
-      inspectorName: "Saksham Garg",
-      expectedWidth: "44",
-      actualWidth: 44,
-      expectedFold: "97",
-      actualFold: 97,
-      photos: [],
-      notes: "Fabric GSM and width verified. No warp or weft defects observed. Approved for main stock.",
-      qcStatus: "OK",
-      // OK / Send for Admin Approval / Reject
-      adminDecision: "",
-      adminRemarks: "",
-      dateTime: "01-10-2026 04:30 PM",
-      createdBy: "Saksham Garg"
-    },
-    {
-      id: "QC-0002",
-      grnRef: "GRN-0001",
-      inspectionScope: "Piece-Level",
-      baleRef: "Bale 03",
-      pieceRef: "Piece 07",
-      inspectorName: "Saksham Garg",
-      expectedWidth: "44",
-      actualWidth: 42.5,
-      expectedFold: "97",
-      actualFold: 94,
-      photos: [],
-      notes: "Width is 1.5 inches short and extensive oil stains found in fold.",
-      qcStatus: "Reject",
-      adminDecision: "Reject",
-      adminRemarks: "Confirmed defective selvedge and oil marks. Move to Rejected Stock Pool for RTV.",
-      dateTime: "01-10-2026 05:00 PM",
-      createdBy: "Saksham Garg"
-    }
-  ];
-  var initialRejectedStock = [
-    {
-      id: "REJ-0001",
-      sourceQcRef: "QC-0002",
-      grnRef: "GRN-0001",
-      poRef: "PO-0001",
-      vendorName: "M.S. Textiles",
-      baleRef: "Bale 03",
-      pieceRef: "Piece 07",
-      fabricName: "Grey Cotton Fabrics (100*100)",
-      quantity: 102.5,
-      reason: 'Short width (42.5") and heavy oil stain on fabric body',
-      dateFlagged: "01-10-2026",
-      status: "In Pool",
-      // In Pool / RTV Initiated / To Be Sold / Sold / Transferred
-      actionDetails: null
-    }
-  ];
-  var initialAuditLogs = [
-    {
-      id: "LOG-001",
-      dateTime: "01-09-2026 10:15 AM",
-      user: "Saksham Garg",
-      role: "Procurement Manager",
-      action: "Create",
-      module: "Purchase Order",
-      recordNo: "PO-0001",
-      field: "PO Creation",
-      previousValue: "None",
-      updatedValue: "PO-0001 (10,415.25 Mtrs)",
-      remarks: "Initial procurement PO raised to M.S. Textiles"
-    },
-    {
-      id: "LOG-002",
-      dateTime: "01-10-2026 02:30 PM",
-      user: "Saksham Garg",
-      role: "Stores / Inward Officer",
-      action: "Create",
-      module: "GRN",
-      recordNo: "GRN-0001",
-      field: "GRN Creation",
-      previousValue: "None",
-      updatedValue: "GRN-0001 linked to PO-0001",
-      remarks: "Received 5 Bales via Keshav Freight Carriers"
-    },
-    {
-      id: "LOG-003",
-      dateTime: "01-10-2026 05:00 PM",
-      user: "Saksham Garg",
-      role: "Quality Inspector",
-      action: "Reject",
-      module: "Quality Check",
-      recordNo: "QC-0002",
-      field: "QC Status",
-      previousValue: "Pending",
-      updatedValue: "Reject",
-      remarks: "Short width and oil stains on Piece 07"
-    }
-  ];
-  var initialColors2 = [
-    { id: "CLR-0001", name: "Charcoal", hex: "#36454F", pantone: "19-4104 TCX", category: "Neutral" },
-    { id: "CLR-0002", name: "Green", hex: "#388E3C", pantone: "18-6022 TCX", category: "Green" },
-    { id: "CLR-0003", name: "Ivory", hex: "#FFFFF0", pantone: "11-0604 TCX", category: "Neutral" },
-    { id: "CLR-0004", name: "Jamun", hex: "#2E0854", pantone: "19-3518 TCX", category: "Blue" },
-    { id: "CLR-0005", name: "Lavendar", hex: "#A811DF", pantone: "17-3619 TCX", category: "Purple" },
-    { id: "CLR-0006", name: "Maroon", hex: "#800000", pantone: "19-1528 TCX", category: "Red" },
-    { id: "CLR-0007", name: "Navy Blue", hex: "#001F54", pantone: "19-4029 TCX", category: "Blue" },
-    { id: "CLR-0008", name: "Pastel Red", hex: "#FF6A61", pantone: "16-1543 TCX", category: "Red" },
-    { id: "CLR-0009", name: "Peach", hex: "#FFCBA4", pantone: "14-1227 TCX", category: "Orange" },
-    { id: "CLR-0010", name: "Rama Green", hex: "#0EB2B2", pantone: "16-5121 TCX", category: "Green" },
-    { id: "CLR-0011", name: "Red", hex: "#E53935", pantone: "18-1662 TCX", category: "Red" },
-    { id: "CLR-0012", name: "Rust", hex: "#B7410E", pantone: "18-1442 TCX", category: "Red" },
-    { id: "CLR-0013", name: "Rust Light", hex: "#C86D51", pantone: "17-1444 TCX", category: "Red" },
-    { id: "CLR-0014", name: "Sea Green", hex: "#20C58E", pantone: "15-5534 TCX", category: "Green" },
-    { id: "CLR-0015", name: "Teal", hex: "#008080", pantone: "19-4535 TCX", category: "Blue" },
-    { id: "CLR-0016", name: "Black", hex: "#111827", pantone: "19-4008 TCX", category: "Neutral" },
-    { id: "CLR-0017", name: "White", hex: "#FFFFFF", pantone: "11-0601 TCX", category: "Neutral" },
-    { id: "CLR-0018", name: "Royal Blue", hex: "#4169E1", pantone: "19-4052 TCX", category: "Blue" },
-    { id: "CLR-0019", name: "Grey / Natural", hex: "#9CA3AF", pantone: "14-4102 TCX", category: "Neutral" },
-    { id: "CLR-0020", name: "Off White", hex: "#FAF9F6", pantone: "11-4800 TCX", category: "Neutral" },
-    { id: "CLR-0021", name: "Pista Green", hex: "#93C572", pantone: "13-0317 TCX", category: "Green" },
-    { id: "CLR-0022", name: "Wine", hex: "#722F37", pantone: "19-1525 TCX", category: "Red" },
-    { id: "CLR-0023", name: "Mustard", hex: "#EAB308", pantone: "14-0955 TCX", category: "Yellow" }
-  ];
 
   // frontend/src/components/Orders/AccessoryPOModals.jsx
   var import_react4 = __toESM(require_react());
@@ -25076,7 +24469,7 @@
         if (s) local = JSON.parse(s);
       } catch (e) {
       }
-      const list = [...colors || [], ...local, ...initialColors2];
+      const list = [...colors || [], ...local, ...initialColors];
       const map = /* @__PURE__ */ new Map();
       for (const c of list) {
         if (c && c.hex) {
@@ -28659,19 +28052,6 @@
         "button",
         {
           type: "button",
-          className: "btn btn-sm btn-outline-primary rounded-3 px-2.5 py-1 small fw-semibold d-flex align-items-center gap-1",
-          onClick: () => {
-            setActiveSeriesForAddSize(series);
-            setNewSizeForm({ sizeName: "", displayName: "", description: "" });
-          },
-          title: "Add more size to this series"
-        },
-        /* @__PURE__ */ import_react13.default.createElement("i", { className: "ti ti-plus" }),
-        /* @__PURE__ */ import_react13.default.createElement("span", null, "Add Size")
-      ), /* @__PURE__ */ import_react13.default.createElement(
-        "button",
-        {
-          type: "button",
           className: "btn btn-sm btn-light text-secondary p-1.5 rounded-2",
           title: "Edit Series",
           onClick: () => handleEditSeries(series)
@@ -31404,7 +30784,7 @@
   }
   function ColorMasterView({ isInline = false, onSaveInline, onCloseInline }) {
     const [colors, setColors] = (0, import_react15.useState)(() => {
-      return getStoredData("erp_colors_master_v1", initialColors);
+      return getStoredData("erp_colors_master_v1", initialColors2);
     });
     const [searchTerm, setSearchTerm] = (0, import_react15.useState)("");
     const [statusFilter, setStatusFilter] = (0, import_react15.useState)("All");
@@ -33970,7 +33350,7 @@
       setShowInlineColorModal(false);
       setActiveColorRowId(null);
     };
-    const masterColorList = colors && colors.length > 0 ? colors : initialColors2;
+    const masterColorList = colors && colors.length > 0 ? colors : initialColors;
     const handleVendorChange = (vId, vendorObj = null) => {
       if (vendorObj) {
         setFormData((prev) => ({
@@ -39332,7 +38712,7 @@
         if (s) return JSON.parse(s);
       } catch (e) {
       }
-      return initialColors2;
+      return initialColors;
     });
     (0, import_react33.useEffect)(() => {
       try {
@@ -40900,7 +40280,7 @@
       return list;
     });
     const [colorList, setColorList] = (0, import_react35.useState)(() => {
-      let list = [...initialColors2];
+      let list = [...initialColors];
       try {
         const s = localStorage.getItem("raindrop_colors_v1");
         if (s) {
@@ -42846,7 +42226,7 @@
     const [transporterName, setTransporterName] = (0, import_react39.useState)(initialReturn?.transport_details?.transporter_name || "");
     const [vehicleNo, setVehicleNo] = (0, import_react39.useState)(initialReturn?.transport_details?.vehicle_no || "");
     const [colorMasterList, setColorMasterList] = (0, import_react39.useState)(() => {
-      let list = [...initialColors];
+      let list = [...initialColors2];
       try {
         const s = localStorage.getItem("raindrop_colors_v1") || localStorage.getItem("erp_colors_master_v1");
         if (s) {
@@ -45983,6 +45363,7 @@
   }
 
   // frontend/src/main.jsx
+  resetExampleDataToDefaults();
   var rootElement = document.getElementById("root");
   if (rootElement) {
     const root = import_client.default.createRoot(rootElement);
