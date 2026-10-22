@@ -4,7 +4,9 @@ import {
   initialArticles,
   initialSizeSeries,
   getStoredData,
-  setStoredData
+  setStoredData,
+  getStoredColorsMaster,
+  setStoredColorsMaster
 } from '../../data/salesOrderData';
 import { initialFabrics as procurementFabrics } from '../../data/procurementData';
 import { api } from '../../services/api';
@@ -175,11 +177,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   });
   const [customers, setCustomers] = useState(() => getStoredData('erp_customers_v1', initialCustomers));
   const [masterColors, setMasterColors] = useState(() => {
-    const stored = getStoredData('raindrop_colors_v1', null);
-    const source = (Array.isArray(stored) && stored.length > 0) ? stored : DEFAULT_COLORS;
-    const clean = deduplicateColors(source);
-    setStoredData('raindrop_colors_v1', clean);
-    return clean;
+    return deduplicateColors(getStoredColorsMaster());
   });
   const getCurrentQuarterTag = () => {
     const m = new Date().getMonth();
@@ -193,6 +191,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   const [customerColorTab, setCustomerColorTab] = useState({});
   const [customerColorSearch, setCustomerColorSearch] = useState({});
 
+  // Real-time synchronization with Article Master
   useEffect(() => {
     const handleArticlesSync = () => {
       setArticleTypes(loadSyncedArticles());
@@ -202,6 +201,22 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     return () => {
       window.removeEventListener('storage', handleArticlesSync);
       window.removeEventListener('erp_articles_updated', handleArticlesSync);
+    };
+  }, []);
+
+  // Real-time synchronization with Color Master
+  useEffect(() => {
+    const handleColorsSync = () => {
+      const synced = getStoredColorsMaster();
+      setMasterColors(deduplicateColors(synced));
+    };
+    window.addEventListener('storage', handleColorsSync);
+    window.addEventListener('erp_colors_updated', handleColorsSync);
+    window.addEventListener('raindrop_colors_updated', handleColorsSync);
+    return () => {
+      window.removeEventListener('storage', handleColorsSync);
+      window.removeEventListener('erp_colors_updated', handleColorsSync);
+      window.removeEventListener('raindrop_colors_updated', handleColorsSync);
     };
   }, []);
 
@@ -286,10 +301,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           }));
           setMasterColors(prev => {
             const combined = [...mappedCol];
-            DEFAULT_COLORS.forEach(dc => {
-              if (!combined.some(c => (c.name || '').toLowerCase() === (dc.name || '').toLowerCase())) combined.push(dc);
+            prev.forEach(pc => {
+              if (!combined.some(c => (c.name || '').toLowerCase() === (pc.name || '').toLowerCase())) combined.push(pc);
             });
-            return combined;
+            const deduplicated = deduplicateColors(combined);
+            setStoredColorsMaster(deduplicated);
+            return deduplicated;
           });
         }
       } catch (e) {}
@@ -1107,9 +1124,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     };
     const updated = deduplicateColors([...masterColors.filter(c => (c.name || '').toLowerCase() !== created.name.toLowerCase()), created]);
     setMasterColors(updated);
-    try {
-      setStoredData('raindrop_colors_v1', updated);
-    } catch (err) {}
+    setStoredColorsMaster(updated);
     if (api && api.saveColor) {
       try { await api.saveColor(created); } catch (err) {}
     }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { api } from '../../services/api';
 
 export const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -18,6 +19,7 @@ export const INDIAN_STATES = [
 export default function VendorMasterView({
   vendors = [],
   onSaveVendor,
+  onDeleteVendor,
   isInline = false,
   onCloseInline
 }) {
@@ -119,8 +121,8 @@ export default function VendorMasterView({
     setSelectedVendor(vendor);
     setFormData({ ...vendor });
     setIsCreatingNew(false);
-    setIsEditing(false);
-    setActiveSection('none');
+    setIsEditing(true);
+    setActiveSection('all');
   };
 
   // Capitalize word by word
@@ -153,6 +155,7 @@ export default function VendorMasterView({
 
     const updatedVendor = {
       ...formData,
+      name: capitalizeWords((formData.name || '').trim()),
       lastModifiedDate: new Date().toLocaleDateString('en-GB')
     };
 
@@ -164,7 +167,7 @@ export default function VendorMasterView({
     }
 
     setVendorList(updatedList);
-    setSelectedVendor(updatedVendor);
+    setSelectedVendor(null);
     setIsEditing(false);
     setIsCreatingNew(false);
 
@@ -174,6 +177,31 @@ export default function VendorMasterView({
 
     if (isInline && onCloseInline) {
       onCloseInline(updatedVendor);
+    }
+  };
+
+  const handleDeleteVendor = (id, name, e) => {
+    e?.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete vendor "${name || id}"?`)) return;
+    const updated = vendorList.filter((v) => v.id !== id);
+    setVendorList(updated);
+    if (selectedVendor?.id === id) {
+      setSelectedVendor(null);
+      setIsEditing(false);
+      setIsCreatingNew(false);
+    }
+    try {
+      localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_vendors_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err) {}
+    if (api && api.deleteVendor) {
+      try {
+        api.deleteVendor(id);
+      } catch (err) {}
+    }
+    if (onDeleteVendor) {
+      onDeleteVendor(id);
     }
   };
 
@@ -310,6 +338,7 @@ export default function VendorMasterView({
                         <option value="Inactive">Inactive</option>
                       </select>
                     </th>
+                    <th style={{ width: '80px' }}></th>
                   </tr>
                   <tr>
                     <th>Vendor ID</th>
@@ -319,6 +348,7 @@ export default function VendorMasterView({
                     <th>GSTIN</th>
                     <th className="text-center">Rating</th>
                     <th>Status</th>
+                    <th className="text-end" style={{ width: '80px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,9 +382,26 @@ export default function VendorMasterView({
                             {v.active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        <td className="text-end" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
+                            title="Delete Vendor"
+                            onClick={(e) => handleDeleteVendor(v.id, v.name || v.id, e)}
+                          >
+                            <i className="ti ti-trash fs-5"></i>
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
+                  {filteredVendors.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="text-center py-4 text-muted">
+                        No vendors found matching criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -432,15 +479,18 @@ export default function VendorMasterView({
                     <div className="col-12">
                       <label className="form-label fs-12 fw-semibold mb-1">Vendor Name *</label>
                       {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
-                        <input
-                          type="text"
-                          required
-                          className={`form-control form-control-sm bg-white ${
-                            formErrors.name ? 'is-invalid' : ''
-                          }`}
-                          value={formData.name}
-                          onChange={(e) => handleTextChange('name', e.target.value, true)}
-                        />
+                        <>
+                          <input
+                            type="text"
+                            required
+                            className={`form-control form-control-sm bg-white ${
+                              formErrors.name ? 'is-invalid' : ''
+                            }`}
+                            value={formData.name}
+                            onChange={(e) => handleTextChange('name', e.target.value, true)}
+                          />
+                          <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        </>
                       ) : (
                         <div className="fw-semibold text-dark fs-14">{formData.name || '-'}</div>
                       )}

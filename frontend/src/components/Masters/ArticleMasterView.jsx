@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { initialArticles, getStoredData, setStoredData } from '../../data/salesOrderData';
 
 const PREDEFINED_EMOJIS = [
@@ -221,6 +221,30 @@ export const reorderArticlesWithTarget = (allArticles, articleToPlace, requested
   }));
 };
 
+// Reorder an article position via Drag & Drop
+export const reorderArticlePositions = (allArticles, fromIndex, toIndex) => {
+  if (
+    fromIndex === toIndex ||
+    fromIndex === null ||
+    toIndex === null ||
+    fromIndex === undefined ||
+    toIndex === undefined ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= allArticles.length ||
+    toIndex >= allArticles.length
+  ) {
+    return allArticles;
+  }
+  const list = [...allArticles];
+  const [moved] = list.splice(fromIndex, 1);
+  list.splice(toIndex, 0, moved);
+  return list.map((art, idx) => ({
+    ...art,
+    sortOrder: idx + 1
+  }));
+};
+
 export default function ArticleMasterView({ isInline = false, onSaveInline, onCloseInline }) {
   const [articles, setArticles] = useState(() => {
     const list = getStoredData('erp_articles_v1', initialArticles);
@@ -229,14 +253,31 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     return normalized;
   });
 
+  useEffect(() => {
+    const handleUpdate = () => {
+      const stored = getStoredData('erp_articles_v1', null) !== null
+        ? getStoredData('erp_articles_v1', null)
+        : getStoredData('erp_articles_master', null);
+      if (Array.isArray(stored)) {
+        setArticles(normalizeArticleOrders(stored));
+      }
+    };
+    window.addEventListener('erp_articles_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('erp_articles_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   const [viewMode, setViewMode] = useState('tiles'); // 'tiles' | 'table'
-  const [showOthers, setShowOthers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArticle, setSelectedArticle] = useState(null);
 
   // Modal / Form state for Section 4.2 popup
   const [isModalOpen, setIsModalOpen] = useState(isInline);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
+  const [isModalEditMode, setIsModalEditMode] = useState(isInline);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showInlineEmojiPicker, setShowInlineEmojiPicker] = useState(false);
   const [showSectionEmojiPicker, setShowSectionEmojiPicker] = useState(false);
@@ -260,6 +301,68 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 2500);
+  };
+
+  // Drag and Drop state for Section 4.2 Tiles
+  const [draggedArticleIdx, setDraggedArticleIdx] = useState(null);
+  const [dragOverArticleIdx, setDragOverArticleIdx] = useState(null);
+  const isDraggingCardRef = useRef(false);
+
+  const handleArticleDragStart = (e, index) => {
+    isDraggingCardRef.current = true;
+    setDraggedArticleIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleArticleDragOver = (e, index) => {
+    if (draggedArticleIdx !== null) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOverArticleIdx !== index) {
+        setDragOverArticleIdx(index);
+      }
+    }
+  };
+
+  const handleArticleDragLeave = (e, index) => {
+    if (dragOverArticleIdx === index) {
+      setDragOverArticleIdx(null);
+    }
+  };
+
+  const handleArticleDrop = (e, targetIdx) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const fromIdx = draggedArticleIdx;
+    setDraggedArticleIdx(null);
+    setDragOverArticleIdx(null);
+    setTimeout(() => {
+      isDraggingCardRef.current = false;
+    }, 120);
+
+    if (fromIdx === null || fromIdx === undefined || fromIdx === targetIdx) {
+      return;
+    }
+
+    const updated = reorderArticlePositions(articles, fromIdx, targetIdx);
+    const moved = updated[targetIdx];
+    setArticles(updated);
+    setStoredData('erp_articles_v1', updated);
+
+    try {
+      window.dispatchEvent(new Event('erp_articles_updated'));
+    } catch (err) {}
+
+    showToast(`"${moved.name}" moved to position #${targetIdx + 1}`);
+  };
+
+  const handleArticleDragEnd = () => {
+    setDraggedArticleIdx(null);
+    setDragOverArticleIdx(null);
+    setTimeout(() => {
+      isDraggingCardRef.current = false;
+    }, 120);
   };
 
   // Form State (Section 4.1)
@@ -287,7 +390,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
       articleType: '',
       icon: '',
       customIcon: '',
-      sortOrder: '',
+      sortOrder: String(articles.length + 1),
       description: '',
       active: true,
       createdBy: 'Saksham Garg (Procurement & Quality Manager)',
@@ -305,9 +408,10 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     });
     setIsEditingExisting(false);
     setIsModalOpen(true);
+    setIsModalEditMode(true);
   };
 
-  const handleEditArticle = (art) => {
+  const handleEditArticle = (art, forceEdit = false) => {
     const isPredefined = PREDEFINED_EMOJIS.some((item) => item.emoji === art.icon);
     const matchedType = ARTICLE_TYPES.find(
       (t) => t.id === art.articleType || t.label.toLowerCase() === (art.name || '').toLowerCase() || t.icon === art.icon
@@ -329,6 +433,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     });
     setIsEditingExisting(true);
     setIsModalOpen(true);
+    setIsModalEditMode(forceEdit);
   };
 
   const logActivity = (article, action, details) => {
@@ -370,28 +475,43 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
       lastModifiedDate: new Date().toISOString()
     };
 
-    // Guarantee unique sequential priority numbers without duplicates
-    const updated = reorderArticlesWithTarget(articles, articleData, formData.sortOrder);
-    const savedArticle = updated.find((a) => a.id === nextId) || articleData;
+    let updated;
+    let savedArticle;
 
     if (exists) {
+      // Preserve existing sortOrder when editing an article
+      const existingArt = articles.find((a) => a.id === nextId);
+      const preservedSortOrder = existingArt ? existingArt.sortOrder : articles.length;
+      savedArticle = {
+        ...articleData,
+        sortOrder: preservedSortOrder
+      };
       savedArticle.activityLog = logActivity(
         savedArticle,
         'Updated Article',
         `Updated name: ${savedArticle.name}, Priority Rank: #${savedArticle.sortOrder}, Icon: ${savedArticle.icon}`
       );
+      updated = articles.map((a) => (a.id === nextId ? savedArticle : a));
       showToast(`Article "${savedArticle.name}" updated (Rank #${savedArticle.sortOrder}).`);
     } else {
+      // Assign sequential sortOrder at the end for new articles
+      const nextSortOrder = articles.length + 1;
+      savedArticle = {
+        ...articleData,
+        sortOrder: nextSortOrder
+      };
       savedArticle.activityLog = logActivity(
         savedArticle,
         'Created Article',
-        `New article registered: ${savedArticle.name} (${savedArticle.id}) at Rank #${savedArticle.sortOrder}`
+        `New article registered: ${savedArticle.name} (${savedArticle.id}) at Rank #${nextSortOrder}`
       );
-      showToast(`Article "${savedArticle.name}" created at Rank #${savedArticle.sortOrder}.`);
+      updated = [...articles, savedArticle];
+      showToast(`Article "${savedArticle.name}" created at Rank #${nextSortOrder}.`);
     }
 
-    setArticles(updated);
-    setStoredData('erp_articles_v1', updated);
+    const normalized = normalizeArticleOrders(updated);
+    setArticles(normalized);
+    setStoredData('erp_articles_v1', normalized);
 
     // Broadcast event for live sync across ERP
     try {
@@ -404,7 +524,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     }
 
     setIsModalOpen(false);
-    setSelectedArticle(savedArticle);
+    setSelectedArticle(null);
   };
 
   // Section-wise Save in View Mode (Section 11.2 & 11.5)
@@ -421,16 +541,8 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
       updatedArt.name = autoCapitalizeWords(sectionData.name.trim());
     }
 
-    let updatedList;
-    let savedArticle;
-
-    if (secName === 'display') {
-      updatedList = reorderArticlesWithTarget(articles, updatedArt, sectionData.sortOrder);
-      savedArticle = updatedList.find((a) => a.id === updatedArt.id) || updatedArt;
-    } else {
-      updatedList = articles.map((a) => (a.id === updatedArt.id ? updatedArt : a));
-      savedArticle = updatedArt;
-    }
+    const updatedList = articles.map((a) => (a.id === updatedArt.id ? updatedArt : a));
+    const savedArticle = updatedArt;
 
     const changeSummary = Object.keys(sectionData)
       .map((k) => `${k}: ${selectedArticle[k]} ➔ ${savedArticle[k]}`)
@@ -491,9 +603,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     } catch (err) {}
   };
 
-  // Section 4.2: Frequent Articles vs "Others" Tile
-  const primaryArticles = useMemo(() => articles.slice(0, 6), [articles]);
-  const otherArticles = useMemo(() => articles.slice(6), [articles]);
 
   // Filtered Articles for Table View
   const filteredArticles = useMemo(() => {
@@ -534,6 +643,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     return (
       <form onSubmit={saveArticle}>
         <div className="modal-body p-4">
+          <fieldset disabled={!isModalEditMode} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           {/* Article Type * (8 Grid Cards) */}
           <div className="mb-3.5">
             <label className="form-label fw-semibold text-dark mb-2" style={{ fontSize: '13.5px' }}>
@@ -596,6 +706,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                 onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                 style={{ height: '44px', borderRadius: '8px' }}
               />
+              <div className="form-text small text-muted">Auto-capitalised word by word</div>
             </div>
             <div className="col-5">
               <label className="form-label fw-semibold text-dark mb-1.5" style={{ fontSize: '13.5px' }}>
@@ -653,21 +764,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
             </div>
           </div>
 
-          {/* Sort Order */}
-          <div className="mb-3">
-            <label className="form-label fw-semibold text-dark mb-1.5" style={{ fontSize: '13.5px' }}>
-              Sort Order
-            </label>
-            <input
-              type="number"
-              min="0"
-              className="form-control"
-              placeholder="e.g., 1"
-              value={formData.sortOrder ?? ''}
-              onChange={(e) => setFormData({ ...formData, sortOrder: e.target.value })}
-              style={{ height: '42px', borderRadius: '8px' }}
-            />
-          </div>
 
           {/* Description */}
           <div className="mb-3">
@@ -697,15 +793,43 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
               Active
             </label>
           </div>
+          </fieldset>
         </div>
 
         <div className="modal-footer border-top py-3 px-4 d-flex justify-content-end gap-2">
-          <button type="button" className="btn btn-outline-secondary rounded-3 px-3.5" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary rounded-3 px-4 fw-semibold">
-            <i className="ti ti-check me-1"></i> {isEditingExisting ? 'Update Article' : 'Save Article'}
-          </button>
+          {!isModalEditMode ? (
+            <>
+              <button type="button" className="btn btn-theme-close rounded-3 px-4 fw-medium" onClick={onCancel}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary rounded-3 px-4 fw-semibold"
+                onClick={() => setIsModalEditMode(true)}
+              >
+                <i className="ti ti-edit me-1"></i> Edit Article
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-theme-close rounded-3 px-4 fw-medium"
+                onClick={() => {
+                  if (isEditingExisting) {
+                    setIsModalEditMode(false);
+                  } else {
+                    onCancel();
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary rounded-3 px-4 fw-semibold">
+                <i className="ti ti-check me-1"></i> {isEditingExisting ? 'Update Article' : 'Save Article'}
+              </button>
+            </>
+          )}
         </div>
       </form>
     );
@@ -797,54 +921,58 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* CASE 1: SECTION-WISE VIEW MODE FOR SELECTED ARTICLE (11.2 & 11.5)         */}
-      {/* ========================================================================= */}
-      {selectedArticle ? (
-        <div className="d-flex flex-column gap-4 mb-4">
-          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-4 d-flex align-items-center justify-content-center shadow-sm"
-                  style={{ width: '56px', height: '56px', backgroundColor: '#eef2ff', fontSize: '32px' }}
-                >
-                  {selectedArticle.icon}
+      {/* POPUP MODAL: READ-ONLY VIEW MODE REMOVED */}
+      {false && selectedArticle && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1060, backdropFilter: 'blur(3px)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable" style={{ maxWidth: '1080px', maxHeight: '92vh' }}>
+            <div className="modal-content border-0 shadow-2xl rounded-4 overflow-hidden bg-light">
+              {/* Modal Header */}
+              <div className="modal-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-4 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
+                    style={{ width: '48px', height: '48px', backgroundColor: '#eef2ff', fontSize: '28px' }}
+                  >
+                    {selectedArticle.icon}
+                  </div>
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="badge bg-primary-subtle text-primary font-monospace px-2.5 py-1 rounded-2">
+                        {selectedArticle.id}
+                      </span>
+                      <h5 className="fw-bold text-dark mb-0">{selectedArticle.name}</h5>
+                      <span className={`badge ${selectedArticle.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
+                        {selectedArticle.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="text-muted small mt-0.5">
+                      Sort Order Priority: <strong>#{selectedArticle.sortOrder || '—'}</strong> &bull; {selectedArticle.description || 'No description entered'}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="badge bg-primary-subtle text-primary font-monospace px-2.5 py-1 rounded-2">
-                      {selectedArticle.id}
-                    </span>
-                    <h4 className="fw-bold text-dark mb-0">{selectedArticle.name}</h4>
-                    <span className={`badge ${selectedArticle.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
-                      {selectedArticle.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div className="text-muted small mt-1">
-                    Sort Order Priority: <strong>#{selectedArticle.sortOrder || '—'}</strong> &bull; {selectedArticle.description || 'No description entered'}
-                  </div>
+
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                    onClick={() => handleEditArticle(selectedArticle)}
+                  >
+                    <i className="ti ti-edit"></i>
+                    <span>Edit Full Article</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-theme-close btn-sm rounded-3 px-3 d-flex align-items-center gap-1"
+                    onClick={() => setSelectedArticle(null)}
+                  >
+                    <i className="ti ti-x"></i>
+                    <span>Close</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary btn-sm rounded-3 px-3"
-                  onClick={() => setSelectedArticle(null)}
-                >
-                  <i className="ti ti-arrow-left me-1"></i> Close View
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm rounded-3 px-3 fw-semibold"
-                  onClick={() => handleEditArticle(selectedArticle)}
-                >
-                  <i className="ti ti-edit me-1"></i> Edit Full Article
-                </button>
-              </div>
-            </div>
-          </div>
+              {/* Modal Body */}
+              <div className="modal-body p-4" style={{ maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' }}>
 
           {/* Section 11.2 & 11.5: Split into Logical Sections with Independent Edit Buttons */}
           <div className="row g-4">
@@ -896,6 +1024,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                           value={sectionData.name || ''}
                           onChange={(e) => setSectionData({ ...sectionData, name: autoCapitalizeWords(e.target.value) })}
                         />
+                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
                       </div>
                       <div>
                         <label className="form-label fw-semibold text-primary mb-1.5" style={{ fontSize: '14px' }}>
@@ -1022,17 +1151,14 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                 <div className="card-body p-4">
                   {editingSection === 'display' ? (
                     <div className="d-flex flex-column gap-3">
-                      <div>
-                        <label className="form-label small fw-semibold text-muted">Sort Order Priority # (Unique)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          className="form-control form-control-sm"
-                          placeholder="e.g. 1"
-                          value={sectionData.sortOrder || ''}
-                          onChange={(e) => setSectionData({ ...sectionData, sortOrder: e.target.value })}
-                        />
-                        <div className="form-text small text-muted">Unique priority (1 to {articles.length}). Other articles shift automatically to prevent duplicate numbers.</div>
+                      <div className="p-2.5 bg-light rounded-3 border">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="small fw-semibold text-dark">Priority Rank</span>
+                          <span className="badge bg-primary px-2.5 py-1 rounded-pill">#{selectedArticle?.sortOrder || 1}</span>
+                        </div>
+                        <div className="small text-muted mt-1" style={{ fontSize: '11.5px' }}>
+                          <i className="ti ti-arrows-move me-1 text-primary"></i> Reorder articles anytime by dragging and dropping the cards on the main dashboard.
+                        </div>
                       </div>
                       <div>
                         <label className="form-label small fw-semibold text-muted">Description / Specifications</label>
@@ -1083,9 +1209,12 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                 </div>
               </div>
             </div>
+            </div>
+              </div>
+            </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* ========================================================================= */}
       {/* CASE 2: FIELD-STAFF CLICKABLE CARDS / TILES (SECTION 4.2)                 */}
@@ -1094,7 +1223,12 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
         <div className="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
-              <h5 className="fw-bold text-dark mb-0">Active Article Types (Field-Staff Tiles)</h5>
+              <h5 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                <span>Active Article Types (Field-Staff Tiles)</span>
+                <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-pill fs-11 fw-medium">
+                  <i className="ti ti-arrows-move me-1"></i>Drag &amp; drop to reorder
+                </span>
+              </h5>
               <p className="text-muted small mb-0">
                 Section 4.2 &bull; Small clickable cards showing emoji/icon and name for fast identification
               </p>
@@ -1102,148 +1236,133 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
           </div>
 
           <div className="row g-3">
-            {/* Primary Frequently Used Articles */}
-            {primaryArticles.map((art) => (
-              <div key={art.id} className="col-6 col-sm-4 col-md-3 col-lg-2">
+            {/* All Articles with Drag & Drop Reordering */}
+            {articles.map((art, index) => {
+              const isDragging = draggedArticleIdx === index;
+              const isOver = dragOverArticleIdx === index && !isDragging;
+
+              return (
                 <div
-                  className="card h-100 border text-center p-3 rounded-4 shadow-xs transition position-relative hover-elevate"
-                  style={{
-                    cursor: 'pointer',
-                    borderColor: '#e2e8f0',
-                    backgroundColor: art.active ? '#ffffff' : '#f8fafc',
-                    opacity: art.active ? 1 : 0.65
-                  }}
-                  onClick={() => setSelectedArticle(art)}
+                  key={art.id}
+                  className="col-6 col-sm-4 col-md-3 col-lg-2"
+                  onDragOver={(e) => handleArticleDragOver(e, index)}
+                  onDragLeave={(e) => handleArticleDragLeave(e, index)}
+                  onDrop={(e) => handleArticleDrop(e, index)}
                 >
-                  {/* Priority Badge */}
-                  <span
-                    className="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-primary"
-                    style={{ left: '16px', top: '14px', fontSize: '10px' }}
-                  >
-                    #{art.sortOrder}
-                  </span>
-
-                  <div className="fs-1 mb-1 mt-1">{art.icon}</div>
-                  <div className="fw-bold text-dark fs-14">{art.name}</div>
-                  <div className="text-muted small font-monospace" style={{ fontSize: '11px' }}>
-                    {art.id}
-                  </div>
-
-                  {/* Actions Bar */}
                   <div
-                    className="mt-2 pt-2 border-top d-flex justify-content-center gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className="btn btn-xs btn-light text-primary p-1 rounded-2"
-                      title="Edit"
-                      onClick={() => handleEditArticle(art)}
-                    >
-                      <i className="ti ti-edit"></i>
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-xs btn-light ${art.active ? 'text-success' : 'text-danger'} p-1 rounded-2`}
-                      title={art.active ? 'Active' : 'Inactive'}
-                      onClick={(e) => toggleArticleActive(art, e)}
-                    >
-                      <i className={`ti ti-${art.active ? 'check' : 'power'}`}></i>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-xs btn-light text-danger p-1 rounded-2"
-                      title="Delete"
-                      onClick={(e) => deleteArticle(art.id, art.name, e)}
-                    >
-                      <i className="ti ti-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Section 4.2: Remaining Articles Hidden Behind "Others" Tile */}
-            {otherArticles.length > 0 && !showOthers && (
-              <div className="col-6 col-sm-4 col-md-3 col-lg-2">
-                <div
-                  className="card h-100 border border-dashed text-center p-3 rounded-4 bg-light d-flex flex-column justify-content-center align-items-center shadow-xs transition"
-                  style={{ cursor: 'pointer', minHeight: '130px', borderColor: '#cbd5e1' }}
-                  onClick={() => setShowOthers(true)}
-                >
-                  <div className="fs-2 text-secondary mb-1">+{otherArticles.length}</div>
-                  <div className="fw-bold text-secondary fs-13">Others</div>
-                  <div className="text-muted small" style={{ fontSize: '11px' }}>
-                    Click to view
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Revealed Other Articles */}
-            {showOthers &&
-              otherArticles.map((art) => (
-                <div key={art.id} className="col-6 col-sm-4 col-md-3 col-lg-2">
-                  <div
+                    draggable={true}
+                    onDragStart={(e) => handleArticleDragStart(e, index)}
+                    onDragEnd={handleArticleDragEnd}
                     className="card h-100 border text-center p-3 rounded-4 shadow-xs transition position-relative hover-elevate"
                     style={{
-                      cursor: 'pointer',
-                      borderColor: '#e2e8f0',
-                      backgroundColor: art.active ? '#ffffff' : '#f8fafc',
-                      opacity: art.active ? 1 : 0.65
+                      cursor: isDragging ? 'grabbing' : 'grab',
+                      borderColor: isOver ? '#4f46e5' : isDragging ? '#94a3b8' : '#e2e8f0',
+                      backgroundColor: isOver ? '#eef2ff' : isDragging ? '#f1f5f9' : art.active ? '#ffffff' : '#f8fafc',
+                      opacity: isDragging ? 0.35 : art.active ? 1 : 0.65,
+                      transform: isOver ? 'scale(1.05)' : isDragging ? 'scale(0.95)' : 'none',
+                      boxShadow: isOver ? '0 10px 25px -5px rgba(79, 70, 229, 0.3)' : undefined,
+                      transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                      userSelect: 'none'
                     }}
-                    onClick={() => setSelectedArticle(art)}
+                    onClick={() => {
+                      if (isDraggingCardRef.current) return;
+                      handleEditArticle(art, false);
+                    }}
                   >
+                    {/* Priority Badge */}
                     <span
-                      className="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-secondary"
+                      className="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-primary shadow-xs"
                       style={{ left: '16px', top: '14px', fontSize: '10px' }}
                     >
-                      #{art.sortOrder}
+                      #{art.sortOrder || index + 1}
                     </span>
+
+                    {/* Drag Grip Handle Indicator */}
+                    <div
+                      className="position-absolute text-muted"
+                      style={{ right: '10px', top: '8px', opacity: 0.45 }}
+                      title="Drag to reorder priority"
+                    >
+                      <i className="ti ti-grip-vertical fs-14"></i>
+                    </div>
+
                     <div className="fs-1 mb-1 mt-1">{art.icon}</div>
                     <div className="fw-bold text-dark fs-14">{art.name}</div>
                     <div className="text-muted small font-monospace" style={{ fontSize: '11px' }}>
                       {art.id}
                     </div>
 
+                    {/* Actions Bar */}
                     <div
-                      className="mt-2 pt-2 border-top d-flex justify-content-center gap-1"
+                      className="mt-2 pt-2 border-top d-flex justify-content-center gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
-                        className="btn btn-xs btn-light text-primary p-1 rounded-2"
+                        className="btn btn-sm btn-light text-primary rounded-3 d-inline-flex align-items-center justify-content-center border shadow-xs"
+                        style={{ width: '32px', height: '32px', padding: 0 }}
                         title="Edit"
-                        onClick={() => handleEditArticle(art)}
+                        onClick={() => handleEditArticle(art, true)}
                       >
-                        <i className="ti ti-edit"></i>
+                        <i className="ti ti-edit fs-15"></i>
                       </button>
                       <button
                         type="button"
-                        className={`btn btn-xs btn-light ${art.active ? 'text-success' : 'text-danger'} p-1 rounded-2`}
+                        className={`btn btn-sm btn-light ${art.active ? 'text-success' : 'text-danger'} rounded-3 d-inline-flex align-items-center justify-content-center border shadow-xs`}
+                        style={{ width: '32px', height: '32px', padding: 0 }}
                         title={art.active ? 'Active' : 'Inactive'}
                         onClick={(e) => toggleArticleActive(art, e)}
                       >
-                        <i className={`ti ti-${art.active ? 'check' : 'power'}`}></i>
+                        <i className={`ti ti-${art.active ? 'check' : 'power'} fs-15`}></i>
                       </button>
                       <button
                         type="button"
-                        className="btn btn-xs btn-light text-danger p-1 rounded-2"
+                        className="btn btn-sm btn-light text-danger rounded-3 d-inline-flex align-items-center justify-content-center border shadow-xs"
+                        style={{ width: '32px', height: '32px', padding: 0 }}
                         title="Delete"
                         onClick={(e) => deleteArticle(art.id, art.name, e)}
                       >
-                        <i className="ti ti-trash"></i>
+                        <i className="ti ti-trash fs-15"></i>
                       </button>
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
 
             {/* Section 4.2: Dedicated "+ Add New Article" card sits alongside the article tiles */}
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+            <div
+              className="col-6 col-sm-4 col-md-3 col-lg-2"
+              onDragOver={(e) => {
+                if (draggedArticleIdx !== null) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverArticleIdx !== 'end') setDragOverArticleIdx('end');
+                }
+              }}
+              onDragLeave={() => {
+                if (dragOverArticleIdx === 'end') setDragOverArticleIdx(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (draggedArticleIdx !== null && draggedArticleIdx !== articles.length - 1) {
+                  handleArticleDrop(e, articles.length - 1);
+                }
+              }}
+            >
               <div
-                className="card h-100 border border-primary border-dashed text-center p-3 rounded-4 bg-primary-subtle d-flex flex-column justify-content-center align-items-center shadow-xs transition hover-elevate"
-                style={{ cursor: 'pointer', minHeight: '130px' }}
+                className={`card h-100 border text-center p-3 rounded-4 d-flex flex-column justify-content-center align-items-center shadow-xs transition hover-elevate ${
+                  dragOverArticleIdx === 'end'
+                    ? 'border-2 border-primary bg-primary-subtle'
+                    : 'border-primary border-dashed bg-primary-subtle'
+                }`}
+                style={{
+                  cursor: 'pointer',
+                  minHeight: '130px',
+                  transform: dragOverArticleIdx === 'end' ? 'scale(1.04)' : 'none',
+                  transition: 'all 0.18s ease'
+                }}
                 onClick={handleOpenAddModal}
               >
                 <i className="ti ti-plus fs-2 text-primary mb-1"></i>
@@ -1388,7 +1507,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                   <tr
                     key={art.id}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedArticle(art)}
+                    onClick={() => handleEditArticle(art, false)}
                   >
                     <td className="px-3 fw-bold text-primary font-monospace fs-13">{art.id}</td>
                     <td className="px-3 fs-4">{art.icon}</td>
@@ -1410,7 +1529,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                           type="button"
                           className="btn btn-sm btn-light text-primary p-1 rounded-2"
                           title="View Details"
-                          onClick={() => setSelectedArticle(art)}
+                          onClick={() => handleEditArticle(art, false)}
                         >
                           <i className="ti ti-eye fs-5"></i>
                         </button>
@@ -1418,7 +1537,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                           type="button"
                           className="btn btn-sm btn-light text-secondary p-1 rounded-2"
                           title="Edit Article"
-                          onClick={() => handleEditArticle(art)}
+                          onClick={() => handleEditArticle(art, true)}
                         >
                           <i className="ti ti-edit fs-5"></i>
                         </button>
@@ -1449,9 +1568,34 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
             <div className="modal-content shadow-lg border-0 rounded-4 bg-white">
               <div className="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
                 <h5 className="modal-title fw-bold text-dark mb-0">
-                  {isEditingExisting ? `Edit Article: ${formData.name}` : 'Add New Article'}
+                  {isEditingExisting
+                    ? (isModalEditMode ? `Edit Article: ${formData.name || ''}` : `Article Details: ${formData.name || ''}`)
+                    : 'Add New Article'}
                 </h5>
-                <button type="button" className="btn-close" onClick={() => setIsModalOpen(false)}></button>
+                <div className="d-flex align-items-center gap-2">
+                  {isEditingExisting && (
+                    !isModalEditMode ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                        onClick={() => setIsModalEditMode(true)}
+                      >
+                        <i className="ti ti-edit"></i>
+                        <span>Edit</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-light border text-secondary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                        onClick={() => setIsModalEditMode(false)}
+                      >
+                        <i className="ti ti-eye"></i>
+                        <span>View Mode</span>
+                      </button>
+                    )
+                  )}
+                  <button type="button" className="btn-close" onClick={() => setIsModalOpen(false)}></button>
+                </div>
               </div>
               {renderArticleModalForm(false)}
             </div>

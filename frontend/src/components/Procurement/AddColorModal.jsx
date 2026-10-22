@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
+const autoCapitalizeWords = (text) => {
+  if (!text) return '';
+  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 /**
  * HSV to HEX conversion helper
  */
@@ -110,7 +115,25 @@ const PRESET_COLOR_DETAILS = {
   '#36454F': { name: 'Charcoal', pantone: '19-4104 TCX' }
 };
 
-export default function AddColorModal({ initialColor = null, colors = [], onSave, onClose }) {
+export default function AddColorModal({
+  initialColor = null,
+  colors = [],
+  onSave,
+  onClose,
+  isModalEditMode: propIsEditMode,
+  onToggleEditMode
+}) {
+  const [isEditMode, setIsEditMode] = useState(() => {
+    if (propIsEditMode !== undefined) return propIsEditMode;
+    return initialColor ? false : true;
+  });
+
+  useEffect(() => {
+    if (propIsEditMode !== undefined) {
+      setIsEditMode(propIsEditMode);
+    }
+  }, [propIsEditMode]);
+
   const initHex = initialColor?.hex || '#000000';
   const initHsv = hexToHsv(initHex);
 
@@ -169,9 +192,8 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
     return null;
   };
 
-  const initialMatched = initialColor || findColorMatch(initHex);
-  const [colorName, setColorName] = useState(initialMatched?.name || '');
-  const [pantoneCode, setPantoneCode] = useState(initialMatched?.pantone || '');
+  const [colorName, setColorName] = useState(initialColor?.name || '');
+  const [pantoneCode, setPantoneCode] = useState(initialColor?.pantone || '');
   const [isUserEditedName, setIsUserEditedName] = useState(Boolean(initialColor?.name));
   const [isUserEditedPantone, setIsUserEditedPantone] = useState(Boolean(initialColor?.pantone));
   const [category, setCategory] = useState(initialColor?.category || detectCategory(initHex));
@@ -195,16 +217,6 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
     setHexInput(computedHex);
     if (!initialColor) {
       setCategory(detectCategory(computedHex));
-      // Auto-suggest name only if user has NOT manually customized the name
-      if (!isUserEditedName) {
-        const matched = findColorMatch(computedHex);
-        if (matched) {
-          setColorName(matched.name);
-          if (!isUserEditedPantone && matched.pantone) {
-            setPantoneCode(matched.pantone);
-          }
-        }
-      }
     }
   }, [hue, sat, val]);
 
@@ -220,17 +232,10 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
       setSat(parsedHsv.s);
       setVal(parsedHsv.v);
       setCategory(detectCategory(valStr));
-      if (!isUserEditedName) {
-        const matched = findColorMatch(valStr);
-        if (matched) {
-          setColorName(matched.name || '');
-          if (!isUserEditedPantone) setPantoneCode(matched.pantone || '');
-        }
-      }
     }
   };
 
-  // Quick Select click
+  // Quick Select click - only update color values, no pre-filled name or pantone code
   const handleQuickSelect = (swatchHex) => {
     const parsed = hexToHsv(swatchHex);
     setHue(parsed.h);
@@ -238,15 +243,6 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
     setVal(parsed.v);
     setHexInput(swatchHex.toUpperCase());
     setCategory(detectCategory(swatchHex));
-
-    // Fill name & code for the selected preset swatch
-    const matched = findColorMatch(swatchHex);
-    if (matched) {
-      setColorName(matched.name || '');
-      setPantoneCode(matched.pantone || '');
-      setIsUserEditedName(false);
-      setIsUserEditedPantone(false);
-    }
   };
 
   // Saturation / Value drag handler
@@ -378,7 +374,7 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
     const finalHex = /^#[0-9A-F]{6}$/i.test(hexInput) ? hexInput : hsvToHex(hue, sat, val);
     const newColor = {
       id: initialColor?.id || `CLR-${Date.now().toString().slice(-4)}`,
-      name: colorName.trim(),
+      name: autoCapitalizeWords(colorName.trim()),
       hex: finalHex,
       pantone: pantoneCode.trim(),
       category: category || detectCategory(finalHex),
@@ -411,21 +407,60 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
         >
           {/* MODAL HEADER */}
           <div className="modal-header border-0 pb-0 pt-4 px-4 d-flex align-items-center justify-content-between">
-            <h5 className="modal-title fw-bold text-dark fs-18 mb-0">
-              {initialColor ? 'Edit Color' : 'Add New Color'}
-            </h5>
-            <button
-              type="button"
-              className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center"
-              style={{ width: '32px', height: '32px', color: '#64748b' }}
-              onClick={() => onClose && onClose(null)}
-            >
-              <i className="ti ti-x fs-16"></i>
-            </button>
+            <div>
+              <h5 className="modal-title fw-bold text-dark fs-18 mb-0">
+                {initialColor ? (isEditMode ? 'Edit Color' : 'Color Details') : 'Add New Color'}
+              </h5>
+              {initialColor?.id && (
+                <span className="badge bg-light text-secondary border font-monospace mt-1" style={{ fontSize: '11px' }}>
+                  {initialColor.id}
+                </span>
+              )}
+            </div>
+
+            <div className="d-flex align-items-center gap-2">
+              {initialColor && (
+                !isEditMode ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                    onClick={() => {
+                      setIsEditMode(true);
+                      if (onToggleEditMode) onToggleEditMode(true);
+                    }}
+                  >
+                    <i className="ti ti-edit"></i>
+                    <span>Edit</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-light border text-secondary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                    onClick={() => {
+                      setIsEditMode(false);
+                      if (onToggleEditMode) onToggleEditMode(false);
+                    }}
+                  >
+                    <i className="ti ti-eye"></i>
+                    <span>View Mode</span>
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center"
+                style={{ width: '32px', height: '32px', color: '#64748b' }}
+                onClick={() => onClose && onClose(null)}
+              >
+                <i className="ti ti-x fs-16"></i>
+              </button>
+            </div>
           </div>
 
           {/* MODAL BODY */}
           <div className="modal-body px-4 pt-3 pb-3">
+            <fieldset disabled={!isEditMode} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, opacity: isEditMode ? 1 : 0.85 }}>
             {errorMessage && (
               <div className="alert alert-danger py-2 px-3 fs-12 mb-3 rounded-3">
                 {errorMessage}
@@ -704,12 +739,13 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
                 placeholder="e.g., Navy Blue, Rust, Maroon"
                 value={colorName}
                 onChange={(e) => {
-                  setColorName(e.target.value);
+                  setColorName(autoCapitalizeWords(e.target.value));
                   setIsUserEditedName(true);
                   if (errorMessage) setErrorMessage('');
                 }}
                 required
               />
+              <div className="form-text small text-muted">Auto-capitalised word by word</div>
             </div>
 
             {/* PANTONE CODE */}
@@ -761,50 +797,59 @@ export default function AddColorModal({ initialColor = null, colors = [], onSave
                 <option value="Q2">☀️ Apr – Jun (Q2 Summer Pastels)</option>
                 <option value="Q3">🌧️ Jul – Sep (Q3 Monsoon & Festive)</option>
                 <option value="Q4">❄️ Oct – Dec (Q4 Winter & Wedding)</option>
-                <option value="ALL">🌈 Core All-Season Staple</option>
               </select>
-              <div className="form-check mt-2">
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  id="colorIsTrendingCheck"
-                  checked={isTrending}
-                  onChange={(e) => setIsTrending(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <label
-                  className="form-check-label fs-13 fw-semibold text-dark"
-                  htmlFor="colorIsTrendingCheck"
-                  style={{ cursor: 'pointer' }}
-                >
-                  ⭐ Mark as Famous / Trending Color (Jan-Mar / Seasonal Hot Seller)
-                </label>
-              </div>
             </div>
+            </fieldset>
           </div>
 
           {/* MODAL FOOTER */}
           <div className="modal-footer border-top pt-3 pb-3 px-4 d-flex align-items-center justify-content-end gap-2">
-            <button
-              type="button"
-              className="btn btn-link text-secondary text-decoration-none fs-13 fw-medium px-3"
-              onClick={() => onClose && onClose(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn text-white fs-13 fw-semibold px-4 py-2"
-              style={{
-                backgroundColor: '#4f46e5',
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 1px 3px rgba(79, 70, 229, 0.3)'
-              }}
-              onClick={handleSave}
-            >
-              {initialColor ? 'Save Changes' : 'Create'}
-            </button>
+            {!isEditMode ? (
+              <div className="d-flex align-items-center justify-content-end gap-2 w-100">
+                <button
+                  type="button"
+                  className="btn btn-light border text-secondary fs-13 fw-semibold px-3 py-2 rounded-3"
+                  onClick={() => onClose && onClose(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary fs-13 fw-semibold px-4 py-2 rounded-3 d-flex align-items-center gap-1.5 shadow-sm"
+                  style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5' }}
+                  onClick={() => {
+                    setIsEditMode(true);
+                    if (onToggleEditMode) onToggleEditMode(true);
+                  }}
+                >
+                  <i className="ti ti-edit"></i>
+                  <span>Edit Color</span>
+                </button>
+              </div>
+            ) : (
+              <div className="d-flex align-items-center justify-content-end gap-2 w-100">
+                <button
+                  type="button"
+                  className="btn btn-link text-secondary text-decoration-none fs-13 fw-medium px-3"
+                  onClick={() => onClose && onClose(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn text-white fs-13 fw-semibold px-4 py-2"
+                  style={{
+                    backgroundColor: '#4f46e5',
+                    borderRadius: '8px',
+                    border: 'none',
+                    boxShadow: '0 1px 3px rgba(79, 70, 229, 0.3)'
+                  }}
+                  onClick={handleSave}
+                >
+                  {initialColor ? 'Save Changes' : 'Create'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

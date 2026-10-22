@@ -1,56 +1,61 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { initialSizeSeries, getStoredData, setStoredData } from '../../data/salesOrderData';
 
+const autoCapitalizeWords = (text) => {
+  if (!text) return '';
+  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function SizeMasterView() {
-  const [seriesList, setSeriesList] = useState(() => {
-    const normalize = (list) => {
-      return (list || []).map((s, idx) => {
-        const detailsMap = {};
-        (s.sizeDetails || []).forEach((d) => {
-          if (d && d.size) detailsMap[d.size] = d.label || d.size;
-        });
-        const initMatch = initialSizeSeries.find((x) => x.id === s.id || x.name === s.name);
-        if (initMatch) {
-          (initMatch.sizeDetails || []).forEach((d) => {
-            if (d && d.size && !detailsMap[d.size]) detailsMap[d.size] = d.label || d.size;
-          });
-        }
-
-        const sizes = Array.isArray(s.sizes) && s.sizes.length > 0
-          ? s.sizes
-          : (s.sizeRecords || []).map((r) => r.sizeName);
-
-        const records = (s.sizeRecords && s.sizeRecords.length > 0
-          ? s.sizeRecords
-          : sizes.map((sz, sIdx) => ({
-              id: `SZ-${s.id}-${String(sIdx + 1).padStart(2, '0')}`,
-              seriesId: s.id,
-              sizeName: sz,
-              displayName: detailsMap[sz] || sz,
-              description: detailsMap[sz] || ''
-            }))
-        ).map((r, rIdx) => ({
-          ...r,
-          id: r.id || `SZ-${s.id}-${String(rIdx + 1).padStart(2, '0')}`,
-          seriesId: s.id,
-          sizeName: r.sizeName || r.size || '',
-          displayName: r.displayName || detailsMap[r.sizeName] || r.sizeName || '',
-          description: r.description || detailsMap[r.sizeName] || ''
-        }));
-
-        return {
-          ...s,
-          displayOrder: s.displayOrder || idx + 1,
-          active: s.active !== false,
-          sizes: records.map((r) => r.sizeName),
-          sizeDetails: records.map((r) => ({ size: r.sizeName, label: r.displayName || r.sizeName })),
-          sizeRecords: records
-        };
+  const normalize = (list) => {
+    return (list || []).map((s, idx) => {
+      const detailsMap = {};
+      (s.sizeDetails || []).forEach((d) => {
+        if (d && d.size) detailsMap[d.size] = d.label || d.size;
       });
-    };
+      const initMatch = initialSizeSeries.find((x) => x.id === s.id || x.name === s.name);
+      if (initMatch) {
+        (initMatch.sizeDetails || []).forEach((d) => {
+          if (d && d.size && !detailsMap[d.size]) detailsMap[d.size] = d.label || d.size;
+        });
+      }
 
+      const sizes = Array.isArray(s.sizes) && s.sizes.length > 0
+        ? s.sizes
+        : (s.sizeRecords || []).map((r) => r.sizeName);
+
+      const records = (s.sizeRecords && s.sizeRecords.length > 0
+        ? s.sizeRecords
+        : sizes.map((sz, sIdx) => ({
+            id: `SZ-${s.id}-${String(sIdx + 1).padStart(2, '0')}`,
+            seriesId: s.id,
+            sizeName: sz,
+            displayName: detailsMap[sz] || sz,
+            description: detailsMap[sz] || ''
+          }))
+      ).map((r, rIdx) => ({
+        ...r,
+        id: r.id || `SZ-${s.id}-${String(rIdx + 1).padStart(2, '0')}`,
+        seriesId: s.id,
+        sizeName: r.sizeName || r.size || '',
+        displayName: r.displayName || detailsMap[r.sizeName] || r.sizeName || '',
+        description: r.description || detailsMap[r.sizeName] || ''
+      }));
+
+      return {
+        ...s,
+        displayOrder: s.displayOrder || idx + 1,
+        active: s.active !== false,
+        sizes: records.map((r) => r.sizeName),
+        sizeDetails: records.map((r) => ({ size: r.sizeName, label: r.displayName || r.sizeName })),
+        sizeRecords: records
+      };
+    });
+  };
+
+  const [seriesList, setSeriesList] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
-    if (Array.isArray(stored) && stored.length > 0) {
+    if (Array.isArray(stored)) {
       const normalized = normalize(stored);
       setStoredData('erp_size_series_v1', normalized);
       return normalized;
@@ -59,6 +64,21 @@ export default function SizeMasterView() {
     setStoredData('erp_size_series_v1', initialNormalized);
     return initialNormalized;
   });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      const stored = getStoredData('erp_size_series_v1', null);
+      if (Array.isArray(stored)) {
+        setSeriesList(normalize(stored));
+      }
+    };
+    window.addEventListener('erp_size_series_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('erp_size_series_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -175,6 +195,51 @@ export default function SizeMasterView() {
     setDragOverTarget(null);
   };
 
+  // Series Drag-and-Drop state (for reordering numric, alpha, etc.)
+  const [draggedSeriesIdx, setDraggedSeriesIdx] = useState(null);
+  const [dragOverSeriesIdx, setDragOverSeriesIdx] = useState(null);
+
+  const handleSeriesDragStart = (e, index) => {
+    setDraggedSeriesIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/series-index', String(index));
+  };
+
+  const handleSeriesDragOver = (e, index) => {
+    if (draggedSeriesIdx !== null) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOverSeriesIdx !== index) {
+        setDragOverSeriesIdx(index);
+      }
+    }
+  };
+
+  const handleSeriesDrop = (e, targetIdx) => {
+    if (draggedSeriesIdx === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fromIdx = draggedSeriesIdx;
+    setDraggedSeriesIdx(null);
+    setDragOverSeriesIdx(null);
+
+    if (fromIdx === targetIdx || fromIdx === null || targetIdx === null) return;
+
+    const list = [...seriesList];
+    const [moved] = list.splice(fromIdx, 1);
+    list.splice(targetIdx, 0, moved);
+
+    const updated = list.map((s, idx) => ({ ...s, displayOrder: idx + 1 }));
+    persistSeries(updated);
+    showToast(`"${moved.name}" moved to position #${targetIdx + 1}`);
+  };
+
+  const handleSeriesDragEnd = () => {
+    setDraggedSeriesIdx(null);
+    setDragOverSeriesIdx(null);
+  };
+
   const handleReorderModalSizes = (fromIdx, toIdx) => {
     if (fromIdx === toIdx) return;
     const records = [...seriesFormData.sizeRecords];
@@ -287,11 +352,11 @@ export default function SizeMasterView() {
 
     const finalObj = {
       ...seriesFormData,
-      name: seriesFormData.name.trim(),
+      name: autoCapitalizeWords(seriesFormData.name.trim()),
       sizes: cleanSizes.map((s) => s.sizeName.trim()),
       sizeDetails: cleanSizes.map((s) => ({
         size: s.sizeName.trim(),
-        label: (s.displayName || s.sizeName).trim()
+        label: autoCapitalizeWords((s.displayName || s.sizeName).trim())
       })),
       sizeRecords: cleanSizes.map((s, idx) => ({
         ...s,
@@ -362,7 +427,7 @@ export default function SizeMasterView() {
       id: `SZ-${activeSeriesForAddSize.id}-${String((activeSeriesForAddSize.sizeRecords || []).length + 1).padStart(2, '0')}`,
       seriesId: activeSeriesForAddSize.id,
       sizeName: newSizeForm.sizeName.trim().toUpperCase(),
-      displayName: (newSizeForm.displayName || newSizeForm.sizeName).trim(),
+      displayName: autoCapitalizeWords((newSizeForm.displayName || newSizeForm.sizeName).trim()),
       description: newSizeForm.description.trim()
     };
 
@@ -494,56 +559,98 @@ export default function SizeMasterView() {
 
       {/* Series Cards (Section 5.1 & 5.2) */}
       <div className="d-flex flex-column gap-3.5">
-        {filteredSeries.map((series, idx) => (
-          <div
-            key={series.id}
-            className="card border-0 shadow-sm rounded-4 p-4 bg-white transition hover-elevate"
-            style={{
-              border: '1px solid #e2e8f0',
-              opacity: series.active ? 1 : 0.7
-            }}
-          >
-            {/* Card Header matching Image 2 */}
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 pb-2 border-bottom">
-              <div className="d-flex align-items-center gap-3">
-                {/* Series Icon matching Image 2 */}
+        {filteredSeries.map((series, idx) => {
+          const isSeriesDragging = draggedSeriesIdx === idx;
+          const isSeriesOver = dragOverSeriesIdx === idx;
+
+          return (
+            <div
+              key={series.id}
+              onDragOver={(e) => handleSeriesDragOver(e, idx)}
+              onDrop={(e) => handleSeriesDrop(e, idx)}
+              className="card border-0 shadow-sm rounded-4 p-4 bg-white transition hover-elevate"
+              style={{
+                border: isSeriesOver ? '2px dashed #4f46e5' : '1px solid #e2e8f0',
+                backgroundColor: isSeriesOver ? '#f5f3ff' : '#ffffff',
+                opacity: isSeriesDragging ? 0.35 : (series.active ? 1 : 0.7),
+                transform: isSeriesOver ? 'scale(1.01)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {/* Card Header matching Image 2 */}
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 pb-2 border-bottom">
                 <div
-                  className="rounded-3 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
-                  style={{ width: '40px', height: '40px', backgroundColor: '#eef2ff' }}
+                  className="d-flex align-items-center gap-2"
+                  style={{ cursor: 'grab' }}
+                  draggable={true}
+                  onDragStart={(e) => handleSeriesDragStart(e, idx)}
+                  onDragEnd={handleSeriesDragEnd}
+                  title="Drag and drop to reorder series priority"
                 >
-                  <i className="ti ti-layers-subtract fs-4"></i>
-                </div>
-
-                <div>
-                  <div className="d-flex align-items-center gap-2">
-                    <h5 className="fw-bold text-dark mb-0 fs-16">{series.name}</h5>
+                  {/* Drag Grip Handle */}
+                  <div
+                    className="text-muted d-flex align-items-center justify-content-center me-1"
+                    style={{ fontSize: '18px', userSelect: 'none', cursor: 'grab' }}
+                  >
+                    ⋮⋮
                   </div>
-                  <span className="text-muted small" style={{ fontSize: '12px' }}>
-                    {(series.sizeRecords || []).length} sizes &bull; {(series.sizeRecords || []).length} sizes &bull; {series.description || `${(series.sizeRecords || []).length} sizes · Standard kurta run`}
-                  </span>
+
+                  {/* Series Icon matching Image 2 */}
+                  <div
+                    className="rounded-3 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
+                    style={{ width: '40px', height: '40px', backgroundColor: '#eef2ff' }}
+                  >
+                    <i className="ti ti-layers-subtract fs-4"></i>
+                  </div>
+
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <h5 className="fw-bold text-dark mb-0 fs-16">{series.name}</h5>
+                    </div>
+                    <span className="text-muted small" style={{ fontSize: '12px' }}>
+                      {(series.sizeRecords || []).length} sizes &bull; {(series.sizeRecords || []).length} sizes &bull; {series.description || `${(series.sizeRecords || []).length} sizes · Standard kurta run`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons matching Image 2 */}
+                <div className="d-flex align-items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light text-secondary p-1.5 rounded-2"
+                    title="Move Up"
+                    disabled={idx === 0}
+                    onClick={() => handleMoveSeries(idx, -1)}
+                  >
+                    <i className="ti ti-chevron-up"></i>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light text-secondary p-1.5 rounded-2"
+                    title="Move Down"
+                    disabled={idx === seriesList.length - 1}
+                    onClick={() => handleMoveSeries(idx, 1)}
+                  >
+                    <i className="ti ti-chevron-down"></i>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light text-secondary p-1.5 rounded-2 ms-1"
+                    title="Edit Series"
+                    onClick={() => handleEditSeries(series)}
+                  >
+                    <i className="ti ti-edit fs-5"></i>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
+                    title="Delete Series"
+                    onClick={() => handleDeleteSeries(series.id, series.name)}
+                  >
+                    <i className="ti ti-trash fs-5"></i>
+                  </button>
                 </div>
               </div>
-
-              {/* Action Buttons matching Image 2 */}
-              <div className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-light text-secondary p-1.5 rounded-2"
-                  title="Edit Series"
-                  onClick={() => handleEditSeries(series)}
-                >
-                  <i className="ti ti-edit fs-5"></i>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
-                  title="Delete Series"
-                  onClick={() => handleDeleteSeries(series.id, series.name)}
-                >
-                  <i className="ti ti-trash fs-5"></i>
-                </button>
-              </div>
-            </div>
 
             {/* Individual Size Records Grid matching Image 1 & 2 (Reorderable via Drag & Drop) */}
             <div className="d-flex flex-wrap gap-2.5 pt-1">
@@ -608,7 +715,8 @@ export default function SizeMasterView() {
               })}
             </div>
           </div>
-        ))}
+        );
+      })}
 
         {filteredSeries.length === 0 && (
           <div className="card border-0 shadow-sm rounded-4 p-5 text-center text-muted bg-white">
@@ -650,8 +758,9 @@ export default function SizeMasterView() {
                         placeholder="e.g. Alphabetic, Numeric, Roman"
                         required
                         value={seriesFormData.name}
-                        onChange={(e) => setSeriesFormData({ ...seriesFormData, name: e.target.value })}
+                        onChange={(e) => setSeriesFormData({ ...seriesFormData, name: autoCapitalizeWords(e.target.value) })}
                       />
+                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
                     </div>
                     <div className="col-md-2">
                       <label className="form-label small fw-semibold text-muted">Display Order</label>
@@ -769,7 +878,7 @@ export default function SizeMasterView() {
                                   onChange={(e) => {
                                     const updated = [...(seriesFormData.sizeRecords || arr)];
                                     if (!updated[rIdx]) updated[rIdx] = { ...sz };
-                                    updated[rIdx].displayName = e.target.value;
+                                    updated[rIdx].displayName = autoCapitalizeWords(e.target.value);
                                     setSeriesFormData({ ...seriesFormData, sizeRecords: updated });
                                   }}
                                 />
@@ -870,8 +979,9 @@ export default function SizeMasterView() {
                       className="form-control"
                       placeholder="What's shown to user, if different"
                       value={newSizeForm.displayName}
-                      onChange={(e) => setNewSizeForm({ ...newSizeForm, displayName: e.target.value })}
+                      onChange={(e) => setNewSizeForm({ ...newSizeForm, displayName: autoCapitalizeWords(e.target.value) })}
                     />
+                    <div className="form-text small text-muted">Auto-capitalised word by word</div>
                   </div>
 
                   <div className="mb-3">

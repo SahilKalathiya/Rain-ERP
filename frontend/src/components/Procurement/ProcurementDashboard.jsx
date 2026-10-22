@@ -375,23 +375,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       const s = localStorage.getItem('raindrop_stock_pool_v1');
       if (s) return JSON.parse(s);
     } catch (e) { }
-    return [
-      {
-        id: 'SP-1001',
-        fabricId: 'FAB-001',
-        fabricName: 'Tussar Silk',
-        width: '42"',
-        colorId: 'COL-001',
-        colorName: 'Ivory',
-        colorHex: '#FFFFF0',
-        qty: 1900.0,
-        source: 'QC approved',
-        sourceType: 'GRN',
-        poId: 'PO-1001',
-        grnId: 'GRN-1001',
-        decidedAt: '07/10/2026'
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -1312,6 +1296,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             api.saveVendor(v).catch((e) => console.warn('Vendor save sync error:', e));
             addAuditLog('Save', 'Vendor Master', v.id, 'Vendor Details', 'Record', v.name);
           }}
+          onDeleteVendor={(id) => {
+            setVendors((prev) => prev.filter((item) => item.id !== id));
+            api.deleteVendor(id).catch((e) => console.warn('Vendor delete sync error:', e));
+            addAuditLog('Delete', 'Vendor Master', id, 'Vendor Details', 'Record', id);
+          }}
         />
       )}
 
@@ -1326,6 +1315,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             });
             api.saveFabric(f).catch((e) => console.warn('Fabric save sync error:', e));
             addAuditLog('Save', 'Fabric Master', f.id, 'Fabric Quality', 'Record', f.qualityName);
+          }}
+          onDeleteFabric={(id) => {
+            setFabrics((prev) => prev.filter((item) => item.id !== id));
+            api.deleteFabric(id).catch((e) => console.warn('Fabric delete sync error:', e));
+            addAuditLog('Delete', 'Fabric Master', id, 'Fabric Quality', 'Record', id);
           }}
         />
       )}
@@ -1361,6 +1355,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             });
             api.saveTransporter(t).catch((e) => console.warn('Transporter save sync error:', e));
             addAuditLog('Save', 'Transporter Master', t.id, 'Logistics Carrier', 'Record', t.name);
+          }}
+          onDeleteTransporter={(id) => {
+            setTransporters((prev) => prev.filter((item) => item.id !== id));
+            api.deleteTransporter(id).catch((e) => console.warn('Transporter delete sync error:', e));
+            addAuditLog('Delete', 'Transporter Master', id, 'Logistics Carrier', 'Record', id);
           }}
         />
       )}

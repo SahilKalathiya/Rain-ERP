@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { initialColors, getStoredData, setStoredData } from '../../data/salesOrderData';
+import { initialColors, getStoredData, setStoredData, getStoredColorsMaster, setStoredColorsMaster } from '../../data/salesOrderData';
 import AddColorModal from '../Procurement/AddColorModal';
 
 /**
@@ -39,14 +39,13 @@ function isLightColor(hexStr) {
 }
 
 export default function ColorMasterView({ isInline = false, onSaveInline, onCloseInline }) {
-  const [colors, setColors] = useState(() => {
-    return getStoredData('erp_colors_master_v1', initialColors);
-  });
+  const [colors, setColors] = useState(() => getStoredColorsMaster());
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
+  const [isModalEditMode, setIsModalEditMode] = useState(isInline);
   const [toastMessage, setToastMessage] = useState('');
 
   const [editingColor, setEditingColor] = useState(null);
@@ -54,18 +53,15 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
 
   useEffect(() => {
     const handleUpdate = () => {
-      try {
-        const stored = getStoredData('erp_colors_master_v1', null) || getStoredData('raindrop_colors_v1', null);
-        if (Array.isArray(stored) && stored.length > 0) {
-          setColors(stored);
-        }
-      } catch (e) {}
+      setColors(getStoredColorsMaster());
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('raindrop_colors_updated', handleUpdate);
+    window.addEventListener('erp_colors_updated', handleUpdate);
     return () => {
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('raindrop_colors_updated', handleUpdate);
+      window.removeEventListener('erp_colors_updated', handleUpdate);
     };
   }, []);
 
@@ -86,10 +82,11 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
       active: true
     });
     setIsCreatingNew(true);
+    setIsModalEditMode(true);
     setIsEditing(true);
   };
 
-  const handleEdit = (color) => {
+  const handleEdit = (color, forceEdit = false) => {
     setEditingColor({
       id: color.id,
       name: color.name || '',
@@ -101,6 +98,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
       active: color.active !== false
     });
     setIsCreatingNew(false);
+    setIsModalEditMode(forceEdit);
     setIsEditing(true);
   };
 
@@ -108,24 +106,14 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
     if (!window.confirm('Are you sure you want to delete this color?')) return;
     const updated = colors.filter((c) => c.id !== colorId);
     setColors(updated);
-    setStoredData('erp_colors_master_v1', updated);
-    try {
-      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updated));
-      window.dispatchEvent(new Event('raindrop_colors_updated'));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
+    setStoredColorsMaster(updated);
     showToast('Color deleted successfully');
   };
 
   const handleToggleStatus = (colorId) => {
     const updated = colors.map((c) => (c.id === colorId ? { ...c, active: !c.active } : c));
     setColors(updated);
-    setStoredData('erp_colors_master_v1', updated);
-    try {
-      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updated));
-      window.dispatchEvent(new Event('raindrop_colors_updated'));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
+    setStoredColorsMaster(updated);
     showToast('Status updated');
   };
 
@@ -158,12 +146,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
     }
 
     setColors(updatedList);
-    setStoredData('erp_colors_master_v1', updatedList);
-    try {
-      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updatedList));
-      window.dispatchEvent(new Event('raindrop_colors_updated'));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
+    setStoredColorsMaster(updatedList);
 
     if (isInline && onSaveInline) {
       onSaveInline(colorObj);
@@ -299,6 +282,8 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
         <AddColorModal
           initialColor={isCreatingNew ? null : editingColor}
           colors={colors}
+          isModalEditMode={isModalEditMode}
+          onToggleEditMode={setIsModalEditMode}
           onSave={handleModalSave}
           onClose={() => {
             setIsEditing(false);
@@ -318,13 +303,15 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
           return (
             <div key={col.id} className="col-sm-6 col-md-4 col-lg-3">
               <div
-                className="card border-0 shadow-xs h-100 overflow-hidden transition-all"
+                className="card border-0 shadow-xs h-100 overflow-hidden transition-all hover-elevate"
                 style={{
                   borderRadius: '14px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  cursor: 'pointer'
                 }}
+                onClick={() => handleEdit(col, false)}
               >
                 {/* Visual Swatch Area */}
                 <div
@@ -352,7 +339,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                   </span>
 
                   {/* Actions (Edit / Delete) */}
-                  <div className="d-flex align-items-center gap-1">
+                  <div className="d-flex align-items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       className="btn btn-sm p-1 rounded-2 shadow-xs"
                       style={{
@@ -361,7 +348,10 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                         width: '28px',
                         height: '28px'
                       }}
-                      onClick={() => handleEdit(col)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(col, true);
+                      }}
                       title="Edit Color"
                     >
                       <i className="ti ti-edit" style={{ fontSize: '13px' }}></i>
@@ -374,7 +364,10 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                         width: '28px',
                         height: '28px'
                       }}
-                      onClick={() => handleDelete(col.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(col.id);
+                      }}
                       title="Delete Color"
                     >
                       <i className="ti ti-trash" style={{ fontSize: '13px' }}></i>

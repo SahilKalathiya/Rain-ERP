@@ -376,19 +376,60 @@ header.navbar {
 .text-warning {
   color: #d97706 !important;
 }
+.btn-secondary,
 .btn-outline-secondary,
 .btn-secondary-outline,
-.btn-outline-default {
+.btn-outline-default,
+.btn-theme-close,
+button.btn-theme-close,
+.modal-footer .btn-theme-close,
+.modal-footer .btn-secondary,
+.modal-footer .btn-outline-secondary {
   background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #475569 !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  outline: none !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:focus-visible,
+.btn-secondary:active,
 .btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:focus-visible,
+.btn-outline-secondary:active,
 .btn-secondary-outline:hover,
-.btn-outline-default:hover {
-  background-color: #f8fafc !important;
-  border-color: #94a3b8 !important;
-  color: #1e293b !important;
+.btn-secondary-outline:focus,
+.btn-outline-default:hover,
+.btn-theme-close:hover,
+.btn-theme-close:focus,
+.btn-theme-close:focus-visible,
+.btn-theme-close:active,
+button.btn-theme-close:hover,
+button.btn-theme-close:focus,
+button.btn-theme-close:focus-visible,
+button.btn-theme-close:active,
+.modal-footer .btn-theme-close:hover,
+.modal-footer .btn-theme-close:focus,
+.modal-footer .btn-theme-close:focus-visible,
+.modal-footer .btn-theme-close:active,
+.modal-footer .btn-secondary:hover,
+.modal-footer .btn-secondary:focus,
+.modal-footer .btn-secondary:focus-visible,
+.modal-footer .btn-secondary:active,
+.modal-footer .btn-outline-secondary:hover,
+.modal-footer .btn-outline-secondary:focus,
+.modal-footer .btn-outline-secondary:focus-visible,
+.modal-footer .btn-outline-secondary:active {
+  background-color: #f5f3ff !important;
+  border-color: #6366f1 !important;
+  color: #4f46e5 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18) !important;
+  outline: none !important;
 }
 .btn-outline-info,
 .btn-info,

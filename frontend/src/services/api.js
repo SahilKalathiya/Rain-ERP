@@ -25,12 +25,15 @@ export const api = {
   // 1. Masters
   getVendors: () => request('/procurement/vendors'),
   saveVendor: (vendor) => request('/procurement/vendors', { method: 'POST', body: JSON.stringify(vendor) }),
+  deleteVendor: (id) => request(`/procurement/vendors/${id}`, { method: 'DELETE' }),
 
   getFabrics: () => request('/procurement/fabrics'),
   saveFabric: (fabric) => request('/procurement/fabrics', { method: 'POST', body: JSON.stringify(fabric) }),
+  deleteFabric: (id) => request(`/procurement/fabrics/${id}`, { method: 'DELETE' }),
 
   getTransporters: () => request('/procurement/transporters'),
   saveTransporter: (transporter) => request('/procurement/transporters', { method: 'POST', body: JSON.stringify(transporter) }),
+  deleteTransporter: (id) => request(`/procurement/transporters/${id}`, { method: 'DELETE' }),
 
   getColors: () => request('/procurement/colors'),
   saveColor: (color) => request('/procurement/colors', { method: 'POST', body: JSON.stringify(color) }),

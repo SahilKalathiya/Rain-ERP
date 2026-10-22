@@ -6,9 +6,137 @@ import { api } from '../../services/api';
  * Supports: Tag-input for widths (chips), GSM, Shrinkage %, HSN Code,
  * View mode by default with section-wise edit, and inline creation.
  */
+function WidthTagInput({ tags = [], onChange, isEditing = true, error }) {
+  const [inputValue, setInputValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = React.useRef(null);
+
+  const addTag = (val) => {
+    const items = (val || '')
+      .split(/[,\s]+/)
+      .map((s) => s.trim().replace(/"/g, ''))
+      .filter(Boolean);
+    if (!items.length) return;
+    const newTags = [...tags];
+    items.forEach((item) => {
+      if (!newTags.includes(item)) {
+        newTags.push(item);
+      }
+    });
+    onChange(newTags);
+    setInputValue('');
+  };
+
+  const removeTag = (idx, e) => {
+    e?.stopPropagation();
+    onChange(tags.filter((_, i) => i !== idx));
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      e.stopPropagation();
+      addTag(inputValue);
+    } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (inputValue.trim()) {
+      addTag(inputValue);
+    }
+  };
+
+  return (
+    <div>
+      <div
+        className="form-control d-flex flex-wrap align-items-center gap-2"
+        style={{
+          minHeight: '44px',
+          cursor: isEditing ? 'text' : 'default',
+          borderRadius: '8px',
+          borderColor: isFocused ? '#6366f1' : (error ? '#ef4444' : '#cbd5e1'),
+          backgroundColor: isEditing ? '#ffffff' : '#f8fafc',
+          boxShadow: isFocused ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
+          padding: '6px 12px',
+          transition: 'all 0.15s ease'
+        }}
+        onClick={() => {
+          if (isEditing) inputRef.current?.focus();
+        }}
+      >
+        {tags.map((tag, idx) => (
+          <span
+            key={idx}
+            className="d-inline-flex align-items-center px-2.5 py-1 rounded-pill"
+            style={{
+              backgroundColor: '#eef2ff',
+              border: '1px solid #c7d2fe',
+              color: '#4338ca',
+              fontSize: '12px',
+              fontWeight: 600,
+              lineHeight: 1.2
+            }}
+          >
+            <span>{tag}"</span>
+            {isEditing && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="d-inline-flex align-items-center justify-content-center rounded-circle ms-1.5"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  fontSize: '12px',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                  color: '#4338ca',
+                  transition: 'all 0.15s ease'
+                }}
+                onClick={(e) => removeTag(idx, e)}
+                title={`Remove ${tag}"`}
+              >
+                &times;
+              </span>
+            )}
+          </span>
+        ))}
+
+        {isEditing && (
+          <input
+            ref={inputRef}
+            type="text"
+            className="border-0 bg-transparent flex-grow-1 shadow-none text-dark"
+            style={{
+              minWidth: '160px',
+              outline: 'none',
+              fontSize: '13.5px',
+              padding: '2px 4px'
+            }}
+            placeholder={tags.length === 0 ? 'Type a value, press Enter' : ''}
+            value={inputValue}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        )}
+        {!isEditing && tags.length === 0 && (
+          <span className="text-muted fs-12 fst-italic">No widths configured</span>
+        )}
+      </div>
+      {error && <div className="text-danger fs-11 mt-1">{error}</div>}
+    </div>
+  );
+}
+
 export default function FabricMasterView({
   fabrics = [],
   onSaveFabric,
+  onDeleteFabric,
   isInline = false,
   onCloseInline
 }) {
@@ -107,6 +235,38 @@ export default function FabricMasterView({
     setSelectedFabric(null);
   };
 
+  const handleCloseModal = () => {
+    setSelectedFabric(null);
+    setIsCreatingNew(false);
+    setIsEditing(false);
+    setWidthInput('');
+    setFormErrors({});
+    if (isInline && onCloseInline) onCloseInline(null);
+  };
+
+  const handleDeleteFabric = (id, name, e) => {
+    e?.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete fabric "${name || id}"?`)) return;
+    const updated = fabricList.filter((f) => f.id !== id);
+    setFabricList(updated);
+    if (selectedFabric?.id === id) {
+      handleCloseModal();
+    }
+    try {
+      localStorage.setItem('raindrop_fabrics_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_fabrics_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err) {}
+    if (api && api.deleteFabric) {
+      try {
+        api.deleteFabric(id);
+      } catch (err) {}
+    }
+    if (onDeleteFabric) {
+      onDeleteFabric(id);
+    }
+  };
+
   const handleSelectFabric = (f) => {
     if (!f) return;
     setSelectedFabric(f);
@@ -126,25 +286,35 @@ export default function FabricMasterView({
       widths: parsedWidths,
       hsnCode: f.hsnCode || f.hsn_code || '520811'
     });
+    setFormErrors({});
     setIsCreatingNew(false);
     setIsEditing(false);
   };
 
   const addCurrentWidth = (valToUse) => {
     const raw = (valToUse !== undefined ? valToUse : widthInput);
-    const trimmed = String(raw).trim().replace(/"/g, '');
-    if (trimmed && !formData.widths.includes(trimmed)) {
-      setFormData((prev) => ({
+    if (!raw && raw !== 0) return;
+    const items = String(raw)
+      .split(/[,\s]+/)
+      .map((s) => s.trim().replace(/"/g, ''))
+      .filter(Boolean);
+    if (!items.length) return;
+    setFormData((prev) => {
+      const existing = prev.widths || [];
+      const toAdd = items.filter((it) => !existing.includes(it));
+      if (!toAdd.length) return prev;
+      return {
         ...prev,
-        widths: [...prev.widths, trimmed]
-      }));
-      setWidthInput('');
-    }
+        widths: [...existing, ...toAdd]
+      };
+    });
+    setWidthInput('');
+    if (formErrors.widths) setFormErrors((prev) => ({ ...prev, widths: null }));
   };
 
   // Add width tag
   const handleAddWidthTag = (e) => {
-    if (e.key === 'Enter' || e.type === 'click') {
+    if (e.key === 'Enter' || e.key === ',' || e.type === 'click') {
       if (e.preventDefault) e.preventDefault();
       if (e.stopPropagation) e.stopPropagation();
       addCurrentWidth();
@@ -203,12 +373,13 @@ export default function FabricMasterView({
       return;
     }
 
+    const capitalizedQName = capitalizeWords((formData.qualityName || '').trim());
     const updatedFabric = {
       ...formData,
       id: formData.id || `FAB-${Date.now()}`,
-      quality: formData.qualityName,
-      qualityName: formData.qualityName,
-      name: formData.qualityName,
+      quality: capitalizedQName,
+      qualityName: capitalizedQName,
+      name: capitalizedQName,
       widths: currentWidths,
       gsm: Number(formData.gsm) || null,
       defaultShrinkage: Number(formData.defaultShrinkage) || 0,
@@ -224,7 +395,7 @@ export default function FabricMasterView({
     }
 
     setFabricList(updatedList);
-    setSelectedFabric(updatedFabric);
+    setSelectedFabric(null);
     setIsEditing(false);
     setIsCreatingNew(false);
 
@@ -302,6 +473,7 @@ export default function FabricMasterView({
                       if (formErrors.qualityName) setFormErrors((prev) => ({ ...prev, qualityName: null }));
                     }}
                   />
+                  <div className="form-text small text-muted">Auto-capitalised word by word</div>
                   {formErrors.qualityName && <div className="invalid-feedback fs-11">{formErrors.qualityName}</div>}
                 </div>
 
@@ -390,57 +562,18 @@ export default function FabricMasterView({
 
               {/* 2. Width Tag Input */}
               <div className="mb-3 p-3 bg-light rounded-3">
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <label className="form-label fs-12 fw-semibold mb-0 text-dark">
-                    Allowed Widths (Tag Input, Numeric Chips) *
-                  </label>
-                </div>
-
-                <div className="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 bg-white border rounded-2">
-                  {(formData.widths || []).map((w) => (
-                    <span
-                      key={w}
-                      className="badge bg-primary d-flex align-items-center gap-1 px-2 py-1 fs-12 rounded-pill"
-                    >
-                      <span>{w}"</span>
-                      <i
-                        className="ti ti-x fs-11 cursor-pointer hover-opacity"
-                        onClick={() => handleRemoveWidthTag(w)}
-                      ></i>
-                    </span>
-                  ))}
-
-                  <div className="input-group input-group-sm" style={{ width: '130px' }}>
-                    <input
-                      type="number"
-                      placeholder="Add width"
-                      className="form-control form-control-sm border-0 fs-12 p-1 no-spinner"
-                      value={widthInput}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.includes(',') || val.includes(' ')) {
-                          addCurrentWidth(val);
-                        } else {
-                          setWidthInput(val);
-                        }
-                      }}
-                      onBlur={() => addCurrentWidth()}
-                      onKeyDown={handleAddWidthTag}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm border-0 px-1"
-                      onClick={() => addCurrentWidth()}
-                      title="Add chip"
-                    >
-                      <i className="ti ti-plus fs-12"></i>
-                    </button>
-                  </div>
-                </div>
-                {formErrors.widths && <div className="text-danger fs-11 mb-1">{formErrors.widths}</div>}
-                <div className="form-text fs-11 text-muted">
-                  Type a number and press Enter to add chip. PO &amp; GRN entry will be strictly restricted to these widths.
-                </div>
+                <label className="form-label fs-12 fw-semibold mb-1 text-dark">
+                  Available Widths (inches, e.g. 42", 44", 48") <span className="text-danger">*</span>
+                </label>
+                <WidthTagInput
+                  tags={formData.widths || []}
+                  onChange={(newWidths) => {
+                    setFormData({ ...formData, widths: newWidths });
+                    if (formErrors.widths) setFormErrors((prev) => ({ ...prev, widths: null }));
+                  }}
+                  isEditing={true}
+                  error={formErrors.widths}
+                />
               </div>
 
               {/* 3. Shrinkage & HSN */}
@@ -639,12 +772,13 @@ export default function FabricMasterView({
               <table className="table table-hover align-middle mb-0 fs-13" style={{ width: '100%' }}>
                 <thead className="table-light text-secondary">
                   <tr style={{ fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                    <th style={{ width: '16%' }}>FABRIC ID</th>
-                    <th style={{ width: '28%' }}>QUALITY NAME</th>
-                    <th style={{ width: '20%' }}>FABRIC TYPE</th>
-                    <th style={{ width: '12%' }}>GSM</th>
-                    <th style={{ width: '14%' }}>WIDTHS</th>
-                    <th style={{ width: '10%' }} className="text-end">STATUS</th>
+                    <th style={{ width: '15%' }}>FABRIC ID</th>
+                    <th style={{ width: '27%' }}>QUALITY NAME</th>
+                    <th style={{ width: '18%' }}>FABRIC TYPE</th>
+                    <th style={{ width: '11%' }}>GSM</th>
+                    <th style={{ width: '13%' }}>WIDTHS</th>
+                    <th style={{ width: '8%' }} className="text-center">STATUS</th>
+                    <th style={{ width: '8%' }} className="text-end">ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -675,7 +809,7 @@ export default function FabricMasterView({
                             ))}
                           </div>
                         </td>
-                        <td className="text-end">
+                        <td className="text-center">
                           <span
                             className={`badge px-2 py-1 ${
                               f.active
@@ -686,9 +820,26 @@ export default function FabricMasterView({
                             {f.active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        <td className="text-end" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
+                            title="Delete Fabric"
+                            onClick={(e) => handleDeleteFabric(f.id, f.qualityName || f.name || f.id, e)}
+                          >
+                            <i className="ti ti-trash fs-5"></i>
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
+                  {filteredFabrics.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-4 text-muted">
+                        No fabric qualities found matching criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -714,66 +865,73 @@ export default function FabricMasterView({
                   </div>
 
                   <div className="d-flex align-items-center gap-2">
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        <i className="ti ti-edit fs-14"></i>
-                        <span>Edit Fabric</span>
-                      </button>
+                    {!isCreatingNew && (
+                      !isEditing ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1.5 rounded-3 fw-semibold shadow-sm"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          <i className="ti ti-edit fs-14"></i>
+                          <span>Edit Fabric</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-light border text-secondary btn-sm px-3 d-flex align-items-center gap-1.5 rounded-3 fw-semibold"
+                          onClick={() => setIsEditing(false)}
+                        >
+                          <i className="ti ti-eye fs-14"></i>
+                          <span>View Mode</span>
+                        </button>
+                      )
                     )}
                     <button
                       type="button"
                       className="btn-close ms-2"
-                      onClick={() => {
-                        setSelectedFabric(null);
-                        setIsCreatingNew(false);
-                        setIsEditing(false);
-                        setWidthInput('');
-                        if (isInline && onCloseInline) onCloseInline(null);
-                      }}
+                      onClick={handleCloseModal}
                     ></button>
                   </div>
                 </div>
 
                 <form onSubmit={handleSave}>
                   <div style={{ maxHeight: 'calc(80vh - 140px)', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* 1. Quality & Fabric Type */}
-                <div className="mb-3 p-3 bg-light rounded-3">
-                  <div className="mb-2">
-                    <label className="form-label fs-12 fw-semibold mb-1">Quality Name *</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Suh Cotton / Rayon 14kg"
-                        className={`form-control form-control-sm bg-white ${
-                          formErrors.qualityName ? 'is-invalid' : ''
-                        }`}
-                        value={formData.qualityName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, qualityName: capitalizeWords(e.target.value) })
-                        }
-                      />
-                    ) : (
-                      <div className="fw-bold text-dark fs-15">{formData.qualityName || '-'}</div>
-                    )}
-                  </div>
+                    {/* 1. Quality & Fabric Type */}
+                    <div className="mb-3 p-3 bg-light rounded-3">
+                      <div className="mb-2">
+                        <label className="form-label fs-12 fw-semibold mb-1">Quality Name *</label>
+                        <input
+                          type="text"
+                          required
+                          disabled={!isEditing}
+                          placeholder="e.g. Suh Cotton / Rayon 14kg"
+                          className={`form-control form-control-sm ${
+                            formErrors.qualityName ? 'is-invalid' : ''
+                          }`}
+                          style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
+                          value={formData.qualityName}
+                          onChange={(e) =>
+                            setFormData({ ...formData, qualityName: capitalizeWords(e.target.value) })
+                          }
+                        />
+                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        {formErrors.qualityName && (
+                          <div className="invalid-feedback fs-11">{formErrors.qualityName}</div>
+                        )}
+                      </div>
 
-                  <div className="row g-2">
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Fabric Type *</label>
-                      {isEditing ? (
-                        <>
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Fabric Type *</label>
                           {isCustomFabricType ? (
                             <div className="input-group input-group-sm">
                               <input
                                 type="text"
-                                className={`form-control form-control-sm bg-white ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                                disabled={!isEditing}
+                                className={`form-control form-control-sm ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                                style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                                 placeholder="Type custom fabric type..."
-                                autoFocus
+                                autoFocus={isEditing}
                                 value={formData.fabricType || ''}
                                 onChange={(e) => {
                                   const newType = e.target.value;
@@ -784,23 +942,27 @@ export default function FabricMasterView({
                                   if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
                                 }}
                               />
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary"
-                                onClick={() => {
-                                  setIsCustomFabricType(false);
-                                  setFormData({ ...formData, fabricType: '' });
-                                }}
-                                title="Switch back to dropdown list"
-                              >
-                                <i className="ti ti-chevron-down"></i>
-                              </button>
+                              {isEditing && (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary"
+                                  onClick={() => {
+                                    setIsCustomFabricType(false);
+                                    setFormData({ ...formData, fabricType: '' });
+                                  }}
+                                  title="Switch back to dropdown list"
+                                >
+                                  <i className="ti ti-chevron-down"></i>
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <select
-                              className={`form-select form-select-sm bg-white ${
+                              className={`form-select form-select-sm ${
                                 formErrors.fabricType ? 'is-invalid' : ''
                               }`}
+                              disabled={!isEditing}
+                              style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                               value={formData.fabricType}
                               onChange={(e) => {
                                 const newType = e.target.value;
@@ -838,108 +1000,57 @@ export default function FabricMasterView({
                           {formErrors.fabricType && (
                             <div className="invalid-feedback fs-11">{formErrors.fabricType}</div>
                           )}
-                        </>
-                      ) : (
-                        <div className="text-dark fs-13 fw-semibold">{formData.fabricType || '-'}</div>
-                      )}
+                        </div>
+
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">GSM (Grams/Sq Meter)</label>
+                          <input
+                            type="number"
+                            disabled={!isEditing}
+                            placeholder="e.g. 140"
+                            className="form-control form-control-sm no-spinner"
+                            style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
+                            value={formData.gsm || ''}
+                            onChange={(e) => setFormData({ ...formData, gsm: e.target.value })}
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">GSM (Grams/Sq Meter)</label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          placeholder="e.g. 140"
-                          className="form-control form-control-sm bg-white no-spinner"
-                          value={formData.gsm || ''}
-                          onChange={(e) => setFormData({ ...formData, gsm: e.target.value })}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.gsm ? `${formData.gsm} gsm` : '-'}</div>
-                      )}
+                    {/* 2. Width Tag Input */}
+                    <div className="mb-3 p-3 bg-light rounded-3">
+                      <label className="form-label fs-12 fw-semibold mb-1 text-dark">
+                        Available Widths (inches, e.g. 42", 44", 48") <span className="text-danger">*</span>
+                      </label>
+                      <WidthTagInput
+                        tags={formData.widths || []}
+                        onChange={(newWidths) => {
+                          setFormData({ ...formData, widths: newWidths });
+                          if (formErrors.widths) setFormErrors((prev) => ({ ...prev, widths: null }));
+                        }}
+                        isEditing={isEditing}
+                        error={formErrors.widths}
+                      />
                     </div>
-                  </div>
-                </div>
 
-                {/* 2. Width Tag Input (Crucial Feature from 3.2.2) */}
-                <div className="mb-3 p-3 bg-light rounded-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <label className="form-label fs-12 fw-semibold mb-0 text-dark">
-                      Allowed Widths (Tag Input, Numeric Chips) *
-                    </label>
-                  </div>
-
-                  {/* Render chips */}
-                  <div className="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 bg-white border rounded-2">
-                    {formData.widths.map((w) => (
-                      <span
-                        key={w}
-                        className="badge bg-primary d-flex align-items-center gap-1 px-2 py-1 fs-12 rounded-pill"
-                      >
-                        <span>{w}"</span>
-                        {isEditing && (
-                          <i
-                            className="ti ti-x fs-11 cursor-pointer hover-opacity"
-                            onClick={() => handleRemoveWidthTag(w)}
-                          ></i>
-                        )}
-                      </span>
-                    ))}
-
-                    {/* Tag input box */}
-                    {isEditing && (
-                      <div className="input-group input-group-sm" style={{ width: '130px' }}>
-                        <input
-                          type="number"
-                          placeholder="Add width"
-                          className="form-control form-control-sm border-0 fs-12 p-1 no-spinner"
-                          value={widthInput}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val.includes(',') || val.includes(' ')) {
-                              addCurrentWidth(val);
-                            } else {
-                              setWidthInput(val);
-                            }
-                          }}
-                          onBlur={() => addCurrentWidth()}
-                          onKeyDown={handleAddWidthTag}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary btn-sm border-0 px-1"
-                          onClick={() => addCurrentWidth()}
-                          title="Add chip"
-                        >
-                          <i className="ti ti-plus fs-12"></i>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="form-text fs-11 text-muted">
-                    Type a number and press Enter to add chip. PO &amp; GRN entry will be strictly
-                    restricted to these widths.
-                  </div>
-                </div>
-
-                {/* 3. Shrinkage & HSN */}
-                <div className="mb-3 p-3 bg-light rounded-3">
-                  <div className="row g-2">
-                    <div className="col-6">
-                      <div className="d-flex align-items-center justify-content-between mb-1">
-                        <label className="form-label fs-12 fw-semibold mb-0">Default Shrinkage %</label>
-                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Allowance</span>
-                      </div>
-                      {isEditing ? (
-                        <>
+                    {/* 3. Shrinkage & HSN */}
+                    <div className="mb-3 p-3 bg-light rounded-3">
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <div className="d-flex align-items-center justify-content-between mb-1">
+                            <label className="form-label fs-12 fw-semibold mb-0">Default Shrinkage %</label>
+                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Allowance</span>
+                          </div>
                           <div className="input-group input-group-sm">
                             <input
                               type="number"
                               step="0.1"
                               min="0"
                               max="30"
+                              disabled={!isEditing}
                               placeholder="e.g. 3.5"
-                              className="form-control form-control-sm bg-white no-spinner"
+                              className="form-control form-control-sm no-spinner"
+                              style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                               value={formData.defaultShrinkage || ''}
                               onChange={(e) =>
                                 setFormData({ ...formData, defaultShrinkage: e.target.value })
@@ -950,91 +1061,86 @@ export default function FabricMasterView({
                           <div className="form-text fs-11 mt-1 text-muted">
                             <i className="ti ti-info-circle me-1"></i>Shrinkage percentage allowance for fabric processing.
                           </div>
-                        </>
-                      ) : (
-                        <div>
-                          <div className="text-dark fs-13 fw-semibold">
-                            {formData.defaultShrinkage ? `${formData.defaultShrinkage}%` : '0%'}
-                          </div>
-                          <div className="fs-11 text-muted">
-                            Processing shrinkage allowance configured
+                        </div>
+
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">HSN Code</label>
+                          <input
+                            type="text"
+                            disabled={!isEditing}
+                            placeholder="e.g. 520811"
+                            className="form-control form-control-sm font-monospace"
+                            style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
+                            value={formData.hsnCode}
+                            onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="col-12 mt-2">
+                          <label className="form-label fs-12 fw-semibold mb-1">Description / Notes</label>
+                          <textarea
+                            rows="2"
+                            disabled={!isEditing}
+                            placeholder="Add any additional notes or specifications..."
+                            className="form-control form-control-sm fs-12"
+                            style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
+                            value={formData.description || ''}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          ></textarea>
+                        </div>
+
+                        <div className="col-12 mt-2">
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id="fabricActive"
+                              disabled={!isEditing}
+                              checked={formData.active}
+                              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                            />
+                            <label className="form-check-label fs-12 fw-semibold" htmlFor="fabricActive">
+                              Active Quality (Selectable on new POs)
+                            </label>
                           </div>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">HSN Code</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          placeholder="e.g. 520811"
-                          className="form-control form-control-sm bg-white font-monospace"
-                          value={formData.hsnCode}
-                          onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
-                        />
-                      ) : (
-                        <div className="font-monospace text-dark fs-13">{formData.hsnCode || '-'}</div>
-                      )}
-                    </div>
-
-                    <div className="col-12 mt-2">
-                      <label className="form-label fs-12 fw-semibold mb-1">Description / Notes</label>
-                      {isEditing ? (
-                        <textarea
-                          rows="2"
-                          className="form-control form-control-sm bg-white fs-12"
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        ></textarea>
-                      ) : (
-                        <div className="text-secondary fs-13">{formData.description || '-'}</div>
-                      )}
-                    </div>
-
-                    <div className="col-12 mt-2">
-                      <div className="form-check form-switch">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="fabricActive"
-                          disabled={!isEditing}
-                          checked={formData.active}
-                          onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                        />
-                        <label className="form-check-label fs-12 fw-semibold" htmlFor="fabricActive">
-                          Active Quality (Selectable on new POs)
-                        </label>
                       </div>
                     </div>
-                  </div>
-                </div>
-
                   </div>
 
                   {/* Modal Footer Controls */}
                   <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
-                    <button
-                      type="button"
-                      className="btn btn-light px-4 rounded-3"
-                      onClick={() => {
-                        if (isCreatingNew) {
-                          setSelectedFabric(null);
-                          setIsCreatingNew(false);
-                        } else if (selectedFabric) {
-                          setFormData({ ...selectedFabric, widths: Array.isArray(selectedFabric.widths) ? [...selectedFabric.widths] : ['44'] });
-                        }
-                        setWidthInput('');
-                        setIsEditing(false);
-                        if (isInline && onCloseInline) onCloseInline(null);
-                      }}
-                    >
-                      {isEditing ? 'Cancel' : 'Close'}
-                    </button>
-                    {isEditing && (
-                      <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
-                        <i className="ti ti-check me-1"></i> Save Fabric
-                      </button>
+                    {!isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-light px-4 rounded-3"
+                          onClick={handleCloseModal}
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm d-flex align-items-center gap-1.5"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          <i className="ti ti-edit"></i>
+                          <span>Edit Fabric</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-light px-4 rounded-3"
+                          onClick={handleCloseModal}
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
+                          <i className="ti ti-check me-1"></i> Save Fabric
+                        </button>
+                      </>
                     )}
                   </div>
                 </form>

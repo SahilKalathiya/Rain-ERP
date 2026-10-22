@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { api } from '../../services/api';
 
 /**
  * TransporterMasterView - 3.3 Transporter Master
@@ -8,6 +9,7 @@ import React, { useState } from 'react';
 export default function TransporterMasterView({
   transporters = [],
   onSaveTransporter,
+  onDeleteTransporter,
   isInline = false,
   onCloseInline
 }) {
@@ -85,24 +87,54 @@ export default function TransporterMasterView({
       return;
     }
 
+    const dataToSave = {
+      ...formData,
+      name: capitalizeWords((formData.name || '').trim())
+    };
+
     let updatedList;
     if (isCreatingNew) {
-      updatedList = [formData, ...transporterList];
+      updatedList = [dataToSave, ...transporterList];
     } else {
-      updatedList = transporterList.map((t) => (t.id === formData.id ? formData : t));
+      updatedList = transporterList.map((t) => (t.id === dataToSave.id ? dataToSave : t));
     }
 
     setTransporterList(updatedList);
-    setSelectedTransporter(formData);
+    setSelectedTransporter(dataToSave);
     setIsEditing(false);
     setIsCreatingNew(false);
 
     if (onSaveTransporter) {
-      onSaveTransporter(formData);
+      onSaveTransporter(dataToSave);
     }
 
     if (isInline && onCloseInline) {
-      onCloseInline(formData);
+      onCloseInline(dataToSave);
+    }
+  };
+
+  const handleDeleteTransporter = (id, name, e) => {
+    e?.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete transporter "${name || id}"?`)) return;
+    const updated = transporterList.filter((t) => t.id !== id);
+    setTransporterList(updated);
+    if (selectedTransporter?.id === id) {
+      setSelectedTransporter(null);
+      setIsEditing(false);
+      setIsCreatingNew(false);
+    }
+    try {
+      localStorage.setItem('raindrop_transporters_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_transporters_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err) {}
+    if (api && api.deleteTransporter) {
+      try {
+        api.deleteTransporter(id);
+      } catch (err) {}
+    }
+    if (onDeleteTransporter) {
+      onDeleteTransporter(id);
     }
   };
 
@@ -196,12 +228,14 @@ export default function TransporterMasterView({
                         <option value="Inactive">Inactive</option>
                       </select>
                     </th>
+                    <th style={{ width: '80px' }}></th>
                   </tr>
                   <tr>
                     <th>Transporter ID</th>
                     <th>Name</th>
                     <th>Phone</th>
                     <th>Status</th>
+                    <th className="text-end" style={{ width: '80px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,9 +261,26 @@ export default function TransporterMasterView({
                             {t.active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        <td className="text-end" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
+                            title="Delete Transporter"
+                            onClick={(e) => handleDeleteTransporter(t.id, t.name || t.id, e)}
+                          >
+                            <i className="ti ti-trash fs-5"></i>
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-4 text-muted">
+                        No transporters found matching criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -284,16 +335,19 @@ export default function TransporterMasterView({
                   <div className="mb-2">
                     <label className="form-label fs-12 fw-semibold mb-1">Transporter Name *</label>
                     {isEditing ? (
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Keshav Freight Carriers"
-                        className="form-control form-control-sm bg-white"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: capitalizeWords(e.target.value) })
-                        }
-                      />
+                      <>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Keshav Freight Carriers"
+                          className="form-control form-control-sm bg-white"
+                          value={formData.name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, name: capitalizeWords(e.target.value) })
+                          }
+                        />
+                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                      </>
                     ) : (
                       <div className="fw-bold text-dark fs-15">{formData.name || '-'}</div>
                     )}

@@ -14,6 +14,11 @@ import {
 } from '../../data/salesOrderData';
 import { initialFabrics } from '../../data/procurementData';
 
+const autoCapitalizeWords = (text) => {
+  if (!text) return '';
+  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const ACCESSORY_CATEGORIES = [
   'Button',
   'Lace',
@@ -115,12 +120,13 @@ const FABRIC_QUALITIES = [
 
 const STANDARD_WIDTHS = ['42"', '44"', '48"', '58"'];
 
-function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, press Enter', suggestions = [] }) {
+function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, press Enter', suggestions = [], disabled = false }) {
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = React.useRef(null);
 
   const addTag = (val) => {
+    if (disabled) return;
     const items = (val || '')
       .split(',')
       .map((s) => s.trim())
@@ -137,11 +143,13 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
   };
 
   const removeTag = (indexToRemove, e) => {
+    if (disabled) return;
     e?.stopPropagation();
     onChange(tags.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleKeyDown = (e) => {
+    if (disabled) return;
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addTag(inputValue);
@@ -168,15 +176,15 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
         className="form-control d-flex flex-wrap align-items-center gap-2"
         style={{
           minHeight: '42px',
-          cursor: 'text',
+          cursor: disabled ? 'default' : 'text',
           borderRadius: '8px',
           borderColor: isFocused ? '#6366f1' : '#cbd5e1',
-          backgroundColor: '#ffffff',
+          backgroundColor: disabled ? '#f8fafc' : '#ffffff',
           boxShadow: isFocused ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
           padding: '6px 12px',
           transition: 'all 0.15s ease'
         }}
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => !disabled && inputRef.current?.focus()}
       >
         {tags.map((tag, idx) => (
           <span
@@ -192,48 +200,52 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
             }}
           >
             <span>{tag}</span>
-            <span
-              role="button"
-              tabIndex={0}
-              className="d-inline-flex align-items-center justify-content-center rounded-circle ms-1.5"
-              style={{
-                width: '16px',
-                height: '16px',
-                fontSize: '12px',
-                lineHeight: 1,
-                cursor: 'pointer',
-                backgroundColor: 'rgba(79, 70, 229, 0.12)',
-                color: '#4338ca',
-                transition: 'all 0.15s ease'
-              }}
-              onClick={(e) => removeTag(idx, e)}
-              title={`Remove ${tag}`}
-            >
-              &times;
-            </span>
+            {!disabled && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="d-inline-flex align-items-center justify-content-center rounded-circle ms-1.5"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  fontSize: '12px',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                  color: '#4338ca',
+                  transition: 'all 0.15s ease'
+                }}
+                onClick={(e) => removeTag(idx, e)}
+                title={`Remove ${tag}`}
+              >
+                &times;
+              </span>
+            )}
           </span>
         ))}
 
-        <input
-          ref={inputRef}
-          type="text"
-          className="border-0 bg-transparent flex-grow-1 shadow-none text-dark"
-          style={{
-            minWidth: '160px',
-            outline: 'none',
-            fontSize: '13.5px',
-            padding: '2px 4px'
-          }}
-          placeholder={tags.length === 0 ? placeholder : 'Type a value, press Enter'}
-          value={inputValue}
-          onFocus={() => setIsFocused(true)}
-          onBlur={handleBlur}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
+        {!disabled && (
+          <input
+            ref={inputRef}
+            type="text"
+            className="border-0 bg-transparent flex-grow-1 shadow-none text-dark"
+            style={{
+              minWidth: '160px',
+              outline: 'none',
+              fontSize: '13.5px',
+              padding: '2px 4px'
+            }}
+            placeholder={tags.length === 0 ? placeholder : 'Type a value, press Enter'}
+            value={inputValue}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        )}
       </div>
 
-      {suggestions && suggestions.length > 0 && (
+      {!disabled && suggestions && suggestions.length > 0 && (
         <div className="d-flex align-items-center gap-1.5 mt-2 flex-wrap">
           <span className="text-muted fw-semibold" style={{ fontSize: '11px' }}>Quick:</span>
           {suggestions.map((sug) => {
@@ -275,6 +287,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
+  const [isModalEditMode, setIsModalEditMode] = useState(isInline);
   const [toastMessage, setToastMessage] = useState('');
 
   // Section 11.2 & 11.5 View Mode with Section-wise Edit State
@@ -305,16 +318,27 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     const handleFabricsUpdate = () => {
       try {
         const stored = getStoredData('raindrop_fabrics_v1', null);
-        if (Array.isArray(stored) && stored.length > 0) {
+        if (Array.isArray(stored)) {
           setMasterFabrics(stored);
         }
       } catch (e) {}
     };
+    const handleAccessoriesUpdate = () => {
+      try {
+        setAccessories(getStoredAccessoriesMaster());
+        setThreadSizes(getStoredThreadSizes());
+        setThreadColors(getStoredThreadBrandColors());
+      } catch (e) {}
+    };
     window.addEventListener('storage', handleFabricsUpdate);
     window.addEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+    window.addEventListener('storage', handleAccessoriesUpdate);
+    window.addEventListener('erp_accessories_master_updated', handleAccessoriesUpdate);
     return () => {
       window.removeEventListener('storage', handleFabricsUpdate);
       window.removeEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+      window.removeEventListener('storage', handleAccessoriesUpdate);
+      window.removeEventListener('erp_accessories_master_updated', handleAccessoriesUpdate);
     };
   }, []);
 
@@ -414,6 +438,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     // Lace
     laceSizeValue: '',
     laceSizeUnit: 'mm',
+    laceSizesList: [],
     defaultShrinkage: '',
     fabricPerMeterLace: '',
 
@@ -447,6 +472,35 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   });
 
   const [formData, setFormData] = useState(() => getEmptyAccessoryForm('Buttons'));
+  const [laceSizeInput, setLaceSizeInput] = useState('');
+
+  const handleAddLaceSize = () => {
+    if (!laceSizeInput.trim()) return;
+    const items = laceSizeInput.split(',').map((s) => s.trim()).filter(Boolean);
+    const unit = formData.laceSizeUnit || 'mm';
+    const newSizes = [...(formData.laceSizesList || [])];
+    items.forEach((it) => {
+      const formatted = it.endsWith('mm') || it.endsWith('cm') || it.endsWith('inch') || it.endsWith('"')
+        ? it
+        : `${it} ${unit}`;
+      if (!newSizes.includes(formatted)) {
+        newSizes.push(formatted);
+      }
+    });
+    setFormData((prev) => ({
+      ...prev,
+      laceSizesList: newSizes,
+      laceSizeValue: newSizes[0] ? parseFloat(newSizes[0]) || '' : ''
+    }));
+    setLaceSizeInput('');
+  };
+
+  const handleRemoveLaceSize = (idxToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      laceSizesList: (prev.laceSizesList || []).filter((_, i) => i !== idxToRemove)
+    }));
+  };
 
   // Modal State for Section 8
   const [threadSizeModal, setThreadSizeModal] = useState(false);
@@ -481,20 +535,26 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       : 'Buttons';
 
     setFormData(getEmptyAccessoryForm(targetCat));
+    setLaceSizeInput('');
     setIsCustomThreadSize(false);
     setIsCustomThreadUnit(false);
     setIsCreatingNew(true);
     setIsEditing(true);
+    setIsModalEditMode(true);
     setSelectedAccessory(null);
   };
 
-  const handleEditAccessory = (acc) => {
+  const handleEditAccessory = (acc, forceEdit = false) => {
     const szList = acc.buttonSizesList?.length
       ? acc.buttonSizesList
       : (acc.buttonSizes ? acc.buttonSizes.split(',').map(s => s.trim()).filter(Boolean) : (acc.sizes?.length ? acc.sizes : (acc.size ? [acc.size] : [])));
     const clList = acc.buttonColorsList?.length
       ? acc.buttonColorsList
       : (acc.buttonColors ? acc.buttonColors.split(',').map(s => s.trim()).filter(Boolean) : (acc.colors?.length ? acc.colors : (acc.color ? [acc.color] : [])));
+
+    const laceList = acc.laceSizesList?.length
+      ? acc.laceSizesList
+      : (acc.laceSize ? acc.laceSize.split(',').map((s) => s.trim()).filter(Boolean) : (acc.sizes?.length ? acc.sizes : (acc.laceSizeValue ? [`${acc.laceSizeValue} ${acc.laceSizeUnit || 'mm'}`] : [])));
 
     const isCustomSz = Boolean(acc.threadSize && !THREAD_SIZE_OPTIONS.includes(acc.threadSize) && !(threadSizes || []).some(ts => {
       const label = `${ts.brandName ? ts.brandName + ' - ' : ''}${ts.packagingType || 'Reel'}${ts.threadLengthPerPiece ? ` (${ts.threadLengthPerPiece}m)` : ''}`;
@@ -503,18 +563,20 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     const isCustomU = Boolean(acc.unit && !THREAD_UNIT_OPTIONS.includes(acc.unit));
     setIsCustomThreadSize(isCustomSz);
     setIsCustomThreadUnit(isCustomU);
+    setLaceSizeInput('');
 
     setFormData({
       ...acc,
       name: acc.name || '',
       category: acc.category || 'Buttons',
+      laceSizesList: laceList,
       laceSizeValue: acc.laceSizeValue !== undefined ? acc.laceSizeValue : (acc.laceSize ? parseFloat(acc.laceSize) || '' : ''),
       laceSizeUnit: acc.laceSizeUnit || (acc.laceSize && acc.laceSize.includes('cm') ? 'cm' : (acc.laceSize && acc.laceSize.includes('inch') ? 'inch' : 'mm')),
       defaultShrinkage: acc.defaultShrinkage || '',
       fabricPerMeterLace: acc.fabricPerMeterLace || '',
       sizeValue: acc.sizeValue !== undefined ? acc.sizeValue : (acc.threadSize ? parseFloat(acc.threadSize) || '' : ''),
       sizeUnit: acc.sizeUnit || 'mm',
-      unit: acc.unit || (acc.category === 'Thread' ? 'Meter' : (CONTINUOUS_UNITS.includes(acc.category) ? 'Meter' : 'Piece')),
+      unit: acc.unit || (acc.category === 'Thread' ? 'Meter' : (CONTINUOUS_UNITS.includes(cat => cat === acc.category) ? 'Meter' : 'Piece')),
       piecesPerUnit: acc.piecesPerUnit !== undefined && acc.piecesPerUnit !== '' ? acc.piecesPerUnit : 1,
       threadPattern: acc.threadPattern || '',
       threadSize: acc.threadSize || acc.size || '',
@@ -549,6 +611,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     });
     setIsCreatingNew(false);
     setIsEditing(true);
+    setIsModalEditMode(forceEdit);
   };
 
   const handleDeleteAccessory = (accId) => {
@@ -579,7 +642,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       buttonColorsList: formData.buttonColorsList || [],
       variants: formData.variants || formData.buttonSizesList || [],
       colors: formData.colors || formData.buttonColorsList || [],
-      laceSize: formData.laceSizeValue ? `${formData.laceSizeValue} ${formData.laceSizeUnit || 'mm'}` : (formData.laceSize || ''),
+      laceSizesList: formData.laceSizesList || [],
+      laceSize: (formData.laceSizesList && formData.laceSizesList.length > 0)
+        ? formData.laceSizesList.join(', ')
+        : (formData.laceSizeValue ? `${formData.laceSizeValue} ${formData.laceSizeUnit || 'mm'}` : (formData.laceSize || '')),
+      sizes: (formData.laceSizesList && formData.laceSizesList.length > 0)
+        ? formData.laceSizesList
+        : (formData.sizes || []),
       threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
       threadSizeCustom: formData.threadSizeCustom || '',
       unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' || formData.category === 'Thread' ? 'Meter' : 'Piece'))),
@@ -627,10 +696,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       return;
     }
 
-    // Section 11.2: Record opens in read-only View Mode by default
-    setSelectedAccessory(accObj);
+    // Return straight to accessories grid
+    setSelectedAccessory(null);
     setIsEditing(false);
     setIsCreatingNew(false);
+    setIsModalEditMode(false);
     setEditingSection(null);
   };
 
@@ -644,6 +714,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       buttonColors: sectionFormData.buttonColorsList ? sectionFormData.buttonColorsList.join(', ') : selectedAccessory.buttonColors,
       buttonSizesList: sectionFormData.buttonSizesList || selectedAccessory.buttonSizesList || [],
       buttonColorsList: sectionFormData.buttonColorsList || selectedAccessory.buttonColorsList || [],
+      laceSizesList: sectionFormData.laceSizesList || selectedAccessory.laceSizesList || [],
+      laceSize: (sectionFormData.laceSizesList && sectionFormData.laceSizesList.length > 0)
+        ? sectionFormData.laceSizesList.join(', ')
+        : (sectionFormData.laceSize || selectedAccessory.laceSize),
+      sizes: sectionFormData.laceSizesList || sectionFormData.buttonSizesList || selectedAccessory.sizes || [],
       lastModified: new Date().toISOString()
     };
     if (sectionFormData.name) {
@@ -906,18 +981,47 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
               {/* Modal Header */}
               <div className="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center bg-white">
                 <h5 className="modal-title fw-bold text-dark mb-0 fs-18">
-                  {isCreatingNew ? 'New Accessory' : 'Edit Accessory'}
+                  {isCreatingNew
+                    ? 'New Accessory'
+                    : (isModalEditMode ? 'Edit Accessory' : `Accessory: ${formData.name || ''}`)}
                 </h5>
-                <button
-                  type="button"
-                  className="btn-close shadow-none"
-                  onClick={() => setIsEditing(false)}
-                  aria-label="Close"
-                ></button>
+                <div className="d-flex align-items-center gap-2">
+                  {!isCreatingNew && (
+                    !isModalEditMode ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                        onClick={() => setIsModalEditMode(true)}
+                      >
+                        <i className="ti ti-edit"></i>
+                        <span>Edit</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-light border text-secondary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                        onClick={() => setIsModalEditMode(false)}
+                      >
+                        <i className="ti ti-eye"></i>
+                        <span>View Mode</span>
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    className="btn-close shadow-none"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setIsModalEditMode(false);
+                    }}
+                    aria-label="Close"
+                  ></button>
+                </div>
               </div>
 
               <form onSubmit={saveAccessory}>
                 <div className="modal-body p-4" style={{ maxHeight: 'calc(85vh - 130px)', overflowY: 'auto' }}>
+                  <fieldset disabled={!isModalEditMode} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
                   {/* Row 1: Accessory Name & Category */}
                   <div className="row g-3 mb-3">
                     <div className="col-md-6">
@@ -930,9 +1034,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         required
                         placeholder="e.g. Shell Button, Metallic Lace"
                         value={formData.name || ''}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                         style={{ height: '42px', borderRadius: '8px' }}
                       />
+                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold text-dark small mb-1.5">
@@ -993,6 +1098,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           tags={formData.variants?.length ? formData.variants : (formData.buttonSizesList || [])}
                           onChange={(newTags) => setFormData({ ...formData, variants: newTags, buttonSizesList: newTags })}
                           placeholder="Type a value, press Enter"
+                          disabled={!isModalEditMode}
                         />
                       </div>
                       <div className="mb-3">
@@ -1001,6 +1107,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           tags={formData.colors?.length ? formData.colors : (formData.buttonColorsList || [])}
                           onChange={(newTags) => setFormData({ ...formData, colors: newTags, buttonColorsList: newTags })}
                           placeholder="Type a value, press Enter"
+                          disabled={!isModalEditMode}
                         />
                       </div>
                     </>
@@ -1011,44 +1118,24 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {/* ============================================================== */}
                   {formData.category === 'Lace' && (
                     <>
-                      <div className="row g-3 mb-3 align-items-end">
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Lace size</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            placeholder="e.g. 15"
-                            value={formData.laceSizeValue ?? ''}
-                            onChange={(e) => setFormData({ ...formData, laceSizeValue: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Unit of size</label>
-                          <select
-                            className="form-select"
-                            value={formData.laceSizeUnit || 'mm'}
-                            onChange={(e) => setFormData({ ...formData, laceSizeUnit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          >
-                            {SIZE_UNITS.map((u) => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="col-md-4 pb-2">
-                          <span
-                            className="badge px-3 py-2 rounded-pill fw-semibold"
-                            style={{
-                              backgroundColor: '#eef2ff',
-                              border: '1px solid #c7d2fe',
-                              color: '#4338ca',
-                              fontSize: '12px'
-                            }}
-                          >
-                            = {formData.laceSizeValue || '—'} {formData.laceSizeUnit || 'mm'}
-                          </span>
-                        </div>
+                      <div className="mb-3">
+                        <TagInput
+                          label="Lace variants (sizes, e.g. 10 mm, 20 mm, 1 inch)"
+                          tags={formData.variants?.length ? formData.variants : (formData.laceSizesList || [])}
+                          onChange={(newTags) => setFormData({ ...formData, variants: newTags, laceSizesList: newTags })}
+                          placeholder="Type a value, press Enter"
+                          suggestions={['10 mm', '15 mm', '20 mm', '25 mm', '30 mm', '40 mm', '50 mm', '1 inch']}
+                          disabled={!isModalEditMode}
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <TagInput
+                          label="Lace colors"
+                          tags={formData.colors?.length ? formData.colors : (formData.laceColorsList || [])}
+                          onChange={(newTags) => setFormData({ ...formData, colors: newTags, laceColorsList: newTags })}
+                          placeholder="Type a value, press Enter"
+                          disabled={!isModalEditMode}
+                        />
                       </div>
 
                       <div className="row g-3 mb-3">
@@ -1077,22 +1164,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           />
                         </div>
                       </div>
-
-                      <div className="mb-3">
-                        <label className="form-label fw-semibold text-dark small mb-1.5">Fabric required for 1m of lace</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          placeholder="e.g. 0.05"
-                          value={formData.fabricPerMeterLace ?? ''}
-                          onChange={(e) => setFormData({ ...formData, fabricPerMeterLace: e.target.value })}
-                          style={{ height: '42px', borderRadius: '8px' }}
-                        />
-                      </div>
-
-                      <p className="form-text text-muted mb-3" style={{ fontSize: '12.5px', lineHeight: 1.4 }}>
-                        Lace is measured continuously, not counted per piece — there's no "pieces per unit" here.
-                      </p>
                     </>
                   )}
 
@@ -1422,6 +1493,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 onChange={(newTags) => setFormData({ ...formData, coneSizes: newTags })}
                                 placeholder="Type cone size (e.g. 5000 m) and press Enter"
                                 suggestions={['5000 m', '10000 m', '20000 m']}
+                                disabled={!isModalEditMode}
                               />
                             </div>
 
@@ -1436,6 +1508,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
                                 placeholder="Add placement (e.g. Sleeves, Collar) and press Enter"
                                 suggestions={['Sleeves', 'Front', 'Back', 'Collar', 'Hemline', 'Pocket', 'Placket']}
+                                disabled={!isModalEditMode}
                               />
                             </div>
 
@@ -2054,21 +2127,29 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                                 {/* Step 3: Consumption per Width (cm) */}
                                 {selectedWidths.length > 0 && (
-                                  <div className="p-2.5 rounded-3 bg-light border">
-                                    <label className="form-label text-muted small mb-1.5 fw-medium">
-                                      Step 3: Fabric Consumption per Width (cm)
-                                    </label>
-                                    <div className="row g-2">
+                                  <div className="p-3 rounded-3 bg-light border">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                      <label className="form-label text-dark small mb-0 fw-semibold">
+                                        Step 3: Fabric Consumption per Width (cm) <span className="text-danger">*</span>
+                                      </label>
+                                      <span className="text-muted" style={{ fontSize: '11px' }}>
+                                        Enter consumption in cm per dori
+                                      </span>
+                                    </div>
+                                    <div className="row g-2.5">
                                       {selectedWidths.map((w) => (
-                                        <div key={w} className={selectedWidths.length === 1 ? 'col-12' : 'col-md-6 col-lg-3'}>
-                                          <div className="input-group input-group-sm">
-                                            <span className="input-group-text bg-white fw-semibold font-monospace small px-2">
+                                        <div key={w} className={selectedWidths.length === 1 ? 'col-12' : (selectedWidths.length === 2 ? 'col-6' : 'col-12 col-sm-6 col-md-4')}>
+                                          <div className="input-group shadow-xs rounded-2 overflow-hidden border">
+                                            <span
+                                              className="input-group-text bg-white fw-bold font-monospace text-primary border-0 border-end px-2.5"
+                                              style={{ fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}
+                                            >
                                               {w}
                                             </span>
                                             <input
                                               type="number"
                                               step="0.1"
-                                              className="form-control text-end font-monospace"
+                                              className="form-control border-0 text-center font-monospace fw-semibold px-2"
                                               placeholder="e.g. 15"
                                               value={fe.consumptions?.[w] ?? ''}
                                               onChange={(e) => {
@@ -2078,8 +2159,12 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                                 updated[idx] = { ...updated[idx], consumptions: cons };
                                                 setFormData({ ...formData, doriFabricEntries: updated });
                                               }}
+                                              style={{ height: '38px', fontSize: '13px' }}
                                             />
-                                            <span className="input-group-text bg-light text-muted small px-2">
+                                            <span
+                                              className="input-group-text bg-light text-muted border-0 border-start px-2.5 fw-medium"
+                                              style={{ fontSize: '12px' }}
+                                            >
                                               cm
                                             </span>
                                           </div>
@@ -2529,23 +2614,55 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       style={{ borderRadius: '8px' }}
                     />
                   </div>
+                  </fieldset>
                 </div>
 
                 {/* Modal Footer with Clean Theme Buttons */}
                 <div className="modal-footer border-top py-3 px-4 d-flex justify-content-end gap-2 bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary rounded-3 px-4 fw-medium"
-                    onClick={() => setIsEditing(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary rounded-3 px-4 fw-semibold"
-                  >
-                    <i className="ti ti-check me-1"></i> Save Accessory
-                  </button>
+                  {!isModalEditMode ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-theme-close rounded-3 px-4 fw-medium"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setIsModalEditMode(false);
+                        }}
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary rounded-3 px-4 fw-semibold"
+                        onClick={() => setIsModalEditMode(true)}
+                      >
+                        <i className="ti ti-edit me-1"></i> Edit Accessory
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-theme-close rounded-3 px-4 fw-medium"
+                        onClick={() => {
+                          if (isCreatingNew) {
+                            setIsEditing(false);
+                            setIsModalEditMode(false);
+                          } else {
+                            setIsModalEditMode(false);
+                          }
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary rounded-3 px-4 fw-semibold"
+                      >
+                        <i className="ti ti-check me-1"></i> Save Accessory
+                      </button>
+                    </>
+                  )}
                 </div>
               </form>
             </div>
@@ -2761,68 +2878,64 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 11.2 & 11.5: READ-ONLY VIEW MODE WITH SECTION-WISE EDIT           */}
-      {/* ========================================================================= */}
-      {selectedAccessory && !isEditing && (
-        <div className="d-flex flex-column gap-4 mb-4">
-          {/* Top Banner */}
-          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm"
-                  style={{ width: '56px', height: '56px', backgroundColor: '#a855f7', fontSize: '26px' }}
-                >
-                  <i className={
-                    selectedAccessory.category === 'Lace' ? 'ti ti-cut' :
-                    selectedAccessory.category === 'Tassels' ? 'ti ti-archive' :
-                    selectedAccessory.category === 'Thread' ? 'ti ti-needle-thread' :
-                    selectedAccessory.category === 'Dori' ? 'ti ti-wave-sine' :
-                    selectedAccessory.category === 'Elastic' ? 'ti ti-arrows-horizontal' :
-                    selectedAccessory.category === 'Buttons' ? 'ti ti-circle-dot' : 'ti ti-tag'
-                  }></i>
+      {/* POPUP MODAL: READ-ONLY VIEW MODE REMOVED */}
+      {false && selectedAccessory && !isEditing && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1060, backdropFilter: 'blur(3px)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable" style={{ maxWidth: '1080px', maxHeight: '92vh' }}>
+            <div className="modal-content border-0 shadow-2xl rounded-4 overflow-hidden bg-light">
+              {/* Modal Header */}
+              <div className="modal-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0"
+                    style={{ width: '48px', height: '48px', backgroundColor: getCategoryColor(selectedAccessory.category), fontSize: '22px' }}
+                  >
+                    <i className={getCategoryIcon(selectedAccessory.category)}></i>
+                  </div>
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="badge bg-purple-subtle text-purple font-monospace px-2.5 py-1 rounded-2">
+                        {selectedAccessory.id}
+                      </span>
+                      <h5 className="fw-bold text-dark mb-0">{selectedAccessory.name}</h5>
+                      <span className={`badge ${selectedAccessory.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
+                        {selectedAccessory.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="text-muted small mt-0.5">
+                      Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` (${selectedAccessory.piecesPerUnit || 1} pcs/unit)`}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="badge bg-purple-subtle text-purple font-monospace px-2.5 py-1 rounded-2">
-                      {selectedAccessory.id}
-                    </span>
-                    <h4 className="fw-bold text-dark mb-0">{selectedAccessory.name}</h4>
-                    <span className={`badge ${selectedAccessory.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
-                      {selectedAccessory.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div className="text-muted small mt-1">
-                    Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` (${selectedAccessory.piecesPerUnit || 1} pcs/unit)`}
-                  </div>
+
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                    onClick={() => {
+                      handleEditAccessory(selectedAccessory);
+                      setSelectedAccessory(null);
+                    }}
+                  >
+                    <i className="ti ti-edit"></i>
+                    <span>Edit Full Accessory</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-theme-close btn-sm rounded-3 px-3 d-flex align-items-center gap-1"
+                    onClick={() => {
+                      setSelectedAccessory(null);
+                      setEditingSection(null);
+                    }}
+                  >
+                    <i className="ti ti-x"></i>
+                    <span>Close</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary btn-sm rounded-3 px-3"
-                  onClick={() => {
-                    setSelectedAccessory(null);
-                    setEditingSection(null);
-                  }}
-                >
-                  <i className="ti ti-arrow-left me-1"></i> Back to Grid
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm rounded-3 px-3 fw-semibold"
-                  onClick={() => {
-                    handleEditAccessory(selectedAccessory);
-                    setSelectedAccessory(null);
-                  }}
-                >
-                  <i className="ti ti-edit me-1"></i> Edit Full Accessory
-                </button>
-              </div>
-            </div>
-          </div>
+              {/* Modal Body */}
+              <div className="modal-body p-4" style={{ maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' }}>
 
           {/* Logical Sections */}
           <div className="row g-4">
@@ -2872,8 +2985,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           type="text"
                           className="form-control form-control-sm"
                           value={sectionFormData.name || ''}
-                          onChange={(e) => setSectionFormData({ ...sectionFormData, name: e.target.value })}
+                          onChange={(e) => setSectionFormData({ ...sectionFormData, name: autoCapitalizeWords(e.target.value) })}
                         />
+                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
                       </div>
                       <div className="row g-2">
                         <div className={!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) ? 'col-6' : 'col-12'}>
@@ -3061,19 +3175,64 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   )}
 
                   {selectedAccessory.category === 'Lace' && (
-                    <div className="d-flex flex-column gap-2.5">
-                      <div>
-                        <div className="text-muted small">Lace Size (Free text)</div>
-                        <div className="fw-bold text-dark">{selectedAccessory.laceSize || selectedAccessory.size || '18 mm'}</div>
+                    editingSection === 'category' ? (
+                      <div className="d-flex flex-column gap-3">
+                        <TagInput
+                          label="Lace Sizes / Variants"
+                          tags={sectionFormData.laceSizesList?.length ? sectionFormData.laceSizesList : (sectionFormData.laceSize ? sectionFormData.laceSize.split(',').map(s => s.trim()).filter(Boolean) : (sectionFormData.size ? [sectionFormData.size] : []))}
+                          onChange={(newTags) => {
+                            setSectionFormData({
+                              ...sectionFormData,
+                              laceSizesList: newTags,
+                              laceSize: newTags.join(', '),
+                              size: newTags[0] || ''
+                            });
+                          }}
+                          placeholder="Type size and press Enter (e.g. 15 mm, 20 mm)"
+                          suggestions={['10 mm', '15 mm', '20 mm', '25 mm', '30 mm', '40 mm', '1 inch']}
+                        />
+                        <div>
+                          <label className="form-label small fw-semibold text-muted">Default Shrinkage (%)</label>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            value={sectionFormData.defaultShrinkage || ''}
+                            onChange={(e) => setSectionFormData({ ...sectionFormData, defaultShrinkage: e.target.value })}
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-muted small">Default Shrinkage (%)</div>
-                        <div className="fw-semibold text-secondary">{selectedAccessory.defaultShrinkage ? `${selectedAccessory.defaultShrinkage}%` : '0%'}</div>
+                    ) : (
+                      <div className="d-flex flex-column gap-3">
+                        <div>
+                          <div className="text-muted small">Lace Sizes / Variants</div>
+                          <div className="d-flex flex-wrap gap-1.5 mt-1">
+                            {((selectedAccessory.laceSizesList && selectedAccessory.laceSizesList.length > 0)
+                              ? selectedAccessory.laceSizesList
+                              : (selectedAccessory.laceSize ? selectedAccessory.laceSize.split(',').map(s => s.trim()).filter(Boolean) : [selectedAccessory.size || '15 mm'])
+                            ).map((sz, i) => (
+                              <span
+                                key={i}
+                                className="d-inline-flex align-items-center px-2.5 py-1 rounded-pill font-monospace"
+                                style={{
+                                  backgroundColor: '#eff6ff',
+                                  border: '1px solid #bfdbfe',
+                                  color: '#1d4ed8',
+                                  fontSize: '12.5px',
+                                  fontWeight: 600
+                                }}
+                              >
+                                <i className="ti ti-cut me-1"></i>
+                                {sz}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted small">Default Shrinkage (%)</div>
+                          <div className="fw-semibold text-secondary">{selectedAccessory.defaultShrinkage ? `${selectedAccessory.defaultShrinkage}%` : '0%'}</div>
+                        </div>
                       </div>
-                      <div className="p-2 bg-light rounded text-muted small">
-                        Note: Fabric requirement calculation is automated in BOM.
-                      </div>
-                    </div>
+                    )
                   )}
 
                   {selectedAccessory.category === 'Tassels' && (
@@ -3378,6 +3537,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                 </div>
               </div>
             </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -3385,7 +3547,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       {/* ========================================================================= */}
       {/* STANDARD ACCESSORIES GRID                                                 */}
       {/* ========================================================================= */}
-      {selectedCategory !== 'Thread Sizes' && selectedCategory !== 'Thread Brand & Colors' && !isEditing && !selectedAccessory && (
+      {selectedCategory !== 'Thread Sizes' && selectedCategory !== 'Thread Brand & Colors' && !isEditing && (
         <div className="row g-3">
           {filteredAccessories.map((acc) => {
             const isButton = acc.category === 'Buttons';
@@ -3404,8 +3566,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     cursor: 'pointer'
                   }}
                   onClick={() => {
-                    setSelectedAccessory(acc);
-                    setEditingSection(null);
+                    handleEditAccessory(acc, false);
                   }}
                 >
                   {/* Top: Icon + Title/Subtitle + Actions (Matching Image 2) */}
@@ -3459,7 +3620,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         className="btn btn-sm btn-light p-1 rounded-2 text-muted"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleEditAccessory(acc);
+                          handleEditAccessory(acc, true);
                         }}
                         title="Edit Accessory"
                         style={{ width: '28px', height: '28px' }}
@@ -3652,8 +3813,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         placeholder="e.g. Coats India, Vardhman"
                         required
                         value={threadSizeForm.brandName}
-                        onChange={(e) => setThreadSizeForm({ ...threadSizeForm, brandName: e.target.value })}
+                        onChange={(e) => setThreadSizeForm({ ...threadSizeForm, brandName: autoCapitalizeWords(e.target.value) })}
                       />
+                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold small text-muted">Packaging Type *</label>
@@ -3740,7 +3902,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   </div>
                 </div>
                 <div className="modal-footer border-top py-3 px-4">
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setThreadSizeModal(false)}>
+                  <button type="button" className="btn btn-theme-close rounded-3 px-4 fw-medium" onClick={() => setThreadSizeModal(false)}>
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary fw-semibold">
@@ -3792,8 +3954,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         placeholder="e.g. Coats Astra, Vardhman Poly"
                         required
                         value={threadColorForm.brandName}
-                        onChange={(e) => setThreadColorForm({ ...threadColorForm, brandName: e.target.value })}
+                        onChange={(e) => setThreadColorForm({ ...threadColorForm, brandName: autoCapitalizeWords(e.target.value) })}
                       />
+                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold small text-muted">Color Number *</label>
@@ -3849,7 +4012,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   </div>
                 </div>
                 <div className="modal-footer border-top py-3 px-4">
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setThreadColorModal(false)}>
+                  <button type="button" className="btn btn-theme-close rounded-3 px-4 fw-medium" onClick={() => setThreadColorModal(false)}>
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary fw-semibold">
