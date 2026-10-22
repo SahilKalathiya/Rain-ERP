@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { initialColors, getStoredData, setStoredData } from '../../data/salesOrderData';
+import AddColorModal from '../Procurement/AddColorModal';
 
 /**
  * Standard palette for quick color selection in Color Picker dialog
@@ -48,18 +49,25 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Form State matching Section 3.1 & Section 6 Data Structure
-  const [formData, setFormData] = useState({
-    id: isInline ? `COL-${String(colors.length + 1).padStart(3, '0')}` : '',
-    name: '',
-    hexCode: '',
-    pantoneCode: '',
-    quarterTag: '',
-    isTrending: false,
-    active: true
-  });
-
+  const [editingColor, setEditingColor] = useState(null);
   const [quarterFilter, setQuarterFilter] = useState('All');
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const stored = getStoredData('erp_colors_master_v1', null) || getStoredData('raindrop_colors_v1', null);
+        if (Array.isArray(stored) && stored.length > 0) {
+          setColors(stored);
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('raindrop_colors_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('raindrop_colors_updated', handleUpdate);
+    };
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -68,12 +76,12 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
 
   const handleAddNew = () => {
     const nextNum = colors.length + 1;
-    setFormData({
+    setEditingColor({
       id: `COL-${String(nextNum).padStart(3, '0')}`,
       name: '',
-      hexCode: '',
-      pantoneCode: '',
-      quarterTag: '',
+      hex: '#000000',
+      pantone: '',
+      quarterTag: 'Q1',
       isTrending: false,
       active: true
     });
@@ -82,12 +90,13 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
   };
 
   const handleEdit = (color) => {
-    setFormData({
+    setEditingColor({
       id: color.id,
       name: color.name || '',
-      hexCode: color.hexCode || color.hex || '#333333',
-      pantoneCode: color.pantoneCode || color.pantone || '',
-      quarterTag: color.quarterTag || '',
+      hex: color.hexCode || color.hex || '#000000',
+      pantone: color.pantoneCode || color.pantone || '',
+      category: color.category || '',
+      quarterTag: color.quarterTag || 'Q1',
       isTrending: Boolean(color.isTrending),
       active: color.active !== false
     });
@@ -100,6 +109,11 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
     const updated = colors.filter((c) => c.id !== colorId);
     setColors(updated);
     setStoredData('erp_colors_master_v1', updated);
+    try {
+      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_colors_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
     showToast('Color deleted successfully');
   };
 
@@ -107,37 +121,30 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
     const updated = colors.map((c) => (c.id === colorId ? { ...c, active: !c.active } : c));
     setColors(updated);
     setStoredData('erp_colors_master_v1', updated);
+    try {
+      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_colors_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
     showToast('Status updated');
   };
 
-  const saveColor = (e) => {
-    e?.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Color Name is required');
-      return;
-    }
-
-    // Section 12.1 Validation: Hex code must be valid 6-character hex value
-    let cleanHex = formData.hexCode.trim();
-    if (!cleanHex.startsWith('#')) cleanHex = `#${cleanHex}`;
-    const hexPattern = /^#([0-9A-Fa-f]{6})$/;
-    if (!hexPattern.test(cleanHex)) {
-      alert('Please enter a valid 6-character HEX code (e.g. #333333 or #2E8B57)');
-      return;
-    }
-
-    // Auto-capitalise word by word
-    const capitalizedName = formData.name.replace(/\b\w/g, (c) => c.toUpperCase());
+  const handleModalSave = (savedColor) => {
+    if (!savedColor) return;
+    const cleanHex = (savedColor.hex || savedColor.hexCode || '#000000').toUpperCase().trim();
+    const capitalizedName = (savedColor.name || '').replace(/\b\w/g, (c) => c.toUpperCase());
     const nextNum = colors.length + 1;
     const colorObj = {
-      ...formData,
-      id: formData.id || `COL-${String(nextNum).padStart(3, '0')}`,
+      ...savedColor,
+      id: editingColor?.id || savedColor.id || `COL-${String(nextNum).padStart(3, '0')}`,
       name: capitalizedName,
-      hexCode: cleanHex.toUpperCase(),
-      pantoneCode: formData.pantoneCode.trim(),
-      quarterTag: formData.quarterTag || '',
-      isTrending: Boolean(formData.isTrending),
-      active: formData.active !== false,
+      hex: cleanHex,
+      hexCode: cleanHex,
+      pantone: (savedColor.pantone || savedColor.pantoneCode || '').trim(),
+      pantoneCode: (savedColor.pantone || savedColor.pantoneCode || '').trim(),
+      quarterTag: savedColor.quarterTag || 'Q1',
+      isTrending: Boolean(savedColor.isTrending),
+      active: editingColor?.active !== undefined ? editingColor.active : (savedColor.active !== false),
       lastModified: new Date().toISOString()
     };
 
@@ -152,6 +159,11 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
 
     setColors(updatedList);
     setStoredData('erp_colors_master_v1', updatedList);
+    try {
+      localStorage.setItem('raindrop_colors_v1', JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('raindrop_colors_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
 
     if (isInline && onSaveInline) {
       onSaveInline(colorObj);
@@ -159,6 +171,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
     }
 
     setIsEditing(false);
+    setEditingColor(null);
     setIsCreatingNew(false);
   };
 
@@ -281,257 +294,19 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
         </div>
       </div>
 
-      {/* Add / Edit Form Modal (Section 3.2 Color Picker Dialog Popup) */}
+      {/* Add / Edit Form Modal (Matching Image 2: AddColorModal) */}
       {isEditing && (
-        <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1055, overflowY: 'auto' }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-              <div className="modal-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-                <h5 className="modal-title fw-bold text-dark mb-0 d-flex align-items-center gap-2">
-                  <span
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '4px',
-                      backgroundColor: formData.hexCode || '#e2e8f0',
-                      border: '1px solid #cbd5e1'
-                    }}
-                  />
-                  {isCreatingNew ? 'Add New Color' : `Edit Color: ${formData.name}`}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setIsEditing(false);
-                    if (isInline && onCloseInline) onCloseInline();
-                  }}
-                ></button>
-              </div>
-
-              <form onSubmit={saveColor}>
-                <div className="modal-body p-4">
-                  <div className="row g-4">
-                    {/* Left Side: Fields */}
-                    <div className="col-md-7">
-                      <div className="row g-3">
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">Color Name *</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g. Royal Maroon"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          />
-                        </div>
-
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">Pantone Code</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g. PANTONE 19-1528"
-                            value={formData.pantoneCode}
-                            onChange={(e) => setFormData({ ...formData, pantoneCode: e.target.value })}
-                          />
-                        </div>
-
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">Hex Code *</label>
-                          <div className="input-group">
-                            <span
-                              className="input-group-text p-1 border-end-0"
-                              style={{ backgroundColor: '#ffffff' }}
-                            >
-                              <input
-                                type="color"
-                                value={formData.hexCode || '#ffffff'}
-                                onChange={(e) => setFormData({ ...formData, hexCode: e.target.value.toUpperCase() })}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  border: formData.hexCode ? 'none' : '1px dashed #cbd5e1',
-                                  cursor: 'pointer',
-                                  borderRadius: '6px'
-                                }}
-                              />
-                            </span>
-                            <input
-                              type="text"
-                              className="form-control font-monospace border-start-0"
-                              placeholder="e.g. #2E37A4"
-                              required
-                              value={formData.hexCode || ''}
-                              onChange={(e) => setFormData({ ...formData, hexCode: e.target.value.toUpperCase() })}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="col-md-6 d-flex align-items-center pt-4">
-                          <div className="form-check form-switch">
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              id="activeStatusSwitch"
-                              checked={formData.active}
-                              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            <label className="form-check-label fw-semibold small text-dark ms-2" htmlFor="activeStatusSwitch">
-                              Active Status
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Section 6.2: Assign this colour to a specific Quarter? */}
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">
-                            Assign this colour to a specific Quarter?
-                          </label>
-                          <select
-                            className="form-select"
-                            value={formData.quarterTag || ''}
-                            onChange={(e) => setFormData({ ...formData, quarterTag: e.target.value })}
-                            style={{ fontSize: '13px' }}
-                          >
-                            <option value="">None / Untagged</option>
-                            <option value="Q1">🌸 Q1 (Jan–Mar · Spring / Trending)</option>
-                            <option value="Q2">☀️ Q2 (Apr–Jun · Summer Pastels)</option>
-                            <option value="Q3">🌧️ Q3 (Jul–Sep · Monsoon & Festive)</option>
-                            <option value="Q4">❄️ Q4 (Oct–Dec · Winter & Wedding)</option>
-                          </select>
-                        </div>
-
-                        {/* Section 6.1: Trending Flag */}
-                        <div className="col-md-6 d-flex align-items-center pt-3">
-                          <div className="form-check form-switch">
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              id="trendingFlagSwitch"
-                              checked={formData.isTrending || false}
-                              onChange={(e) => setFormData({ ...formData, isTrending: e.target.checked })}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            <label className="form-check-label fw-semibold small text-dark ms-2" htmlFor="trendingFlagSwitch">
-                              ⭐ Trending Colour (Always show in Order Form)
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Standard Color Palette Picker (Section 3.2) */}
-                        <div className="col-12 mt-3">
-                          <label className="form-label fw-semibold small text-muted mb-2">
-                            Quick Select Standard Palette
-                          </label>
-                          <div className="d-flex flex-wrap gap-2">
-                            {STANDARD_PALETTE.map((pal) => (
-                              <button
-                                key={pal.name}
-                                type="button"
-                                className="btn btn-sm d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill border shadow-xs"
-                                style={{
-                                  backgroundColor: '#ffffff',
-                                  borderColor: formData.hexCode === pal.hex ? '#4f46e5' : '#e2e8f0',
-                                  borderWidth: formData.hexCode === pal.hex ? '2px' : '1px'
-                                }}
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    name: formData.name || pal.name,
-                                    hexCode: pal.hex
-                                  });
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '50%',
-                                    backgroundColor: pal.hex,
-                                    border: '1px solid rgba(0,0,0,0.15)'
-                                  }}
-                                />
-                                <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
-                                  {pal.name}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Side: Live Swatch Card Preview (Section 3.2) */}
-                    <div className="col-md-5 d-flex align-items-center justify-content-center">
-                      <div
-                        className="card border-0 shadow-sm rounded-4 overflow-hidden text-center"
-                        style={{ width: '240px', border: '1px solid #e2e8f0' }}
-                      >
-                        <div
-                          style={{
-                            height: '140px',
-                            backgroundColor: formData.hexCode || '#f8fafc',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: formData.hexCode ? (isLightColor(formData.hexCode) ? '#0f172a' : '#ffffff') : '#94a3b8',
-                            fontWeight: 700,
-                            fontSize: formData.hexCode ? '18px' : '13px',
-                            letterSpacing: '0.04em',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          {formData.hexCode ? (
-                            <span>{formData.hexCode}</span>
-                          ) : (
-                            <div className="text-center p-2">
-                              <i className="ti ti-palette fs-2 mb-1 d-block opacity-40"></i>
-                              <span className="small fw-normal">Select or Enter Color</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="card-body p-3 bg-white">
-                          <h6 className="fw-bold text-dark mb-1">
-                            {formData.name || 'Color Preview'}
-                          </h6>
-                          <span className="text-muted small font-monospace d-block">
-                            {formData.pantoneCode || 'PANTONE —'}
-                          </span>
-                          <span className="badge bg-success-subtle text-success border border-success-subtle mt-2 px-2.5 py-1 rounded-pill small">
-                            {formData.active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary rounded-3 px-4"
-                    onClick={() => {
-                      setIsEditing(false);
-                      if (isInline && onCloseInline) onCloseInline();
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary rounded-3 px-4 fw-semibold">
-                    <i className="ti ti-check me-1"></i> {isCreatingNew ? 'Create Color' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <AddColorModal
+          initialColor={isCreatingNew ? null : editingColor}
+          colors={colors}
+          onSave={handleModalSave}
+          onClose={() => {
+            setIsEditing(false);
+            setEditingColor(null);
+            setIsCreatingNew(false);
+            if (isInline && onCloseInline) onCloseInline();
+          }}
+        />
       )}
 
       {/* Colors Grid — Attractive Card Layout (Section 3.2) */}

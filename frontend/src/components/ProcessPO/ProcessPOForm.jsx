@@ -276,11 +276,12 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
 
   const handleStyleChange = (styleValue) => {
     setSelectedStyle(styleValue);
-    if (items.length > 0 && (!items[0].style_name || items[0].style_name === selectedStyle)) {
-      const updated = [...items];
-      updated[0].style_name = styleValue;
-      setItems(updated);
-    }
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        style_name: styleValue
+      }))
+    );
   };
 
   const handleAddPreset = (preset) => {
@@ -502,7 +503,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
         <div className="card-body p-4" style={{ background: '#f8fafc' }}>
 
           {/* ========================================================================= */}
-          {/* SECTION 1: ORDER LINK & STYLE SELECTION                                    */}
+          {/* UNIFIED PO HEADER & VENDOR DETAILS (Merged 1 & 2 simply and cleanly)      */}
           {/* ========================================================================= */}
           <div
             className="card border mb-4 shadow-sm"
@@ -529,19 +530,19 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                     color: '#4f46e5'
                   }}
                 >
-                  <i className="ti ti-link fs-16"></i>
+                  <i className="ti ti-file-invoice fs-16"></i>
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold text-dark fs-14">
-                    1. Order Linkage & Style Details
+                    Purchase Order &amp; Vendor Details
                   </h6>
                   <p className="text-muted fs-11 mb-0">
-                    Connect with a Sales Order or create a standalone Job Work PO
+                    Order linkage, vendor assignment, delivery dates, and style specifications
                   </p>
                 </div>
               </div>
 
-              {/* Segmented Switch */}
+              {/* Segmented Switch: Linked vs Standalone */}
               <div
                 className="btn-group p-1 rounded-pill border"
                 style={{ background: '#f1f5f9', borderColor: '#e2e8f0' }}
@@ -581,171 +582,8 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
             </div>
 
             <div className="p-4">
-              <div className="row g-4 align-items-start">
-                
-                {/* Sales Order Reference */}
-                {isOrderLinked ? (
-                  <div className="col-lg-6 col-md-12">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                      <span>Sales Order Reference</span>
-                      {currentSelectedOrder && (
-                        <span className="badge bg-indigo-subtle text-primary border border-indigo-200 fs-10 fw-semibold px-2">
-                          {currentSelectedOrder.status}
-                        </span>
-                      )}
-                    </label>
-
-                    <select
-                      className="form-select bg-white fs-13"
-                      style={{ borderColor: '#cbd5e1', borderRadius: '8px', height: '42px' }}
-                      value={linkedOrderId}
-                      disabled={isReadOnly}
-                      onChange={(e) => handleSelectOrder(e.target.value)}
-                    >
-                      <option value="">-- Select Sales Order (Optional) --</option>
-                      {availableSalesOrders.map((ord) => (
-                        <option key={ord.id} value={ord.id}>
-                          {ord.id} — {ord.customer} • {ord.style} ({ord.targetPcs} Pcs)
-                        </option>
-                      ))}
-                    </select>
-
-                    {currentSelectedOrder && (
-                      <div
-                        className="mt-2.5 p-3 rounded-3 d-flex flex-column gap-1.5 border"
-                        style={{
-                          background: '#f8faff',
-                          borderColor: '#c7d2fe'
-                        }}
-                      >
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-2">
-                            <span className="badge bg-primary text-white fs-11 fw-bold px-2 py-0.5">
-                              {currentSelectedOrder.id}
-                            </span>
-                            <span className="fw-bold text-dark fs-13">
-                              {currentSelectedOrder.style}
-                            </span>
-                          </div>
-                          <span className="badge bg-white text-primary border border-indigo-200 fs-11 fw-semibold">
-                            Target: {currentSelectedOrder.targetPcs} pcs
-                          </span>
-                        </div>
-                        <div className="d-flex flex-wrap align-items-center justify-content-between text-muted fs-11 pt-1 border-top border-indigo-100">
-                          <div>
-                            <i className="ti ti-user me-1 text-primary"></i>
-                            <strong>Client:</strong> {currentSelectedOrder.customer}
-                          </div>
-                          <div>
-                            <i className="ti ti-calendar me-1 text-primary"></i>
-                            <strong>Delivery:</strong> {currentSelectedOrder.deliveryDate}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="col-lg-6 col-md-12">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
-                      Stock Category
-                    </label>
-                    <div className="p-3 rounded-3 border bg-light d-flex align-items-center gap-3">
-                      <div
-                        className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                        style={{ width: '38px', height: '38px', background: '#334155' }}
-                      >
-                        <i className="ti ti-building-warehouse fs-18"></i>
-                      </div>
-                      <div>
-                        <div className="fw-bold text-dark fs-13">Buffer Stock Procurement</div>
-                        <div className="text-muted fs-11">
-                          No order constraint. Fabric rolls will be dyed for warehouse stock pool.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Style Name */}
-                <div className="col-lg-6 col-md-12">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                    <span>Style Name</span>
-                    <span className="text-muted fs-11">Garment style to be processed</span>
-                  </label>
-
-                  <div className="d-flex gap-2">
-                    <select
-                      className="form-select bg-white fs-13"
-                      style={{ borderColor: '#cbd5e1', borderRadius: '8px', height: '42px', flex: '1 1 50%' }}
-                      value={selectedStyle}
-                      disabled={isReadOnly}
-                      onChange={(e) => handleStyleChange(e.target.value)}
-                    >
-                      <option value="">-- Select Master Style --</option>
-                      {availableStyles.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-
-                    <input
-                      type="text"
-                      className="form-control bg-white fs-13"
-                      placeholder="Or enter custom style name..."
-                      style={{ borderColor: '#cbd5e1', borderRadius: '8px', height: '42px', flex: '1 1 50%' }}
-                      value={selectedStyle}
-                      disabled={isReadOnly}
-                      onChange={(e) => handleStyleChange(e.target.value)}
-                    />
-                  </div>
-
-                  <small className="text-muted fs-11 mt-1.5 d-block">
-                    Choose from predefined style masters or enter custom style name.
-                  </small>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================================= */}
-          {/* SECTION 2: PO HEADER DETAILS & VENDOR ASSIGNMENT (WITH + NEW VENDOR)      */}
-          {/* ========================================================================= */}
-          <div
-            className="card border mb-4 shadow-sm"
-            style={{
-              borderRadius: '10px',
-              borderColor: '#e2e8f0',
-              background: '#ffffff'
-            }}
-          >
-            <div
-              className="p-3 px-4 border-bottom d-flex align-items-center gap-2.5"
-              style={{ borderColor: '#e2e8f0', background: '#fafbfc' }}
-            >
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  color: '#059669'
-                }}
-              >
-                <i className="ti ti-clipboard-text fs-16"></i>
-              </div>
-              <div>
-                <h6 className="mb-0 fw-bold text-dark fs-14">
-                  2. Purchase Order Details & Vendor
-                </h6>
-                <p className="text-muted fs-11 mb-0">
-                  Assign vendor, specify issue dates and delivery schedule
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4">
               <div className="row g-3">
-                {/* PO Number */}
+                {/* Row 1: Dates & PO Number */}
                 <div className="col-lg-3 col-md-4 col-sm-6">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     PO Number <span className="text-danger">*</span>
@@ -761,7 +599,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   />
                 </div>
 
-                {/* PO Date */}
                 <div className="col-lg-3 col-md-4 col-sm-6">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     PO Date <span className="text-danger">*</span>
@@ -777,7 +614,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   />
                 </div>
 
-                {/* Issue Date */}
                 <div className="col-lg-3 col-md-4 col-sm-6">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Issue Date
@@ -792,7 +628,6 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   />
                 </div>
 
-                {/* Delivery Due Date */}
                 <div className="col-lg-3 col-md-6 col-sm-6">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Delivery Due Date
@@ -807,8 +642,8 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   />
                 </div>
 
-                {/* Vendor - Clean ERP style with "+ New" vendor button on the right */}
-                <div className="col-lg-6 col-md-6">
+                {/* Row 2: Vendor, Sales Order Reference, Customer / Brand */}
+                <div className="col-lg-4 col-md-6">
                   <div className="d-flex align-items-center justify-content-between mb-1">
                     <label className="form-label fs-12 fw-semibold text-secondary mb-0">
                       Vendor <span className="text-danger">*</span>
@@ -846,8 +681,42 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   </select>
                 </div>
 
-                {/* Customer / Brand Label */}
-                <div className="col-lg-6 col-md-6">
+                <div className="col-lg-4 col-md-6">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-flex align-items-center justify-content-between">
+                    <span>Sales Order Reference</span>
+                    {isOrderLinked && currentSelectedOrder && (
+                      <span className="badge bg-indigo-subtle text-primary border border-indigo-200 fs-10 fw-semibold px-2">
+                        {currentSelectedOrder.status}
+                      </span>
+                    )}
+                  </label>
+                  {isOrderLinked ? (
+                    <select
+                      className="form-select form-select-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                      value={linkedOrderId}
+                      disabled={isReadOnly}
+                      onChange={(e) => handleSelectOrder(e.target.value)}
+                    >
+                      <option value="">-- Select Sales Order (Optional) --</option>
+                      {availableSalesOrders.map((ord) => (
+                        <option key={ord.id} value={ord.id}>
+                          {ord.id} — {ord.customer} • {ord.style} ({ord.targetPcs} Pcs)
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      className="form-control form-control-sm bg-light text-muted fs-12 d-flex align-items-center gap-1.5"
+                      style={{ borderColor: '#e2e8f0', height: '38px', borderRadius: '6px' }}
+                    >
+                      <i className="ti ti-building-warehouse text-secondary"></i>
+                      <span>Standalone PO (General Buffer Stock)</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-lg-4 col-md-12">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Customer / Brand Label
                   </label>
@@ -861,6 +730,57 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                     onChange={(e) => setCustomerBrandName(e.target.value)}
                   />
                 </div>
+
+                {/* Row 3: Style Name */}
+                <div className="col-12">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-flex align-items-center justify-content-between">
+                    <span>Style Name <span className="text-danger">*</span></span>
+                    <span className="text-muted fs-11">Choose master style or type custom name</span>
+                  </label>
+                  <div className="d-flex gap-2">
+                    <select
+                      className="form-select form-select-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px', flex: '1 1 50%' }}
+                      value={selectedStyle}
+                      disabled={isReadOnly}
+                      onChange={(e) => handleStyleChange(e.target.value)}
+                    >
+                      <option value="">-- Select Master Style --</option>
+                      {availableStyles.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="text"
+                      className="form-control form-control-sm bg-white fs-13"
+                      placeholder="Or enter custom style name..."
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px', flex: '1 1 50%' }}
+                      value={selectedStyle}
+                      disabled={isReadOnly}
+                      onChange={(e) => handleStyleChange(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Compact Linked Order Pill if active */}
+                  {isOrderLinked && currentSelectedOrder && (
+                    <div
+                      className="mt-2 p-2 px-3 rounded-2 d-flex flex-wrap align-items-center justify-content-between border text-muted fs-11"
+                      style={{ background: '#f8faff', borderColor: '#c7d2fe' }}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="badge bg-primary text-white fs-10 px-2">{currentSelectedOrder.id}</span>
+                        <strong className="text-dark fs-12">{currentSelectedOrder.style}</strong>
+                        <span>• Client: <strong>{currentSelectedOrder.customer}</strong></span>
+                      </div>
+                      <div className="d-flex align-items-center gap-3">
+                        <span>Target: <strong>{currentSelectedOrder.targetPcs} pcs</strong></span>
+                        <span>Delivery: <strong>{currentSelectedOrder.deliveryDate}</strong></span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           </div>
@@ -894,7 +814,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold text-dark fs-14">
-                    3. Fabric & Processing Line Items
+                    Fabric &amp; Processing Line Items
                   </h6>
                   <p className="text-muted fs-11 mb-0">
                     Bi-directional Metres ↔ Pieces calculation (@2.60 m/pc default) + 4% shrinkage
@@ -920,9 +840,9 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                   <thead style={{ background: '#f8fafc' }}>
                     <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                       <th className="text-center py-2" style={{ width: '38px', border: '1px solid #dee2e6' }}>#</th>
-                      <th style={{ minWidth: '270px', border: '1px solid #dee2e6', padding: '8px 10px' }}>
+                      <th style={{ minWidth: '240px', border: '1px solid #dee2e6', padding: '8px 10px' }}>
                         <div className="d-flex align-items-center justify-content-between">
-                          <span>STYLE & BASE FABRIC *</span>
+                          <span>FABRIC QUALITY *</span>
                           {!isReadOnly && (
                             <button
                               type="button"
@@ -967,22 +887,13 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                       <tr key={item.id || idx}>
                         <td className="text-center fw-bold text-muted" style={{ border: '1px solid #dee2e6', verticalAlign: 'middle' }}>{idx + 1}</td>
                         
-                        {/* Style & Base Fabric - Spacious and never sliced vertically */}
+                        {/* Base Fabric Quality - Clean & Spacious with Linked Style Indicator from Step 1 */}
                         <td style={{ border: '1px solid #dee2e6', padding: '8px 10px', verticalAlign: 'middle' }}>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm fw-medium fs-13 mb-1.5 bg-white"
-                            placeholder="Style Name"
-                            value={item.style_name || selectedStyle || ''}
-                            disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 10px', fontSize: '13px' }}
-                            onChange={(e) => handleItemChange(idx, 'style_name', e.target.value)}
-                          />
                           <select
                             className="form-select form-select-sm fs-13 bg-white"
                             value={item.fabric_id || ''}
                             disabled={isReadOnly}
-                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '34px', padding: '4px 24px 4px 10px', fontSize: '13px', lineHeight: '1.4' }}
+                            style={{ borderColor: '#cbd5e1', borderRadius: '4px', height: '36px', padding: '4px 24px 4px 10px', fontSize: '13px', lineHeight: '1.4' }}
                             onChange={(e) => {
                               const fId = e.target.value;
                               const f = fabricList.find(fab => fab.id === fId);
@@ -1006,6 +917,12 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
                               <option key={fab.id} value={fab.id}>{fab.name || fab.qualityName}</option>
                             ))}
                           </select>
+                          <div className="text-muted fs-11 mt-1.5 d-flex align-items-center gap-1">
+                            <i className="ti ti-hanger text-secondary fs-12"></i>
+                            <span className="text-truncate" style={{ maxWidth: '210px' }} title={selectedStyle || item.style_name || 'Selected Master Style from Step 1'}>
+                              Style: <strong className="text-dark">{selectedStyle || item.style_name || '(Set in Step 1)'}</strong>
+                            </span>
+                          </div>
                         </td>
 
                         {/* Color Shade - Full width, swatch on left, zero cut-off */}
@@ -1246,7 +1163,7 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 4: INSTRUCTIONS & TERMS                                           */}
+          {/* TERMS & SPECIAL INSTRUCTIONS (PDF Section 3.1 & Page 11 Specification)   */}
           {/* ========================================================================= */}
           <div
             className="card border mb-2 shadow-sm"
@@ -1256,58 +1173,18 @@ export default function ProcessPOForm({ initialPO, onSave, onCancel, readOnlyDef
               background: '#ffffff'
             }}
           >
-            <div
-              className="p-3 px-4 border-bottom d-flex align-items-center gap-2.5"
-              style={{ borderColor: '#e2e8f0', background: '#fafbfc' }}
-            >
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  color: '#d97706'
-                }}
-              >
-                <i className="ti ti-notes fs-16"></i>
-              </div>
-              <div>
-                <h6 className="mb-0 fw-bold text-dark fs-14">
-                  4. Processing Instructions & Quality Compliance
-                </h6>
-                <p className="text-muted fs-11 mb-0">
-                  Specify quality compliance directives, shrinkage tolerance and job work terms
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4">
+            <div className="p-3 px-4">
               <div className="row g-3">
                 <div className="col-12">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-0">
-                      Execution Instructions & Terms
-                    </label>
-                    <div className="d-flex flex-wrap gap-1">
-                      {instructionPresets.map((p, pIdx) => (
-                        <button
-                          key={pIdx}
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => handleAddPreset(p)}
-                          className="badge bg-light text-secondary border hover-bg-primary-subtle transition-all"
-                          style={{ cursor: 'pointer', fontSize: '11px', padding: '4px 8px' }}
-                        >
-                          + {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-flex align-items-center justify-content-between">
+                    <span>Terms &amp; Special Instructions</span>
+                    <span className="text-muted fs-11">Optional (PDF Section 3.1 &amp; Page 11)</span>
+                  </label>
                   <textarea
-                    className="form-control fs-13"
-                    rows="3"
-                    placeholder="Enter vendor processing instructions, shrinkage tolerances, colorfastness standards..."
-                    style={{ borderColor: '#cbd5e1', borderRadius: '8px' }}
+                    className="form-control fs-13 bg-white"
+                    rows="2"
+                    placeholder='e.g. "Goods delivered must be strictly as per sample and specification, within stipulated date"'
+                    style={{ borderColor: '#cbd5e1', borderRadius: '6px' }}
                     value={terms}
                     disabled={isReadOnly}
                     onChange={(e) => setTerms(e.target.value)}

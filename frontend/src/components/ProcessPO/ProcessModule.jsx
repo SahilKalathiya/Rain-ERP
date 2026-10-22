@@ -93,9 +93,11 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   const handleCreateChallanFromPO = (po) => {
-    const chNo = `${Math.floor(4000 + Math.random() * 1000)}`;
-    const challanId = `PCH-${chNo}`;
-    const poRef = po.id || (po.po_number ? `PPO-${po.po_number}` : `PPO-${chNo}`);
+    const chNum = `${Math.floor(4000 + Math.random() * 1000)}`;
+    const chNo = `CH-${chNum}`;
+    const challanId = `PCH-${chNum}`;
+    const poNum = po.po_number || String(po.id).replace(/\D/g, '') || chNum;
+    const poRef = po.id || `PPO-${poNum}`;
 
     const challanItems = po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
       id: Date.now() + idx,
@@ -127,18 +129,18 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       id: challanId,
       challan_number: chNo,
       date: new Date().toISOString().split('T')[0],
-      vendor_id: po.vendor_id || 'VEND-0003',
-      vendor_name: po.vendor_name || 'Raju Dyeing (Krishna Dyeing)',
-      linked_pos: [poRef],
+      vendor_id: po.vendor_id || '',
+      vendor_name: po.vendor_name || '',
+      linked_pos: [poNum, poRef, po.id].filter(Boolean),
       styles_info: po.style_names || [],
-      customer_brand: po.customer_brand_name || 'Raindrop Signature',
+      customer_brand: po.customer_brand_name || po.customer_brand || '',
       po_link_status: 'Linked',
       admin_alert_triggered: false,
       folding_notation: 'L100',
       total_bales: 1,
       total_pieces: challanItems.length,
       grand_total_meters: Number(grandTotal.toFixed(2)),
-      remarks: `Dispatch Challan for PO #${po.po_number || po.id}`,
+      remarks: `Dispatch Challan for PO #${poNum}`,
       receiver_signature: '',
       company_representative: 'Saksham Garg',
       status: 'Dispatched',
@@ -153,14 +155,14 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     saveStoredProcessChallans(updatedChallans);
 
     // 2. Update linked PO status to 'Sent to Vendor'
-    const updatedPOs = pos.map(p => {
-      if (p.id === po.id || p.po_number === po.po_number) {
-        return { ...p, status: 'Sent to Vendor' };
-      }
-      return p;
+    setPos(prevPOs => {
+      const exists = prevPOs.some(p => p.id === po.id || p.po_number === po.po_number);
+      const updated = exists
+        ? prevPOs.map(p => (p.id === po.id || p.po_number === po.po_number ? { ...p, status: 'Sent to Vendor' } : p))
+        : [{ ...po, status: 'Sent to Vendor' }, ...prevPOs];
+      saveStoredProcessPOs(updated);
+      return updated;
     });
-    setPos(updatedPOs);
-    saveStoredProcessPOs(updatedPOs);
 
     // 3. Switch directly to Challan Tab with the created challan open
     setEditingChallan(generatedChallan);

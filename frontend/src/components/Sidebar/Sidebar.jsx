@@ -95,6 +95,7 @@ export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
                 const isActive =
                   item.link === currentRoute ||
                   (item.link === '/orders' && currentRoute.startsWith('/orders')) ||
+                  (item.link === '/activity-log' && currentRoute.startsWith('/activity-log')) ||
                   (item.link === '/dashboard' && (currentRoute === '/dashboard' || currentRoute === '/'));
 
                 return (

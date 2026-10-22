@@ -2857,6 +2857,12 @@ export default function OrderDetailView({
             role="button"
             tabIndex={0}
             onClick={handleConfirmOrder}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleConfirmOrder();
+              }
+            }}
             className="rounded-3 d-flex justify-content-between align-items-center transition cursor-pointer shadow-xs"
             style={{
               padding: '16px 20px',

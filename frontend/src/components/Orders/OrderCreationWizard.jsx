@@ -306,10 +306,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
   // --- Article Selection Handlers ---
   const toggleArticleSelection = (type) => {
-    const existing = addedArticles.find(a => a.articleTypeId === type.id);
+    const existing = addedArticles.find(a => (type.id && a.articleTypeId === type.id) || a.name === type.name);
     if (existing) {
       // Rule 4: Each article type can be added to an order only once
-      setAddedArticles(prev => prev.filter(a => a.articleTypeId !== type.id));
+      setAddedArticles(prev => prev.filter(a => a.id !== existing.id && a.name !== type.name && (!type.id || a.articleTypeId !== type.id)));
       setOrderCustomers(prev => prev.map(c => ({
         ...c,
         assignedArticleIds: (c.assignedArticleIds || []).filter(id => id !== existing.id),
@@ -320,7 +320,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     } else {
       const newArticle = {
         id: `ART-${Date.now()}-${Math.floor(Math.random() * 100)}`,
-        articleTypeId: type.id,
+        articleTypeId: type.id || `ART-${Date.now()}`,
         name: type.name,
         avgLength: '',
         fabrics: [
@@ -1276,6 +1276,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
               placeholder="e.g. Ikkat Black Kurta Set"
               value={orderInfo.styleName}
               onChange={(e) => setOrderInfo({ ...orderInfo, styleName: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const firstTile = document.getElementById('article-tile-0');
+                  if (firstTile) firstTile.focus();
+                }
+              }}
             />
           </div>
           <div className="col-6 col-md-3">
@@ -1327,11 +1334,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
         {/* Article Grid Tiles */}
         <div className="row g-2 mb-3">
-          {(showAllArticleTypes ? articleTypes : (articleTypes.length <= 8 ? articleTypes : articleTypes.slice(0, 8))).map((type) => {
+          {(showAllArticleTypes ? articleTypes : (articleTypes.length <= 8 ? articleTypes : articleTypes.slice(0, 8))).map((type, tIdx) => {
             const isSelected = addedArticles.some(a => a.articleTypeId === type.id || a.name === type.name);
             return (
               <div key={type.id || type.name} className="col-6 col-md-2">
                 <div
+                  id={`article-tile-${tIdx}`}
                   role="button"
                   tabIndex={0}
                   className={`p-3 rounded-3 text-center border transition position-relative cursor-pointer ${
@@ -1343,6 +1351,20 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                     color: isSelected ? '#2e37a4' : '#334155'
                   }}
                   onClick={() => toggleArticleSelection(type)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleArticleSelection(type);
+                    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const nextEl = document.getElementById(`article-tile-${tIdx + 1}`) || document.getElementById('article-tile-more') || document.getElementById('article-tile-new');
+                      if (nextEl) nextEl.focus();
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prevEl = document.getElementById(`article-tile-${tIdx - 1}`);
+                      if (prevEl) prevEl.focus();
+                    }
+                  }}
                 >
                   <div style={{ fontSize: '24px', lineHeight: 1, marginBottom: '6px' }}>{type.icon || type.emoji || '👕'}</div>
                   <div className="fw-semibold small text-truncate" title={type.name}>{type.name}</div>
@@ -1362,11 +1384,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           {!showAllArticleTypes && articleTypes.length > 8 && (
             <div className="col-6 col-md-2">
               <div
+                id="article-tile-more"
                 role="button"
                 tabIndex={0}
                 className="p-3 rounded-3 text-center border bg-light text-primary cursor-pointer h-100 d-flex flex-column align-items-center justify-content-center transition shadow-xs"
                 style={{ borderColor: '#c7d2fe' }}
                 onClick={() => setShowAllArticleTypes(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowAllArticleTypes(true);
+                  } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const newBtn = document.getElementById('article-tile-new');
+                    if (newBtn) newBtn.focus();
+                  } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prevEl = document.getElementById(`article-tile-${Math.min(8, articleTypes.length) - 1}`);
+                    if (prevEl) prevEl.focus();
+                  }
+                }}
                 title="View all articles"
               >
                 <div className="fs-5 mb-1 fw-bold">+</div>
@@ -1378,11 +1415,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           {showAllArticleTypes && articleTypes.length > 8 && (
             <div className="col-6 col-md-2">
               <div
+                id="article-tile-less"
                 role="button"
                 tabIndex={0}
                 className="p-3 rounded-3 text-center border bg-light text-secondary cursor-pointer h-100 d-flex flex-column align-items-center justify-content-center transition"
                 style={{ borderColor: '#e2e8f0' }}
                 onClick={() => setShowAllArticleTypes(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowAllArticleTypes(false);
+                  } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const newBtn = document.getElementById('article-tile-new');
+                    if (newBtn) newBtn.focus();
+                  } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prevEl = document.getElementById(`article-tile-${articleTypes.length - 1}`);
+                    if (prevEl) prevEl.focus();
+                  }
+                }}
                 title="Collapse view to 8"
               >
                 <div className="fs-5 mb-1">&minus;</div>
@@ -1393,10 +1445,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
           <div className="col-6 col-md-2">
             <div
+              id="article-tile-new"
               role="button"
               tabIndex={0}
               className="p-3 rounded-3 text-center border border-dashed erp-article-add-btn cursor-pointer h-100 d-flex flex-column align-items-center justify-content-center"
               onClick={() => setShowNewArticleModal(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowNewArticleModal(true);
+                } else if (e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  const moreEl = document.getElementById('article-tile-more') || document.getElementById('article-tile-less');
+                  if (moreEl) {
+                    moreEl.focus();
+                  } else {
+                    const maxIdx = (showAllArticleTypes ? articleTypes.length : Math.min(8, articleTypes.length)) - 1;
+                    const prevEl = document.getElementById(`article-tile-${maxIdx}`);
+                    if (prevEl) prevEl.focus();
+                  }
+                }
+              }}
             >
               <div className="fs-5 mb-1">+</div>
               <div className="small fw-semibold">New Article Type</div>

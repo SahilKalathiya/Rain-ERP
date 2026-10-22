@@ -592,6 +592,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       return;
     }
 
+    // If saving draft progress (e.g. Save Bale, Save All Bales, Save Header), keep user on current form!
+    if (!isCompleted) {
+      setSelectedGRN(enrichedGRN);
+      return;
+    }
+
     setActiveGrnView('list');
   };
 

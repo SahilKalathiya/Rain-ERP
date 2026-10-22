@@ -1,31 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initialVendors } from '../../data/procurementData';
+import { initialColors } from '../../data/salesOrderData';
+import AddColorModal from '../Procurement/AddColorModal';
 
 /**
  * ProcessReturnForm - Vendor Return / Inbound Processing GRN
  * Implementation of Section 5 of PDF Specification
  * Features:
- * - Vendor external challan number & date verification
+ * - Unified clean card layout (removes separate disjointed cards & 1., 2., 3. numbering)
+ * - Vendor labeled as "Vendor (Job Worker) *"
+ * - Auto-carries Vendor and Fabric Quality from Linked Process PO
+ * - COLOR dropdown populated from Color Master + Linked PO colors + Inline "+ Master Color" creation
  * - Piece-wise meterage grid with auto sum validation against vendor stated summary
+ * - Grey fabric return (creates Open Bale with audit trail per Section 5.3)
  * - Collapsible transport details
- * - Grey fabric return (creates Open Bale with audit trail)
  */
 export default function ProcessReturnForm({ availablePOs = [], availableChallans = [], onSave, onCancel, initialReturn }) {
   const isEditing = Boolean(initialReturn);
 
-  const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || (initialVendors[0]?.id || ''));
-  const [vendorName, setVendorName] = useState(initialReturn?.vendor_name || (initialVendors[0]?.name || ''));
+  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || (availablePOs[0]?.id || ''));
+  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || (availableChallans[0]?.id || ''));
+
+  // Vendor (Job Worker) state - initialized from initialReturn or linked PO or initialVendors
+  const [vendorId, setVendorId] = useState(() => {
+    if (initialReturn?.vendor_id) return initialReturn.vendor_id;
+    if (availablePOs && availablePOs.length > 0) {
+      return availablePOs[0].vendor_id || initialVendors[0]?.id || '';
+    }
+    return initialVendors[0]?.id || '';
+  });
+
+  const [vendorName, setVendorName] = useState(() => {
+    if (initialReturn?.vendor_name) return initialReturn.vendor_name;
+    if (availablePOs && availablePOs.length > 0) {
+      return availablePOs[0].vendor_name || initialVendors[0]?.name || '';
+    }
+    return initialVendors[0]?.name || '';
+  });
+
   const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '');
   const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || new Date().toISOString().split('T')[0]);
   const [vendorInvoiceNo, setVendorInvoiceNo] = useState(initialReturn?.vendor_invoice_no || '');
   const [vendorInvoiceValue, setVendorInvoiceValue] = useState(initialReturn?.vendor_invoice_value || '');
-  
-  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || (availablePOs[0]?.id || ''));
-  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || (availableChallans[0]?.id || ''));
   const [receivedDate, setReceivedDate] = useState(initialReturn?.received_date || new Date().toISOString().split('T')[0]);
   
-  const [fabricQuality, setFabricQuality] = useState(initialReturn?.fabric_quality || '');
-  const [width, setWidth] = useState(initialReturn?.width || '48');
+  const [fabricQuality, setFabricQuality] = useState(() => {
+    if (initialReturn?.fabric_quality) return initialReturn.fabric_quality;
+    if (availablePOs && availablePOs.length > 0) {
+      return availablePOs[0].fabric_quality || availablePOs[0].items?.[0]?.fabric_name || '';
+    }
+    return '';
+  });
+
+  const [width, setWidth] = useState(() => {
+    if (initialReturn?.width) return initialReturn.width;
+    if (availablePOs && availablePOs.length > 0 && availablePOs[0].items?.[0]?.width) {
+      return availablePOs[0].items[0].width;
+    }
+    return '48';
+  });
+
   const [weight, setWeight] = useState(initialReturn?.weight || '');
   const [foldingStandard, setFoldingStandard] = useState(initialReturn?.folding_standard || 'Fold 100');
   
@@ -44,14 +78,112 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
   const [transporterName, setTransporterName] = useState(initialReturn?.transport_details?.transporter_name || '');
   const [vehicleNo, setVehicleNo] = useState(initialReturn?.transport_details?.vehicle_no || '');
 
+  // Color Master list initialized with initialColors and localStorage persistence
+  const [colorMasterList, setColorMasterList] = useState(() => {
+    let list = [...initialColors];
+    try {
+      const s = localStorage.getItem('raindrop_colors_v1') || localStorage.getItem('erp_colors_master_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        parsed.forEach(c => {
+          if (!list.some(existing => (c.name && existing.name?.toLowerCase() === c.name.toLowerCase()))) {
+            list.push(c);
+          }
+        });
+      }
+    } catch (e) {}
+    return list;
+  });
+
+  // Modal for inline Color Master creation
+  const [showInlineColorModal, setShowInlineColorModal] = useState(false);
+  const [activeColorRowIndex, setActiveColorRowIndex] = useState(null);
+
+  const selectedPO = availablePOs.find(p =>
+    p.id === linkedPoId || p.po_number === linkedPoId || `PPO-${p.po_number}` === linkedPoId
+  );
+
+  const poColors = selectedPO?.items
+    ? Array.from(new Set(selectedPO.items.map(it => it.color_name).filter(Boolean)))
+    : (selectedPO?.color_name ? [selectedPO.color_name] : []);
+
   // Piece-Wise Grid Data
   const [pieces, setPieces] = useState(
     initialReturn?.pieces && initialReturn.pieces.length > 0
       ? initialReturn.pieces
       : [
-          { id: 1, piece_no: 1, meters: '', color_name: '', folding: 'Fold 100' }
+          { id: 1, piece_no: 1, meters: '', color_name: poColors[0] || 'Beige', folding: 'Fold 100' }
         ]
   );
+
+  // Auto-sync when linked PO changes
+  const handleLinkedPoChange = (poId) => {
+    setLinkedPoId(poId);
+    const po = availablePOs.find(p => p.id === poId || p.po_number === poId || `PPO-${p.po_number}` === poId);
+    if (po) {
+      if (po.vendor_id) setVendorId(po.vendor_id);
+      if (po.vendor_name) setVendorName(po.vendor_name);
+      if (po.fabric_quality) setFabricQuality(po.fabric_quality);
+      else if (po.items && po.items[0]?.fabric_name) setFabricQuality(po.items[0].fabric_name);
+      
+      if (po.items && po.items[0]?.width) setWidth(po.items[0].width);
+      if (po.total_meters && !vendorDeclaredMeters) setVendorDeclaredMeters(po.total_meters);
+
+      // If pieces color is blank, set from first PO color
+      const primaryColor = po.items?.[0]?.color_name || '';
+      if (primaryColor) {
+        setPieces(prev => prev.map(pc => ({
+          ...pc,
+          color_name: pc.color_name || primaryColor
+        })));
+      }
+    }
+  };
+
+  // Mount sync with first PO if creating fresh
+  useEffect(() => {
+    if (linkedPoId && !isEditing) {
+      const po = availablePOs.find(p => p.id === linkedPoId || p.po_number === linkedPoId || `PPO-${p.po_number}` === linkedPoId);
+      if (po) {
+        if (!initialReturn?.vendor_id && po.vendor_id) setVendorId(po.vendor_id);
+        if (!initialReturn?.vendor_name && po.vendor_name) setVendorName(po.vendor_name);
+        if (!fabricQuality) {
+          if (po.fabric_quality) setFabricQuality(po.fabric_quality);
+          else if (po.items?.[0]?.fabric_name) setFabricQuality(po.items[0].fabric_name);
+        }
+        if (!width && po.items?.[0]?.width) setWidth(po.items[0].width);
+      }
+    }
+  }, [linkedPoId, availablePOs, isEditing]);
+
+  const handleOpenNewColorModal = (rowIndex = null) => {
+    setActiveColorRowIndex(rowIndex);
+    setShowInlineColorModal(true);
+  };
+
+  const handleNewColorCreated = (newColor) => {
+    if (!newColor) return;
+    setColorMasterList(prev => {
+      if (prev.some(c => c.name.toLowerCase() === newColor.name.toLowerCase())) return prev;
+      return [newColor, ...prev];
+    });
+
+    try {
+      const s = localStorage.getItem('raindrop_colors_v1');
+      const existing = s ? JSON.parse(s) : [];
+      if (!existing.some(c => c.name?.toLowerCase() === newColor.name?.toLowerCase())) {
+        localStorage.setItem('raindrop_colors_v1', JSON.stringify([newColor, ...existing]));
+      }
+    } catch (e) {}
+
+    if (activeColorRowIndex !== null && pieces[activeColorRowIndex]) {
+      const updated = [...pieces];
+      updated[activeColorRowIndex].color_name = newColor.name;
+      setPieces(updated);
+    }
+    setShowInlineColorModal(false);
+    setActiveColorRowIndex(null);
+  };
 
   const handlePieceMeterChange = (index, value) => {
     const updated = [...pieces];
@@ -66,7 +198,7 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
         id: Date.now(),
         piece_no: pieces.length + 1,
         meters: '',
-        color_name: pieces[pieces.length - 1]?.color_name || '',
+        color_name: pieces[pieces.length - 1]?.color_name || (poColors[0] || 'Beige'),
         folding: foldingStandard
       }
     ]);
@@ -128,7 +260,8 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
 
   return (
     <div className="card shadow-sm border mb-4" style={{ borderRadius: '12px', borderColor: '#e2e8f0', background: '#ffffff' }}>
-      <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center" style={{ borderRadius: '12px 12px 0 0' }}>
+      {/* Form Top Banner Header */}
+      <div className="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center" style={{ borderRadius: '12px 12px 0 0' }}>
         <div className="d-flex align-items-center gap-2.5">
           <div
             className="rounded-3 d-flex align-items-center justify-content-center shadow-xs"
@@ -147,8 +280,7 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
         </div>
         <button
           type="button"
-          className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3"
-          style={{ borderRadius: '8px' }}
+          className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3 rounded-2"
           onClick={onCancel}
         >
           <i className="ti ti-arrow-left fs-14"></i>
@@ -158,159 +290,245 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
 
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4">
-          {/* Section 1: Vendor & Document Identification */}
-          <div className="row g-3 mb-4 p-3 rounded border bg-light" style={{ borderColor: '#e2e8f0' }}>
-            <div className="col-md-3">
-              <label className="form-label small fw-bold">Job Work Vendor *</label>
-              <select
-                className="form-select form-select-sm"
-                value={vendorId}
-                onChange={(e) => {
-                  setVendorId(e.target.value);
-                  const v = initialVendors.find(vend => vend.id === e.target.value);
-                  if (v) setVendorName(v.name);
-                }}
-              >
-                {initialVendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
+
+          {/* UNIFIED CARD 1: INBOUND PROCESSING GRN & VENDOR DETAILS */}
+          <div
+            className="card mb-4 shadow-none"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '16px 20px'
+            }}
+          >
+            <div className="border-bottom pb-2 mb-3 d-flex align-items-center justify-content-between">
+              <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
+                Inbound Processing GRN &amp; Vendor Details
+              </span>
+              <span className="badge bg-indigo-subtle text-primary border border-indigo-200 fs-11">
+                Internal Series: Job Work
+              </span>
             </div>
 
-            <div className="col-md-3">
-              <label className="form-label small fw-bold">Vendor's External Challan No *</label>
-              <input
-                type="text"
-                className="form-control form-control-sm fw-bold text-dark"
-                value={externalChallanNo}
-                onChange={(e) => setExternalChallanNo(e.target.value)}
-                placeholder="e.g. 2196 (from physical slip)"
-                required
-              />
-              <small className="text-muted" style={{ fontSize: '10px' }}>Unique within this vendor</small>
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Vendor Challan Date *</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
-                value={externalChallanDate}
-                onChange={(e) => setExternalChallanDate(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Received in Factory *</label>
-              <input
-                type="date"
-                className="form-control form-control-sm"
-                value={receivedDate}
-                onChange={(e) => setReceivedDate(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Linked Process PO *</label>
-              <select
-                className="form-select form-select-sm"
-                value={linkedPoId}
-                onChange={(e) => setLinkedPoId(e.target.value)}
-              >
-                <option value="">-- Select Linked PO --</option>
-                {availablePOs && availablePOs.length > 0 ? (
-                  availablePOs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.id} ({p.fabric_quality || p.vendor_name || 'Process PO'})
+            {/* Row 1: Vendor (Job Worker), External Challan No, Challan Date, Received Date, Linked PO */}
+            <div className="row g-3 mb-3">
+              <div className="col-12 col-md-3">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Vendor (Job Worker) <span className="text-danger">*</span>
+                </label>
+                <select
+                  className="form-select form-select-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={vendorId}
+                  onChange={(e) => {
+                    setVendorId(e.target.value);
+                    const v = initialVendors.find(vend => vend.id === e.target.value);
+                    if (v) setVendorName(v.name);
+                  }}
+                  required
+                >
+                  <option value="">Select Vendor...</option>
+                  {initialVendors.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.city ? `(${v.city})` : ''}
                     </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="PPO-7611">PO #7611 (Beige - 525m)</option>
-                    <option value="PPO-7612">PO #7612 (Off White - 1006m)</option>
-                    <option value="PPO-7613">PO #7613 (Cambric - 887m)</option>
-                  </>
-                )}
-              </select>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-12 col-md-3">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Vendor's External Challan No <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm bg-white fs-13 fw-bold text-dark"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={externalChallanNo}
+                  onChange={(e) => setExternalChallanNo(e.target.value)}
+                  placeholder="e.g. 2196 (from physical slip)"
+                  required
+                />
+                <small className="text-muted" style={{ fontSize: '10.5px' }}>Unique within this vendor</small>
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Vendor Challan Date <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={externalChallanDate}
+                  onChange={(e) => setExternalChallanDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Received in Factory <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={receivedDate}
+                  onChange={(e) => setReceivedDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Linked Process PO <span className="text-danger">*</span>
+                </label>
+                <select
+                  className="form-select form-select-sm bg-white fs-13 fw-bold text-primary"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={linkedPoId}
+                  onChange={(e) => handleLinkedPoChange(e.target.value)}
+                  required
+                >
+                  <option value="">-- Select Linked PO --</option>
+                  {availablePOs && availablePOs.length > 0 ? (
+                    availablePOs.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.id || `PPO-${p.po_number}`} ({p.vendor_name || p.fabric_quality || 'Process PO'})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="PPO-7611">PO #7611 (Beige - 525m)</option>
+                      <option value="PPO-7612">PO #7612 (Off White - 1006m)</option>
+                      <option value="PPO-7613">PO #7613 (Cambric - 887m)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 2: Fabric Quality, Width, Folding Standard, Weight, Vendor Stated Mtrs */}
+            <div className="row g-3 pt-2 border-top">
+              <div className="col-12 col-md-3">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Returned Fabric Quality <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={fabricQuality}
+                  onChange={(e) => setFabricQuality(e.target.value)}
+                  placeholder="e.g. 100x100 Voile (Dyed)"
+                  required
+                />
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">Width</label>
+                <select
+                  className="form-select form-select-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                >
+                  <option value="44">44"</option>
+                  <option value="48">48"</option>
+                  <option value="58">58"</option>
+                </select>
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">Folding Standard</label>
+                <select
+                  className="form-select form-select-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={foldingStandard}
+                  onChange={(e) => setFoldingStandard(e.target.value)}
+                >
+                  <option value="Fold 100">Fold 100</option>
+                  <option value="Fold 98">Fold 98</option>
+                  <option value="Fold 97">Fold 97</option>
+                </select>
+              </div>
+
+              <div className="col-12 col-md-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">Weight (Kg)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="form-control form-control-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="e.g. 45.2"
+                />
+              </div>
+
+              <div className="col-12 col-md-3">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Vendor Stated Mtrs <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-control form-control-sm bg-white fs-13 text-end fw-bold text-primary"
+                  style={{ borderColor: '#cbd5e1' }}
+                  value={vendorDeclaredMeters}
+                  onChange={(e) => setVendorDeclaredMeters(e.target.value)}
+                  placeholder="e.g. 1477.60"
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          {/* Section 2: Fabric Quality & Folding Specs */}
-          <div className="row g-3 mb-4">
-            <div className="col-md-4">
-              <label className="form-label small fw-bold">Returned Fabric Quality *</label>
-              <input
-                type="text"
-                className="form-control form-control-sm"
-                value={fabricQuality}
-                onChange={(e) => setFabricQuality(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Width</label>
-              <select className="form-select form-select-sm" value={width} onChange={(e) => setWidth(e.target.value)}>
-                <option value="44">44"</option>
-                <option value="48">48"</option>
-                <option value="58">58"</option>
-              </select>
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Folding Standard</label>
-              <select className="form-select form-select-sm" value={foldingStandard} onChange={(e) => setFoldingStandard(e.target.value)}>
-                <option value="Fold 100">Fold 100</option>
-                <option value="Fold 98">Fold 98</option>
-                <option value="Fold 97">Fold 97</option>
-              </select>
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Weight (Kg)</label>
-              <input
-                type="number"
-                step="0.1"
-                className="form-control form-control-sm"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-              />
-            </div>
-
-            <div className="col-md-2">
-              <label className="form-label small fw-bold">Vendor Stated Mtrs *</label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-control form-control-sm text-end fw-bold"
-                value={vendorDeclaredMeters}
-                onChange={(e) => setVendorDeclaredMeters(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Section 3: Piece-Wise Meterage Breakdown (Section 5.2 - e.g. 13 thans) */}
-          <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <span className="fw-bold text-dark text-uppercase small">
-                  <i className="ti ti-layout-grid me-1 text-primary"></i> 2. Piece-Wise Meterage Breakdown
+          {/* UNIFIED CARD 2: PIECE-WISE METERAGE BREAKDOWN */}
+          <div
+            className="card mb-4 shadow-none"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '16px 20px'
+            }}
+          >
+            <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-2 mb-3 gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
+                  Piece-Wise Meterage Breakdown
                 </span>
-                <span className="badge bg-light text-muted ms-2 border">
-                  Must match vendor stated total of {vendorDeclaredMeters} m ({pieces.length} thans)
+                <span className="badge bg-white text-muted border fs-11">
+                  Must match vendor stated total of {vendorDeclaredMeters || '0.00'} m ({pieces.length} {pieces.length === 1 ? 'than' : 'thans'})
                 </span>
               </div>
-              <button type="button" className="btn btn-outline-primary btn-sm" onClick={addPieceRow}>
-                <i className="ti ti-plus me-1"></i> + Add Than / Roll
-              </button>
+              <div className="d-flex align-items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm px-2.5 rounded-2 d-flex align-items-center gap-1 fs-12"
+                  onClick={() => handleOpenNewColorModal(null)}
+                  title="Add new color to Color Master"
+                >
+                  <i className="ti ti-palette fs-14"></i>
+                  <span>+ Master Color</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
+                  style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+                  onClick={addPieceRow}
+                >
+                  <i className="ti ti-plus fs-14"></i>
+                  <span>Add Than / Roll</span>
+                </button>
+              </div>
             </div>
 
             {/* Validation Alert if Mismatched */}
             {isMeterMismatch && (
-              <div className="alert alert-warning py-2 small d-flex align-items-center mb-2">
+              <div className="alert alert-warning py-2 px-3 small d-flex align-items-center mb-3 rounded-2">
                 <i className="ti ti-alert-circle me-2 fs-5"></i>
                 <div>
                   <strong>Meterage Discrepancy:</strong> Entered pieces total <strong>{calculatedTotalMeters.toFixed(2)} m</strong>,
@@ -319,16 +537,16 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
               </div>
             )}
 
-            <div className="table-responsive border rounded">
+            <div className="table-responsive border rounded bg-white">
               <table className="table table-sm table-bordered align-middle mb-0" style={{ fontSize: '13px' }}>
                 <thead className="table-light text-center">
                   <tr>
-                    <th style={{ width: '50px' }}>Than #</th>
-                    <th>Color</th>
-                    <th style={{ width: '150px' }} className="table-primary text-primary">Length (Mtrs) *</th>
-                    <th style={{ width: '120px' }}>Folding</th>
+                    <th style={{ width: '60px' }}>Than #</th>
+                    <th style={{ minWidth: '220px' }}>Color (from Master)</th>
+                    <th style={{ width: '160px' }} className="table-primary text-primary">Length (Mtrs) *</th>
+                    <th style={{ width: '130px' }}>Folding</th>
                     <th style={{ width: '120px' }}>Status</th>
-                    <th style={{ width: '40px' }}>Action</th>
+                    <th style={{ width: '45px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,16 +554,41 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
                     <tr key={p.id || idx}>
                       <td className="text-center fw-bold">#{p.piece_no}</td>
                       <td>
-                        <input
-                          type="text"
-                          className="form-control form-control-sm"
-                          value={p.color_name}
+                        <select
+                          className="form-select form-select-sm bg-white fs-12 fw-semibold text-dark"
+                          style={{ borderColor: '#cbd5e1' }}
+                          value={p.color_name || ''}
                           onChange={(e) => {
-                            const updated = [...pieces];
-                            updated[idx].color_name = e.target.value;
-                            setPieces(updated);
+                            if (e.target.value === '__NEW_COLOR__') {
+                              handleOpenNewColorModal(idx);
+                            } else {
+                              const updated = [...pieces];
+                              updated[idx].color_name = e.target.value;
+                              setPieces(updated);
+                            }
                           }}
-                        />
+                        >
+                          <option value="">Select Color from Master...</option>
+                          {poColors.length > 0 && (
+                            <optgroup label="Colors from Linked PO">
+                              {poColors.map(c => (
+                                <option key={`po-${c}`} value={c}>
+                                  ★ {c} (From PO)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <optgroup label="Color Master">
+                            {colorMasterList.map(c => (
+                              <option key={c.id || c.name} value={c.name}>
+                                {c.name} {c.hexCode ? `(${c.hexCode})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="__NEW_COLOR__" className="text-primary fw-bold">
+                            + Add New Color to Master...
+                          </option>
+                        </select>
                       </td>
                       <td>
                         <input
@@ -354,6 +597,7 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
                           className="form-control form-control-sm text-end fw-bold border-primary"
                           value={p.meters}
                           onChange={(e) => handlePieceMeterChange(idx, e.target.value)}
+                          placeholder="0.00"
                         />
                       </td>
                       <td>
@@ -377,8 +621,9 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
                           className="btn btn-link text-danger p-0"
                           onClick={() => removePieceRow(idx)}
                           disabled={pieces.length <= 1}
+                          title="Remove Than"
                         >
-                          <i className="ti ti-trash"></i>
+                          <i className="ti ti-trash fs-15"></i>
                         </button>
                       </td>
                     </tr>
@@ -386,10 +631,14 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
                 </tbody>
                 <tfoot className="table-light">
                   <tr className="fw-bold">
-                    <td colSpan={2} className="text-end text-uppercase">Sum of Individual Pieces:</td>
-                    <td className="text-end text-primary fs-6">{calculatedTotalMeters.toFixed(2)} m</td>
-                    <td colSpan={3} className="text-muted small">
-                      Total: {pieces.length} Pieces / Thans
+                    <td colSpan={2} className="text-end text-uppercase text-secondary py-2 fs-12">
+                      Sum of Individual Pieces:
+                    </td>
+                    <td className="text-end text-primary fs-14 py-2">
+                      {calculatedTotalMeters.toFixed(2)} m
+                    </td>
+                    <td colSpan={3} className="text-muted fs-12 py-2">
+                      Total: {pieces.length} {pieces.length === 1 ? 'Piece / Than' : 'Pieces / Thans'}
                     </td>
                   </tr>
                 </tfoot>
@@ -397,117 +646,171 @@ export default function ProcessReturnForm({ availablePOs = [], availableChallans
             </div>
           </div>
 
-          {/* Section 4: Dedicated Grey Fabric Return (Section 5.3) */}
-          <div className="p-3 mb-4 rounded border border-secondary-subtle bg-light">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="fw-bold text-dark text-uppercase small">
-                <i className="ti ti-archive me-1 text-secondary"></i> 3. Grey Fabric / Unprocessed Stock Return (Open Bale)
+          {/* UNIFIED CARD 3: GREY FABRIC / UNPROCESSED STOCK RETURN (OPEN BALE) */}
+          <div
+            className="card mb-4 shadow-none"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '16px 20px'
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+              <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
+                Grey Fabric / Unprocessed Stock Return (Open Bale)
               </span>
-              <span className="badge bg-secondary text-white">Section 5.3 Rule</span>
+              <span className="badge bg-secondary text-white fs-11">Section 5.3 Rule</span>
             </div>
-            <p className="small text-muted mb-2">
+            <p className="text-muted fs-12 mb-3">
               When vendor returns uncut/unutilised grey fabric alongside dyed goods, it is logged here to generate an <strong>Open Bale</strong> in warehouse stock:
             </p>
             <div className="row g-3">
-              <div className="col-md-3">
-                <label className="form-label small fw-bold">Grey Fabric Returned (Metres)</label>
+              <div className="col-12 col-md-3">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Grey Fabric Returned (Metres)
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  className="form-control form-control-sm text-end fw-bold"
+                  className="form-control form-control-sm bg-white fs-13 text-end fw-bold"
+                  style={{ borderColor: '#cbd5e1' }}
                   value={greyFabricReturned}
                   onChange={(e) => setGreyFabricReturned(e.target.value)}
                   placeholder="e.g. 40.00"
                 />
               </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">Target Purchase Invoice for Return Restock</label>
+              <div className="col-12 col-md-6">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                  Target Purchase Invoice for Return Restock
+                </label>
                 <select
-                  className="form-select form-select-sm"
+                  className="form-select form-select-sm bg-white fs-13"
+                  style={{ borderColor: '#cbd5e1' }}
                   value={targetInvoiceForGrey}
                   onChange={(e) => setTargetInvoiceForGrey(e.target.value)}
                 >
                   <option value="INV-MS-0091 (M.S. Textiles - Largest Balance)">INV-MS-0091 (M.S. Textiles - Auto Assigned Largest Balance)</option>
                   <option value="INV-SR-0042 (Surat Rayon & Silk Mills)">INV-SR-0042 (Surat Rayon & Silk Mills)</option>
                 </select>
-                <small className="text-muted" style={{ fontSize: '10px' }}>Auto-assigned to invoice with largest balance; manual override supported</small>
+                <small className="text-muted" style={{ fontSize: '10.5px' }}>Auto-assigned to invoice with largest balance; manual override supported</small>
               </div>
-              <div className="col-md-3 d-flex align-items-end">
-                <span className="small text-success fw-bold">
+              <div className="col-12 col-md-3 d-flex align-items-end">
+                <span className="fs-12 text-success fw-bold pb-2">
                   <i className="ti ti-check me-1"></i> Will create Open Bale #OB-0001
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Section 5: Collapsible Transport Details (Section 5.2) */}
+          {/* UNIFIED CARD 4: COLLAPSIBLE TRANSPORT DETAILS */}
           <div className="mb-3">
             <button
               type="button"
-              className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+              className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 px-3 rounded-2"
               onClick={() => setShowTransport(!showTransport)}
             >
               <i className={`ti ${showTransport ? 'ti-chevron-up' : 'ti-chevron-down'}`}></i>
-              {showTransport ? 'Hide Transport Details' : '+ Show Collapsible Transport Details (Optional for Local Trips)'}
+              <span>{showTransport ? 'Hide Transport Details' : '+ Show Collapsible Transport Details (Optional for Local Trips)'}</span>
             </button>
 
             {showTransport && (
-              <div className="row g-3 mt-1 p-3 border rounded bg-white">
-                <div className="col-md-3">
-                  <label className="form-label small fw-bold">LR Number</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={lrNumber}
-                    onChange={(e) => setLrNumber(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-bold">LR Date</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={lrDate}
-                    onChange={(e) => setLrDate(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-bold">Transporter Name</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={transporterName}
-                    onChange={(e) => setTransporterName(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label small fw-bold">Vehicle No</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm"
-                    value={vehicleNo}
-                    onChange={(e) => setVehicleNo(e.target.value)}
-                  />
+              <div
+                className="mt-2 p-3 rounded"
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px'
+                }}
+              >
+                <div className="row g-3">
+                  <div className="col-12 col-md-3">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Number</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1' }}
+                      value={lrNumber}
+                      onChange={(e) => setLrNumber(e.target.value)}
+                      placeholder="e.g. LR-9081"
+                    />
+                  </div>
+                  <div className="col-12 col-md-3">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1' }}
+                      value={lrDate}
+                      onChange={(e) => setLrDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-12 col-md-3">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-1">Transporter Name</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1' }}
+                      value={transporterName}
+                      onChange={(e) => setTransporterName(e.target.value)}
+                      placeholder="e.g. Keshav Freight Carriers"
+                    />
+                  </div>
+                  <div className="col-12 col-md-3">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-1">Vehicle No</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm bg-white fs-13"
+                      style={{ borderColor: '#cbd5e1' }}
+                      value={vehicleNo}
+                      onChange={(e) => setVehicleNo(e.target.value)}
+                      placeholder="e.g. RJ-14-GA-9901"
+                    />
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="card-footer bg-white border-top py-3 d-flex justify-content-between align-items-center">
-          <div className="text-muted small">
-            Automatically sends all {pieces.length} thans to <strong>Quality Control (QC)</strong>
+        {/* Card Footer Bar */}
+        <div className="card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center">
+          <div className="text-muted fs-12">
+            Automatically sends all <strong>{pieces.length}</strong> thans to <strong>Quality Control (QC)</strong>
           </div>
           <div className="d-flex gap-2">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
+            <button type="button" className="btn btn-outline-secondary btn-sm px-3 rounded-2" onClick={onCancel}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary btn-sm px-4">
-              <i className="ti ti-check me-1"></i> Save Inward & Proceed to QC
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm px-4 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+              style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+            >
+              <i className="ti ti-check fs-14"></i>
+              <span>Save Inward &amp; Proceed to QC</span>
             </button>
           </div>
         </div>
       </form>
+
+      {/* Inline Modal: Color Master Creation */}
+      {showInlineColorModal && (
+        <AddColorModal
+          colors={colorMasterList}
+          onSave={(newColor) => {
+            handleNewColorCreated(newColor);
+          }}
+          onClose={(newColor) => {
+            setShowInlineColorModal(false);
+            if (newColor) {
+              handleNewColorCreated(newColor);
+            } else {
+              setActiveColorRowIndex(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

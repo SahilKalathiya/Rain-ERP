@@ -536,11 +536,14 @@ function SearchableFabricInput({
                     >
                       <div className="d-flex flex-column text-truncate me-2" style={{ minWidth: 0 }}>
                         <span className="text-truncate">{fab.qualityName}</span>
-                        {(fab.code || fab.pannaWidth) && (
+                        {(fab.code || fab.pannaWidth || (fab.widths && fab.widths.length > 0)) && (
                           <span className="text-muted fs-11">
                             {fab.code ? `Code: ${fab.code}` : ''}
-                            {fab.code && fab.pannaWidth ? ' • ' : ''}
-                            {fab.pannaWidth ? `Width: ${fab.pannaWidth}"` : ''}
+                            {fab.code && (fab.pannaWidth || (fab.widths && fab.widths.length > 0)) ? ' • ' : ''}
+                            {fab.widths && fab.widths.length > 0
+                              ? `Width: ${fab.widths.map(w => String(w).replace(/"/g, '') + '"').join(', ')}`
+                              : (fab.pannaWidth ? `Width: ${fab.pannaWidth}"` : '')
+                            }
                           </span>
                         )}
                       </div>
@@ -553,23 +556,6 @@ function SearchableFabricInput({
                   No matching fabric found
                 </div>
               )}
-            </div>
-
-            {/* Bottom Action: + Add New Fabric */}
-            <div className="border-top p-1.5 bg-light d-flex align-items-center justify-content-between">
-              <button
-                type="button"
-                className="btn btn-sm btn-link text-decoration-none w-100 text-start px-2 py-1 fs-12 fw-semibold d-flex align-items-center gap-1.5"
-                style={{ color: '#5b47fb' }}
-                onClick={() => {
-                  setIsOpen(false);
-                  setIsTyping(false);
-                  if (onAddNew) onAddNew();
-                }}
-              >
-                <i className="ti ti-plus fs-13"></i>
-                <span>Add &quot;{searchTerm || 'New Fabric'}&quot; to Master...</span>
-              </button>
             </div>
           </div>,
           document.body
@@ -750,11 +736,13 @@ export default function PurchaseOrderForm({
 
       const updatedItems = prev.items.map((it) => {
         if (it.id === targetRowId) {
+          const wList = newFabric.widths || (newFabric.pannaWidth ? [String(newFabric.pannaWidth)] : []);
+          const defaultWidth = (wList && wList.length === 1) ? String(wList[0]).replace(/"/g, '') : '';
           return {
             ...it,
             fabricId: newFabric.id,
             fabricName: newFabric.qualityName,
-            width: '',
+            width: defaultWidth,
             rate: it.rate || '',
             fold: it.fold || ''
           };
@@ -883,12 +871,19 @@ export default function PurchaseOrderForm({
 
         const updated = { ...it, [field]: value };
 
-        // Auto-fill fabric name when fabric is selected, leave width/rate/fold empty for manual entry
+        // Auto-fill fabric name when fabric is selected, auto-select width if only 1 width configured
         if (field === 'fabricId') {
-          const matchedFabric = fabrics.find((f) => f.id === value);
+          const matchedFabric = fabrics.find(
+            (f) => f.id === value || (f.qualityName && f.qualityName.toLowerCase() === String(value).toLowerCase())
+          );
           if (matchedFabric) {
             updated.fabricName = matchedFabric.qualityName;
-            updated.width = '';
+            const wList = matchedFabric.widths || (matchedFabric.pannaWidth ? [String(matchedFabric.pannaWidth)] : []);
+            if (wList && wList.length === 1) {
+              updated.width = String(wList[0]).replace(/"/g, '');
+            } else {
+              updated.width = '';
+            }
           } else {
             updated.fabricName = '';
             updated.width = '';
@@ -1317,14 +1312,6 @@ export default function PurchaseOrderForm({
             <div className="d-flex align-items-center gap-2">
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12 bg-white"
-                onClick={() => handleOpenNewFabricModal()}
-              >
-                <i className="ti ti-plus fs-13"></i>
-                <span>New Fabric</span>
-              </button>
-              <button
-                type="button"
                 className="btn btn-outline-primary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12"
                 onClick={handleAddItem}
               >
@@ -1388,8 +1375,13 @@ export default function PurchaseOrderForm({
             </thead>
             <tbody>
               {formData.items.map((row) => {
-                const currentFabric = fabrics.find((f) => f.id === row.fabricId);
-                const allowedWidths = currentFabric?.widths || (currentFabric?.pannaWidth ? [String(currentFabric.pannaWidth)] : ['44', '48', '58']);
+                const currentFabric = fabrics.find(
+                  (f) => f.id === row.fabricId || (f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || '').toLowerCase())
+                );
+                let rawWidths = currentFabric?.widths;
+                if (!rawWidths && currentFabric?.pannaWidth) rawWidths = [String(currentFabric.pannaWidth)];
+                if (!rawWidths || rawWidths.length === 0) rawWidths = ['44', '48', '58'];
+                const allowedWidths = Array.from(new Set(rawWidths.map((w) => String(w).trim().replace(/"/g, '')).filter(Boolean)));
 
                 return (
                   <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
@@ -1450,11 +1442,11 @@ export default function PurchaseOrderForm({
                     {/* Width (Panna) - Left-aligned text & variables */}
                     <td style={{ border: '1px solid #dee2e6', padding: '6px 6px' }} className="text-start">
                       {isEditing ? (
-                        allowedWidths.length > 1 ? (
+                        allowedWidths && allowedWidths.length > 0 ? (
                           <select
                             className="form-select form-select-sm bg-light fs-13 text-start"
                             style={{ borderColor: '#cbd5e1', paddingRight: '22px' }}
-                            value={row.width || ''}
+                            value={String(row.width || '').replace(/"/g, '')}
                             onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
                           >
                             <option value="">Select...</option>
@@ -1475,7 +1467,7 @@ export default function PurchaseOrderForm({
                           />
                         )
                       ) : (
-                        <div className="text-start text-dark">{row.width ? `${row.width}"` : '—'}</div>
+                        <div className="text-start text-dark">{row.width ? `${String(row.width).replace(/"/g, '')}"` : '—'}</div>
                       )}
                     </td>
 

@@ -211,8 +211,8 @@ export default function FabricMasterView({
       name: formData.qualityName,
       widths: currentWidths,
       gsm: Number(formData.gsm) || null,
-      defaultShrinkage: isGreige ? (Number(formData.defaultShrinkage) || 0) : 0,
-      shrinkage: isGreige ? (Number(formData.defaultShrinkage) || 0) : 0,
+      defaultShrinkage: Number(formData.defaultShrinkage) || 0,
+      shrinkage: Number(formData.defaultShrinkage) || 0,
       active: formData.active !== false
     };
 
@@ -351,16 +351,9 @@ export default function FabricMasterView({
                             });
                             return;
                           }
-                          const isNewGreige = Boolean(
-                            newType &&
-                            (newType.toLowerCase().includes('greige') ||
-                             newType.toLowerCase().includes('grey') ||
-                             newType.toLowerCase().includes('undyed'))
-                          );
                           setFormData({
                             ...formData,
-                            fabricType: newType,
-                            defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
+                            fabricType: newType
                           });
                           if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
                         }}
@@ -456,13 +449,7 @@ export default function FabricMasterView({
                   <div className="col-6">
                     <div className="d-flex align-items-center justify-content-between mb-1">
                       <label className="form-label fs-12 fw-semibold mb-0">Default Shrinkage %</label>
-                      {formData.fabricType ? (
-                        isGreige ? (
-                          <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Greige Only</span>
-                        ) : (
-                          <span className="badge bg-secondary-subtle text-secondary border fs-10 px-1.5 py-0.5">Processed (0%)</span>
-                        )
-                      ) : null}
+                      <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Allowance</span>
                     </div>
                     <div className="input-group input-group-sm">
                       <input
@@ -470,26 +457,15 @@ export default function FabricMasterView({
                         step="0.1"
                         min="0"
                         max="30"
-                        placeholder={isGreige ? "e.g. 3.5" : ""}
-                        disabled={!isGreige}
-                        className={`form-control form-control-sm no-spinner ${
-                          !isGreige ? 'bg-light text-muted cursor-not-allowed' : 'bg-white'
-                        }`}
+                        placeholder="e.g. 3.5"
+                        className="form-control form-control-sm bg-white no-spinner"
                         value={formData.defaultShrinkage || ''}
                         onChange={(e) => setFormData({ ...formData, defaultShrinkage: e.target.value })}
                       />
                       <span className="input-group-text bg-light text-muted fs-12">%</span>
                     </div>
-                    <div className="form-text fs-11 mt-1">
-                      {isGreige ? (
-                        <span className="text-success">
-                          <i className="ti ti-check me-1"></i>Shrinkage allowed for greige fabric (shrinks after processing).
-                        </span>
-                      ) : (
-                        <span className="text-muted">
-                          <i className="ti ti-info-circle me-1"></i>Shrinkage allowed is only for greige fabrics. For processed fabric, allowance is 0%.
-                        </span>
-                      )}
+                    <div className="form-text fs-11 mt-1 text-muted">
+                      <i className="ti ti-info-circle me-1"></i>Shrinkage percentage allowance for fabric processing.
                     </div>
                   </div>
 
@@ -596,14 +572,6 @@ export default function FabricMasterView({
                   {filteredFabrics.length} of {fabricList.length} Qualities
                 </span>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm d-flex align-items-center gap-1 px-3 py-1 fw-semibold rounded-3 shadow-sm"
-                onClick={handleOpenNew}
-              >
-                <i className="ti ti-plus fs-14"></i>
-                <span>New Fabric</span>
-              </button>
             </div>
 
             {/* Clean Top Search & Filter Bar */}
@@ -844,16 +812,9 @@ export default function FabricMasterView({
                                   });
                                   return;
                                 }
-                                const isNewGreige = Boolean(
-                                  newType &&
-                                  (newType.toLowerCase().includes('greige') ||
-                                   newType.toLowerCase().includes('grey') ||
-                                   newType.toLowerCase().includes('undyed'))
-                                );
                                 setFormData({
                                   ...formData,
-                                  fabricType: newType,
-                                  defaultShrinkage: isNewGreige ? (formData.defaultShrinkage || '') : ''
+                                  fabricType: newType
                                 });
                                 if (formErrors.fabricType) {
                                   setFormErrors((prev) => ({ ...prev, fabricType: null }));
@@ -967,13 +928,7 @@ export default function FabricMasterView({
                     <div className="col-6">
                       <div className="d-flex align-items-center justify-content-between mb-1">
                         <label className="form-label fs-12 fw-semibold mb-0">Default Shrinkage %</label>
-                        {formData.fabricType ? (
-                          isGreige ? (
-                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Greige Only</span>
-                          ) : (
-                            <span className="badge bg-secondary-subtle text-secondary border fs-10 px-1.5 py-0.5">Processed (0%)</span>
-                          )
-                        ) : null}
+                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 px-1.5 py-0.5">Allowance</span>
                       </div>
                       {isEditing ? (
                         <>
@@ -983,11 +938,8 @@ export default function FabricMasterView({
                               step="0.1"
                               min="0"
                               max="30"
-                              placeholder={isGreige ? "e.g. 3.5" : ""}
-                              disabled={!isGreige}
-                              className={`form-control form-control-sm no-spinner ${
-                                !isGreige ? 'bg-light text-muted cursor-not-allowed' : 'bg-white'
-                              }`}
+                              placeholder="e.g. 3.5"
+                              className="form-control form-control-sm bg-white no-spinner"
                               value={formData.defaultShrinkage || ''}
                               onChange={(e) =>
                                 setFormData({ ...formData, defaultShrinkage: e.target.value })
@@ -995,25 +947,17 @@ export default function FabricMasterView({
                             />
                             <span className="input-group-text bg-light text-muted fs-12">%</span>
                           </div>
-                          <div className="form-text fs-11 mt-1">
-                            {isGreige ? (
-                              <span className="text-success">
-                                <i className="ti ti-check me-1"></i>Shrinkage allowed for greige fabric (shrinks after processing).
-                              </span>
-                            ) : (
-                              <span className="text-muted">
-                                <i className="ti ti-info-circle me-1"></i>Shrinkage allowed is only for greige fabrics. For processed fabric, allowance is 0%.
-                              </span>
-                            )}
+                          <div className="form-text fs-11 mt-1 text-muted">
+                            <i className="ti ti-info-circle me-1"></i>Shrinkage percentage allowance for fabric processing.
                           </div>
                         </>
                       ) : (
                         <div>
                           <div className="text-dark fs-13 fw-semibold">
-                            {isGreige ? `${formData.defaultShrinkage || 0}%` : '0% (N/A - Processed)'}
+                            {formData.defaultShrinkage ? `${formData.defaultShrinkage}%` : '0%'}
                           </div>
                           <div className="fs-11 text-muted">
-                            {isGreige ? 'Processing shrinkage allowance active' : 'No shrinkage for processed fabric'}
+                            Processing shrinkage allowance configured
                           </div>
                         </div>
                       )}

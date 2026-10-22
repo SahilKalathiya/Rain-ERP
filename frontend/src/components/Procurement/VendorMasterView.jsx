@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
 
+export const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+];
+
 /**
  * VendorMasterView - 3.1 Vendor Master
  * Supports: View Mode by default, Section-wise edit, Column filters, 
@@ -254,8 +264,9 @@ export default function VendorMasterView({
                         onChange={(e) => setColFilters({ ...colFilters, type: e.target.value })}
                       >
                         <option value="">All Types</option>
-                        <option value="Fabric Supplier">Fabric Supplier</option>
-                        <option value="Job Worker">Job Worker</option>
+                        {Array.from(new Set(vendorList.map((v) => v.type).filter(Boolean))).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
                       </select>
                     </th>
                     <th>
@@ -438,15 +449,24 @@ export default function VendorMasterView({
                     <div className="col-6">
                       <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
                       {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
-                        <select
-                          className="form-select form-select-sm bg-white"
-                          value={formData.type || ''}
-                          onChange={(e) => handleTextChange('type', e.target.value)}
-                        >
-                          <option value="">Select Type...</option>
-                          <option value="Fabric Supplier">Fabric Supplier</option>
-                          <option value="Job Worker">Job Worker</option>
-                        </select>
+                        <>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm bg-white"
+                            placeholder="e.g. Fabric Supplier, Job Worker..."
+                            value={formData.type || ''}
+                            onChange={(e) => handleTextChange('type', e.target.value, true)}
+                            list="vendor-type-options"
+                          />
+                          <datalist id="vendor-type-options">
+                            <option value="Fabric Supplier" />
+                            <option value="Job Worker" />
+                            <option value="Dyeing & Printing" />
+                            <option value="Embroidery" />
+                            <option value="Washing" />
+                            <option value="Trims & Accessories" />
+                          </datalist>
+                        </>
                       ) : (
                         <div className="text-secondary fs-13">{formData.type || '—'}</div>
                       )}
@@ -596,16 +616,9 @@ export default function VendorMasterView({
                             onChange={(e) => handleTextChange('state', e.target.value)}
                           >
                             <option value="">Select State</option>
-                            <option value="Gujarat">Gujarat</option>
-                            <option value="Maharashtra">Maharashtra</option>
-                            <option value="Rajasthan">Rajasthan</option>
-                            <option value="Delhi">Delhi</option>
-                            <option value="Karnataka">Karnataka</option>
-                            <option value="Tamil Nadu">Tamil Nadu</option>
-                            <option value="Punjab">Punjab</option>
-                            <option value="West Bengal">West Bengal</option>
-                            <option value="Haryana">Haryana</option>
-                            <option value="Uttar Pradesh">Uttar Pradesh</option>
+                            {INDIAN_STATES.map((st) => (
+                              <option key={st} value={st}>{st}</option>
+                            ))}
                           </select>
                         ) : (
                           <div className="text-dark fs-13">{formData.state || '-'}</div>

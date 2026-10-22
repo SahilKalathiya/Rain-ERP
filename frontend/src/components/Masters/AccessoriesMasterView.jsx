@@ -12,6 +12,7 @@ import {
   setStoredThreadBrandColors,
   initialArticles
 } from '../../data/salesOrderData';
+import { initialFabrics } from '../../data/procurementData';
 
 const ACCESSORY_CATEGORIES = [
   'Button',
@@ -292,16 +293,77 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     return initialArticles || [];
   });
 
-  const allAvailableFabrics = useMemo(() => {
+  const [masterFabrics, setMasterFabrics] = useState(() => {
     try {
       const stored = getStoredData('raindrop_fabrics_v1', null);
-      if (Array.isArray(stored) && stored.length > 0) {
-        const names = stored.map(f => f.quality || f.qualityName || f.name).filter(Boolean);
-        if (names.length > 0) return Array.from(new Set(names));
-      }
+      if (Array.isArray(stored) && stored.length > 0) return stored;
     } catch (e) {}
-    return FABRIC_QUALITIES;
+    return initialFabrics || [];
+  });
+
+  useEffect(() => {
+    const handleFabricsUpdate = () => {
+      try {
+        const stored = getStoredData('raindrop_fabrics_v1', null);
+        if (Array.isArray(stored) && stored.length > 0) {
+          setMasterFabrics(stored);
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('storage', handleFabricsUpdate);
+    window.addEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+    return () => {
+      window.removeEventListener('storage', handleFabricsUpdate);
+      window.removeEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
+    };
   }, []);
+
+  const formatWidthTag = (w) => {
+    if (w === undefined || w === null || w === '') return '';
+    const clean = String(w).trim().replace(/"/g, '');
+    return clean ? `${clean}"` : '';
+  };
+
+  const getFabricWidths = (qualityName) => {
+    if (!qualityName) return [];
+    const norm = qualityName.trim().toLowerCase();
+    const found = masterFabrics.find(f => 
+      (f.qualityName && f.qualityName.trim().toLowerCase() === norm) ||
+      (f.quality && f.quality.trim().toLowerCase() === norm) ||
+      (f.name && f.name.trim().toLowerCase() === norm)
+    );
+    let wArr = [];
+    if (found) {
+      if (Array.isArray(found.widths) && found.widths.length > 0) {
+        wArr = found.widths;
+      } else if (found.pannaWidth) {
+        wArr = [found.pannaWidth];
+      } else if (found.width) {
+        wArr = [found.width];
+      }
+    }
+    if (wArr.length === 0) {
+      const match = qualityName.match(/(\d{2,3})"/);
+      if (match) {
+        wArr = [match[1]];
+      }
+    }
+    return Array.from(new Set(wArr.map(formatWidthTag).filter(Boolean)));
+  };
+
+  const allAvailableFabrics = useMemo(() => {
+    const names = [];
+    masterFabrics.forEach(f => {
+      const n = f.qualityName || f.quality || f.name;
+      if (n && !names.includes(n)) names.push(n);
+    });
+    if (names.length === 0) {
+      FABRIC_QUALITIES.forEach(q => {
+        if (!names.includes(q)) names.push(q);
+      });
+    }
+    return names;
+  }, [masterFabrics]);
 
   // Thread Suggestion Engine State (Section 8.1)
   const [calcMetres, setCalcMetres] = useState(1100);
@@ -1893,54 +1955,93 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     className="form-select form-select-sm"
                                     value={fe.fabricQuality || ''}
                                     onChange={(e) => {
+                                      const selectedQuality = e.target.value;
+                                      const widthsForFab = getFabricWidths(selectedQuality);
                                       const updated = [...doriEntries];
-                                      updated[idx] = { ...updated[idx], fabricQuality: e.target.value };
+                                      const curSelected = fe.widthSizes || [];
+                                      let newSelectedWidths = curSelected.filter(w =>
+                                        widthsForFab.some(wf => wf.replace(/"/g, '') === String(w).replace(/"/g, ''))
+                                      );
+                                      if (newSelectedWidths.length === 0 && widthsForFab.length === 1) {
+                                        newSelectedWidths = [widthsForFab[0]];
+                                      }
+                                      updated[idx] = {
+                                        ...updated[idx],
+                                        fabricQuality: selectedQuality,
+                                        widthSizes: newSelectedWidths
+                                      };
                                       setFormData({ ...formData, doriFabricEntries: updated });
                                     }}
                                     style={{ height: '38px', borderRadius: '7px' }}
                                   >
                                     <option value="">-- Select Fabric Quality --</option>
-                                    {allAvailableFabrics.map((fq) => (
-                                      <option key={fq} value={fq}>{fq}</option>
-                                    ))}
+                                    {allAvailableFabrics.map((fq) => {
+                                      const wList = getFabricWidths(fq);
+                                      const wLabel = wList.length > 0 ? ` (${wList.join(', ')})` : '';
+                                      return (
+                                        <option key={fq} value={fq}>
+                                          {fq}{wLabel}
+                                        </option>
+                                      );
+                                    })}
                                   </select>
                                 </div>
 
                                 {/* Step 2: Width Size(s) Multi-select Chips */}
                                 <div className="mb-3">
-                                  <label className="form-label text-muted small mb-1 fw-medium">
-                                    Step 2: Width Size(s) <span className="text-danger">*</span>
-                                  </label>
+                                  <div className="d-flex justify-content-between align-items-center mb-1">
+                                    <label className="form-label text-muted small mb-0 fw-medium">
+                                      Step 2: Width Size(s) <span className="text-danger">*</span>
+                                    </label>
+                                    {fe.fabricQuality && (
+                                      <span className="text-muted" style={{ fontSize: '11px' }}>
+                                        {getFabricWidths(fe.fabricQuality).length > 0
+                                          ? `Configured in Master: ${getFabricWidths(fe.fabricQuality).join(', ')}`
+                                          : 'Standard Widths'}
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="d-flex flex-wrap gap-2">
-                                    {STANDARD_WIDTHS.map((w) => {
-                                      const isSelected = selectedWidths.includes(w);
-                                      return (
-                                        <button
-                                          key={w}
-                                          type="button"
-                                          className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold font-monospace ${
-                                            isSelected ? 'btn-primary text-white' : 'btn-outline-secondary bg-white text-dark'
-                                          }`}
-                                          style={{ fontSize: '12px' }}
-                                          onClick={() => {
-                                            const updated = [...doriEntries];
-                                            const curWidths = fe.widthSizes || [];
-                                            const curCons = { ...(fe.consumptions || {}) };
-                                            if (isSelected) {
-                                              const nextWidths = curWidths.filter(x => x !== w);
-                                              delete curCons[w];
-                                              updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
-                                            } else {
-                                              const nextWidths = [...curWidths, w];
-                                              updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
-                                            }
-                                            setFormData({ ...formData, doriFabricEntries: updated });
-                                          }}
-                                        >
-                                          {isSelected ? `✓ ${w}` : `+ ${w}`}
-                                        </button>
-                                      );
-                                    })}
+                                    {(() => {
+                                      const availableWidths = getFabricWidths(fe.fabricQuality);
+                                      const displayWidths = availableWidths.length > 0 ? availableWidths : STANDARD_WIDTHS;
+                                      return displayWidths.map((w) => {
+                                        const cleanW = String(w).replace(/"/g, '');
+                                        const isSelected = selectedWidths.some(
+                                          (sw) => String(sw).replace(/"/g, '') === cleanW
+                                        );
+                                        return (
+                                          <button
+                                            key={w}
+                                            type="button"
+                                            className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold font-monospace ${
+                                              isSelected ? 'btn-primary text-white' : 'btn-outline-secondary bg-white text-dark'
+                                            }`}
+                                            style={{ fontSize: '12px' }}
+                                            onClick={() => {
+                                              const updated = [...doriEntries];
+                                              const curWidths = fe.widthSizes || [];
+                                              const curCons = { ...(fe.consumptions || {}) };
+                                              if (isSelected) {
+                                                const nextWidths = curWidths.filter(
+                                                  (x) => String(x).replace(/"/g, '') !== cleanW
+                                                );
+                                                delete curCons[w];
+                                                delete curCons[cleanW];
+                                                delete curCons[`${cleanW}"`];
+                                                updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
+                                              } else {
+                                                const nextWidths = [...curWidths, w];
+                                                updated[idx] = { ...updated[idx], widthSizes: nextWidths, consumptions: curCons };
+                                              }
+                                              setFormData({ ...formData, doriFabricEntries: updated });
+                                            }}
+                                          >
+                                            {isSelected ? `✓ ${w}` : `+ ${w}`}
+                                          </button>
+                                        );
+                                      });
+                                    })()}
                                   </div>
                                 </div>
 
@@ -2045,9 +2146,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 style={{ height: '36px', borderRadius: '6px' }}
                               >
                                 <option value="">-- Select Associated Fabric --</option>
-                                {allAvailableFabrics.map((fq) => (
-                                  <option key={fq} value={fq}>{fq}</option>
-                                ))}
+                                {allAvailableFabrics.map((fq) => {
+                                  const wList = getFabricWidths(fq);
+                                  const wLabel = wList.length > 0 ? ` (${wList.join(', ')})` : '';
+                                  return (
+                                    <option key={fq} value={fq}>{fq}{wLabel}</option>
+                                  );
+                                })}
                               </select>
                             </div>
                             <div className="col-md-2">
@@ -2196,9 +2301,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 style={{ height: '36px', borderRadius: '6px' }}
                               >
                                 <option value="">-- Select Associated Fabric --</option>
-                                {allAvailableFabrics.map((fq) => (
-                                  <option key={fq} value={fq}>{fq}</option>
-                                ))}
+                                {allAvailableFabrics.map((fq) => {
+                                  const wList = getFabricWidths(fq);
+                                  const wLabel = wList.length > 0 ? ` (${wList.join(', ')})` : '';
+                                  return (
+                                    <option key={fq} value={fq}>{fq}{wLabel}</option>
+                                  );
+                                })}
                               </select>
                             </div>
                             <div className="col-md-2">

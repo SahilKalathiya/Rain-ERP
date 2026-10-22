@@ -242,8 +242,10 @@ export default function GRNForm({
     formData.status === 'QC Rejected' ||
     formData.status === 'Pending Admin Approval'
   );
-
   const isLinkedFromPO = Boolean(grn && ((grn.linkedPOs && grn.linkedPOs.length > 0) || grn.poId));
+
+  // Visual save feedback per bale
+  const [savedBaleMap, setSavedBaleMap] = useState({});
 
   // Current active PO
   const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : purchaseOrders[0]) || null;
@@ -604,9 +606,21 @@ export default function GRNForm({
 
     if (onSaveGRN) {
       onSaveGRN(payload, false);
-      const totalCount = (formData.bales || []).length;
-      const configuredCount = (formData.bales || []).filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
-      showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${totalMetersEntered}m entered)`, 'success');
+      if (specificBaleIdx !== null && specificBaleIdx !== undefined) {
+        const targetBale = formData.bales[specificBaleIdx];
+        const bNo = targetBale?.baleNo || (specificBaleIdx + 1);
+        const pLen = (targetBale?.pieces || []).length;
+        const bTot = targetBale?.totalLength || 0;
+        setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
+        showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
+        setTimeout(() => {
+          setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: false }));
+        }, 3000);
+      } else {
+        const totalCount = (formData.bales || []).length;
+        const configuredCount = (formData.bales || []).filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
+        showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${totalMetersEntered}m entered)`, 'success');
+      }
     }
   };
 
@@ -1117,14 +1131,30 @@ export default function GRNForm({
                     </div>
 
                     {!isQcActioned && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link text-danger p-0 fs-13 text-decoration-none fw-semibold d-inline-flex align-items-center gap-1.5"
-                        onClick={() => handleRemoveBale(bIdx)}
-                      >
-                        <i className="ti ti-trash fs-14"></i>
-                        <span>Remove Bale</span>
-                      </button>
+                      <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
+                          style={{
+                            backgroundColor: savedBaleMap[bIdx] ? '#10b981' : '#7c3aed',
+                            borderColor: savedBaleMap[bIdx] ? '#10b981' : '#7c3aed',
+                            fontSize: '12.5px'
+                          }}
+                          onClick={() => handleSaveSingleBale(bIdx)}
+                          title={`Save Bale ${bale.baleNo || bIdx + 1}`}
+                        >
+                          <i className={`ti ${savedBaleMap[bIdx] ? 'ti-check' : 'ti-device-floppy'}`} style={{ fontSize: '15px' }}></i>
+                          <span>{savedBaleMap[bIdx] ? 'Saved' : 'Save'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-link text-muted p-1"
+                          onClick={() => handleRemoveBale(bIdx)}
+                          title="Remove Bale"
+                        >
+                          <i className="ti ti-trash text-danger" style={{ fontSize: '16px' }}></i>
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1237,23 +1267,9 @@ export default function GRNForm({
                         <span className="fs-12 fw-semibold text-dark text-uppercase" style={{ letterSpacing: '0.04em' }}>
                           Piece-Wise Length (Meters)
                         </span>
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="fs-11 text-muted fw-medium">
-                            {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured
-                          </span>
-                          {!isQcActioned && (
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-white border shadow-sm d-inline-flex align-items-center gap-1.5 px-3 py-1 fs-12 fw-semibold text-primary rounded-2"
-                              style={{ borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}
-                              onClick={() => handleSaveSingleBale(bIdx)}
-                              title={`Save progress for Bale ${bale.baleNo || bIdx + 1}`}
-                            >
-                              <i className="ti ti-device-floppy fs-14" style={{ color: '#5b47fb' }}></i>
-                              <span>Save Bale {bale.baleNo || bIdx + 1}</span>
-                            </button>
-                          )}
-                        </div>
+                        <span className="fs-11 text-muted fw-medium">
+                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured
+                        </span>
                       </div>
 
                       {!bale.pieces || bale.pieces.length === 0 ? (
@@ -1288,26 +1304,6 @@ export default function GRNForm({
                               </div>
                             );
                           })}
-
-                          {!isQcActioned && (
-                            <div className="d-flex align-items-center" style={{ height: '62px' }}>
-                              <button
-                                type="button"
-                                className="btn btn-sm d-inline-flex align-items-center gap-1.5 px-3 py-2 fs-12 fw-semibold rounded-2 shadow-sm"
-                                style={{
-                                  height: '36px',
-                                  borderColor: '#5b47fb',
-                                  backgroundColor: '#5b47fb',
-                                  color: '#ffffff'
-                                }}
-                                onClick={() => handleSaveSingleBale(bIdx)}
-                                title={`Save Bale ${bale.baleNo || bIdx + 1}`}
-                              >
-                                <i className="ti ti-device-floppy fs-14"></i>
-                                <span>Save Bale</span>
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>

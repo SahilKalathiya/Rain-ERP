@@ -67,27 +67,44 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
     }
   }, [initialChallan]);
 
+  // Helper: Match PO by id, po_number, or formatted reference string
+  const isPOMatched = (po, idOrRef) => {
+    if (!po || !idOrRef) return false;
+    const target = String(idOrRef).trim().toLowerCase();
+    const poId = String(po.id || '').trim().toLowerCase();
+    const poNum = String(po.po_number || '').trim().toLowerCase();
+    const poClean = poNum.replace(/\D/g, '');
+    const targetClean = target.replace(/\D/g, '');
+
+    if (poId === target || poNum === target) return true;
+    if (target === `ppo-${poNum}` || poId === `ppo-${targetClean}`) return true;
+    if (poClean && targetClean && poClean === targetClean) return true;
+    return false;
+  };
+
   // Auto-carry Vendor, Styles, and Stock items when PO is selected
   useEffect(() => {
     if (!isEmergencyDispatch && selectedPOs.length > 0) {
       const selectedPOObjects = availablePOs.filter(p =>
-        selectedPOs.some(id => id === p.id || id === p.po_number || id === `PPO-${p.po_number}` || String(id).includes(p.po_number) || String(p.id).includes(id))
+        selectedPOs.some(ref => isPOMatched(p, ref))
       );
       if (selectedPOObjects.length > 0) {
         const firstPO = selectedPOObjects[0];
-        setVendorId(prev => prev || firstPO.vendor_id || '');
-        setVendorName(prev => prev || firstPO.vendor_name || '');
+        if (firstPO.vendor_id) setVendorId(firstPO.vendor_id);
+        if (firstPO.vendor_name) setVendorName(firstPO.vendor_name);
 
         const allStyles = [];
         selectedPOObjects.forEach(p => {
           if (Array.isArray(p.style_names)) {
             p.style_names.forEach(s => {
-              if (!allStyles.includes(s)) allStyles.push(s);
+              if (s && !allStyles.includes(s)) allStyles.push(s);
             });
           }
         });
         setStylesInfo(allStyles);
-        setCustomerBrand(prev => prev || firstPO.customer_brand_name || '');
+        if (firstPO.customer_brand_name) {
+          setCustomerBrand(firstPO.customer_brand_name);
+        }
 
         // Auto-populate items if currently empty
         setItems(prevItems => {
@@ -132,11 +149,13 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
   }, [selectedPOs, isEmergencyDispatch, availablePOs]);
 
   // Toggle PO selection
-  const togglePOSelection = (poId) => {
-    if (selectedPOs.includes(poId)) {
-      setSelectedPOs(selectedPOs.filter(p => p !== poId));
+  const togglePOSelection = (po) => {
+    const poKey = po.po_number || po.id;
+    const isAlreadySelected = selectedPOs.some(ref => isPOMatched(po, ref));
+    if (isAlreadySelected) {
+      setSelectedPOs(selectedPOs.filter(ref => !isPOMatched(po, ref)));
     } else {
-      setSelectedPOs([...selectedPOs, poId]);
+      setSelectedPOs([...selectedPOs, poKey]);
     }
   };
 
@@ -284,7 +303,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4">
 
-          {/* SECTION 1: PROCESS PO LINKAGE & DISPATCH MODE */}
+          {/* PROCESS PO LINKAGE & CHALLAN DETAILS */}
           <div
             className="card mb-4 shadow-none"
             style={{
@@ -296,7 +315,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
           >
             <div className="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
               <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
-                1. PROCESS PO LINKAGE &amp; DISPATCH MODE
+                Process PO Linkage &amp; Challan Details
               </span>
               <div className="form-check form-switch mb-0">
                 <input
@@ -316,14 +335,14 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
             </div>
 
             {isEmergencyDispatch ? (
-              <div className="alert alert-danger py-2 px-3 mb-0 fs-12 d-flex align-items-center gap-2 rounded-2">
+              <div className="alert alert-danger py-2 px-3 mb-3 fs-12 d-flex align-items-center gap-2 rounded-2">
                 <i className="ti ti-alert-triangle fs-16"></i>
                 <span>
                   <strong>Emergency Dispatch (Pending PO Link):</strong> Goods will leave godown immediately without a PO. You can link a PO retrospectively.
                 </span>
               </div>
             ) : (
-              <div>
+              <div className="mb-3 pb-3 border-bottom">
                 <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
                   Select Process PO(s) <span className="text-danger">*</span>
                 </label>
@@ -334,14 +353,12 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
                 ) : (
                   <div className="d-flex flex-wrap gap-2">
                     {availablePOs.map((po) => {
-                      const isSelected = selectedPOs.some(
-                        id => id === po.id || id === po.po_number || id === `PPO-${po.po_number}` || String(id).includes(po.po_number) || String(po.id).includes(id)
-                      );
+                      const isSelected = selectedPOs.some(ref => isPOMatched(po, ref));
                       return (
                         <button
                           type="button"
-                          key={po.id}
-                          onClick={() => togglePOSelection(po.id)}
+                          key={po.id || po.po_number}
+                          onClick={() => togglePOSelection(po)}
                           className={`btn btn-sm d-flex align-items-center gap-1.5 rounded-2 px-3 py-1.5 transition-all ${
                             isSelected
                               ? 'btn-primary text-white shadow-xs'
@@ -373,23 +390,6 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
                 )}
               </div>
             )}
-          </div>
-
-          {/* SECTION 2: CHALLAN DETAILS & VENDOR */}
-          <div
-            className="card mb-4 shadow-none"
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '16px 20px'
-            }}
-          >
-            <div className="border-bottom pb-2 mb-3">
-              <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
-                2. CHALLAN DETAILS &amp; VENDOR
-              </span>
-            </div>
 
             <div className="row g-3">
               {/* Challan No */}
@@ -504,7 +504,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
             </div>
           </div>
 
-          {/* SECTION 3: STOCK ALLOCATION (BALES / ROLLS DISPATCH) */}
+          {/* STOCK ALLOCATION (BALES / ROLLS DISPATCH) */}
           <div
             className="card mb-4 shadow-none"
             style={{
@@ -516,7 +516,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
           >
             <div className="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
               <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
-                3. STOCK ALLOCATION (BALES / ROLLS DISPATCH)
+                Stock Allocation (Bales / Rolls Dispatch)
               </span>
 
               {/* Single '+' button (Fixed double '+' bug from image 2) */}
@@ -715,7 +715,7 @@ export default function ProcessChallanForm({ availablePOs = [], onSave, onCancel
           >
             <div className="border-bottom pb-2 mb-3">
               <span className="fw-bold text-secondary text-uppercase fs-12" style={{ letterSpacing: '0.05em' }}>
-                4. DISPATCH REMARKS
+                Dispatch Remarks &amp; Instructions
               </span>
             </div>
             <textarea

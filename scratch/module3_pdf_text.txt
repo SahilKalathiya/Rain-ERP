@@ -1,0 +1,646 @@
+Raindrop Garments
+Order & Stock Management System
+Process PO — Job Work Procurement Module
+Final Requirements & Business Rules
+Final document for the initial production / development stage of this module.
+
+-- 1 of 32 --
+
+1. Overview & Scope
+This document covers what happens after a Sales Order's fabric requirement is known and the fabric needs to go out
+to a job-work vendor for dyeing, printing, or embroidery: the Process PO, the Process Challan that physically
+dispatches the fabric, the vendor's return, and the Quality Control / lot-division logic that closes the loop. It merges
+the original walkthrough, the follow-up additions, and today's final approval — covering the detailed search-
+narrowing, ordering, quantity, costing, stock-allocation, and QC rules — into one production-ready specification. It
+follows the same structure as every other module document already issued: each functional area has its own Data
+Structure and Functional Points, edge cases are covered section by section, and portal-wide rules are collected once
+at the end.
+This document assumes the Sales Order Masters and the Order Detail Form already exist as documented separately,
+and that Route 2 (Raw Material Procurement) already covers buying fresh fabric and its own QC. This module is the
+other path: processing fabric that is already in the Stock Pool.
+In scope:
+• Process PO — flexible any-direction creation, search narrowing, order-linked vs standalone, quantity and costing
+engine
+• Process Challan — dispatch to vendor, stock allocation (bale/roll selection, FIFO, folding), challans without a PO
+• Vendor Return / Inbound Processing GRN — vendor identification, piece-wise entry, grey fabric returns
+• Quality Control, defect management, and lot/piece division on return
+• Required / Sent / Received / Pending live tracking
+• Printing, signatures, and audit history for all of the above
+Out of scope for this document (documented separately):
+• The Sales Order Masters and Order Detail Form
+• Raw Material Procurement (buying fresh fabric), its own GRN and QC — Route 2
+• Cutting, stitching, finishing, and dispatch — future modules
+
+-- 2 of 32 --
+
+2. Process Flow
+The two charts below are native, editable Word diagrams, using the same shape convention as every other flow chart
+in this project: rounded boxes are start/end points, rectangles are process steps, diamonds are decision points, red
+boxes are a rejected/scrapped outcome. Click any shape to select it, double-click to edit its wording, or drag to move
+or resize.
+
+-- 3 of 32 --
+
+Style, Article, or Fabric picked first
+(any order) — system fetches matching Sales Order data
+Consumption shown: Required vs Already Received,
+for immediate cross-check
+Link to a Sales Order,
+or create a standalone PO?
+Search narrows automatically:
+styles → fabrics → colours → articles
+Full master data available — pick any
+style/article/fabric/colour manually
+One PO bundles multiple articles/colours/styles
+for the same vendor
+Quantity entered by fabric metres (auto-computes pieces)
+or by garment pieces (auto-computes metres) — shrinkage/width applied
+Rate + dyeing cost entered/recommended;
+sample photo attached (camera or file)
+Process PO saved
+Process Challan created — stock allocated by FIFO /
+single-batch rule, bale/piece selected, folding allowance applied
+Stock Pool reduced — marked “Out for Processing”
+Vendor Return recorded — piece-wise meterage,
+any grey fabric return logged as an Open Bale
+Quality Control performed
+QC Outcome?
+Good → added to
+Stock Pool Reprocess → new
+Process PO for that portion
+Scrap / direct
+reject to stock
+Order-linked Standalone
+Good Reprocess Scrap
+
+-- 4 of 32 --
+
+2.1 Process PO Lifecycle. A PO can start from Style, Article, or Fabric — whichever is most natural — and can
+be linked to a Sales Order (narrowing the search automatically) or created standalone (full master access).
+From there it flows through quantity/rate entry, dispatch via a Process Challan, the vendor's return, and
+Quality Control, with a rejected portion simply restarting the cycle on a fresh PO.
+
+-- 5 of 32 --
+
+Quality Control on a vendor return has its own branching logic, shown here exactly as walked through with the client.
+2.2 QC, Defect & Lot Division Workflow. Inbound goods are either fully rejected (reprocessed via a fresh Job
+Work Challan, or scrapped) or accepted — and accepted goods can be split by piece (stitch cuts, feeding
+cutting-room planning) or grouped by lot/batch (shade variance, kept strictly isolated in the cutting room).
+Inbound Received Goods
+Full Rejection, or
+Accepted Goods?
+Reprocess, or
+Scrap?
+Piece Division, or
+Lot/Batch Division?
+Send for Reprocessing
+(Job Work Challan) — no new
+payment; stays in the loop
+until final QC
+Scrap / Direct
+Reject to Stock Piece Division (Stitch Cuts)
+e.g. 63.1 m → 30 m + 33.1 m;
+feeds cutting room planning
+Lot/Batch Division (Shade Variance)
+Batch 1 vs Batch 2 — cutting room
+treats lots as isolated, no mixing
+Ready for Stock / Cutting Room
+Full Rejection
+Accepted
+Reprocess Scrap Piece Division Lot Division
+
+-- 6 of 32 --
+
+3. Process PO Module
+A Process PO records what is being sent out for job work — which fabric, in which colour(s), to which vendor, and at
+what rate. It is deliberately flexible: one PO can cover a single colour of a single style, or bundle multiple colours,
+styles, and fabrics together, however makes sense for the vendor and the shipment.
+3.1 Data Structure
+Field Type Mandatory Notes
+PO Number Auto (system generated) or entered Yes Unique per PO
+Date Date Yes Unique per PO; creation date
+Issue Date Date No May differ from creation date
+Vendor Reference — Vendor Master Yes Job-work vendor; inline creation
+available
+Linked Sales Order Reference — Sales Order, optional No Absent for a standalone PO
+Style Name(s) Reference, one or more Yes A PO can serve multiple styles at once
+Number of Styles for this PO Number (1 or 2+) Yes Drives how many Style input boxes
+open, and their display order
+Line Item – Fabric Quality Reference — Fabric Master Yes Narrowed to fabrics used by the
+selected style(s) when order-linked
+Line Item – Colour Reference — Color Master Yes Narrowed to colours used by the
+selected fabric/style
+Line Item – Article Reference — Article Master Yes Narrowed to articles used by the
+selected style
+Line Item – Width Reference — Fabric's saved widths Yes
+Line Item – Quantity (Metres) Decimal, auto or manual Yes Entering this auto-computes pieces —
+see 3.2
+Line Item – Quantity (Pieces) Decimal, auto or manual Yes Entering this auto-computes metres —
+see 3.2
+Line Item – Fabric Rate (per
+Metre) Decimal Yes Varies by width
+Line Item – Dyeing/Job Work
+Rate (per Metre)
+Decimal, manual entry with auto-
+recommendation Yes Varies by width and process
+Line Item – Total Actual Cost Decimal, auto Auto = Fabric Purchase Rate + Dyeing/Job
+Work Rate, per metre
+Line Item – Remarks / Sample
+Reference Text No
+Line Item – Sample Photo Image, via Camera or File Chooser No Kept in the digital record only — not
+printed on the physical PO
+Line Item Status Auto (Not Ordered / Already Ordered
+/ Partially Ordered) Auto See Section 3.2
+
+-- 7 of 32 --
+
+Field Type Mandatory Notes
+Customer Name / Brand Name Text, optional reference No As used on the client's paper format
+Delivery Date Date No Expected date the processed fabric
+should be ready
+Terms Text (multiline) No
+e.g. “Goods must be strictly as per
+sample and specification, within
+stipulated date”
+Created By Auto (current logged-in user) Auto See Section 9
+Created / Modified Date Auto Auto Feeds the Activity History — Section
+13.4
+
+-- 8 of 32 --
+
+3.2 Functional Points
+PO Parameters & Search Narrowing
+• PO Number, Date, and Issue Date are entered or generated up front.
+• The user is asked how many styles this PO covers (one, or more); that count determines how many Style input
+boxes open, each a searchable dropdown, and the user sets which style displays on top or bottom.
+• Selecting styles narrows every subsequent selection automatically: only fabric qualities actually used by the
+selected style(s) are offered — e.g. selecting 2 qualities in one style and 2 in another shows only those 4, even if
+the fabric master holds 50.
+• Selecting fabric then narrows the colour list to colours actually ordered in that fabric, and selecting colour
+narrows the article list the same way. Each step only ever shows what's genuinely relevant.
+Ordering Logic & Selection Flow
+• When a style is selected, the system shows what's available to order within that style, so the user picks directly
+from what's real rather than free-typing.
+• For a multi-style PO, each selected style's full display appears in turn (style 1, then style 2), and the user then
+chooses which specific items across both to actually place on this PO.
+Order-Linked vs Non-Order POs
+• A “Do not link to order” option is always available when starting a PO.
+• With no order link, all fabrics, colours, and widths in the master data are available for manual selection — useful
+for building up general stock rather than fulfilling a specific customer order; once dyed, that stock goes straight
+into the Stock Pool.
+• When linked to an order, creating a PO opens directly with all details auto-populated from the order — no extra
+intermediate steps.
+• Whatever is selected, a running summary is shown below the form listing Colour, Fabric Quality & Width, Article,
+and Style Name together for the whole PO.
+Handling Partially Ordered Quantities & Already-Ordered Items
+• Each selectable item (e.g. a specific colour of Kurta) carries its own Select button so items can be picked one at a
+time.
+• Once a fabric+colour has been fully ordered on a previous PO, it is flagged “Already Ordered” and can no longer
+be selected — it stays visible in the list for reference, but is locked from further action unless the colour itself
+changes.
+• A partially fulfilled item (half ordered, half still pending) reflects that partial status in the list and can still be
+selected for the remaining pending portion.
+
+-- 9 of 32 --
+
+Quantity Calculations (Garments vs Fabric)
+• Quantity can be entered either way: enter fabric metres and the system computes the number of garments, or
+enter the number of garment pieces and the system computes the fabric metres required, using the pre-set
+consumption-per-piece formula.
+• Worked example: at 2.60 m required per piece, 525 m of available fabric yields 525 ÷ 2.60 = 201.9, rounded
+down to 201 pieces — if the order calls for 300 pieces, the PO is still created for 201, matching what the fabric
+actually allows.
+• Worked example in the other direction: entering 200 pieces calculates 200 × 2.6 = 520 metres of fabric needed
+for the PO.
+• The formula factors in fabric shrinkage automatically, based on the fabric quality's own shrinkage percentage —
+e.g. needing 2.5 m of ready/dyed fabric at a given width, with a 4% shrinkage allowance, automatically
+determines the raw (grey) fabric quantity required.
+Rates, Dyeing Costs & Sample Photos
+• A Fabric Rate column is included on the PO; rates vary by width and by the specific processing type (e.g. dyeing
+rate for Width A = ₹10/m, Width B = ₹12/m, Width C = ₹15/m).
+• Total Actual Cost = Fabric Purchase Rate per Metre + Dyeing/Job Work Rate per Metre, calculated upfront so
+different width/vendor options can be compared for cost-effectiveness before the PO is finalised.
+• Since different dye houses quote different rates, the Dyeing/Job Work Rate field supports manual entry, with an
+auto-recommendation button offered alongside it.
+• Sample photos can be attached via either Camera Capture or File Chooser — useful for keeping a record of a
+signed fabric swatch — and are kept in the digital record only, never printed on the physical PO.
+Flexible Any-Direction Creation
+• A user can start a PO from the Style, the Article, or the Fabric — whichever is most natural for that moment.
+Whichever is picked first, the system fetches the matching Sales Order data and auto-fills the rest.
+• The moment a PO is opened from a Sales Order, the consumption reference figures — total required, and how
+much has already been received — are shown auto-populated, so the person creating the PO can cross-check
+immediately rather than looking the numbers up elsewhere.
+• One PO can bundle multiple articles: if Kurta and Pyjama of the same style need to go for processing together, in
+the same colour or different colours, a single PO can carry all of it rather than forcing one PO per article.
+• When a PO is not linked to any Sales Order, full master data — every style, article, colour, and fabric on file — is
+available for free selection, exactly as today.
+📷 Process PO —
+
+-- 10 of 32 --
+
+
+
+-- 11 of 32 --
+
+
+
+-- 12 of 32 --
+
+4. Process Challan Module
+The Process Challan is the packing list that physically travels with the fabric to the vendor. It is a separate document
+from the PO, created after the PO(s) it covers already exist — a Challan cannot exist standalone under normal
+circumstances (see Section 4.3 for the emergency exception).
+4.1 Data Structure
+Field Type Mandatory Notes
+Challan Number Auto (system generated) Auto Unique
+Linked PO Number(s) Reference — Process PO, multi-select Yes* One or many; *not required for an
+emergency Challan, see 4.3
+Date Date Yes Date of dispatch
+Vendor Auto-carried from the linked PO(s) Auto
+Style / Customer / Brand Auto-carried from the linked PO(s) Auto
+Bale/Roll Reference Reference — warehouse stock, per
+PO/colour Yes Invoice Number + Bale/Roll
+Number — see 4.2
+Selected Pieces (if partial) Reference, multi-select within a bale No A bale need not be sent in full —
+specific pieces can be chosen
+Folding Notation Text, e.g. “L100” No Recorded against the batch
+Grand Total Decimal, auto Auto Sum of all bale/piece lines
+Remarks / Notes Text (multiline) No Available on every module — see
+Section 13
+PO Link Status Auto (Linked / Pending PO Link) Auto Flagged red when created without
+a PO — see 4.3
+Receiver Signature / Company
+Representative Print fields N/A See Section 9
+Created By / Created Date Auto Auto Feeds the Activity History —
+Section 13.4
+
+-- 13 of 32 --
+
+4.2 Functional Points
+Challan-to-PO Linking & Stock Impact
+• A Challan references the PO Number it dispatches against (e.g. PO #7611: 525 m of 100x100 Voile in Beige).
+• One Challan can bundle one or many Process POs — even across different colours, styles, and fabrics — as long
+as they're going to the same vendor in the same shipment.
+• The moment a Process Challan is created and the fabric physically leaves, the corresponding quantity is
+deducted from the Stock Pool and tracked as “Out for Processing” against that vendor until it's returned.
+Bale & Roll Selection Logic
+• Selecting a fabric quality (e.g. 100x100 Voile) displays all matching GRNs and unutilised stock currently in the
+warehouse for that quality.
+• Warehouse stock is stored in Bales/Rolls/Thans with unique Invoice Numbers and Bale Numbers; the system
+shows the available breakdown by Invoice Number and Bale/Roll Number (e.g. Invoice #1 has 4 bales of specific
+meterages).
+• Selecting exact bales tells the godown in-charge precisely which bale to dispatch, removing ambiguity even
+across a 10,000-metre inventory.
+• A bale does not have to be sent in full — specific pieces within it can be selected for this Challan, leaving the rest
+of the bale available for a different Challan or purpose.
+Partial Cuts vs Full Bales
+• Scenario A — Full Roll Dispatch: a large roll (e.g. 400 m) is dispatched whole; after dyeing only part of it (e.g. 280
+m), the remainder returns to stock as part of the Process Return.
+• Scenario B — Cut Pieces: if an order needs 10 m but the smallest available piece is 20 m, the system supports
+either sending the full 20 m piece (processing 10 m, returning 10 m), or cutting 10 m from the 20 m piece before
+dispatch — in which case that specific piece's stock record updates from 20 m to 10 m immediately.
+• Folding allowance: fabric folding measurements (e.g. 98 folds vs 100 folds) affect actual dispatch length, and the
+system accounts for folding percentage variations when calculating dispatch quantities.
+📷 Process Challan —
+
+-- 14 of 32 --
+
+
+
+-- 15 of 32 --
+
+
+
+-- 16 of 32 --
+
+4.3 Challans Without a PO (Emergency Dispatch)
+• If fabric must be dispatched urgently before a PO exists, a Challan can be created without a linked PO.
+• Any such Challan automatically triggers an Admin Approval Alert and is flagged in red as “Pending PO Link” until
+a PO is created and linked to it afterwards.
+4.4 Filters & Automation Rules for Stock Selection
+To simplify stock picking for the godown in-charge, search filters are available based on:
+• Style Name
+• PO Number
+• Date / Priority (FIFO)
+• Fabric Quality & Width
+• Supplier Name
+System rules that drive automatic stock allocation suggestions:
+• Do Not Mix Invoices (Single Batch Rule): the system prioritises fulfilling a requirement from a single
+invoice/batch, since different invoices can be different dye lots with visible colour variation; mixing invoices
+requires explicit user confirmation/override.
+• First-In, First-Out (FIFO): the system recommends older stock first, to prevent fabric degradation and pest
+damage sitting in the warehouse.
+• User-Friendly Automation: the workflow is built to need minimal decision-making from warehouse staff, so a
+new or unskilled operator can follow clear, step-by-step system recommendations without guesswork.
+
+-- 17 of 32 --
+
+5. Vendor Return / Inbound Processing GRN Module
+When processed fabric (dyed or finished) returns to the factory, the vendor provides their own physical challan, in
+their own format. That document is manually entered into the system as a Process Return, linked back to the original
+Challan and PO.
+5.1 Data Structure
+Field Type Mandatory Notes
+Return ID Auto (system generated) Auto Primary key, sequential
+Vendor Reference — Vendor Master Yes
+Vendor's External Challan Number Text Yes
+Identified together with Vendor
+Name to prevent duplicate-number
+clashes across vendors
+Vendor's Challan Date Date Yes
+Vendor's Invoice Number, Date &
+Value Text / Date / Decimal No
+Internal Series Auto (Selling / Job Work) Auto The system maintains distinct
+internal numbering series for each
+Source Document / Linked PO
+Number Reference — Process PO Yes
+Linked Internal Job Work Challan Reference — Process Challan Yes
+Received Date Date Yes When it physically arrived back
+Fabric Quality, Width, Weight,
+Folding Standard Reference / Decimal / Text Yes e.g. Fold 100 vs Fold 98
+Total Quantity (Metres) Decimal, auto Auto Cross-checked against the piece-
+wise grid — see 5.2
+Number of Rolls / Thans / Bales Number, auto Auto Cross-checked against the piece-
+wise grid
+Transport Details (Collapsible) Section — LR Number, LR Date,
+Transport Details No Hidden by default; expands on click
+— see 5.2
+Grey Fabric Returned Decimal (metres) No Logged in a dedicated section —
+see Section 5.3
+Status Auto Auto Feeds into QC exactly as an
+incoming GRN does
+Created By / Created Date Auto Auto Feeds the Activity History —
+Section 13.4
+
+-- 18 of 32 --
+
+5.2 Functional Points
+Vendor Identification & Numbering
+• A return is identified by Vendor Name plus the vendor's own external Challan Number (e.g. Raju Dyeing #2196
+vs. Rahman Dyeing #1004), which prevents duplicate-number collisions across vendors who happen to share the
+same numeric series.
+• The system's own internal numbering keeps Selling and Job Work as two distinct series.
+• Every return links directly to the underlying PO Number and the original Internal Job Work Challan it's returning
+against.
+Collapsible Transport Section
+• Since local processing accounts for the vast majority of transactions, LR Number, LR Date, and Transport Details
+are hidden by default inside a collapsible “Transport Details” panel, expanding only on click — for non-
+local/interstate dispatches where they're actually needed.
+Piece-Wise & Meterage Data Entry
+• Vendors send a summarised total (e.g. 13 thans = 1,477.60 m) alongside a detailed per-piece breakdown; the
+system records individual piece lengths (e.g. 63.10 m, 104.10 m, 184.60 m) and auto-calculates total pieces and
+aggregate meterage to validate against the vendor's stated summary before saving.
+• If a vendor's delivery spans multiple POs, selecting a PO displays all its pending items for quick selection into this
+return.
+📷 Vendor Return Entry —
+
+-- 19 of 32 --
+
+
+
+-- 20 of 32 --
+
+
+
+-- 21 of 32 --
+
+5.3 Grey Fabric / Unprocessed Stock Returns
+• When a vendor returns unutilised grey fabric alongside dyed goods, it's logged on the same receiving screen
+under a dedicated “Grey Fabric Return” section (e.g. Grey Fabric Returned: 40 metres).
+• Vendors often cut/return full or partial rolls without specifying the exact original bale ID; such stock returns as
+an “Open Bale” linked to the original vendor purchase invoice rather than a specific bale number.
+• Multi-Invoice Auto-Resolution: when multiple invoices hold active stock, the system auto-assigns the return to
+the invoice with the largest remaining stock balance.
+• Manual Override: for more complex cases, the system instead prompts the user to select the target invoice
+manually.
+• Audit History: clicking an Open Bale shows its full audit trail — when it was originally issued, cut, sent for
+processing, and returned.
+
+-- 22 of 32 --
+
+6. Quality Control, Defect Management & Lot Splitting
+Every piece undergoes Quality Control on receipt, following the branching shown in the chart in Section 2.2.
+6.1 Data Structure
+Field Type Mandatory Notes
+QC Outcome Auto (Full Rejection / Accepted) Yes First-level branch
+Rejection Action Dropdown — Reprocess / Scrap Conditional Present when QC Outcome =
+Full Rejection
+Reprocessing Job Work Challan Reference — new Process PO/Challan Conditional
+Created directly from this QC
+screen; no new payment
+obligation
+Reprocessing Loop Status Auto (In Loop / Cleared) Auto
+Stays flagged against the
+original PO until it passes final
+QC
+Piece Division Entries Repeatable — original length, split lengths Conditional e.g. 63.10 m split into 30.00 m
++ 33.10 m
+Lot/Batch Assignment Reference — Batch ID Conditional Present when Accepted goods
+are sorted by shade variance
+Paper QC Report Attachment Image No Photo of the inspector's
+handwritten defect log
+Adjusted Yield Number, manual No
+e.g. lowered from 25 to 20
+pieces, based on the attached
+report
+Color Fastness Result Dropdown — Pass / Fail No
+Color Fastness Image Proof Image No e.g. rub/wash test swatch
+
+-- 23 of 32 --
+
+6.2 Functional Points
+A. Reprocessing Workflow
+• A Job Work Challan for reprocessing is issued directly from the receiving QC screen by selecting the specific bad
+pieces (e.g. 3 out of 13 thans).
+• Reprocessing challans do not generate a new payment obligation to the vendor — this is rectification job work,
+not a new order.
+• The item stays flagged in a reprocessing loop linked to the original PO until it passes final QC.
+B. Piece Division (Stitch Cutting)
+• Background: continuous dyeing machines stitch multiple rolls together (e.g. 4 × 400 m = 1,600 m); after drying
+and finishing, the continuous run is cut into manageable pieces (e.g. ~100 m each).
+• The system allows splitting a single received length into multiple physical pieces (e.g. a 63.10 m roll with a
+middle join split into 30.00 m and 33.10 m).
+• The updated piece count feeds directly into cutting-room planning.
+C. Lot / Batch Division (Shade Sorting)
+• Pieces are sorted into distinct shade/colour-variance batches (e.g. Batch 1 for standard shade, Batch 2 for a
+slightly lighter shade).
+• The cutting room treats batches strictly as isolated inventory lots — mixing different lots within the same
+garment run is not permitted.
+D. Digital QC Inspection Reports & Colour Fastness
+• Inspectors write detailed defect logs on paper (e.g. 3 weaving mistakes, 4 dents); the system allows uploading a
+photo of that report against the piece record, so cutting masters can adjust expected yield accordingly (e.g.
+lowering output from 25 pieces to 20).
+• Colour Fastness is recorded as a binary Pass/Fail, together with an attached image of the rub/wash test swatch
+as proof (e.g. a white cloth stained pink).
+📷 QC Screen —
+
+-- 24 of 32 --
+
+
+
+-- 25 of 32 --
+
+
+
+-- 26 of 32 --
+
+7. Required / Sent / Received / Pending Tracking
+Because POs, Challans, and Returns can each happen at different times and in any number, the system keeps a live
+running calculation per order + fabric + colour, so anyone can see at a glance how much of a fabric+colour still needs
+to go for processing, and how much is currently sitting at the vendor waiting to come back.
+• Required, Sent, Received, and Pending figures recalculate live as POs, Challans, and Returns are added —
+regardless of the order they happen in, or how much time passes between them.
+• A PO can be created and only actioned into a Challan much later; the running totals simply catch up whenever
+that happens.
+8. Printing
+Both the Process PO and the Process Challan need a working print option that reproduces the client's existing paper
+layouts — company header, order/challan numbers, the line-item or bale/piece table, auto-calculated totals, terms,
+and signature blocks for both parties. This follows the same approach as the Procurement PO print option already
+built for Route 2.
+
+-- 27 of 32 --
+
+9. System Users & Header Signature Logic
+• Printed Challans and POs carry a “Receiver Signature” line and a “Company Representative Name” line on the
+physical layout.
+• “PO / Challan Created By” auto-populates with the current logged-in user who generated the document.
+• Role Delegation / On-Leave Handling: when login access is shared because someone is on leave, the system logs
+and displays the username of whichever account was actually active at the exact moment of creation, keeping
+the audit trail accurate regardless of temporary delegation.
+10. Flexibility Principles (Explicit Client Requirement)
+• Any number of Process POs can be raised against one order, at any time.
+• Any number of Challans can be raised, each bundling any combination of POs.
+• A vendor can return goods in any number of shipments.
+• A PO can be created and only actioned much later — the running totals simply catch up whenever that happens.
+• If returned fabric isn't right, a fresh Process PO restarts the cycle for just that portion, with nothing special
+needing to be configured to allow it.
+• Every record — PO, Challan, Return — is editable, deletable, and cancellable, at every stage, with the change
+written to the Audit Log.
+11. Structural vs Incremental System Scope Strategy
+The core structural baseline — Procurement, PO, Job Work Challans, Receiving GRN, QC, and Stock Allocation — is
+established and stabilised before final rollout. Smaller enhancements, such as seasonal/quarterly colour series
+tracking or more advanced transport configurations, are treated as optional field extensions to be added during post-
+implementation reviews, so they don't hold up the core delivery schedule.
+
+-- 28 of 32 --
+
+12. Validations, Edge Cases & Challenges
+Covered section by section, in the same order as the modules above.
+12.1 Process PO
+• Search narrowing (style → fabric → colour → article) must update live as each prior selection changes —
+changing the style after a fabric is already picked must re-validate that the fabric still belongs to the new style,
+not silently leave a stale selection.
+• An item flagged “Already Ordered” must remain visible for reference but genuinely unselectable, while a
+“Partially Ordered” item must only allow selection of the remaining pending portion, not the whole original
+quantity again.
+• Switching between fabric-quantity entry and garment-quantity entry on the same line must recalculate the
+other value immediately and consistently — the two must never be allowed to silently disagree.
+• The shrinkage-adjusted grey fabric calculation must always trace back to the specific fabric quality's own
+shrinkage percentage, not a generic default, even when the PO covers multiple fabric qualities in one go.
+• A standalone (non-order-linked) PO must still feed correctly into the same Required/Sent/Received/Pending
+tracking once it's eventually associated with stock movement, even though it started without an order
+reference.
+12.2 Process Challan
+• A Challan bundling multiple POs across different colours or styles must still let each underlying PO's own
+quantities be tracked back individually, not just a combined Challan total.
+• Cutting a piece prior to dispatch (Scenario B, Option 2) must update that exact bale/piece's stock record
+immediately and permanently — the original 20 m record must not still show 20 m once 10 m has been cut and
+dispatched.
+• The “Do Not Mix Invoices” rule must be enforceable but overridable — the system should default to single-batch
+fulfilment and only allow mixing after an explicit user confirmation, never silently.
+• An emergency Challan created without a PO must be impossible to overlook: the red “Pending PO Link” flag and
+the Admin Approval Alert must persist and stay visible until a PO is actually linked, not just at the moment of
+creation.
+
+-- 29 of 32 --
+
+12.3 Vendor Return / Inbound GRN
+• The piece-wise grid total must be validated against the vendor's stated summary total before the return can be
+saved as complete — a mismatch should be flagged for recheck, not silently accepted.
+• A vendor's external Challan Number must be checked for uniqueness only within that specific vendor, since
+different vendors legitimately reuse the same numbering ranges.
+• Multiple partial returns against the same Challan/PO must each be trackable individually while still correctly
+reducing the same underlying “Out for Processing” balance.
+• An Open Bale created from an ambiguous grey fabric return must still resolve to exactly one invoice (auto-
+assigned or manually overridden) — it must never be left attached to more than one invoice at once.
+12.4 QC, Defect Management & Lot Splitting
+• A piece sent into the reprocessing loop must be excluded from normal available-stock counts until it clears final
+QC, so it isn't accidentally counted as available twice.
+• Piece Division must preserve full traceability back to the original received length — splitting 63.10 m into 30.00
+m and 33.10 m must not lose the record that both came from the same original piece.
+• Lot/Batch Division must be enforced at the cutting-room level: the system should actively prevent mixing pieces
+from two different batches into the same cutting run, not merely warn after the fact.
+• A Colour Fastness “Fail” result must route the affected pieces back into the QC rejection branch (Reprocess or
+Scrap) rather than being recorded as a side note with no workflow consequence.
+13. Global Points — Apply Across the Whole Portal
+These rules are not specific to this module — they are the standing behaviour for every screen and every record in
+this portal, already established for the other modules and carried over here unchanged.
+13.1 Remarks & Notes Everywhere
+A Remarks/Notes field is available across every module — POs, Challans, Returns, and Master screens alike — to log
+custom instructions and free-text notes at every stage.
+13.2 Global Search Bar
+A static global search bar sits at the top-right corner of the portal at all times, for platform-wide searching across POs,
+Challans, Returns, and every master.
+13.3 View Mode by Default, with Section-wise Edit
+• Once any record is saved, it always opens in a read-only View Mode by default.
+• Each section of a saved record has its own independent Edit button, alongside an overall page-level Save/Edit.
+
+-- 30 of 32 --
+
+13.4 Activity History & Audit Trail
+Every PO, Challan, Return, and Master record maintains a detailed Activity History, automatically capturing
+date/time, user and role, action type, module, record, field(s) changed, previous and updated values, and remarks,
+for every create, edit, update, approve, reject, delete, or restore.
+13.5 Column-wise Filters
+Every table listing saved records has its own column-header filters, in addition to the global search bar.
+13.6 Time-Bound Editing & Admin Overrides
+Records are freely editable within a defined time window after saving (e.g. 24 to 72 hours); after that window, editing
+requires Admin Approval with a mandatory reason.
+
+-- 31 of 32 --
+
+14. Data Structure Summary
+Entity Key fields Notes
+ProcessPO PO No., Date, Issue Date, Vendor, Style(s), Linked Order
+(optional)
+Line items below; can span multiple
+styles/colours/fabrics
+ProcessPOLine Fabric, Colour, Article, Width, Qty (m/pieces), Rate, Dyeing
+Rate, Sample Photo Belongs to one ProcessPO
+ProcessChallan Challan No., Date, Vendor, Linked PO No.(s), PO Link Status Bundles one or more ProcessPOs into
+one shipment
+ProcessChallanLine Bale/Roll No., selected pieces, metres, PO/Colour ref,
+Folding Belongs to one ProcessChallan
+ProcessReturn Vendor Challan No./Date, linked Challan/PO, Received
+Date, Transport (collapsible)
+One or more per Challan (partial
+shipments back)
+ProcessReturnLine Piece metres, Folding, PO/Colour ref Belongs to one ProcessReturn; feeds
+QC
+OpenBale Original Vendor Invoice ref, remaining qty Created from an ambiguous grey
+fabric return
+QCRecord (Process) Outcome, Rejection Action, Piece Division, Lot/Batch ID,
+Colour Fastness
+Drives Stock Pool vs Reprocessing
+Loop routing
+StockLedger Fabric, Colour, +/− Qty, Reason (Sent/Received/GRN/QC),
+Date
+Running balance including “Out for
+Processing”
+ActivityLog / AuditTrail Date/Time, User, Role, Action Type, Module, Record, Field,
+Previous/Updated Value
+Written automatically for every
+create/edit/approve/reject/delete/res
+tore
+15. Deferred / Out of Scope
+• Pending — additional PO fields: the client is sharing a separate reference sheet listing extra fields required on
+the Purchase Order form, with values that need to calculate automatically. This document will be updated once
+that sheet is received and reviewed.
+• QC logic itself is reused exactly as specified for Route 2 — not rebuilt here.
+• Article, Customer, Colour, Size, Vendor, Fabric masters, and Accessories are unchanged — documented
+separately.
+• Cutting, Stitching, Finishing, and Dispatch stages — to be documented in future sessions.
+• IP address / device information capture in the Activity History — optional, for future implementation.
+
+-- 32 of 32 --
+

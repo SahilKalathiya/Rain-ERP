@@ -29,8 +29,7 @@ export const navigationMenu = [
           { label: 'Purchase Orders', link: '/process-po' },
           { label: 'Challans', link: '/process-challan' },
           { label: 'Record Inward (GRN)', link: '/process-return' },
-          { label: 'QC & Lot Division', link: '/process-qc' },
-          { label: 'Live Tracking & Open Bales', link: '/process-tracking' }
+          { label: 'QC & Lot Division', link: '/process-qc' }
         ]
       },
       {
@@ -47,6 +46,11 @@ export const navigationMenu = [
           { label: 'Vendors', link: '/vendors' },
           { label: 'Transporters', link: '/transporters' }
         ]
+      },
+      {
+        label: 'Activity Log',
+        link: '/activity-log',
+        icon: 'ti ti-history'
       }
     ]
   }

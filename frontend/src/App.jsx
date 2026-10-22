@@ -9,6 +9,7 @@ import AccessoriesMasterView from './components/Masters/AccessoriesMasterView';
 import ColorMasterView from './components/Masters/ColorMasterView';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
 import ProcessModule from './components/ProcessPO/ProcessModule';
+import ActivityLogView from './components/ActivityLog/ActivityLogView';
 import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
 
@@ -162,7 +163,12 @@ export default function App() {
       );
     }
 
-    // 5. Route 2 Raw Material Procurement Dashboard
+    // 5. Activity Log & Audit Trail (Section 13.4)
+    if (currentRoute.startsWith('/activity-log') || currentRoute.startsWith('/audit-log') || currentRoute.startsWith('/activity')) {
+      return <ActivityLogView onNavigate={handleRouteNavigate} />;
+    }
+
+    // 6. Route 2 Raw Material Procurement Dashboard
     let submodule = 'overview';
     if (currentRoute.startsWith('/procurement-pos') || currentRoute.startsWith('/po')) {
       submodule = 'pos';
