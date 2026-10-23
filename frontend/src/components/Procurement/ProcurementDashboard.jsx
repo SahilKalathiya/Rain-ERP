@@ -431,12 +431,38 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setActivePoView('list');
   };
 
-  const handleInwardFromPO = (po) => {
-    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
-    const existingGrnsForPo = grns.filter((g) => g.linkedPOs && g.linkedPOs.includes(po.id));
-    const alreadyReceived = existingGrnsForPo.reduce((sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
-    const remainingMeters = Math.max(0, orderedMeters - alreadyReceived) || orderedMeters;
+  const handleViewGRN = (grn) => {
+    if (!grn) return;
+    setSelectedGRN(grn);
+    setActiveGrnView('detail');
+    setActiveTab('grn');
+    if (onNavigate) onNavigate('/goods-inward');
+  };
 
+  const handleInwardFromPO = (po) => {
+    if (!po) return;
+
+    // Check if GRN already exists for this PO
+    const existingGrnsForPo = (grns || []).filter((g) =>
+      g && (
+        (g.linkedPOs && g.linkedPOs.includes(po.id)) ||
+        g.poId === po.id ||
+        g.poNumber === po.id ||
+        g.againstPo === po.id
+      )
+    );
+
+    if (existingGrnsForPo.length > 0) {
+      const existing = existingGrnsForPo[0];
+      alert(`PO ${po.id} માટે GRN (${existing.id}) પહેલેથી જ બની ગયું છે. એક PO માટે માત્ર એક જ વાર GRN બની શકે છે.`);
+      setSelectedGRN(existing);
+      setActiveGrnView('detail');
+      setActiveTab('grn');
+      if (onNavigate) onNavigate('/goods-inward');
+      return;
+    }
+
+    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
     const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : '';
     const vMatch = vendors.find((v) => v.id === po.vendorId);
     const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : (po.vendorId || ''));
@@ -448,13 +474,15 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       createdAt: now,
       updatedAt: now,
       linkedPOs: [po.id],
+      poId: po.id,
       vendorId: po.vendorId,
       vendorName: resolvedVendorName,
       fabricName: fabricItem,
       status: 'Bale Entry in Progress',
       totalBales: '',
-      totalQty: String(remainingMeters),
-      declaredTotalMeters: remainingMeters,
+      poOrderedMeters: orderedMeters,
+      totalQty: '',
+      declaredTotalMeters: 0,
       bales: []
     };
     setSelectedGRN(newGrn);
@@ -925,6 +953,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             <PurchaseOrderList
               purchaseOrders={purchaseOrders}
               vendors={vendors}
+              grns={grns}
               onNewPO={() => {
                 setSelectedPO(null);
                 setActivePoView('form');
@@ -938,6 +967,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActivePoView('print');
               }}
               onInwardGRN={handleInwardFromPO}
+              onViewGRN={handleViewGRN}
             />
           )}
 
@@ -946,6 +976,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               po={selectedPO}
               vendors={vendors}
               fabrics={fabrics}
+              grns={grns}
               onBack={() => setActivePoView('list')}
               onSavePO={handleSavePO}
               onPrintPO={(po) => {
@@ -953,6 +984,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActivePoView('print');
               }}
               onInwardGRN={handleInwardFromPO}
+              onViewGRN={handleViewGRN}
               onSaveVendor={(v) => {
                 setVendors((prev) => {
                   const exists = prev.some((item) => item.id === v.id);
@@ -1016,21 +1048,30 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActiveGrnView('list');
               }}
               onEditHeader={(updatedGrn) => {
-                setGrns((prev) => (prev || []).map((g) => (g && g.id === updatedGrn.id ? updatedGrn : g)));
-                setSelectedGRN(updatedGrn);
-                api.saveGRN(updatedGrn).catch((e) => console.warn('GRN header save sync error:', e));
+                if (!updatedGrn || updatedGrn.isQcActioned || updatedGrn.status === 'QC Approved' || updatedGrn.status === 'QC Passed') {
+                  console.warn('Cannot edit header of QC Approved / Actioned GRN');
+                  return;
+                }
+                const normalized = {
+                  ...updatedGrn,
+                  lrNumber: updatedGrn.lrNumber || updatedGrn.lrNo || '',
+                  lrNo: updatedGrn.lrNumber || updatedGrn.lrNo || ''
+                };
+                setGrns((prev) => (prev || []).map((g) => (g && g.id === normalized.id ? normalized : g)));
+                setSelectedGRN(normalized);
+                api.saveGRN(normalized).catch((e) => console.warn('GRN header save sync error:', e));
 
                 // Synchronize linked Quality Checks
                 setQualityChecks((prev) =>
                   (prev || []).map((q) => {
-                    if (q && q.grnRef === updatedGrn.id) {
+                    if (q && q.grnRef === normalized.id) {
                       const updatedQC = {
                         ...q,
-                        vendorChallanNo: updatedGrn.vendorChallanNo,
-                        vendorInvoiceNo: updatedGrn.vendorInvoiceNo,
-                        transporterName: updatedGrn.transporterName,
-                        lrNumber: updatedGrn.lrNumber,
-                        expectedFold: updatedGrn.foldingCms || updatedGrn.expectedFold || q.expectedFold
+                        vendorChallanNo: normalized.vendorChallanNo,
+                        vendorInvoiceNo: normalized.vendorInvoiceNo,
+                        transporterName: normalized.transporterName,
+                        lrNumber: normalized.lrNumber,
+                        expectedFold: normalized.foldingCms || normalized.expectedFold || q.expectedFold
                       };
                       api.saveQualityCheck(updatedQC).catch((err) => console.warn('QC sync error:', err));
                       return updatedQC;
@@ -1039,7 +1080,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                   })
                 );
 
-                addAuditLog('Update', 'GRN', updatedGrn.id, 'GRN Header Details', 'Previous', `Updated Receipt Details (${updatedGrn.vendorChallanNo || updatedGrn.vendorInvoiceNo || updatedGrn.id})`);
+                addAuditLog('Update', 'GRN', normalized.id, 'GRN Header Details', 'Previous', `Updated Receipt Details (${normalized.vendorChallanNo || normalized.vendorInvoiceNo || normalized.id})`);
               }}
               onEditBales={(g) => {
                 setSelectedGRN(g);
@@ -1067,6 +1108,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               fabrics={fabrics}
               transporters={transporters}
               qualityChecks={qualityChecks}
+              grns={grns}
               onBack={() => {
                 const existsInGrns = selectedGRN && (grns || []).some((g) => g && g.id === selectedGRN.id);
                 if (existsInGrns) {

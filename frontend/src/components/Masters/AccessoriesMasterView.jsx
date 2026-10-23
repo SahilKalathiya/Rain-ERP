@@ -14,6 +14,30 @@ import {
 } from '../../data/salesOrderData';
 import { initialFabrics } from '../../data/procurementData';
 
+export const DEFAULT_TARGETED_ARTICLES = [
+  { id: 'ART-001', name: 'Kurta', icon: '👘' },
+  { id: 'ART-002', name: 'Pant', icon: '👖' },
+  { id: 'ART-003', name: 'Dupatta', icon: '🎀' },
+  { id: 'ART-004', name: 'Shirt', icon: '👔' },
+  { id: 'ART-005', name: 'Top', icon: '👚' },
+  { id: 'ART-006', name: 'Tunic', icon: '👗' },
+  { id: 'ART-007', name: 'Jacket', icon: '🧥' }
+];
+
+export const getStoredArticlesList = () => {
+  try {
+    const stored = getStoredData('erp_articles_v1', null) || getStoredData('erp_articles_master', null);
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored.map((a, idx) => ({
+        id: a.id || `ART-${idx + 1}`,
+        name: a.name || a.label || `Article ${idx + 1}`,
+        icon: a.icon || a.emoji || '👕'
+      }));
+    }
+  } catch (e) {}
+  return DEFAULT_TARGETED_ARTICLES;
+};
+
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
   return text.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -265,13 +289,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   // Section 8 State: Thread Sizes & Thread Brand Colors
   const [threadSizes, setThreadSizes] = useState(() => getStoredThreadSizes());
   const [threadColors, setThreadColors] = useState(() => getStoredThreadBrandColors());
-  const [articlesList] = useState(() => {
-    try {
-      const stored = getStoredData('erp_articles_master', null);
-      if (Array.isArray(stored) && stored.length > 0) return stored;
-    } catch (e) {}
-    return initialArticles || [];
-  });
+  const [articlesList, setArticlesList] = useState(() => getStoredArticlesList());
+  const [customArticleInput, setCustomArticleInput] = useState('');
 
   const [masterFabrics, setMasterFabrics] = useState(() => {
     try {
@@ -297,15 +316,31 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         setThreadColors(getStoredThreadBrandColors());
       } catch (e) {}
     };
+    const handleArticlesUpdate = () => {
+      try {
+        const stored = getStoredData('erp_articles_v1', null) || getStoredData('erp_articles_master', null);
+        if (Array.isArray(stored) && stored.length > 0) {
+          setArticlesList(stored.map((a, idx) => ({
+            id: a.id || `ART-${idx + 1}`,
+            name: a.name || a.label || `Article ${idx + 1}`,
+            icon: a.icon || a.emoji || '👕'
+          })));
+        }
+      } catch (e) {}
+    };
     window.addEventListener('storage', handleFabricsUpdate);
     window.addEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
     window.addEventListener('storage', handleAccessoriesUpdate);
     window.addEventListener('erp_accessories_master_updated', handleAccessoriesUpdate);
+    window.addEventListener('storage', handleArticlesUpdate);
+    window.addEventListener('erp_articles_updated', handleArticlesUpdate);
     return () => {
       window.removeEventListener('storage', handleFabricsUpdate);
       window.removeEventListener('raindrop_fabrics_updated', handleFabricsUpdate);
       window.removeEventListener('storage', handleAccessoriesUpdate);
       window.removeEventListener('erp_accessories_master_updated', handleAccessoriesUpdate);
+      window.removeEventListener('storage', handleArticlesUpdate);
+      window.removeEventListener('erp_articles_updated', handleArticlesUpdate);
     };
   }, []);
 
@@ -411,7 +446,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
     // Tassels
     tasselType: 'Ready Made',
-    jobWorkRows: [],
+    jobWorkRows: [{ size: '', threadConsumption: '' }],
 
     // Dori (Section 6.4)
     doriRequiredSize: '',
@@ -427,6 +462,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     threadSizeCustom: '',
     threadPattern: '',
     threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
+    metersPerMeterStitching: 15, // Single-time entry for Stitching
     threadPerPiece: 60,  // Explicit PDF Default (Page 13)
     boxes: [{ reelsPerBox: '', metersPerReel: '' }],
     coneSizes: [],
@@ -440,6 +476,61 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
   const [formData, setFormData] = useState(() => getEmptyAccessoryForm('Buttons'));
   const [laceSizeInput, setLaceSizeInput] = useState('');
+
+  // Requirement 25: Duplicate names should not be allowed across Accessories
+  const isDuplicateAccessoryName = (name, excludeId = null) => {
+    if (!name || typeof name !== 'string') return false;
+    const clean = name.trim().toLowerCase();
+    if (!clean) return false;
+    return accessories.some(
+      (a) => a && a.id !== excludeId && (a.name || '').trim().toLowerCase() === clean
+    );
+  };
+
+  const isNameDuplicate = Boolean(
+    formData?.name &&
+    formData.name.trim() &&
+    isDuplicateAccessoryName(formData.name, formData.id)
+  );
+
+  const isSectionNameDuplicate = Boolean(
+    sectionFormData?.name &&
+    sectionFormData.name.trim() &&
+    selectedAccessory &&
+    isDuplicateAccessoryName(sectionFormData.name, selectedAccessory.id)
+  );
+
+  const availableTargetArticles = useMemo(() => {
+    const list = [...articlesList];
+    const selectedNames = formData?.stitchingArticles || [];
+    selectedNames.forEach(name => {
+      if (name && !list.some(a => a.name.toLowerCase() === name.toLowerCase())) {
+        list.push({ id: `art-${name}`, name, icon: '👕' });
+      }
+    });
+    return list;
+  }, [articlesList, formData?.stitchingArticles]);
+
+  const handleAddCustomArticle = () => {
+    const trimmed = (customArticleInput || '').trim();
+    if (!trimmed) return;
+    const formatted = autoCapitalizeWords(trimmed);
+    if (!articlesList.some(a => a.name.toLowerCase() === formatted.toLowerCase())) {
+      setArticlesList(prev => [...prev, { id: `ART-custom-${Date.now()}`, name: formatted, icon: '👕' }]);
+    }
+    const current = formData.stitchingArticles || [];
+    if (!current.includes(formatted)) {
+      setFormData({
+        ...formData,
+        stitchingArticles: [...current, formatted],
+        consumptionPer100Pcs: {
+          ...(formData.consumptionPer100Pcs || {}),
+          [formatted]: ''
+        }
+      });
+    }
+    setCustomArticleInput('');
+  };
 
   const handleAddLaceSize = () => {
     if (!laceSizeInput.trim()) return;
@@ -552,13 +643,16 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       articlePlacements: acc.articlePlacements || [],
       stitchingArticles: acc.stitchingArticles || (acc.consumptionPer100Pcs ? Object.keys(acc.consumptionPer100Pcs) : []),
       consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
+      metersPerMeterStitching: acc.metersPerMeterStitching !== undefined ? acc.metersPerMeterStitching : (acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15),
       threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15,
       threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : 60,
       boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
       coneSizes: acc.coneSizes || [],
       placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
-      jobWorkRows: acc.jobWorkRows || [],
+      jobWorkRows: (acc.jobWorkRows && acc.jobWorkRows.length > 0)
+        ? acc.jobWorkRows
+        : [{ size: '', threadConsumption: '' }],
       doriRequiredSize: acc.doriRequiredSize || acc.requiredSize || acc.size || '',
       doriUnit: acc.doriUnit || acc.unit || 'Meter',
       doriFabricEntries: (acc.doriFabricEntries && acc.doriFabricEntries.length > 0)
@@ -600,7 +694,15 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       return;
     }
 
-    const capitalizedName = formData.name.replace(/\b\w/g, (c) => c.toUpperCase());
+    const capitalizedName = formData.name.replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+
+    // Requirement 25: Prevent duplicate names across accessories
+    if (isDuplicateAccessoryName(capitalizedName, formData.id)) {
+      alert(`Duplicate Error: An accessory with the name "${capitalizedName}" already exists. Duplicate names are not allowed across Accessories.`);
+      showToast(`Accessory name "${capitalizedName}" already exists!`, 'error');
+      return;
+    }
+
     const accObj = {
       ...formData,
       buttonSizes: (formData.buttonSizesList || []).join(', '),
@@ -622,7 +724,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       unitCustom: formData.unitCustom || '',
       piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
       threadPattern: formData.threadPattern || 'Stitching',
-      threadPerStitch: parseFloat(formData.threadPerStitch) || 15,
+      metersPerMeterStitching: parseFloat(formData.metersPerMeterStitching !== undefined ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
+      threadPerStitch: parseFloat(formData.metersPerMeterStitching !== undefined ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
       threadPerPiece: parseFloat(formData.threadPerPiece) || 60,
       globalThreadMetric: parseFloat(formData.globalThreadMetric) || 15,
       articlePlacements: formData.articlePlacements || [],
@@ -689,7 +792,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       lastModified: new Date().toISOString()
     };
     if (sectionFormData.name) {
-      updated.name = sectionFormData.name.replace(/\b\w/g, (c) => c.toUpperCase());
+      const cleanSecName = sectionFormData.name.replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+      if (!cleanSecName) {
+        alert('Accessory Name is required');
+        return;
+      }
+      if (isDuplicateAccessoryName(cleanSecName, selectedAccessory.id)) {
+        alert(`Duplicate Error: An accessory with the name "${cleanSecName}" already exists. Duplicate names are not allowed across Accessories.`);
+        showToast(`Accessory name "${cleanSecName}" already exists!`, 'error');
+        return;
+      }
+      updated.name = cleanSecName;
     }
 
     const updatedList = accessories.map((a) => (a.id === updated.id ? updated : a));
@@ -997,14 +1110,21 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       </label>
                       <input
                         type="text"
-                        className="form-control"
+                        className={`form-control ${isNameDuplicate ? 'is-invalid border-danger' : ''}`}
                         required
                         placeholder="e.g. Shell Button, Metallic Lace"
                         value={formData.name || ''}
                         onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                         style={{ height: '42px', borderRadius: '8px' }}
                       />
-                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                      {isNameDuplicate ? (
+                        <div className="invalid-feedback d-block text-danger fw-semibold small mt-1">
+                          <i className="ti ti-alert-circle me-1"></i>
+                          Duplicate name not allowed: An accessory named &quot;{formData.name.trim()}&quot; already exists.
+                        </div>
+                      ) : (
+                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                      )}
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold text-dark small mb-1.5">
@@ -1095,15 +1215,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           disabled={!isModalEditMode}
                         />
                       </div>
-                      <div className="mb-3">
-                        <TagInput
-                          label="Lace colors"
-                          tags={formData.colors?.length ? formData.colors : (formData.laceColorsList || [])}
-                          onChange={(newTags) => setFormData({ ...formData, colors: newTags, laceColorsList: newTags })}
-                          placeholder="Type a value, press Enter"
-                          disabled={!isModalEditMode}
-                        />
-                      </div>
 
                       <div className="row g-3 mb-3">
                         <div className="col-md-7">
@@ -1157,8 +1268,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         <label className="form-label fw-semibold text-dark small mb-1.5">Tassel type</label>
                         <select
                           className="form-select"
+                          disabled={!isModalEditMode}
                           value={formData.tasselType || 'Ready Made'}
-                          onChange={(e) => setFormData({ ...formData, tasselType: e.target.value })}
+                          onChange={(e) => {
+                            const newType = e.target.value;
+                            setFormData({
+                              ...formData,
+                              tasselType: newType,
+                              jobWorkRows: (newType === 'Job Work' && (!formData.jobWorkRows || formData.jobWorkRows.length === 0))
+                                ? [{ size: '', threadConsumption: '' }]
+                                : (formData.jobWorkRows || [{ size: '', threadConsumption: '' }])
+                            });
+                          }}
                           style={{ height: '42px', borderRadius: '8px' }}
                         >
                           <option value="Ready Made">Ready Made</option>
@@ -1171,18 +1292,25 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           <div className="fw-semibold text-dark small mb-2">
                             Size &amp; thread consumption:
                           </div>
-                          {(formData.jobWorkRows || []).map((r, i) => (
+                          {((formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                            ? formData.jobWorkRows
+                            : [{ size: '', threadConsumption: '' }]
+                          ).map((r, i) => (
                             <div key={i} className="row g-2 align-items-end mb-2">
                               <div className="col-5">
                                 <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Size</label>
                                 <input
                                   type="text"
                                   className="form-control form-control-sm"
+                                  placeholder="e.g. Small / 2 inch"
+                                  disabled={!isModalEditMode}
                                   value={r.size || ''}
                                   onChange={(e) => {
-                                    const updated = [...(formData.jobWorkRows || [])];
-                                    updated[i] = { ...updated[i], size: e.target.value };
-                                    setFormData({ ...formData, jobWorkRows: updated });
+                                    const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                                      ? [...formData.jobWorkRows]
+                                      : [{ size: '', threadConsumption: '' }];
+                                    currentRows[i] = { ...currentRows[i], size: e.target.value };
+                                    setFormData({ ...formData, jobWorkRows: currentRows });
                                   }}
                                   style={{ height: '36px', borderRadius: '6px' }}
                                 />
@@ -1192,41 +1320,58 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 <input
                                   type="text"
                                   className="form-control form-control-sm"
+                                  placeholder="e.g. 5m / piece"
+                                  disabled={!isModalEditMode}
                                   value={r.threadConsumption || ''}
                                   onChange={(e) => {
-                                    const updated = [...(formData.jobWorkRows || [])];
-                                    updated[i] = { ...updated[i], threadConsumption: e.target.value };
-                                    setFormData({ ...formData, jobWorkRows: updated });
+                                    const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                                      ? [...formData.jobWorkRows]
+                                      : [{ size: '', threadConsumption: '' }];
+                                    currentRows[i] = { ...currentRows[i], threadConsumption: e.target.value };
+                                    setFormData({ ...formData, jobWorkRows: currentRows });
                                   }}
                                   style={{ height: '36px', borderRadius: '6px' }}
                                 />
                               </div>
                               <div className="col-2 pb-1 text-end">
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                  onClick={() => {
-                                    const updated = (formData.jobWorkRows || []).filter((_, idx) => idx !== i);
-                                    setFormData({ ...formData, jobWorkRows: updated });
-                                  }}
-                                >
-                                  Remove
-                                </button>
+                                {isModalEditMode && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
+                                    onClick={() => {
+                                      const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                                        ? [...formData.jobWorkRows]
+                                        : [{ size: '', threadConsumption: '' }];
+                                      const updated = currentRows.filter((_, idx) => idx !== i);
+                                      setFormData({
+                                        ...formData,
+                                        jobWorkRows: updated.length > 0 ? updated : [{ size: '', threadConsumption: '' }]
+                                      });
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                jobWorkRows: [...(formData.jobWorkRows || []), { size: '', threadConsumption: '' }]
-                              });
-                            }}
-                          >
-                            + Add more
-                          </button>
+                          {isModalEditMode && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
+                              onClick={() => {
+                                const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                                  ? [...formData.jobWorkRows]
+                                  : [{ size: '', threadConsumption: '' }];
+                                setFormData({
+                                  ...formData,
+                                  jobWorkRows: [...currentRows, { size: '', threadConsumption: '' }]
+                                });
+                              }}
+                            >
+                              + Add more
+                            </button>
+                          )}
                         </div>
                       )}
                     </>
@@ -1677,6 +1822,31 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
                             </div>
 
+                            {/* Meters of thread required for 1m stitching (single-time entry) */}
+                            <div className="mb-3">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Meters of thread required for 1m stitching (single‑time entry) <span className="text-danger">*</span>
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '260px' }}>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="form-control fw-bold"
+                                  placeholder="e.g. 15"
+                                  value={formData.metersPerMeterStitching ?? formData.threadPerStitch ?? 15}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setFormData({ ...formData, metersPerMeterStitching: val, threadPerStitch: val });
+                                  }}
+                                  style={{ height: '36px' }}
+                                />
+                                <span className="input-group-text bg-white text-muted">m / 1m stitch</span>
+                              </div>
+                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
+                                Single-time entry: Metres of thread required for 1m stitching (standard default: 15 m).
+                              </div>
+                            </div>
+
                             {/* Thread Per Piece - Default 60m, editable */}
                             <div className="mb-3">
                               <label className="form-label fw-semibold text-dark small mb-1">
@@ -1796,16 +1966,53 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                             {/* Targeted Articles (Multi-Select) & Dynamic Thread Consumption per 100 Pieces (per Article) */}
                             <div className="p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <label className="form-label fw-bold text-dark small mb-1">
-                                Targeted Articles &amp; Consumption per 100 Pieces <span className="text-danger">*</span>
-                              </label>
+                              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                                <label className="form-label fw-bold text-dark small mb-0">
+                                  Targeted Articles &amp; Consumption per 100 Pieces <span className="text-danger">*</span>
+                                </label>
+                                <div className="d-flex align-items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-outline-secondary py-0.5 px-2"
+                                    style={{ fontSize: '11px' }}
+                                    onClick={() => {
+                                      const allNames = availableTargetArticles.map(a => a.name);
+                                      const newConsumption = { ...(formData.consumptionPer100Pcs || {}) };
+                                      allNames.forEach(name => {
+                                        if (newConsumption[name] === undefined) newConsumption[name] = '';
+                                      });
+                                      setFormData({
+                                        ...formData,
+                                        stitchingArticles: allNames,
+                                        consumptionPer100Pcs: newConsumption
+                                      });
+                                    }}
+                                  >
+                                    Select All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-outline-secondary py-0.5 px-2"
+                                    style={{ fontSize: '11px' }}
+                                    onClick={() => {
+                                      setFormData({
+                                        ...formData,
+                                        stitchingArticles: [],
+                                        consumptionPer100Pcs: {}
+                                      });
+                                    }}
+                                  >
+                                    Deselect All
+                                  </button>
+                                </div>
+                              </div>
                               <div className="form-text text-muted mb-2.5" style={{ fontSize: '11.5px' }}>
-                                Select targeted articles via multi-select; for each article, a manual input dynamically opens to record Thread Consumption per 100 Pieces, strictly in metres.
+                                Select targeted articles via multi-select; for each article, record Thread Consumption per 100 Pieces (strictly in metres).
                               </div>
 
                               {/* Multi-select chips for articles */}
-                              <div className="d-flex flex-wrap gap-1.5 mb-3">
-                                {articlesList.map((art) => {
+                              <div className="d-flex flex-wrap gap-1.5 mb-2.5">
+                                {availableTargetArticles.map((art) => {
                                   const isSelected = (formData.stitchingArticles || []).includes(art.name);
                                   return (
                                     <button
@@ -1822,8 +2029,12 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                           : [...current, art.name];
                                         
                                         const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
-                                        if (!isSelected && !nextConsumption[art.name]) {
-                                          nextConsumption[art.name] = '';
+                                        if (isSelected) {
+                                          delete nextConsumption[art.name];
+                                        } else {
+                                          if (nextConsumption[art.name] === undefined) {
+                                            nextConsumption[art.name] = '';
+                                          }
                                         }
                                         setFormData({
                                           ...formData,
@@ -1840,41 +2051,103 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 })}
                               </div>
 
+                              {/* Quick add custom article */}
+                              <div className="d-flex align-items-center gap-2 mb-3">
+                                <div className="input-group input-group-sm" style={{ maxWidth: '280px' }}>
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="Add custom article (e.g. Gown)"
+                                    value={customArticleInput}
+                                    onChange={(e) => setCustomArticleInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddCustomArticle();
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-primary"
+                                    onClick={handleAddCustomArticle}
+                                  >
+                                    <i className="ti ti-plus"></i> Add
+                                  </button>
+                                </div>
+                                <span className="text-muted" style={{ fontSize: '11px' }}>
+                                  (Add garment type if not in the list)
+                                </span>
+                              </div>
+
                               {/* Dynamic input boxes per selected article */}
-                              {(formData.stitchingArticles || []).length > 0 && (
+                              {(formData.stitchingArticles || []).length > 0 ? (
                                 <div className="p-2.5 bg-light rounded-3 border">
-                                  <div className="small fw-semibold text-muted mb-2">
-                                    Thread Consumption per 100 Pieces (strictly in metres):
+                                  <div className="d-flex align-items-center justify-content-between mb-2">
+                                    <div className="small fw-semibold text-dark">
+                                      Thread Consumption per 100 Pieces (strictly in metres):
+                                    </div>
+                                    <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '11px' }}>
+                                      {(formData.stitchingArticles || []).length} Selected
+                                    </span>
                                   </div>
                                   <div className="row g-2">
                                     {(formData.stitchingArticles || []).map((artName) => (
                                       <div key={artName} className="col-md-6">
                                         <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-2 shadow-2xs">
-                                          <span className="fw-semibold text-dark small" style={{ fontSize: '12.5px' }}>
-                                            {artName}:
-                                          </span>
-                                          <div className="input-group input-group-sm" style={{ width: '150px' }}>
-                                            <input
-                                              type="number"
-                                              className="form-control fw-bold"
-                                              placeholder="e.g. 6000"
-                                              value={formData.consumptionPer100Pcs?.[artName] ?? ''}
-                                              onChange={(e) => {
+                                          <div className="d-flex align-items-center gap-1.5 text-truncate" style={{ maxWidth: '140px' }}>
+                                            <span className="fw-semibold text-dark small" style={{ fontSize: '12.5px' }} title={artName}>
+                                              {artName}:
+                                            </span>
+                                          </div>
+                                          <div className="d-flex align-items-center gap-1">
+                                            <div className="input-group input-group-sm" style={{ width: '150px' }}>
+                                              <input
+                                                type="number"
+                                                className="form-control fw-bold"
+                                                placeholder="e.g. 6000"
+                                                value={formData.consumptionPer100Pcs?.[artName] ?? ''}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setFormData({
+                                                    ...formData,
+                                                    consumptionPer100Pcs: {
+                                                      ...(formData.consumptionPer100Pcs || {}),
+                                                      [artName]: val
+                                                    }
+                                                  });
+                                                }}
+                                              />
+                                              <span className="input-group-text bg-light text-muted" style={{ fontSize: '11px' }}>m / 100pcs</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              className="btn btn-sm btn-link text-danger p-0 ms-1 text-decoration-none"
+                                              title={`Remove ${artName}`}
+                                              onClick={() => {
+                                                const current = formData.stitchingArticles || [];
+                                                const next = current.filter(a => a !== artName);
+                                                const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
+                                                delete nextConsumption[artName];
                                                 setFormData({
                                                   ...formData,
-                                                  consumptionPer100Pcs: {
-                                                    ...(formData.consumptionPer100Pcs || {}),
-                                                    [artName]: e.target.value
-                                                  }
+                                                  stitchingArticles: next,
+                                                  consumptionPer100Pcs: nextConsumption
                                                 });
                                               }}
-                                            />
-                                            <span className="input-group-text bg-light text-muted" style={{ fontSize: '11px' }}>m / 100pcs</span>
+                                            >
+                                              <i className="ti ti-x"></i>
+                                            </button>
                                           </div>
                                         </div>
                                       </div>
                                     ))}
                                   </div>
+                                </div>
+                              ) : (
+                                <div className="alert alert-warning py-2 px-3 rounded-2 small mb-0 d-flex align-items-center gap-2">
+                                  <i className="ti ti-alert-triangle"></i>
+                                  <span>No articles selected yet. Click any of the article chips above to enter consumption per 100 pieces.</span>
                                 </div>
                               )}
                             </div>
@@ -2625,6 +2898,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       <button
                         type="submit"
                         className="btn btn-primary rounded-3 px-4 fw-semibold"
+                        disabled={isNameDuplicate}
+                        title={isNameDuplicate ? 'Duplicate accessory names are not allowed' : ''}
                       >
                         <i className="ti ti-check me-1"></i> Save Accessory
                       </button>
@@ -2923,6 +3198,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       <button
                         type="button"
                         className="btn btn-xs btn-primary rounded-2 px-2.5 py-1 small fw-semibold"
+                        disabled={isSectionNameDuplicate}
+                        title={isSectionNameDuplicate ? 'Duplicate accessory names are not allowed' : ''}
                         onClick={() => saveAccessorySection('base')}
                       >
                         Save Section
@@ -2948,11 +3225,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         <label className="form-label small fw-semibold text-muted">Accessory Name *</label>
                         <input
                           type="text"
-                          className="form-control form-control-sm"
+                          className={`form-control form-control-sm ${isSectionNameDuplicate ? 'is-invalid border-danger' : ''}`}
                           value={sectionFormData.name || ''}
                           onChange={(e) => setSectionFormData({ ...sectionFormData, name: autoCapitalizeWords(e.target.value) })}
                         />
-                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        {isSectionNameDuplicate ? (
+                          <div className="invalid-feedback d-block text-danger fw-semibold small mt-1">
+                            <i className="ti ti-alert-circle me-1"></i>
+                            Duplicate name not allowed: An accessory named &quot;{sectionFormData.name.trim()}&quot; already exists.
+                          </div>
+                        ) : (
+                          <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        )}
                       </div>
                       <div className="row g-2">
                         <div className={!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) ? 'col-6' : 'col-12'}>
@@ -3380,22 +3664,36 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                       {selectedAccessory.threadPattern === 'Stitching' && (
                         <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                          <div>
-                            <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                            <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || 60} m / piece</div>
+                          <div className="row g-2">
+                            <div className="col-sm-6">
+                              <div className="text-muted small">Meters of Thread for 1m Stitching</div>
+                              <div className="fw-bold text-dark fs-14">
+                                {selectedAccessory.metersPerMeterStitching || selectedAccessory.threadPerStitch || 15} m / 1m stitch
+                              </div>
+                            </div>
+                            <div className="col-sm-6">
+                              <div className="text-muted small">Thread Per Piece (BOM Default)</div>
+                              <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || 60} m / piece</div>
+                            </div>
                           </div>
 
-                          {selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0 && (
+                          {((selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0) || (selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0)) && (
                             <div>
                               <div className="text-muted small mb-1.5 fw-semibold">Targeted Articles &amp; Consumption per 100 pcs:</div>
                               <div className="d-flex flex-wrap gap-2">
-                                {Object.entries(selectedAccessory.consumptionPer100Pcs).map(([art, m]) => (
-                                  <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-                                    <span className="fw-bold">{art}:</span>
-                                    <span className="text-primary font-monospace fw-bold">{m} m</span>
-                                    <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
-                                  </span>
-                                ))}
+                                {(selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0
+                                  ? selectedAccessory.stitchingArticles
+                                  : Object.keys(selectedAccessory.consumptionPer100Pcs || {})
+                                ).map((art) => {
+                                  const m = selectedAccessory.consumptionPer100Pcs?.[art];
+                                  return (
+                                    <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
+                                      <span className="fw-bold">{art}:</span>
+                                      <span className="text-primary font-monospace fw-bold">{m !== undefined && m !== '' ? `${m} m` : '—'}</span>
+                                      <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

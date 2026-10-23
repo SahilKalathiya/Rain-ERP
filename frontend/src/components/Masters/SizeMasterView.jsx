@@ -55,7 +55,7 @@ export default function SizeMasterView() {
 
   const [seriesList, setSeriesList] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
-    if (Array.isArray(stored)) {
+    if (Array.isArray(stored) && stored.length > 0) {
       const normalized = normalize(stored);
       setStoredData('erp_size_series_v1', normalized);
       return normalized;
@@ -68,7 +68,7 @@ export default function SizeMasterView() {
   useEffect(() => {
     const handleUpdate = () => {
       const stored = getStoredData('erp_size_series_v1', null);
-      if (Array.isArray(stored)) {
+      if (Array.isArray(stored) && stored.length > 0) {
         setSeriesList(normalize(stored));
       }
     };
@@ -462,6 +462,10 @@ export default function SizeMasterView() {
         return {
           ...s,
           sizes: updatedRecords.map((r) => r.sizeName),
+          sizeDetails: updatedRecords.map((r) => ({
+            size: r.sizeName,
+            label: r.displayName || r.sizeName
+          })),
           sizeRecords: updatedRecords
         };
       }

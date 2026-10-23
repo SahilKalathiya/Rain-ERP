@@ -23,7 +23,7 @@ export default function QualityCheckForm({
   // Helper to resolve expected Fold & Width from GRN's linked POs
   const getExpectedFromGRN = (grnId) => {
     const foundGRN = grns.find((g) => g.id === grnId);
-    if (!foundGRN) return { fold: '97', width: '44' };
+    if (!foundGRN) return { fold: '100', width: '44' };
 
     let foundFold = null;
     let foundWidth = null;
@@ -44,9 +44,17 @@ export default function QualityCheckForm({
       }
     }
 
+    if (!foundWidth && foundGRN.pannaWidth) {
+      foundWidth = String(foundGRN.pannaWidth);
+    }
+
+    if (!foundFold && foundGRN.fabricFolding) {
+      foundFold = String(foundGRN.fabricFolding);
+    }
+
     return {
-      fold: foundFold || '3',
-      width: foundWidth || '42'
+      fold: foundFold || '100',
+      width: foundWidth || '44'
     };
   };
 
@@ -77,6 +85,11 @@ export default function QualityCheckForm({
 
   const [pieceInspections, setPieceInspections] = useState(qc?.pieceInspections || {});
   const [toastNotification, setToastNotification] = useState(null);
+
+  // Dropdown states for Bale / Piece-level inspection (Requirement 24)
+  const [selectedBaleFilter, setSelectedBaleFilter] = useState('all');
+  const [selectedPieceKey, setSelectedPieceKey] = useState('');
+  const [inspectionScope, setInspectionScope] = useState('all');
 
   const showToast = (message, type = 'success') => {
     setToastNotification({ message, type });
@@ -153,6 +166,20 @@ export default function QualityCheckForm({
         meters: m
       });
     });
+  });
+
+  // Unique bale numbers for dropdown selection (Requirement 24)
+  const uniqueBaleNumbers = Array.from(new Set(grnPieces.map((p) => String(p.baleNo)))).sort((a, b) => Number(a) - Number(b));
+
+  // Filtered pieces based on dropdown option (Requirement 24)
+  const displayedPieces = grnPieces.filter((pc) => {
+    if (selectedBaleFilter !== 'all' && String(pc.baleNo) !== String(selectedBaleFilter)) {
+      return false;
+    }
+    if (selectedPieceKey && pc.key !== selectedPieceKey) {
+      return false;
+    }
+    return true;
   });
 
   const updatePieceField = (key, field, val) => {
@@ -260,18 +287,61 @@ export default function QualityCheckForm({
     Number(selectedGRN?.totalMetersEntered) ||
     grnPieces.reduce((sum, p) => sum + (Number(p.meters) || 0), 0) || 0;
 
+  const declaredTotalMeters = Number(selectedGRN?.totalQty) || Number(selectedGRN?.declaredTotalMeters) || 0;
+
+  // Requirement 21: QC should not proceed until total quantity entered in GRN has complete bale entries
+  const isBaleCompletenessOk = declaredTotalMeters <= 0 || (
+    totalReceivedMeters > 0 && Math.abs(totalReceivedMeters - declaredTotalMeters) < 0.01
+  );
+
   // Pieces flagged for Admin Review or Rejection
   const issuePieces = inspectedList.filter((p) => p.status !== 'OK');
   const pieceQtyHeldBack = issuePieces.reduce((sum, p) => sum + p.meters, 0);
   const flatDefectQty = Number(formData.defectQty) || 0;
   const totalHeldBackMeters = pieceQtyHeldBack + flatDefectQty;
   const goodMeters = Math.max(0, totalReceivedMeters - totalHeldBackMeters);
+  // Helper for numeric parsing & comparison
+  const parseNum = (val) => {
+    if (val === undefined || val === null || val === '') return null;
+    const cleaned = String(val).replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  };
+
+  const expWidthClean = String(formData.expectedWidth || '44').replace(/"/g, '').trim();
+  const expWidthNum = parseNum(expWidthClean);
+  const actualWidthNum = parseNum(formData.actualWidth);
+  const hasWidth = formData.actualWidth !== undefined && formData.actualWidth !== null && String(formData.actualWidth).trim() !== '';
+  const isWidthMismatch = hasWidth && (actualWidthNum === null || expWidthNum === null || Math.abs(actualWidthNum - expWidthNum) > 0.01);
+  const isWidthMatch = hasWidth && !isWidthMismatch;
+
+  const expFoldClean = String(formData.expectedFold || '100').replace(/%/g, '').trim();
+  const expFoldNum = parseNum(expFoldClean);
+  const actualFoldNum = parseNum(formData.actualFold);
+  const hasFold = formData.actualFold !== undefined && formData.actualFold !== null && String(formData.actualFold).trim() !== '';
+  const isFoldMismatch = hasFold && (actualFoldNum === null || expFoldNum === null || Math.abs(actualFoldNum - expFoldNum) > 0.01);
+  const isFoldMatch = hasFold && !isFoldMismatch;
+
+  // Requirement 23: Exception mismatch detection
+  const hasAnyMismatch = isWidthMismatch || isFoldMismatch;
 
   const handleSubmit = (statusOverride) => {
     const effectiveStatus = (typeof statusOverride === 'string') ? statusOverride : formData.qcStatus;
 
     if (effectiveStatus === 'OK' && flatDefectQty > 0 && !formData.defectReason.trim()) {
       showToast('Please enter a defect reason for the defective quantity in the flat entry box.', 'warning');
+      return;
+    }
+
+    // Requirement 23: During QC, if exceptions do not match, the option to add stock should be hidden or disabled.
+    if (effectiveStatus === 'OK' && hasAnyMismatch) {
+      showToast('Cannot add stock: Width or Fold exception does not match PO specification. Please submit for Admin Approval or Reject.', 'warning');
+      return;
+    }
+
+    // Requirement 21: QC should not proceed until total quantity entered in GRN has complete bale entries.
+    if (effectiveStatus === 'OK' && !isBaleCompletenessOk) {
+      showToast(`Cannot add stock: Total quantity declared in GRN (${declaredTotalMeters}m) has incomplete bale entries (${totalReceivedMeters}m). Please complete all bale entries in GRN first.`, 'warning');
       return;
     }
 
@@ -283,10 +353,14 @@ export default function QualityCheckForm({
       finalStatus = totalHeldBackMeters > 0 ? 'Partial OK' : 'OK';
       finalGoodQty = goodMeters;
       finalHeldBackQty = totalHeldBackMeters;
-    } else if (effectiveStatus === 'Send for Admin Approval') {
-      finalStatus = 'Send for Admin Approval';
+    } else if (effectiveStatus === 'Send for Admin Approval' || (hasAnyMismatch && effectiveStatus !== 'Reject' && effectiveStatus !== 'Approved')) {
+      finalStatus = 'Pending Admin Approval';
       finalGoodQty = 0;
       finalHeldBackQty = totalReceivedMeters;
+    } else if (effectiveStatus === 'Approved') {
+      finalStatus = 'Approved';
+      finalGoodQty = goodMeters;
+      finalHeldBackQty = totalHeldBackMeters;
     } else if (effectiveStatus === 'Reject') {
       finalStatus = 'Reject';
       finalGoodQty = 0;
@@ -295,9 +369,14 @@ export default function QualityCheckForm({
 
     const payload = {
       ...formData,
+      inspectorName: (formData.inspectorName || '').replace(/(?:^|\s)\S/g, (c) => c.toUpperCase()).trim(),
       qcStatus: finalStatus,
-      actualWidth: Number(formData.actualWidth) || 0,
-      actualFold: Number(formData.actualFold) || 100,
+      hasDiscrepancy: hasAnyMismatch,
+      discrepancyType: isWidthMismatch && isFoldMismatch ? 'Width & Fold Mismatch' : (isWidthMismatch ? 'Width Mismatch' : (isFoldMismatch ? 'Fold Mismatch' : 'None')),
+      actualWidth: actualWidthNum !== null ? actualWidthNum : (Number(formData.actualWidth) || 0),
+      actualFold: actualFoldNum !== null ? actualFoldNum : (Number(formData.actualFold) || 100),
+      expectedWidth: expWidthClean,
+      expectedFold: expFoldClean,
       pieceInspections,
       inspectedPieces: inspectedList,
       totalReceivedMeters,
@@ -313,13 +392,18 @@ export default function QualityCheckForm({
       onSaveQC(payload);
     }
 
-    if (effectiveStatus === 'OK') {
+    if (finalStatus === 'OK' || finalStatus === 'Partial OK' || finalStatus === 'Approved') {
       setSuccessModalData({
         goodQty: goodMeters,
         heldBackQty: totalHeldBackMeters,
         issuePiecesCount: issuePieces.length,
         grnId: formData.grnRef
       });
+    } else if (finalStatus === 'Pending Admin Approval') {
+      showToast('Discrepancy flagged! Submitted to Admin for review & approval.', 'warning');
+      setTimeout(() => {
+        if (onBack) onBack();
+      }, 900);
     } else {
       if (onBack) onBack();
     }
@@ -455,6 +539,24 @@ export default function QualityCheckForm({
         </div>
       </div>
 
+      {/* Requirement 21 Alert: Incomplete Bale Entries in GRN */}
+      {!isBaleCompletenessOk && (
+        <div className="alert alert-warning py-3 px-3.5 rounded-4 fs-13 d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 border border-warning shadow-xs">
+          <div className="d-flex align-items-center gap-2.5">
+            <i className="ti ti-alert-triangle fs-22 text-warning flex-shrink-0"></i>
+            <div>
+              <strong className="text-dark d-block">QC Locked &mdash; Incomplete Bale Entries in GRN</strong>
+              <span className="text-secondary">
+                Total quantity declared in GRN is <strong>{declaredTotalMeters}m</strong>, but entered bales/pieces total <strong>{totalReceivedMeters}m</strong> ({Math.abs(declaredTotalMeters - totalReceivedMeters).toFixed(1)}m difference). QC should not proceed until total quantity in GRN has complete bale entries.
+              </span>
+            </div>
+          </div>
+          <span className="badge bg-warning text-dark px-3 py-1.5 fs-11 rounded-pill fw-semibold text-nowrap">
+            Incomplete Bales
+          </span>
+        </div>
+      )}
+
       {/* Main Form */}
       <div style={{ maxWidth: '960px' }}>
         <form onSubmit={handleSubmit}>
@@ -470,92 +572,76 @@ export default function QualityCheckForm({
               <input
                 type="text"
                 className="form-control form-control-sm bg-light fs-13"
+                style={{ textTransform: 'capitalize' }}
                 placeholder="Name of person on shift"
                 value={formData.inspectorName}
-                onChange={(e) => setFormData({ ...formData, inspectorName: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
+                  setFormData({ ...formData, inspectorName: val });
+                }}
               />
             </div>
 
             {/* Side-by-side: Width Found & Fold Found with PO comparison */}
-            {(() => {
-              const parseNum = (val) => {
-                if (val === undefined || val === null || val === '') return null;
-                const cleaned = String(val).replace(/[^0-9.]/g, '');
-                const num = parseFloat(cleaned);
-                return isNaN(num) ? null : num;
-              };
-
-              const expWidthClean = String(formData.expectedWidth || '42').replace(/"/g, '').trim();
-              const expWidthNum = parseNum(expWidthClean);
-              const actualWidthNum = parseNum(formData.actualWidth);
-              const hasWidth = formData.actualWidth !== undefined && formData.actualWidth !== null && String(formData.actualWidth).trim() !== '';
-              const isWidthMismatch = hasWidth && (actualWidthNum === null || expWidthNum === null || Math.abs(actualWidthNum - expWidthNum) > 0.01);
-              const isWidthMatch = hasWidth && !isWidthMismatch;
-
-              const expFoldClean = String(formData.expectedFold || '3').replace(/%/g, '').trim();
-              const expFoldNum = parseNum(expFoldClean);
-              const actualFoldNum = parseNum(formData.actualFold);
-              const hasFold = formData.actualFold !== undefined && formData.actualFold !== null && String(formData.actualFold).trim() !== '';
-              const isFoldMismatch = hasFold && (actualFoldNum === null || expFoldNum === null || Math.abs(actualFoldNum - expFoldNum) > 0.01);
-              const isFoldMatch = hasFold && !isFoldMismatch;
-
-              return (
-                <div className="row g-3 align-items-center mb-3">
-                  <div className="col-12 col-sm-auto">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
-                      Width found
-                    </label>
-                    <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
-                      Expected: {expWidthClean}&quot;
-                    </div>
-                    <input
-                      type="text"
-                      className="form-control bg-white border fs-13 rounded-3"
-                      style={{ width: '160px' }}
-                      placeholder="e.g. 42"
-                      value={formData.actualWidth}
-                      onChange={(e) => setFormData({ ...formData, actualWidth: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="col-12 col-sm-auto">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
-                      Fold found (%)
-                    </label>
-                    <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
-                      Expected: {expFoldClean}%
-                    </div>
-                    <input
-                      type="text"
-                      className="form-control bg-white border fs-13 rounded-3"
-                      style={{ width: '160px' }}
-                      placeholder="e.g. 3"
-                      value={formData.actualFold}
-                      onChange={(e) => setFormData({ ...formData, actualFold: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="col-12 col-md d-flex align-items-center pt-sm-4">
-                    {isWidthMismatch ? (
-                      <div className="d-flex align-items-center gap-1.5 text-danger fw-semibold fs-13">
-                        <i className="ti ti-alert-triangle fs-16"></i>
-                        <span>Width differs from PO (expected {expWidthClean}&quot;)</span>
-                      </div>
-                    ) : isFoldMismatch ? (
-                      <div className="d-flex align-items-center gap-1.5 text-danger fw-semibold fs-13">
-                        <i className="ti ti-alert-triangle fs-16"></i>
-                        <span>Fold differs from PO (expected {expFoldClean}%)</span>
-                      </div>
-                    ) : hasWidth && isWidthMatch && (!hasFold || isFoldMatch) ? (
-                      <div className="d-flex align-items-center gap-1.5 text-success fw-semibold fs-13">
-                        <i className="ti ti-check fs-16"></i>
-                        <span>Matches PO expectation</span>
-                      </div>
-                    ) : null}
-                  </div>
+            <div className="row g-3 align-items-center mb-3">
+              <div className="col-12 col-sm-auto">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
+                  Width found
+                </label>
+                <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
+                  Expected: {expWidthClean}&quot;
                 </div>
-              );
-            })()}
+                <input
+                  type="text"
+                  className={`form-control fs-13 rounded-3 ${isWidthMismatch ? 'border-danger bg-danger-subtle bg-opacity-10' : 'bg-white border'}`}
+                  style={{ width: '160px' }}
+                  placeholder="e.g. 42"
+                  value={formData.actualWidth}
+                  onChange={(e) => setFormData({ ...formData, actualWidth: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-sm-auto">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
+                  Fold found (%)
+                </label>
+                <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
+                  Expected: {expFoldClean}%
+                </div>
+                <input
+                  type="text"
+                  className={`form-control fs-13 rounded-3 ${isFoldMismatch ? 'border-danger bg-danger-subtle bg-opacity-10' : 'bg-white border'}`}
+                  style={{ width: '160px' }}
+                  placeholder="e.g. 100"
+                  value={formData.actualFold}
+                  onChange={(e) => setFormData({ ...formData, actualFold: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-md d-flex align-items-center pt-sm-4">
+                {hasAnyMismatch ? (
+                  <div className="p-2.5 rounded-3 bg-warning-subtle border border-warning border-opacity-50 text-dark fw-medium fs-12 w-100">
+                    <div className="d-flex align-items-center gap-1.5 mb-0.5">
+                      <i className="ti ti-alert-triangle fs-16 text-warning"></i>
+                      <span className="fs-12 fw-bold">Note: Width or Fold differs from PO</span>
+                    </div>
+                    <div className="small text-secondary">
+                      {isWidthMismatch && (
+                        <span>• Width: {actualWidthNum}&quot; (expected {expWidthClean}&quot;). </span>
+                      )}
+                      {isFoldMismatch && (
+                        <span>• Fold: {actualFoldNum}% (expected {expFoldClean}%). </span>
+                      )}
+                    </div>
+                  </div>
+                ) : hasWidth && isWidthMatch && (!hasFold || isFoldMatch) ? (
+                  <div className="d-flex align-items-center gap-1.5 text-success fw-semibold fs-13">
+                    <i className="ti ti-check fs-16"></i>
+                    <span>Matches PO expectation (Width: {expWidthClean}&quot;, Fold: {expFoldClean}%)</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
 
             {/* Notes */}
             <div className="mb-3">
@@ -628,37 +714,126 @@ export default function QualityCheckForm({
               <h5 className="fw-bold text-dark mb-0 fs-16">
                 Bale / piece-level inspection
               </h5>
-              <div className="d-flex align-items-center gap-2">
-                {grnPieces.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-danger py-0.5 px-2.5 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
-                      onClick={handleMarkAllPiecesReject}
-                      title="Mark all pieces as Reject"
-                    >
-                      <i className="ti ti-x fs-12"></i>
-                      <span>Reject All Pieces</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-success py-0.5 px-2.5 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
-                      onClick={handleMarkAllPiecesOK}
-                      title="Mark all pieces as OK"
-                    >
-                      <i className="ti ti-check fs-12"></i>
-                      <span>Mark All OK</span>
-                    </button>
-                  </>
-                )}
-                <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill">
-                  optional
-                </span>
-              </div>
             </div>
             <p className="text-secondary fs-12 mb-3">
-              Most shipments are checked as a whole (above). If only specific pieces need a closer look, tick them below &mdash; each gets its own width/fold/photo/status, independent of the overall decision.
+              Most shipments are checked as a whole (above). If only specific pieces need a closer look, use the dropdown below or tick pieces &mdash; each gets its own width/fold/photo/status.
             </p>
+
+            {/* Requirement 24: Dropdown Options for Bale / Piece-level inspection */}
+            {grnPieces.length > 0 && (
+              <div className="bg-light p-3 rounded-3 border mb-3">
+                <div className="row g-3 align-items-center">
+                  {/* Dropdown 1: Select Bale */}
+                  <div className="col-12 col-sm-4">
+                    <label className="form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1">
+                      <i className="ti ti-box fs-13 text-primary"></i>
+                      <span>Select Bale Dropdown:</span>
+                    </label>
+                    <select
+                      className="form-select form-select-sm bg-white fs-12 border rounded-2"
+                      value={selectedBaleFilter}
+                      onChange={(e) => {
+                        setSelectedBaleFilter(e.target.value);
+                        setSelectedPieceKey('');
+                      }}
+                    >
+                      <option value="all">All Bales ({uniqueBaleNumbers.length} Bales &middot; {grnPieces.length} Pieces)</option>
+                      {uniqueBaleNumbers.map((bNo) => {
+                        const count = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).length;
+                        const meters = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).reduce((s, p) => s + (Number(p.meters) || 0), 0);
+                        return (
+                          <option key={bNo} value={bNo}>
+                            Bale #{bNo} &mdash; {count} pieces ({meters}m)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Dropdown 2: Select Specific Piece */}
+                  <div className="col-12 col-sm-5">
+                    <label className="form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1">
+                      <i className="ti ti-eye fs-13 text-primary"></i>
+                      <span>Inspect Specific Piece Dropdown:</span>
+                    </label>
+                    <select
+                      className="form-select form-select-sm bg-white fs-12 border rounded-2"
+                      value={selectedPieceKey}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        setSelectedPieceKey(key);
+                        if (key) {
+                          const targetPiece = grnPieces.find((p) => p.key === key);
+                          if (targetPiece) {
+                            setSelectedBaleFilter(String(targetPiece.baleNo));
+                            setPieceInspections((prev) => ({
+                              ...prev,
+                              [key]: {
+                                ...(prev[key] || {
+                                  actualWidth: formData.expectedWidth,
+                                  actualFold: formData.expectedFold,
+                                  status: 'OK',
+                                  notes: '',
+                                  photos: []
+                                }),
+                                checked: true
+                              }
+                            }));
+                          }
+                        }
+                      }}
+                    >
+                      <option value="">-- All Pieces in Selected Bale --</option>
+                      {(selectedBaleFilter === 'all' ? grnPieces : grnPieces.filter((p) => String(p.baleNo) === String(selectedBaleFilter))).map((pc) => {
+                        const st = pieceInspections[pc.key]?.status || 'OK';
+                        const isInspected = Boolean(pieceInspections[pc.key]?.checked);
+                        return (
+                          <option key={pc.key} value={pc.key}>
+                            Bale {pc.baleNo} &middot; Piece {pc.pieceIdx + 1} ({pc.meters}m) &mdash; [{isInspected ? st : 'Unchecked'}]
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Dropdown 3: Inspection Level / Scope */}
+                  <div className="col-12 col-sm-3">
+                    <label className="form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1">
+                      <i className="ti ti-layers-subtract fs-13 text-primary"></i>
+                      <span>Inspection Level:</span>
+                    </label>
+                    <select
+                      className="form-select form-select-sm bg-white fs-12 border rounded-2"
+                      value={inspectionScope}
+                      onChange={(e) => setInspectionScope(e.target.value)}
+                    >
+                      <option value="all">Full Shipment Inspection</option>
+                      <option value="bale">Bale-Level Focus</option>
+                      <option value="piece">Piece-Level Detailed</option>
+                    </select>
+                  </div>
+                </div>
+
+                {selectedPieceKey && (
+                  <div className="d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+                    <span className="fs-12 text-secondary">
+                      Showing selected piece: <strong>{selectedPieceKey}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-decoration-none fs-12 fw-semibold"
+                      style={{ color: '#5b47fb' }}
+                      onClick={() => {
+                        setSelectedPieceKey('');
+                        setSelectedBaleFilter('all');
+                      }}
+                    >
+                      Clear Filter (Show All)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {grnPieces.length === 0 ? (
               <div className="text-center py-3 text-muted fs-13 border rounded-3 bg-light">
@@ -666,7 +841,12 @@ export default function QualityCheckForm({
               </div>
             ) : (
               <div className="d-flex flex-column gap-2">
-                {grnPieces.map((pc) => {
+                {displayedPieces.length === 0 ? (
+                  <div className="text-center py-3 text-muted fs-13 border rounded-3 bg-light">
+                    No pieces match the selected dropdown filter.
+                  </div>
+                ) : (
+                  displayedPieces.map((pc) => {
                   const pieceData = pieceInspections[pc.key] || {
                     checked: false,
                     actualWidth: formData.expectedWidth,
@@ -823,7 +1003,8 @@ export default function QualityCheckForm({
                       )}
                     </div>
                   );
-                })}
+                })
+              )}
               </div>
             )}
           </div>
@@ -832,25 +1013,50 @@ export default function QualityCheckForm({
 
 
 
-          {/* Bottom Action Buttons (Matches Screenshot 3 with ERP theme) */}
+          {/* Bottom Action Buttons */}
           <div className="d-flex flex-wrap align-items-center gap-3 pt-3">
-            <button
-              type="button"
-              className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
-              style={{ backgroundColor: '#15803d', borderColor: '#15803d' }}
-              onClick={() => {
-                setFormData({ ...formData, qcStatus: 'OK' });
-                handleSubmit('OK');
-              }}
-            >
-              <i className="ti ti-check fs-16"></i>
-              <span>Mark OK &mdash; Add Good Qty to Stock Pool</span>
-            </button>
+            {/* Requirement 23: During QC, if exceptions do not match, the option to add stock should be hidden or disabled */}
+            {hasAnyMismatch || !isBaleCompletenessOk ? (
+              <div className="d-inline-flex flex-column align-items-start gap-1">
+                <button
+                  type="button"
+                  className="btn btn-secondary px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 opacity-50 cursor-not-allowed"
+                  disabled
+                  title={
+                    hasAnyMismatch
+                      ? "Option to add stock is disabled because Width or Fold exception does not match PO specification"
+                      : "Option to add stock is disabled because total quantity declared in GRN has incomplete bale entries"
+                  }
+                >
+                  <i className="ti ti-lock fs-16"></i>
+                  <span>Mark OK &mdash; Add Good Qty to Stock Pool (Disabled &mdash; Exception Mismatch)</span>
+                </button>
+                <span className="small text-danger fw-semibold d-flex align-items-center gap-1">
+                  <i className="ti ti-alert-triangle fs-12"></i>
+                  {hasAnyMismatch
+                    ? "Add stock disabled: Exceptions (Width/Fold) do not match PO specification. Must send for Admin Approval or Reject."
+                    : "Add stock disabled: Complete all bale entries in GRN before completing QC."}
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
+                style={{ backgroundColor: '#15803d', borderColor: '#15803d' }}
+                onClick={() => {
+                  setFormData({ ...formData, qcStatus: 'OK' });
+                  handleSubmit('OK');
+                }}
+              >
+                <i className="ti ti-check fs-16"></i>
+                <span>Mark OK &mdash; Add Good Qty to Stock Pool</span>
+              </button>
+            )}
 
             <button
               type="button"
-              className="btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
-              style={{ backgroundColor: '#ffffff', borderColor: '#b91c1c', color: '#b91c1c' }}
+              className={`btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 ${hasAnyMismatch ? 'border-2 border-danger text-danger bg-danger-subtle' : ''}`}
+              style={!hasAnyMismatch ? { backgroundColor: '#ffffff', borderColor: '#b91c1c', color: '#b91c1c' } : {}}
               onClick={() => {
                 setFormData({ ...formData, qcStatus: 'Send for Admin Approval' });
                 handleSubmit('Send for Admin Approval');

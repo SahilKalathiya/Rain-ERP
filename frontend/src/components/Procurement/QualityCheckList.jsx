@@ -38,6 +38,22 @@ export default function QualityCheckList({
       firstBale?.fabricItemLabel ||
       firstBale?.fabric ||
       linkedPO?.items?.[0]?.fabricName ||
+      linkedPO?.items?.[0]?.fabricQuality ||
+      'Cotton Rayon Blend';
+
+    // Calculate bale completeness for linked GRN (Requirement 21)
+    const declaredQty = Number(matchedGrn?.totalQty) || Number(matchedGrn?.declaredTotalMeters) || 0;
+    const rawBales = matchedGrn?.bales || [];
+    const baleTotalMeters = rawBales.reduce((s, b) => {
+      const pLen = (b.pieces || []).reduce((ps, p) => ps + (Number(p.length) || 0), 0);
+      return s + (pLen > 0 ? pLen : (Number(b.totalLength) || 0));
+    }, 0);
+    const isBaleEntriesComplete = !matchedGrn || (
+      declaredQty > 0 &&
+      rawBales.length > 0 &&
+      baleTotalMeters > 0 &&
+      Math.abs(baleTotalMeters - declaredQty) < 0.01
+    );
       'Grey Cotton Fabrics (100*100)';
 
     let parsedFabric = rawFabricLabel;
@@ -91,7 +107,10 @@ export default function QualityCheckList({
       color,
       width,
       qty,
-      status
+      status,
+      isBaleEntriesComplete,
+      declaredQty,
+      baleTotalMeters
     };
   };
 
@@ -103,8 +122,7 @@ export default function QualityCheckList({
   const adminCount = qcRecords.filter(
     (qc) =>
       qc.qcStatus === 'Send for Admin Approval' ||
-      qc.qcStatus === 'Admin Approval' ||
-      qc.adminDecision === 'Pending Admin Review'
+      qc.qcStatus === 'Admin Approval'
   ).length;
   const completedCount = qcRecords.filter(
     (qc) =>
@@ -169,8 +187,7 @@ function parseDateForSort(d, id) {
     } else if (activeTabFilter === 'admin') {
       matchesTab =
         qc.qcStatus === 'Send for Admin Approval' ||
-        qc.qcStatus === 'Admin Approval' ||
-        qc.adminDecision === 'Pending Admin Review';
+        qc.qcStatus === 'Admin Approval';
     } else if (activeTabFilter === 'completed') {
       matchesTab =
         qc.qcStatus === 'OK' ||
@@ -422,13 +439,18 @@ function parseDateForSort(d, id) {
                           <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
                             Partial OK
                           </span>
-                        ) : d.status === 'Send for Admin Approval' || d.status === 'Admin Approval' || qc.adminDecision === 'Pending Admin Review' ? (
+                        ) : d.status === 'Send for Admin Approval' || d.status === 'Admin Approval' ? (
                           <span className="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
                             Admin Approval
                           </span>
                         ) : d.status === 'Reject' || d.status === 'Rejected' ? (
                           <span className="badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
                             Rejected
+                          </span>
+                        ) : isPending && !d.isBaleEntriesComplete ? (
+                          <span className="badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1">
+                            <i className="ti ti-alert-triangle text-warning"></i>
+                            <span>Incomplete Bales</span>
                           </span>
                         ) : (
                           <span className="badge px-3 py-1 fs-11 rounded-pill" style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
@@ -440,15 +462,27 @@ function parseDateForSort(d, id) {
                       {/* ACTION */}
                       <td className="text-center" onClick={(e) => e.stopPropagation()}>
                         {isPending ? (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-sm d-inline-flex align-items-center gap-1"
-                            style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                            onClick={() => onSelectQC && onSelectQC(qc)}
-                          >
-                            <span>Run QC</span>
-                            <i className="ti ti-chevron-right fs-11"></i>
-                          </button>
+                          !d.isBaleEntriesComplete ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary px-3 py-1.5 rounded-2 fs-12 fw-semibold opacity-75 shadow-xs d-inline-flex align-items-center gap-1"
+                              onClick={() => alert(`QC cannot proceed: Total quantity in GRN (${d.declaredQty}m) has incomplete bale entries (${d.baleTotalMeters}m). Please complete all bale entries in GRN before starting QC.`)}
+                              title={`Cannot proceed to QC: Bale entries incomplete (${d.baleTotalMeters}m of ${d.declaredQty}m entered)`}
+                            >
+                              <i className="ti ti-lock fs-11 text-muted"></i>
+                              <span>Run QC (Incomplete)</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-sm d-inline-flex align-items-center gap-1"
+                              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                              onClick={() => onSelectQC && onSelectQC(qc)}
+                            >
+                              <span>Run QC</span>
+                              <i className="ti ti-chevron-right fs-11"></i>
+                            </button>
+                          )
                         ) : (
                           <button
                             type="button"

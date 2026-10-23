@@ -28,7 +28,8 @@ export default function GRNDetailView({
     lrNumber: '',
     lrDate: '',
     weightKg: '',
-    foldingCms: ''
+    foldingCms: '',
+    totalQty: ''
   });
 
   useEffect(() => {
@@ -43,7 +44,10 @@ export default function GRNDetailView({
         lrNumber: grn.lrNumber || grn.lrNo || '',
         lrDate: grn.lrDate ? (typeof grn.lrDate === 'string' && grn.lrDate.includes('T') ? grn.lrDate.split('T')[0] : grn.lrDate) : '',
         weightKg: grn.weightKg !== undefined && grn.weightKg !== null ? String(grn.weightKg) : (grn.weight ? String(grn.weight) : ''),
-        foldingCms: grn.foldingCms !== undefined && grn.foldingCms !== null ? String(grn.foldingCms) : (grn.fabricFolding ? String(grn.fabricFolding) : '')
+        foldingCms: grn.foldingCms !== undefined && grn.foldingCms !== null ? String(grn.foldingCms) : (grn.fabricFolding ? String(grn.fabricFolding) : ''),
+        totalQty: grn.totalQty !== undefined && grn.totalQty !== null && grn.totalQty !== ''
+          ? String(grn.totalQty)
+          : (grn.declaredTotalMeters ? String(grn.declaredTotalMeters) : '')
       });
     }
   }, [grn, showEditHeaderModal]);
@@ -91,8 +95,6 @@ export default function GRNDetailView({
   const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
   const mainQC = qcRecs[0];
 
-  const anyPending = !grn.isQcActioned && (!mainQC || mainQC.qcStatus === 'Pending');
-
   const declaredBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
   const rawBales = grn.bales || [];
   let bales = [...rawBales];
@@ -107,7 +109,55 @@ export default function GRNDetailView({
       });
     }
   }
-  const totalMeters = Number(grn.totalMetersEntered) || (bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0)) || Number(grn.declaredTotalMeters) || 0;
+
+  // Calculate declared total quantity entered
+  const declaredTotalQty = Number(grn.totalQty) || Number(grn.declaredTotalMeters) || 0;
+
+  // Calculate actual total meters entered across bales and pieces
+  const baleMetersEntered = (grn.bales || []).reduce((s, b) => {
+    const pLen = (b.pieces || []).reduce((ps, p) => ps + (Number(p.length) || 0), 0);
+    return s + (pLen > 0 ? pLen : (Number(b.totalLength) || 0));
+  }, 0);
+
+  // Requirement 21: QC should not proceed until the total quantity entered in GRN has complete bale entries.
+  const isBaleEntriesComplete = declaredTotalQty > 0 &&
+    (grn.bales && grn.bales.length > 0) &&
+    baleMetersEntered > 0 &&
+    Math.abs(baleMetersEntered - declaredTotalQty) < 0.01;
+
+  const baleIncompleteReason = declaredTotalQty <= 0
+    ? 'Total quantity is not specified in GRN'
+    : (grn.bales || []).length === 0
+    ? 'No bales entered in GRN'
+    : Math.abs(baleMetersEntered - declaredTotalQty) >= 0.01
+    ? `Bale entries total (${baleMetersEntered}m) does not match total quantity (${declaredTotalQty}m)`
+    : '';
+
+  // Requirement 21 & Header Lock: Once QC starts, passes, or is actioned, both bale entries and receipt details are locked / non-editable.
+  const isQcPassedOrApproved = Boolean(
+    grn.status === 'QC Approved' ||
+    grn.status === 'QC Passed' ||
+    grn.status === 'Passed' ||
+    grn.status === 'Completed' ||
+    (mainQC && (mainQC.qcStatus === 'Passed' || mainQC.qcStatus === 'QC Approved' || mainQC.qcStatus === 'Approved'))
+  );
+
+  const isQcStarted = Boolean(
+    isQcPassedOrApproved ||
+    grn.isQcActioned ||
+    (mainQC && mainQC.qcStatus && mainQC.qcStatus !== 'Pending' && mainQC.qcStatus !== 'Awaiting QC') ||
+    (mainQC && (mainQC.startedAt || mainQC.isStarted || mainQC.actualWidth || mainQC.actualFold || (mainQC.inspectedPieces && mainQC.inspectedPieces.length > 0))) ||
+    grn.status === 'QC Rejected' ||
+    grn.status === 'Pending Admin Approval' ||
+    (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC'))
+  );
+
+  const canEditHeader = !isQcStarted;
+  const canEditBales = !isQcStarted;
+
+  const anyPending = !isQcStarted;
+
+  const totalMeters = Number(grn.totalMetersEntered) || (bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0)) || Number(grn.declaredTotalMeters) || Number(grn.totalQty) || 0;
   const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
 
   // Expected Width & Fold
@@ -116,6 +166,11 @@ export default function GRNDetailView({
 
   const handleSaveHeader = (e) => {
     e.preventDefault();
+    if (!canEditHeader) {
+      alert('Receipt details cannot be edited because Quality Check has already started or been approved for this GRN.');
+      setShowEditHeaderModal(false);
+      return;
+    }
     if (onEditHeader) {
       onEditHeader({
         ...grn,
@@ -126,11 +181,14 @@ export default function GRNDetailView({
         invoiceValue: editHeaderForm.invoiceValue,
         transporterName: editHeaderForm.transporter,
         lrNumber: editHeaderForm.lrNumber,
+        lrNo: editHeaderForm.lrNumber,
         lrDate: editHeaderForm.lrDate,
         weightKg: editHeaderForm.weightKg,
         weight: editHeaderForm.weightKg,
         foldingCms: editHeaderForm.foldingCms,
-        fabricFolding: editHeaderForm.foldingCms
+        fabricFolding: editHeaderForm.foldingCms,
+        totalQty: editHeaderForm.totalQty,
+        declaredTotalMeters: Number(editHeaderForm.totalQty) || 0
       });
     }
     setShowEditHeaderModal(false);
@@ -177,14 +235,21 @@ export default function GRNDetailView({
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
         <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
           <h5 className="fw-bold text-dark mb-0 fs-16">Receipt details</h5>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm px-3 py-1 rounded-3 fs-12 fw-medium"
-            onClick={() => setShowEditHeaderModal(true)}
-          >
-            <i className="ti ti-edit me-1"></i>
-            Edit
-          </button>
+          {canEditHeader ? (
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm px-3 py-1 rounded-3 fs-12 fw-medium"
+              onClick={() => setShowEditHeaderModal(true)}
+            >
+              <i className="ti ti-edit me-1"></i>
+              Edit
+            </button>
+          ) : (
+            <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
+              <i className="ti ti-lock fs-13 text-muted"></i>
+              <span>Locked ({isQcPassedOrApproved ? 'QC Approved' : 'QC Actioned'} &mdash; Non-editable)</span>
+            </span>
+          )}
         </div>
 
         <div className="row g-4 fs-13">
@@ -220,7 +285,7 @@ export default function GRNDetailView({
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">LR NO. / DATE</div>
             <div className="fw-bold text-dark">
-              {grn.lrNumber || '—'}
+              {grn.lrNumber || grn.lrNo || '—'}
               {grn.lrDate && (
                 <div className="text-muted fs-11 fw-normal">{grn.lrDate}</div>
               )}
@@ -254,7 +319,7 @@ export default function GRNDetailView({
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
         <div className="card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between">
           <h5 className="fw-bold text-dark mb-0 fs-16">Bale-wise breakdown</h5>
-          {anyPending && onEditBales && (
+          {canEditBales && onEditBales ? (
             <button
               type="button"
               className="btn btn-sm btn-primary px-3 py-1 text-white rounded-3 fs-12 fw-semibold"
@@ -263,6 +328,11 @@ export default function GRNDetailView({
             >
               <i className="ti ti-edit me-1"></i> Edit Bale Entries
             </button>
+          ) : (
+            <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
+              <i className="ti ti-lock fs-13 text-muted"></i>
+              <span>Locked (QC Started &mdash; Non-editable)</span>
+            </span>
           )}
         </div>
 
@@ -295,7 +365,7 @@ export default function GRNDetailView({
                   const bMeters = (bale.pieces && bale.pieces.length > 0)
                     ? bale.pieces.reduce((s, p) => s + (Number(p.length) || 0), 0)
                     : (Number(bale.totalLength) || 0);
-                  const isQcLocked = !anyPending || bale.qcStatus === 'Approved' || bale.qcStatus === 'OK';
+                  const isQcLocked = isQcStarted || bale.qcStatus === 'Approved' || bale.qcStatus === 'OK';
 
                   return (
                     <tr key={idx}>
@@ -323,7 +393,7 @@ export default function GRNDetailView({
                           }`}
                         >
                           <i className={`ti ${isQcLocked ? 'ti-lock' : 'ti-pencil'} me-1 fs-10`}></i>
-                          {isQcLocked ? 'Locked (QC done)' : 'Editable'}
+                          {isQcLocked ? 'Locked (QC started)' : 'Editable'}
                         </span>
                       </td>
                     </tr>
@@ -337,30 +407,45 @@ export default function GRNDetailView({
 
       {/* CARD 3: Quality Check by Item (Clickable - Redirects to QC inspection) */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-3 fs-16">Quality check by item</h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+          <h5 className="fw-bold text-dark mb-0 fs-16">Quality check by item</h5>
+          {!isBaleEntriesComplete && !isQcStarted && (
+            <span className="badge bg-warning-subtle text-dark border border-warning border-opacity-50 px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
+              <i className="ti ti-alert-triangle text-warning"></i>
+              <span>QC Locked: Complete Bale Entries Required ({baleMetersEntered}m / {declaredTotalQty}m)</span>
+            </span>
+          )}
+        </div>
         <div
           className="border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white"
           style={{
-            borderColor: '#e2e8f0',
-            cursor: 'pointer',
+            borderColor: !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0',
+            cursor: !isBaleEntriesComplete && !isQcStarted ? 'not-allowed' : 'pointer',
+            backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff',
             transition: 'all 0.15s ease-in-out'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#5b47fb';
-            e.currentTarget.style.backgroundColor = '#faf9ff';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(91, 71, 251, 0.08)';
+            if (isBaleEntriesComplete || isQcStarted) {
+              e.currentTarget.style.borderColor = '#5b47fb';
+              e.currentTarget.style.backgroundColor = '#faf9ff';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(91, 71, 251, 0.08)';
+            }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = '#e2e8f0';
-            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.borderColor = !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0';
+            e.currentTarget.style.backgroundColor = !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff';
             e.currentTarget.style.boxShadow = 'none';
           }}
           onClick={() => {
+            if (!isBaleEntriesComplete && !isQcStarted) {
+              alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
+              return;
+            }
             if (onSelectQCItem) {
               onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
             }
           }}
-          title="Click anywhere on this card to run quality check inspection"
+          title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : 'Click anywhere on this card to run quality check inspection'}
         >
           <div className="d-flex align-items-center gap-3">
             <div
@@ -381,7 +466,7 @@ export default function GRNDetailView({
                 <span>
                   {mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
                     ? 'QC Inspection Completed'
-                    : 'Awaiting quality check'}
+                    : (!isBaleEntriesComplete && !isQcStarted ? `Awaiting complete bale entries (${baleMetersEntered}m of ${declaredTotalQty}m)` : 'Awaiting quality check')}
                 </span>
               </div>
             </div>
@@ -392,25 +477,35 @@ export default function GRNDetailView({
               className={`badge rounded-pill px-3 py-1.5 fs-12 fw-semibold ${
                 mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
                   ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                  : (!isBaleEntriesComplete && !isQcStarted)
+                  ? 'bg-warning-subtle text-dark border border-warning border-opacity-50'
                   : mainQC?.qcStatus === 'Reject' || mainQC?.qcStatus === 'Rejected'
                   ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
                   : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
               }`}
             >
-              {mainQC?.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC')}
+              {!isBaleEntriesComplete && !isQcStarted ? 'Incomplete Bales' : (mainQC?.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC'))}
             </span>
             <button
               type="button"
-              className="btn btn-sm btn-primary rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white"
-              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+              className={`btn btn-sm rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white ${!isBaleEntriesComplete && !isQcStarted ? 'btn-secondary opacity-75' : 'btn-primary'}`}
+              style={{
+                backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb',
+                borderColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb'
+              }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (!isBaleEntriesComplete && !isQcStarted) {
+                  alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
+                  return;
+                }
                 if (onSelectQCItem) {
                   onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
                 }
               }}
+              title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : ''}
             >
-              <span>{mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved' ? 'View QC' : 'Run Inspection'}</span>
+              <span>{mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved' ? 'View QC' : (!isBaleEntriesComplete && !isQcStarted ? 'Run Inspection (Bales Incomplete)' : 'Run Inspection')}</span>
               <i className="ti ti-arrow-right fs-13"></i>
             </button>
           </div>
@@ -420,7 +515,7 @@ export default function GRNDetailView({
       {/* ========================================================================= */}
       {/* EDIT HEADER MODAL (Matches User Image 2 with all 10 Receipt-level fields) */}
       {/* ========================================================================= */}
-      {showEditHeaderModal && (
+      {canEditHeader && showEditHeaderModal && (
         <div
           className="modal fade show d-block"
           tabIndex="-1"
@@ -585,6 +680,20 @@ export default function GRNDetailView({
                         value={editHeaderForm.foldingCms}
                         onChange={(e) => setEditHeaderForm({ ...editHeaderForm, foldingCms: e.target.value })}
                         placeholder=""
+                      />
+                    </div>
+
+                    {/* 11. Total quantity (m) */}
+                    <div className="col-12 col-sm-6">
+                      <label className="form-label fs-11 fw-medium text-dark mb-1">Total quantity (m)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
+                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
+                        value={editHeaderForm.totalQty}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, totalQty: e.target.value })}
+                        placeholder="e.g. 500"
                       />
                     </div>
                   </div>

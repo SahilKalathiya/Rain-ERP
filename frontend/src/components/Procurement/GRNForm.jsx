@@ -31,6 +31,7 @@ export default function GRNForm({
   fabrics = [],
   transporters = [],
   qualityChecks = [],
+  grns = [],
   onBack,
   onSaveGRN,
   onSaveTransporter
@@ -44,8 +45,22 @@ export default function GRNForm({
     return found ? found.name : (po.vendorId || '');
   };
 
-  // Find eligible POs (all POs or non-Draft POs)
-  const eligiblePOs = purchaseOrders.length > 0 ? purchaseOrders : [];
+  // Find eligible POs (exclude POs that already have an existing GRN, unless editing the current GRN)
+  const eligiblePOs = (purchaseOrders || []).filter((p) => {
+    if (!p) return false;
+    const isCurrentPo = Boolean(grn && (grn.poId === p.id || (grn.linkedPOs && grn.linkedPOs.includes(p.id))));
+    if (isCurrentPo) return true;
+    const hasExistingGrn = (grns || []).some(
+      (g) => g && g.id !== grn?.id && (
+        (g.linkedPOs && g.linkedPOs.includes(p.id)) ||
+        g.poId === p.id ||
+        g.poNumber === p.id ||
+        g.againstPo === p.id
+      )
+    );
+    const poAlreadyReceived = p.status === 'Completed' || p.status === 'Partially Received' || Number(p.receivedQty) > 0;
+    return !hasExistingGrn && !poAlreadyReceived && p.status !== 'Draft' && p.status !== 'Cancelled';
+  });
 
   // Initialize form state
   const [formData, setFormData] = useState(() => {
@@ -58,7 +73,9 @@ export default function GRNForm({
     const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || '');
     const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : '');
 
-    const defaultDeclared = grn?.declaredTotalMeters || grn?.totalQty || '';
+    const defaultDeclared = (grn && grn.totalQty !== undefined && grn.totalQty !== '')
+      ? grn.totalQty
+      : (grn?.declaredTotalMeters ? grn.declaredTotalMeters : '');
 
     const cleanDate = (d) => {
       if (!d) return new Date().toISOString().split('T')[0];
@@ -127,7 +144,8 @@ export default function GRNForm({
       vendorInvoiceDate: grn?.vendorInvoiceDate ? cleanDate(grn.vendorInvoiceDate) : '',
       transporterId: grn?.transporterId || '',
       transporterName: grn?.transporterName || '',
-      lrNo: grn?.lrNo || '',
+      lrNo: grn?.lrNo || grn?.lrNumber || '',
+      lrNumber: grn?.lrNumber || grn?.lrNo || '',
       lrDate: grn?.lrDate ? cleanDate(grn.lrDate) : '',
       weight: grn?.weight !== undefined ? grn.weight : '',
       totalQty: defaultDeclared ? String(defaultDeclared) : '',
@@ -221,11 +239,14 @@ export default function GRNForm({
         vendorInvoiceDate: cleanDate(grn.vendorInvoiceDate) || prev.vendorInvoiceDate,
         transporterId: grn.transporterId || prev.transporterId,
         transporterName: grn.transporterName || prev.transporterName,
-        lrNo: grn.lrNo !== undefined ? grn.lrNo : prev.lrNo,
+        lrNo: grn.lrNo || grn.lrNumber || prev.lrNo || '',
+        lrNumber: grn.lrNumber || grn.lrNo || prev.lrNumber || '',
         lrDate: cleanDate(grn.lrDate) || prev.lrDate,
         weight: grn.weight !== undefined ? grn.weight : prev.weight,
-        totalQty: grn.totalQty !== undefined ? String(grn.totalQty) : String(grn.declaredTotalMeters || prev.totalQty),
-        declaredTotalMeters: Number(grn.totalQty || grn.declaredTotalMeters || prev.declaredTotalMeters || 0),
+        totalQty: (grn && grn.totalQty !== undefined && grn.totalQty !== '')
+          ? String(grn.totalQty)
+          : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')),
+        declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0),
         totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
         status: grn.status || prev.status,
         bales: initialBales.length > 0 ? initialBales : prev.bales
@@ -233,14 +254,20 @@ export default function GRNForm({
     }
   }, [grn, purchaseOrders]);
 
-  // Link to Quality Check and verify if QC has taken action
+  // Link to Quality Check and verify if QC has started or taken action (Requirement 21)
   const linkedQC = (qualityChecks || []).find((q) => q.grnRef === formData.id);
   const isQcActioned = Boolean(
     formData.isQcActioned ||
+    (linkedQC && (linkedQC.qcStatus === 'Passed' || linkedQC.qcStatus === 'QC Approved' || linkedQC.qcStatus === 'Approved')) ||
     (linkedQC && linkedQC.qcStatus && linkedQC.qcStatus !== 'Pending' && linkedQC.qcStatus !== 'Awaiting QC') ||
+    (linkedQC && (linkedQC.startedAt || linkedQC.isStarted || linkedQC.actualWidth || linkedQC.actualFold || (linkedQC.inspectedPieces && linkedQC.inspectedPieces.length > 0))) ||
     formData.status === 'QC Approved' ||
     formData.status === 'QC Rejected' ||
-    formData.status === 'Pending Admin Approval'
+    formData.status === 'QC Passed' ||
+    formData.status === 'Passed' ||
+    formData.status === 'Completed' ||
+    formData.status === 'Pending Admin Approval' ||
+    (formData.status && formData.status.includes('QC'))
   );
   const isLinkedFromPO = Boolean(grn && ((grn.linkedPOs && grn.linkedPOs.length > 0) || grn.poId));
 
@@ -248,7 +275,22 @@ export default function GRNForm({
   const [savedBaleMap, setSavedBaleMap] = useState({});
 
   // Current active PO
-  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : purchaseOrders[0]) || null;
+  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : null) || null;
+
+  // Ordered meters on PO (for display in Total qty label)
+  const poOrderedMeters = currentPO && currentPO.items && currentPO.items.length > 0
+    ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
+    : Number(grn?.poOrderedMeters || 0);
+
+  // Existing previous GRNs for this PO (excluding current GRN being edited)
+  const previousGrnsForPo = (grns || []).filter(
+    (g) => g && g.id !== formData.id && ((g.linkedPOs && g.linkedPOs.includes(formData.poId)) || g.poId === formData.poId)
+  );
+  const alreadyReceivedMeters = previousGrnsForPo.reduce(
+    (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
+    0
+  );
+  const poPendingMeters = Math.max(0, poOrderedMeters - alreadyReceivedMeters);
 
   // Build PO item options for bales
   const getPoItemLabel = (item) => {
@@ -322,45 +364,19 @@ export default function GRNForm({
         linkedPOs: [newPoId],
         vendorId: selectedPO.vendorId,
         vendorName: vName,
-        totalQty: prev.totalQty || '',
-        declaredTotalMeters: Number(prev.totalQty || prev.declaredTotalMeters || 0),
+        totalQty: '',
+        declaredTotalMeters: 0,
         bales: updatedBales
       };
     });
   };
 
-  // Live Bale Count Input change (auto-generates / auto-adjusts bales immediately)
+  // Handle No. of bales input change (only updates count, does NOT auto-generate bales)
   const handleBaleCountChange = (val) => {
-    const count = parseInt(val, 10);
-    if (!isNaN(count) && count >= 0) {
-      const currentBales = formData.bales || [];
-      const newBales = [];
-      for (let i = 0; i < count; i++) {
-        if (currentBales[i]) {
-          newBales.push(currentBales[i]);
-        } else {
-          const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
-          newBales.push({
-            baleNo: String(i + 1),
-            itemIdx: i % (poItemLabels.length || 1),
-            fabricItemLabel: assignedLabel,
-            piecesCount: '',
-            pieces: [],
-            totalLength: 0
-          });
-        }
-      }
-      setFormData((prev) => ({
-        ...prev,
-        totalBales: val,
-        bales: newBales
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        totalBales: val
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      totalBales: val
+    }));
   };
 
   // Generate Bales action
@@ -540,6 +556,10 @@ export default function GRNForm({
 
   // Save Header Only (add bales later)
   const handleSaveHeaderOnly = () => {
+    if (isQcActioned) {
+      showToast('Receipt details are locked because Quality Check has already started or been completed.', 'warning');
+      return;
+    }
     if (!formData.poId) {
       showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
@@ -565,6 +585,9 @@ export default function GRNForm({
       colorHex: colorHexVal,
       width: widthVal,
       declaredTotalMeters: declaredTotal,
+      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      lrNumber: formData.lrNo || formData.lrNumber || '',
+      lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered
     };
 
@@ -601,6 +624,9 @@ export default function GRNForm({
       colorHex: colorHexVal,
       width: widthVal,
       declaredTotalMeters: declaredTotal,
+      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      lrNumber: formData.lrNo || formData.lrNumber || '',
+      lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered
     };
 
@@ -683,6 +709,9 @@ export default function GRNForm({
       colorHex: colorHexVal,
       width: widthVal,
       declaredTotalMeters: declaredTotal,
+      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      lrNumber: formData.lrNo || formData.lrNumber || '',
+      lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered
     };
 
@@ -941,6 +970,21 @@ export default function GRNForm({
           </div>
         </div>
 
+        {/* Partial Inward Notice Banner */}
+        {formData.poId && alreadyReceivedMeters > 0 && (
+          <div className="alert alert-info py-2 px-3 rounded-3 fs-13 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 border-info border-opacity-25 shadow-xs">
+            <div className="d-flex align-items-center gap-2">
+              <i className="ti ti-truck-delivery fs-18 text-info"></i>
+              <span>
+                <strong>Partial Inward for PO {formData.poId}:</strong> {alreadyReceivedMeters.toLocaleString()}m already received in {previousGrnsForPo.map(g => g.id).join(', ')}. <strong>Remaining to Inward: {poPendingMeters.toLocaleString()}m</strong> of {poOrderedMeters.toLocaleString()}m ordered.
+              </span>
+            </div>
+            <span className="badge bg-info text-white fs-11 px-2.5 py-1 rounded-pill">
+              {poPendingMeters.toLocaleString()}m Balance
+            </span>
+          </div>
+        )}
+
         {/* Row 4: Weight, Total qty, No. of bales, Generate Bales, Save Section */}
         <div className="d-flex flex-wrap align-items-end gap-3 pt-2">
           <div style={{ flex: '1 1 140px', minWidth: '130px', maxWidth: '200px' }}>
@@ -956,14 +1000,14 @@ export default function GRNForm({
             />
           </div>
 
-          <div style={{ flex: '1 1 160px', minWidth: '140px', maxWidth: '220px' }}>
+          <div style={{ flex: '1 1 180px', minWidth: '160px', maxWidth: '240px' }}>
             <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Total qty (m) <span className="text-danger">*</span>
+              Total qty {poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : (poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : '(m)')} <span className="text-danger">*</span>
             </label>
             <input
               type="number"
               step="0.01"
-              placeholder="e.g. 1000"
+              placeholder={poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `e.g. ${poPendingMeters}` : (poOrderedMeters > 0 ? `e.g. ${poOrderedMeters}` : "e.g. 1000")}
               className="form-control bg-white fs-13"
               style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
               value={formData.totalQty}
@@ -1004,13 +1048,16 @@ export default function GRNForm({
             className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 text-white shadow-sm"
             style={{
               height: '40px',
-              backgroundColor: '#5b47fb',
-              borderColor: '#5b47fb',
-              borderRadius: '8px'
+              backgroundColor: isQcActioned ? '#94a3b8' : '#5b47fb',
+              borderColor: isQcActioned ? '#94a3b8' : '#5b47fb',
+              borderRadius: '8px',
+              cursor: isQcActioned ? 'not-allowed' : 'pointer'
             }}
+            disabled={isQcActioned}
             onClick={handleGenerateBales}
+            title={isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales'}
           >
-            <i className="ti ti-package fs-15"></i>
+            <i className={`ti ${isQcActioned ? 'ti-lock' : 'ti-package'} fs-15`}></i>
             <span>Generate Bales</span>
           </button>
 
@@ -1021,18 +1068,21 @@ export default function GRNForm({
               height: '40px',
               borderColor: '#cbd5e1',
               borderRadius: '8px',
-              backgroundColor: '#ffffff'
+              backgroundColor: isQcActioned ? '#f1f5f9' : '#ffffff',
+              cursor: isQcActioned ? 'not-allowed' : 'pointer',
+              opacity: isQcActioned ? 0.6 : 1
             }}
+            disabled={isQcActioned}
             onClick={handleSaveHeaderOnly}
-            title="Save Receipt Details header"
+            title={isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header'}
           >
-            <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
+            <i className="ti ti-device-floppy fs-15" style={{ color: isQcActioned ? '#94a3b8' : '#5b47fb' }}></i>
             <span>Save This Section</span>
           </button>
         </div>
 
         <p className="text-muted fs-12 mt-2 mb-0">
-          Press Enter in &quot;No. of bales&quot; to generate immediately, or use the buttons above.
+          Enter the number of bales and click &quot;Generate Bales&quot; (or press Enter) to create bale entries below.
         </p>
       </div>
 
@@ -1068,6 +1118,15 @@ export default function GRNForm({
             </div>
           )}
         </div>
+
+        {isQcActioned && (
+          <div className="alert alert-secondary py-2.5 px-3 rounded-3 fs-13 d-flex align-items-center gap-2 mb-3 border shadow-xs bg-light">
+            <i className="ti ti-lock fs-18 text-secondary"></i>
+            <div>
+              <strong className="text-dark">Bale Entries Locked:</strong> Quality Check has already started for this GRN. Bale & piece entries cannot be edited.
+            </div>
+          </div>
+        )}
 
         {/* Empty state when no bales generated */}
         {formData.bales.length === 0 ? (

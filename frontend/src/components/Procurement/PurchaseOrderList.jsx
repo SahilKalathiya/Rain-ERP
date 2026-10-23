@@ -7,10 +7,12 @@ import React, { useState } from 'react';
 export default function PurchaseOrderList({
   purchaseOrders = [],
   vendors = [],
+  grns = [],
   onNewPO,
   onSelectPO,
   onPrintPO,
-  onInwardGRN
+  onInwardGRN,
+  onViewGRN
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [colFilters, setColFilters] = useState({
@@ -21,6 +23,14 @@ export default function PurchaseOrderList({
     status: '',
     amount: ''
   });
+
+  const isPoGrnLocked = (po) => {
+    if (!po) return false;
+    const isSent = po.status === 'Sent' || po.status === 'Partially Received' || po.status === 'Completed';
+    const grnStarted = po.status === 'Partially Received' || po.status === 'Completed' || (Number(po.receivedQty) > 0) ||
+      (grns || []).some((g) => (g.linkedPOs && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
+    return isSent && grnStarted;
+  };
 
   const getVendorName = (po) => {
     if (po.vendorName && po.vendorName.trim()) return po.vendorName;
@@ -193,66 +203,116 @@ function parseDateForSort(d, id) {
                   </td>
                 </tr>
               ) : (
-                sortedList.map((po) => (
-                  <tr
-                    key={po.id}
-                    style={{ cursor: 'pointer' }}
-                    className="hover-bg-light"
-                    onClick={() => onSelectPO && onSelectPO(po)}
-                  >
-                    <td className="fw-bold text-primary font-monospace">{po.id}</td>
-                    <td>{po.date ? (typeof po.date === 'string' && po.date.includes('T') ? po.date.split('T')[0] : String(po.date)) : '-'}</td>
-                    <td>
-                      <div className="fw-medium text-dark">{getVendorName(po)}</div>
-                      <div className="text-muted fs-11">{po.vendorId}</div>
-                    </td>
-                    <td>
-                      <div className="d-flex flex-column gap-1">
-                        {(po.items || []).map((it, idx) => (
-                          <span key={idx} className="text-dark">
-                            {it.fabricName || it.fabricQuality || 'Fabric'} {it.colorName ? `(${it.colorName})` : ''} ({Number(it.quantity || 0).toLocaleString()}m @ ₹{it.rate || 0})
+                sortedList.map((po) => {
+                  const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+                  const poGrns = (grns || []).filter((g) => (g.linkedPOs && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
+                  const hasExistingGrn = poGrns.length > 0 || (Number(po.receivedQty) > 0) || po.status === 'Partially Received' || po.status === 'Completed';
+                  const receivedMeters = poGrns.reduce((sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0) || Number(po.receivedQty) || 0;
+                  const pendingMeters = Math.max(0, totalOrdered - receivedMeters);
+
+                  return (
+                    <tr
+                      key={po.id}
+                      style={{ cursor: 'pointer' }}
+                      className="hover-bg-light"
+                      onClick={() => onSelectPO && onSelectPO(po)}
+                    >
+                      <td className="fw-bold text-primary font-monospace">{po.id}</td>
+                      <td>{po.date ? (typeof po.date === 'string' && po.date.includes('T') ? po.date.split('T')[0] : String(po.date)) : '-'}</td>
+                      <td>
+                        <div className="fw-medium text-dark">{getVendorName(po)}</div>
+                        <div className="text-muted fs-11">{po.vendorId}</div>
+                      </td>
+                      <td>
+                        <div className="d-flex flex-column gap-1">
+                          {(po.items || []).map((it, idx) => (
+                            <span key={idx} className="text-dark">
+                              {it.fabricName || it.fabricQuality || 'Fabric'} {it.colorName ? `(${it.colorName})` : ''} ({Number(it.quantity || 0).toLocaleString()}m @ ₹{it.rate || 0})
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td>{po.expectedDeliveryDate ? (typeof po.expectedDeliveryDate === 'string' && po.expectedDeliveryDate.includes('T') ? po.expectedDeliveryDate.split('T')[0] : String(po.expectedDeliveryDate)) : '-'}</td>
+                      <td>
+                        {po.bufferAllowed ? (
+                          <span className="badge bg-info-subtle text-info">±{po.bufferPercent}%</span>
+                        ) : (
+                          <span className="text-muted fs-11">None</span>
+                        )}
+                      </td>
+                      <td className="text-end fw-bold text-dark fs-14">
+                        ₹
+                        {(Number(po.totalAmount) || 0).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </td>
+                      <td>
+                        <div className="d-flex flex-column align-items-start gap-1">
+                          <span
+                            className={`badge px-2 py-1 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-12 ${
+                              po.status === 'Completed'
+                                ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                                : po.status === 'Partially Received'
+                                ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                                : po.status === 'Sent'
+                                ? 'bg-primary text-white shadow-sm'
+                                : po.status === 'Draft'
+                                ? 'bg-secondary-subtle text-secondary border'
+                                : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                            }`}
+                          >
+                            {po.status === 'Sent' && <i className="ti ti-send fs-11"></i>}
+                            {po.status === 'Completed' && <i className="ti ti-check fs-11"></i>}
+                            {po.status === 'Draft' && <i className="ti ti-file fs-11"></i>}
+                            <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>{po.expectedDeliveryDate ? (typeof po.expectedDeliveryDate === 'string' && po.expectedDeliveryDate.includes('T') ? po.expectedDeliveryDate.split('T')[0] : String(po.expectedDeliveryDate)) : '-'}</td>
-                    <td>
-                      {po.bufferAllowed ? (
-                        <span className="badge bg-info-subtle text-info">±{po.bufferPercent}%</span>
-                      ) : (
-                        <span className="text-muted fs-11">None</span>
-                      )}
-                    </td>
-                    <td className="text-end fw-bold text-dark fs-14">
-                      ₹
-                      {(Number(po.totalAmount) || 0).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge px-2 py-1 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-12 ${
-                          po.status === 'Completed'
-                            ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                            : po.status === 'Partially Received'
-                            ? 'bg-info-subtle text-info border border-info border-opacity-25'
-                            : po.status === 'Sent'
-                            ? 'bg-primary text-white shadow-sm'
-                            : po.status === 'Draft'
-                            ? 'bg-secondary-subtle text-secondary border'
-                            : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
-                        }`}
-                      >
-                        {po.status === 'Sent' && <i className="ti ti-send fs-11"></i>}
-                        {po.status === 'Completed' && <i className="ti ti-check fs-11"></i>}
-                        {po.status === 'Draft' && <i className="ti ti-file fs-11"></i>}
-                        <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
-                      </span>
-                    </td>
+
+                          {po.status === 'Partially Received' && (
+                            <div className="mt-0.5" style={{ fontSize: '11px', lineHeight: 1.35 }}>
+                              <div className="text-muted">
+                                Recv: <strong className="text-dark">{receivedMeters.toLocaleString()}m</strong> / {totalOrdered.toLocaleString()}m
+                              </div>
+                              <div className="text-danger fw-semibold">
+                                Pending: {pendingMeters.toLocaleString()}m
+                              </div>
+                            </div>
+                          )}
+                          {po.status === 'Completed' && totalOrdered > 0 && (
+                            <div className="text-success fw-medium" style={{ fontSize: '11px' }}>
+                              {totalOrdered.toLocaleString()}m received
+                            </div>
+                          )}
+                        </div>
+                      </td>
                     <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
                       <div className="d-inline-flex align-items-center justify-content-center gap-1">
-                        {po.status !== 'Completed' && po.status !== 'Draft' && (
+                        {poGrns.length > 0 ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                            style={{
+                              background: '#f0fdf4',
+                              color: '#16a34a',
+                              border: '1px solid #bbf7d0',
+                              height: '32px',
+                              lineHeight: 1,
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={`GRN ${poGrns[0].id} already created for this PO. Click to view.`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onViewGRN) {
+                                onViewGRN(poGrns[0]);
+                              } else if (onInwardGRN) {
+                                onInwardGRN(po);
+                              }
+                            }}
+                          >
+                            <i className="ti ti-check fs-13"></i>
+                            <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>{poGrns[0].id}</span>
+                          </button>
+                        ) : !hasExistingGrn && po.status !== 'Completed' && po.status !== 'Draft' ? (
                           <button
                             type="button"
                             className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
@@ -273,12 +333,12 @@ function parseDateForSort(d, id) {
                             <i className="ti ti-package fs-13"></i>
                             <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
                           </button>
-                        )}
+                        ) : null}
                         <button
                           type="button"
                           className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
                           style={{ width: '32px', height: '32px' }}
-                          title="View / Edit PO Details"
+                          title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable)" : "View / Edit PO Details"}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onSelectPO) onSelectPO(po);
@@ -301,8 +361,9 @@ function parseDateForSort(d, id) {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>

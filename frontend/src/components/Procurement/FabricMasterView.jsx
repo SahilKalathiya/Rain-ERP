@@ -382,8 +382,8 @@ export default function FabricMasterView({
       name: capitalizedQName,
       widths: currentWidths,
       gsm: Number(formData.gsm) || null,
-      defaultShrinkage: Number(formData.defaultShrinkage) || 0,
-      shrinkage: Number(formData.defaultShrinkage) || 0,
+      defaultShrinkage: (formData.defaultShrinkage !== '' && formData.defaultShrinkage !== null && formData.defaultShrinkage !== undefined) ? Number(formData.defaultShrinkage) : 0,
+      shrinkage: (formData.defaultShrinkage !== '' && formData.defaultShrinkage !== null && formData.defaultShrinkage !== undefined) ? Number(formData.defaultShrinkage) : 0,
       active: formData.active !== false
     };
 

@@ -11,6 +11,17 @@ export const INDIAN_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 
+export const STANDARD_VENDOR_TYPES = [
+  'Fabric Supplier',
+  'Job Worker',
+  'Dyeing & Printing',
+  'Embroidery',
+  'Washing',
+  'Trims & Accessories',
+  'Packaging Supplier',
+  'Other'
+];
+
 /**
  * VendorMasterView - 3.1 Vendor Master
  * Supports: View Mode by default, Section-wise edit, Column filters, 
@@ -54,6 +65,7 @@ export default function VendorMasterView({
         id: `VEND-${String(vendors.length + 1).padStart(4, '0')}`,
         name: '',
         type: '',
+        customType: '',
         contactPerson: '',
         phone: '',
         alternatePhone: '',
@@ -73,6 +85,7 @@ export default function VendorMasterView({
       id: '',
       name: '',
       type: '',
+      customType: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
@@ -96,6 +109,7 @@ export default function VendorMasterView({
       id: `VEND-${String(vendorList.length + 1).padStart(4, '0')}`,
       name: '',
       type: '',
+      customType: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
@@ -119,7 +133,13 @@ export default function VendorMasterView({
 
   const handleSelectVendor = (vendor) => {
     setSelectedVendor(vendor);
-    setFormData({ ...vendor });
+    const standardOptions = STANDARD_VENDOR_TYPES.filter(t => t !== 'Other');
+    const isStandard = standardOptions.includes(vendor.type);
+    setFormData({
+      ...vendor,
+      type: isStandard ? vendor.type : (vendor.type ? 'Other' : ''),
+      customType: isStandard ? '' : (vendor.type || '')
+    });
     setIsCreatingNew(false);
     setIsEditing(true);
     setActiveSection('all');
@@ -138,12 +158,17 @@ export default function VendorMasterView({
   const validateForm = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'Vendor Name is mandatory';
+    if (!formData.type) {
+      errors.type = 'Vendor Type is mandatory';
+    } else if (formData.type === 'Other' && !formData.customType?.trim()) {
+      errors.type = 'Please specify custom Vendor Type';
+    }
     if (formData.phone && formData.phone.length < 10)
       errors.phone = 'Phone Number must be 10 digits';
     if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email))
       errors.email = 'Invalid Email address format';
-    if (formData.gstin && formData.gstin.length !== 15)
-      errors.gstin = 'GSTIN must be exactly 15 characters';
+    if (formData.gstin && formData.gstin.length > 15)
+      errors.gstin = 'GSTIN cannot exceed 15 characters';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -153,9 +178,15 @@ export default function VendorMasterView({
     if (e) e.preventDefault();
     if (!validateForm()) return;
 
+    const isOtherType = formData.type === 'Other';
+    const finalVendorType = isOtherType
+      ? (formData.customType ? capitalizeWords(formData.customType.trim()) : 'Other')
+      : (formData.type?.trim() || '');
+
     const updatedVendor = {
       ...formData,
       name: capitalizeWords((formData.name || '').trim()),
+      type: finalVendorType,
       lastModifiedDate: new Date().toLocaleDateString('en-GB')
     };
 
@@ -496,22 +527,45 @@ export default function VendorMasterView({
                       <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
                       {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
                         <>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm bg-white"
-                            placeholder="e.g. Fabric Supplier, Job Worker..."
+                          <select
+                            className={`form-select form-select-sm bg-white ${
+                              formErrors.type ? 'is-invalid' : ''
+                            }`}
                             value={formData.type || ''}
-                            onChange={(e) => handleTextChange('type', e.target.value, true)}
-                            list="vendor-type-options"
-                          />
-                          <datalist id="vendor-type-options">
-                            <option value="Fabric Supplier" />
-                            <option value="Job Worker" />
-                            <option value="Dyeing & Printing" />
-                            <option value="Embroidery" />
-                            <option value="Washing" />
-                            <option value="Trims & Accessories" />
-                          </datalist>
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData(prev => ({
+                                ...prev,
+                                type: val,
+                                customType: val === 'Other' ? prev.customType : ''
+                              }));
+                              if (formErrors.type) {
+                                setFormErrors(prev => ({ ...prev, type: null }));
+                              }
+                            }}
+                          >
+                            <option value="">Select Vendor Type...</option>
+                            {STANDARD_VENDOR_TYPES.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          {formData.type === 'Other' && (
+                            <div className="mt-1.5">
+                              <input
+                                type="text"
+                                className={`form-control form-control-sm bg-white ${
+                                  formErrors.type ? 'is-invalid' : ''
+                                }`}
+                                placeholder="Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)"
+                                value={formData.customType || ''}
+                                onChange={(e) => handleTextChange('customType', e.target.value, true)}
+                                autoFocus
+                              />
+                            </div>
+                          )}
+                          {formErrors.type && (
+                            <div className="invalid-feedback fs-11 d-block">{formErrors.type}</div>
+                          )}
                         </>
                       ) : (
                         <div className="text-secondary fs-13">{formData.type || '—'}</div>
@@ -695,7 +749,7 @@ export default function VendorMasterView({
 
                   <div className="row g-2">
                     <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">GSTIN (15 Digits)</label>
+                      <label className="form-label fs-12 fw-semibold mb-1">GSTIN (15 characters)</label>
                       {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
                         <input
                           type="text"

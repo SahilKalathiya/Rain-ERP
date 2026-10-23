@@ -81,15 +81,20 @@ const DEFAULT_FABRICS = [
   { id: 'FAB-004', quality: 'Modal Satin Premium', qualityName: 'Modal Satin Premium', type: 'Silk/Modal', widths: ['44"', '58"'], shrinkage: 2.0, maxBuffer: 1.5, defRate: 85, dyedRate: 110, active: true }
 ];
 
+// Helper to capitalize the first character of each word (Title Case)
+export const capitalizeWords = (str) => {
+  if (!str) return '';
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Master Data State
   const [masterSizeSeries, setMasterSizeSeries] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
-    if (Array.isArray(stored) && stored.length > 0 && stored.some(s => s.name === 'Alpha')) {
+    if (Array.isArray(stored) && stored.length > 0) {
       return stored;
     }
-    setStoredData('erp_size_series_v1', initialSizeSeries);
-    return initialSizeSeries;
+    return Array.isArray(initialSizeSeries) ? initialSizeSeries : [];
   });
 
   const getCleanSeriesName = (series) => {
@@ -102,18 +107,20 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
   const normalizedMasterSizeSeries = useMemo(() => {
     const combined = [...masterSizeSeries];
-    initialSizeSeries.forEach(initS => {
-      const initClean = getCleanSeriesName(initS);
-      if (!combined.some(s => getCleanSeriesName(s) === initClean)) {
-        combined.push(initS);
-      }
-    });
+    if (Array.isArray(initialSizeSeries) && initialSizeSeries.length > 0) {
+      initialSizeSeries.forEach(initS => {
+        const initClean = getCleanSeriesName(initS);
+        if (!combined.some(s => getCleanSeriesName(s) === initClean || (s.id && s.id === initS.id))) {
+          combined.push(initS);
+        }
+      });
+    }
     const list = combined.map(s => ({
       ...s,
-      name: getCleanSeriesName(s),
-      displayName: getCleanSeriesName(s)
+      name: s.name || getCleanSeriesName(s),
+      displayName: s.name || getCleanSeriesName(s)
     }));
-    const orderMap = { 'Alpha': 1, 'Numeric': 2, 'Mix Sizes': 3 };
+    const orderMap = { 'Alpha': 1, 'Alphabetic': 1, 'Numeric': 2, 'Mix Sizes': 3 };
     return list.sort((a, b) => (orderMap[a.name] || 99) - (orderMap[b.name] || 99));
   }, [masterSizeSeries]);
   const [showAllArticleTypes, setShowAllArticleTypes] = useState(false);
@@ -180,6 +187,22 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       window.removeEventListener('storage', handleColorsSync);
       window.removeEventListener('erp_colors_updated', handleColorsSync);
       window.removeEventListener('raindrop_colors_updated', handleColorsSync);
+    };
+  }, []);
+
+  // Real-time synchronization with Size Series Master
+  useEffect(() => {
+    const handleSizeSeriesSync = () => {
+      const stored = getStoredData('erp_size_series_v1', null);
+      if (Array.isArray(stored)) {
+        setMasterSizeSeries(stored);
+      }
+    };
+    window.addEventListener('storage', handleSizeSeriesSync);
+    window.addEventListener('erp_size_series_updated', handleSizeSeriesSync);
+    return () => {
+      window.removeEventListener('storage', handleSizeSeriesSync);
+      window.removeEventListener('erp_size_series_updated', handleSizeSeriesSync);
     };
   }, []);
 
@@ -258,9 +281,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           const mappedCol = colRes.data.map(c => ({
             id: c.id,
             name: c.name || c.colorName,
-            hex: c.hexCode || c.hex || '#333333',
-            pantone: c.pantoneCode || c.pantone || '',
-            category: c.category || 'Primary'
+            hex: c.hexCode || c.hex_code || c.hex || '#333333',
+            pantone: c.pantoneCode || c.pantone_code || c.pantone || '',
+            category: c.category || 'Primary',
+            quarterTag: c.quarterTag || c.quarter_tag || c.tag || 'All Season',
+            isTrending: Boolean(c.isTrending || c.is_trending),
+            active: c.active !== false
           }));
           setMasterColors(prev => {
             const combined = [...mappedCol];
@@ -373,10 +399,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   };
 
   const updateFabricField = (artId, fi, field, val) => {
+    const finalVal = (field === 'role' && typeof val === 'string') ? capitalizeWords(val) : val;
     setAddedArticles(prev => prev.map(a => {
       if (a.id !== artId) return a;
       const updated = [...(a.fabrics || [])];
-      updated[fi] = { ...updated[fi], [field]: val };
+      updated[fi] = { ...updated[fi], [field]: finalVal };
       if (field === 'fabricId') {
         const matchingFab = fabrics.find(f => f.id === val);
         if (matchingFab) {
@@ -495,22 +522,35 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       const curList = getPairSeriesConfigs(c, artId, colorName);
       const cleanName = getCleanSeriesName(seriesObj);
       const cleanLower = cleanName.toLowerCase();
+      const seriesNameLower = (seriesObj?.name || '').toLowerCase();
       if (curList.some(sc => {
         const scClean = (sc.seriesName || '').toLowerCase();
         const scId = (sc.seriesId || '').toLowerCase();
-        return scClean === cleanLower || scId === cleanLower || scId === (seriesObj.id || '').toLowerCase();
+        return scClean === cleanLower || scClean === seriesNameLower || scId === cleanLower || scId === seriesNameLower || scId === (seriesObj.id || '').toLowerCase();
       })) {
         return c;
       }
       const fullDef = masterSizeSeries.find(s => 
+        (s.id && seriesObj.id && s.id === seriesObj.id) ||
+        (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
         getCleanSeriesName(s).toLowerCase() === cleanLower ||
         (s.id || '').toLowerCase() === (seriesObj.id || '').toLowerCase()
-      ) || initialSizeSeries.find(s => getCleanSeriesName(s).toLowerCase() === cleanLower);
+      ) || initialSizeSeries.find(s => 
+        (s.id && seriesObj.id && s.id === seriesObj.id) ||
+        (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
+        getCleanSeriesName(s).toLowerCase() === cleanLower
+      ) || seriesObj;
+
+      const resolvedSizes = (Array.isArray(fullDef?.sizes) && fullDef.sizes.length > 0)
+        ? fullDef.sizes
+        : (Array.isArray(fullDef?.sizeRecords) && fullDef.sizeRecords.length > 0)
+          ? fullDef.sizeRecords.map(r => r.sizeName).filter(Boolean)
+          : (seriesObj.sizes || []);
 
       const newSeriesEntry = {
-        seriesId: seriesObj.id || `SER-${cleanName.toUpperCase().replace(/\s+/g, '')}`,
-        seriesName: cleanName,
-        sizes: (fullDef?.sizes && fullDef.sizes.length > 0) ? fullDef.sizes : (seriesObj.sizes || []),
+        seriesId: seriesObj.id || `SER-${(seriesObj.name || cleanName).toUpperCase().replace(/\s+/g, '')}`,
+        seriesName: seriesObj.name || cleanName,
+        sizes: resolvedSizes,
         selectedSizes: [],
         uniform: null,
         uniformQty: '',
@@ -563,10 +603,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     const curList = getPairSeriesConfigs(cust, artId, colorName);
     const cleanName = getCleanSeriesName(seriesObj);
     const cleanLower = cleanName.toLowerCase();
+    const seriesNameLower = (seriesObj?.name || '').toLowerCase();
     const existing = curList.find(sc => {
       const scClean = (sc.seriesName || '').toLowerCase();
       const scId = (sc.seriesId || '').toLowerCase();
-      return scClean === cleanLower || scId === cleanLower || scId === (seriesObj.id || '').toLowerCase();
+      return scClean === cleanLower ||
+             scClean === seriesNameLower ||
+             scId === cleanLower ||
+             scId === seriesNameLower ||
+             scId === (seriesObj.id || '').toLowerCase();
     });
     if (existing) {
       removeSeriesFromPair(cIdx, artId, colorName, existing.seriesId);
@@ -651,13 +696,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
         const selectedSizes = sc.selectedSizes || [];
         // Do NOT pre-fill with dummy ratio so user can type freely without instant validation errors
         const ratioStr = sc.ratioString || '';
-        const baseQty = sc.baseSetQty || '100';
+        const baseQty = sc.baseSetQty || '';
 
         let newQtys = { ...(sc.sizeQtys || {}) };
         if (ratioUsed && ratioStr) {
           const parts = ratioStr.split(':').map(p => p.trim());
           if (parts.length === selectedSizes.length && parts.every(p => !isNaN(parseInt(p, 10)))) {
-            const baseNum = parseInt(baseQty, 10) || 0;
+            const baseNum = parseInt(baseQty, 10) || 100;
             newQtys = {};
             selectedSizes.forEach((sz, sIdx) => {
               newQtys[sz] = String(baseNum * (parseInt(parts[sIdx], 10) || 1));
@@ -687,7 +732,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     }));
   };
 
-  const updateRatioCalculationForPairSeries = (cIdx, artId, colorName, seriesId, ratioStr, baseQty) => {
+  const updateRatioCalculationForPairSeries = (cIdx, artId, colorName, seriesId, ratioStr, baseQty, userEdited = false) => {
     const key = getSizeConfigKey(artId, colorName);
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
@@ -695,14 +740,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const cleanRatio = ratioStr !== undefined ? ratioStr : (sc.ratioString || '');
-        const cleanBase = baseQty !== undefined ? baseQty : (sc.baseSetQty || '100');
+        const cleanBase = baseQty !== undefined ? baseQty : (sc.baseSetQty || '');
         const parts = cleanRatio.split(':').map(p => p.trim());
         const selectedSizes = sc.selectedSizes || [];
 
         let newQtys = { ...(sc.sizeQtys || {}) };
         // Section 14.4: A ratio string must be validated as a genuine ratio matching the number of selected sizes
         if (parts.length === selectedSizes.length && parts.every(p => p !== '' && !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0)) {
-          const baseNum = parseInt(cleanBase, 10) || 0;
+          const baseNum = parseInt(cleanBase, 10) || 100;
           newQtys = {};
           selectedSizes.forEach((sz, sIdx) => {
             const mult = parseInt(parts[sIdx], 10) || 0;
@@ -713,6 +758,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           ...sc,
           ratioString: cleanRatio,
           baseSetQty: cleanBase,
+          _userEditedBase: userEdited || Boolean(cleanBase && cleanBase !== '100') || sc._userEditedBase,
           sizeQtys: newQtys
         };
       });
@@ -938,8 +984,18 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       (art.fabrics || []).forEach((fr, frIdx) => {
         const fab = fabrics.find(f => f.id === fr.fabricId) || fabrics[0];
         const isGreige = fr.source === 'Greige Fabric' || !fr.source || String(fr.source).includes('Greige');
-        const shrinkPct = isGreige ? (parseFloat(fab?.shrinkage) || 3.5) : 0;
-        const bufferPct = parseFloat(fab?.maxBuffer) || 2.0;
+        const rawShrink = fab?.defaultShrinkage !== undefined && fab?.defaultShrinkage !== null && fab?.defaultShrinkage !== '' 
+          ? fab.defaultShrinkage 
+          : fab?.shrinkage;
+        const shrinkPct = isGreige 
+          ? (rawShrink !== undefined && rawShrink !== null && rawShrink !== '' ? (parseFloat(String(rawShrink).replace('%', '')) || 0) : 3.5) 
+          : 0;
+        const rawBuf = fab?.maxBuffer !== undefined && fab?.maxBuffer !== null && fab?.maxBuffer !== '' 
+          ? fab.maxBuffer 
+          : 2.0;
+        const bufferPct = (rawBuf !== undefined && rawBuf !== null && rawBuf !== '') 
+          ? (parseFloat(String(rawBuf).replace('%', '')) || 0) 
+          : 2.0;
 
         // Default or parsed dyed length in meters
         let dyedPerPiece = 0;
@@ -1111,7 +1167,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     // If user didn't enter a styleName, default it to article name or Kurta
     const primaryArticleName = addedArticles[0]?.name || 'Kurta';
     const finalStyleName = (orderInfo.styleName && orderInfo.styleName.trim()) 
-      ? orderInfo.styleName.trim() 
+      ? capitalizeWords(orderInfo.styleName.trim()) 
       : `${primaryArticleName} Style (${orderInfo.orderId})`;
 
     // If no articles added explicitly, default to Kurta
@@ -1159,6 +1215,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           name: art.name || primaryArticleName,
           totalPieces: artPieces > 0 ? artPieces : Math.round((grandTotalOrderPieces || 0) / (finalArticles.length || 1)),
           fabricQuality: fabQuality,
+          fabrics: (art.fabrics || []).map(f => ({
+            ...f,
+            role: capitalizeWords(f.role || '')
+          })),
           avgGarmentLength: avgLen,
           avgLength: avgLen
         };
@@ -1252,8 +1312,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
               type="text"
               className="form-control rounded-3"
               placeholder="e.g. Ikkat Black Kurta Set"
+              style={{ textTransform: 'capitalize' }}
               value={orderInfo.styleName}
-              onChange={(e) => setOrderInfo({ ...orderInfo, styleName: e.target.value })}
+              onChange={(e) => setOrderInfo({ ...orderInfo, styleName: capitalizeWords(e.target.value) })}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -1509,8 +1570,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                         type="text"
                         className="form-control form-control-sm bg-white"
                         placeholder="e.g. Main, Outer, Lining"
-                        value={fr.role}
-                        onChange={(e) => updateFabricField(art.id, fi, 'role', e.target.value)}
+                        style={{ textTransform: 'capitalize' }}
+                        value={fr.role || ''}
+                        onChange={(e) => updateFabricField(art.id, fi, 'role', capitalizeWords(e.target.value))}
                       />
                     </div>
                     <div className="col-12 col-md-8">
@@ -1773,18 +1835,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                             {/* Filter Tabs */}
                             <div className="d-flex flex-wrap gap-1">
                               {(() => {
-                                const curQ = getCurrentQuarterTag();
                                 return [
-                                  { key: 'currentSeason', label: `Current Season (${curQ})`, icon: '✨' },
                                   { key: 'allSeason', label: 'All Season', icon: '☀️' },
                                   { key: 'Q4', label: 'Oct–Dec (Q4)', icon: '❄️' },
                                   { key: 'Q1', label: 'Jan–Mar (Q1)', icon: '🌸' },
                                   { key: 'Q2', label: 'Apr–Jun (Q2)', icon: '🌱' },
                                   { key: 'Q3', label: 'Jul–Sep (Q3)', icon: '🌧️' },
-                                  { key: 'all', label: `All Colours (${masterColors.length})`, icon: '🌈' },
                                 ];
                               })().map(tab => {
-                                const currentTab = customerColorTab[ci] || 'currentSeason';
+                                const currentTab = customerColorTab[ci] || 'allSeason';
                                 const isActive = currentTab === tab.key;
                                 return (
                                   <button
@@ -1871,7 +1930,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
                         {/* Available Color Badges for Selection (Section 6.2 & Section 14.3) */}
                         {(() => {
-                          const currentTab = customerColorTab[ci] || 'currentSeason';
+                          const currentTab = customerColorTab[ci] || 'allSeason';
                           const searchQuery = (customerColorSearch[ci] || '').trim().toLowerCase();
                           const curQ = getCurrentQuarterTag();
 
@@ -1894,16 +1953,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                             if (newlyAddedColorNames.has(col.name)) return true;
 
                             const qTag = (col.quarterTag || 'All Season').toLowerCase();
-                            if (currentTab === 'currentSeason') {
-                              return qTag === curQ.toLowerCase() || qTag === 'all' || qTag === 'all season';
-                            }
+                            // All Season shows all colors in palette
                             if (currentTab === 'allSeason') {
-                              return qTag === 'all' || qTag === 'all season';
+                              return true;
                             }
-                            if (currentTab === 'Q1') return qTag === 'q1';
-                            if (currentTab === 'Q2') return qTag === 'q2';
-                            if (currentTab === 'Q3') return qTag === 'q3';
-                            if (currentTab === 'Q4') return qTag === 'q4';
+                            if (currentTab === 'Q1') return qTag === 'q1' || qTag === 'all' || qTag === 'all season';
+                            if (currentTab === 'Q2') return qTag === 'q2' || qTag === 'all' || qTag === 'all season';
+                            if (currentTab === 'Q3') return qTag === 'q3' || qTag === 'all' || qTag === 'all season';
+                            if (currentTab === 'Q4') return qTag === 'q4' || qTag === 'all' || qTag === 'all season';
                             return true;
                           });
 
@@ -2022,10 +2079,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                           <div className="d-flex flex-wrap align-items-center" style={{ gap: '12px' }}>
                                             {normalizedMasterSizeSeries.map((series) => {
                                               const cleanSeries = getCleanSeriesName(series).toLowerCase();
+                                              const seriesNameLower = (series.name || '').toLowerCase();
                                               const isOpen = activeSeriesList.some(sc => {
                                                 const scClean = (sc.seriesName || '').toLowerCase();
                                                 const scId = (sc.seriesId || '').toLowerCase();
-                                                return scClean === cleanSeries || scId === cleanSeries || scId === (series.id || '').toLowerCase();
+                                                return scClean === cleanSeries || 
+                                                       scClean === seriesNameLower || 
+                                                       scId === cleanSeries || 
+                                                       scId === seriesNameLower || 
+                                                       scId === (series.id || '').toLowerCase();
                                               });
 
                                               return (
@@ -2063,21 +2125,32 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                             className="p-3 rounded-3 text-center border border-dashed bg-light text-muted"
                                             style={{ fontSize: '13px' }}
                                           >
-                                            Click a size series above (Alpha, Numeric, or Mix Sizes) to open it and enter quantities.
+                                            Click a size series above to open it and enter quantities.
                                           </div>
                                         ) : (
                                           <div className="d-flex flex-column gap-3">
                                             {activeSeriesList.map((sc, scIdx) => {
                                               const cleanScName = getCleanSeriesName({ name: sc.seriesName || sc.seriesId });
+                                              const scNameLower = (sc.seriesName || '').toLowerCase();
                                               const defSeries = masterSizeSeries.find(s => 
+                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
                                                 getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase() ||
                                                 s.id === sc.seriesId || s.name === sc.seriesId
-                                              ) || initialSizeSeries.find(s => getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()) || {
-                                                name: cleanScName,
-                                                sizes: sc.sizes || ['XS', 'S', 'M', 'L', 'XL']
+                                              ) || initialSizeSeries.find(s => 
+                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
+                                                getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()
+                                              ) || {
+                                                name: sc.seriesName || cleanScName,
+                                                sizes: sc.sizes || []
                                               };
-                                              const seriesName = cleanScName || defSeries.name || sc.seriesId;
-                                              const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0) ? defSeries.sizes : (sc.sizes || []);
+                                              const seriesName = sc.seriesName || defSeries.name || cleanScName || sc.seriesId;
+                                              const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0)
+                                                ? defSeries.sizes
+                                                : (defSeries.sizeRecords && defSeries.sizeRecords.length > 0)
+                                                  ? defSeries.sizeRecords.map(r => r.sizeName).filter(Boolean)
+                                                  : (sc.sizes || []);
 
                                               return (
                                                 <div
@@ -2269,9 +2342,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                                 type="number"
                                                                 min="1"
                                                                 className="form-control form-control-sm fw-bold"
-                                                                placeholder="e.g. 100"
-                                                                value={sc.baseSetQty ?? ''}
-                                                                onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value)}
+                                                                placeholder="100"
+                                                                value={sc.baseSetQty && (sc._userEditedBase || sc.baseSetQty !== '100') ? sc.baseSetQty : ''}
+                                                                onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true)}
                                                                 style={{ fontSize: '13px', borderColor: '#cbd5e1', borderRadius: '7px', height: '36px' }}
                                                               />
                                                             </div>
@@ -2284,7 +2357,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                                 style={{ height: '36px', fontSize: '12.5px', backgroundColor: '#2e37a4', borderColor: '#2e37a4', borderRadius: '7px' }}
                                                                 onClick={() => {
                                                                   const base = parseInt(sc.baseSetQty, 10) || 100;
-                                                                  updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, String(base));
+                                                                  updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, sc.baseSetQty || '', true);
                                                                 }}
                                                               >
                                                                 <i className="ti ti-refresh" style={{ fontSize: '14px' }}></i>
@@ -2345,7 +2418,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                               );
                                                             }
 
-                                                            const base = parseInt(sc.baseSetQty, 10) || 0;
+                                                            const base = parseInt(sc.baseSetQty, 10) || 100;
                                                             const totalMultiplier = parts.reduce((acc, p) => acc + (parseInt(p, 10) || 0), 0);
                                                             const totalOrderPieces = totalMultiplier * base;
 

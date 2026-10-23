@@ -87,17 +87,14 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
     activityLog: []
   }));
 
-  // GSTIN Validation helper (Section 12.1)
+  // GSTIN Validation helper (Allow up to 15 characters, no strict format restriction)
   const validateGSTIN = (val) => {
     if (!val || !val.trim()) return { valid: true, message: '' };
     const upper = val.trim().toUpperCase();
-    if (upper.length !== 15) {
-      return { valid: false, message: 'GSTIN must be exactly 15 characters' };
+    if (upper.length > 15) {
+      return { valid: false, message: 'GSTIN cannot exceed 15 characters' };
     }
-    if (!GSTIN_REGEX.test(upper)) {
-      return { valid: false, message: 'Invalid GSTIN format (e.g. 24AAACM1234F1Z1)' };
-    }
-    return { valid: true, message: 'Valid GSTIN format' };
+    return { valid: true, message: '' };
   };
 
   const populateFormDataFromCustomer = (cust) => {
@@ -305,7 +302,6 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
 
   // Modal / Inline Container (Section 2.2)
   if (isInline) {
-    const gCheckInline = validateGSTIN(formData.gstin);
     return (
       <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
         <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -417,11 +413,16 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                       value={formData.gstin}
                       onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
                     />
-                    {formData.gstin && (
-                      <div className={`form-text small ${gCheckInline.valid ? 'text-success' : 'text-danger'}`}>
-                        {gCheckInline.message}
-                      </div>
-                    )}
+                  </div>
+                  <div className="col-md-12">
+                    <label className="form-label fw-semibold small text-muted">Notes / Remarks</label>
+                    <textarea
+                      className="form-control"
+                      rows={2}
+                      placeholder="Payment terms, fabric preferences or client-specific remarks"
+                      value={formData.notes || ''}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
                   </div>
                 </div>
               </div>
@@ -622,11 +623,6 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                         value={formData.gstin}
                         onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
                       />
-                      {formData.gstin && (
-                        <div className={`form-text small ${validateGSTIN(formData.gstin).valid ? 'text-success' : 'text-danger'}`}>
-                          {validateGSTIN(formData.gstin).message}
-                        </div>
-                      )}
                     </div>
 
                     <div className="col-md-6">
@@ -676,7 +672,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                         placeholder="Payment terms, fabric preferences or client-specific remarks"
                         disabled={!isModalEditMode}
                         style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                        value={formData.notes}
+                        value={formData.notes || ''}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       />
                     </div>
@@ -793,6 +789,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>CITY</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>STATE</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '160px' }}>GSTIN</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '150px' }}>NOTES</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold text-center" style={{ minWidth: '100px' }}>STATUS</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold text-end" style={{ minWidth: '110px' }}>ACTIONS</th>
                 </tr>
@@ -818,6 +815,9 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                     <td className="px-3 text-dark small">{cust.city || '—'}</td>
                     <td className="px-3 text-dark small">{cust.state || '—'}</td>
                     <td className="px-3 font-monospace text-muted small">{cust.gstin || '—'}</td>
+                    <td className="px-3 text-muted small text-truncate" style={{ maxWidth: '180px' }} title={cust.notes || ''}>
+                      {cust.notes || '—'}
+                    </td>
                     <td className="px-3 text-center">
                       <span className={`badge ${cust.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
                         {cust.active ? 'Active' : 'Inactive'}

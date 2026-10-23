@@ -2503,8 +2503,11 @@ export default function OrderDetailView({
         map[gk] = { pcs: 0, dyed: 0, greige: 0, orderQty: 0 };
       }
       const isGreige = (row.source || 'Greige Fabric').toLowerCase().includes('greige');
-      const shrinkPct = isGreige ? (parseFloat(row.shrinkPct) || 0) : 0;
-      const bufferPct = parseFloat(row.bufferPct) || 10;
+      const rawShrink = (row.shrinkPct !== undefined && row.shrinkPct !== null && row.shrinkPct !== '') ? String(row.shrinkPct).replace('%', '').trim() : '';
+      const shrinkVal = (!isNaN(parseFloat(rawShrink)) && isFinite(parseFloat(rawShrink))) ? parseFloat(rawShrink) : 0;
+      const shrinkPct = isGreige ? shrinkVal : 0;
+      const rawBuffer = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '') ? String(row.bufferPct).replace('%', '').trim() : '';
+      const bufferPct = (!isNaN(parseFloat(rawBuffer)) && isFinite(parseFloat(rawBuffer))) ? parseFloat(rawBuffer) : 10;
       const dyed = parseFloat(row.dyedRate) || 0;
       const hasDyed = dyed > 0;
       const greigePerPc = hasDyed ? (isGreige ? dyed * (1 + shrinkPct / 100) : dyed) : 0;

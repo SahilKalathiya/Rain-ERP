@@ -48,16 +48,17 @@ export default function QCDetailView({
   const poId = grn?.linkedPOs?.[0] || 'PO-1001';
   const grnId = qc.grnRef || grn?.id || 'GRN-1002';
 
-  const expectedWidth = qc.expectedWidth || '42"';
-  const widthFound = qc.actualWidth || qc.widthFound || '—';
-  const expectedFold = qc.expectedFold || '1000%';
-  const foldFound = qc.actualFold ? `${qc.actualFold}%` : (qc.foldFound ? `${qc.foldFound}%` : '—%');
+  const expectedWidth = qc.expectedWidth ? `${String(qc.expectedWidth).replace(/"/g, '')}"` : '44"';
+  const widthFound = qc.actualWidth ? `${String(qc.actualWidth).replace(/"/g, '')}"` : (qc.widthFound || '—');
+  const expectedFold = qc.expectedFold ? `${String(qc.expectedFold).replace(/%/g, '')}%` : '100%';
+  const foldFound = qc.actualFold ? `${String(qc.actualFold).replace(/%/g, '')}%` : (qc.foldFound ? `${qc.foldFound}%` : '—%');
+
   const receivedQty = Number(qc.totalReceivedMeters) || Number(qc.receivedQty) || Number(grn?.declaredTotalMeters) || 2000;
   const passedQty = Number(qc.passedQty) || (qc.qcStatus === 'Reject' ? 0 : Math.max(0, receivedQty - (Number(qc.heldBackQty) || Number(qc.defectQty) || 0)));
   const rejectedQty = Number(qc.rejectedQty) || (qc.qcStatus === 'Reject' ? receivedQty : (Number(qc.heldBackQty) || Number(qc.defectQty) || 0));
   const linkedPoId = poId;
 
-  const effectiveStatus = damagedItem?.status || qc.adminDecision || 'Pending Admin Review';
+  const effectiveStatus = damagedItem?.status || 'Pending Resolution';
   const itemToResolve = damagedItem || {
     id: `REJ-${qc.id}`,
     sourceQcRef: qc.id,
@@ -67,7 +68,7 @@ export default function QCDetailView({
     vendorName: grn?.vendorName || 'M.S. Textiles',
     quantity: Number(qc.heldBackQty) || Number(qc.defectQty) || (qc.issuePieces?.reduce((s, p) => s + (Number(p.length) || 0), 0)) || 100,
     defectivePieces: qc.issuePieces?.length || 1,
-    status: qc.adminDecision || 'Pending Admin Review',
+    status: 'Pending Resolution',
     dateFlagged: qc.dateTime || new Date().toLocaleDateString('en-GB')
   };
 
@@ -110,9 +111,9 @@ export default function QCDetailView({
               <span>Quality Check &mdash; {fabricName}</span>
               <span
                 className={`badge px-3 py-1 fs-12 rounded-pill ms-3 ${
-                  qc.qcStatus === 'OK' || qc.qcStatus === 'Partial OK'
+                  qc.qcStatus === 'OK' || qc.qcStatus === 'Partial OK' || qc.qcStatus === 'Approved'
                     ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                    : qc.qcStatus === 'Reject'
+                    : qc.qcStatus === 'Reject' || qc.qcStatus === 'Rejected'
                     ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
                     : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
                 }`}
@@ -122,7 +123,7 @@ export default function QCDetailView({
               </span>
             </h2>
             <p className="text-secondary fs-13 mb-0">
-              {grnId} · {poId} · Checked by <strong>{qc.inspectorName || 'Wedc'}</strong> on {qc.decidedAt || '2026-10-07'}
+              {grnId} · {poId} · Checked by <strong>{qc.inspectorName || 'Inspector'}</strong> on {qc.decidedAt || '2026-10-07'}
             </p>
           </div>
         </div>
