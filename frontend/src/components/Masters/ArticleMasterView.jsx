@@ -937,9 +937,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                   </div>
                   <div>
                     <div className="d-flex align-items-center gap-2">
-                      <span className="badge bg-primary-subtle text-primary font-monospace px-2.5 py-1 rounded-2">
-                        {selectedArticle.id}
-                      </span>
                       <h5 className="fw-bold text-dark mb-0">{selectedArticle.name}</h5>
                       <span className={`badge ${selectedArticle.active ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} px-2.5 py-1 rounded-pill`}>
                         {selectedArticle.active ? 'Active' : 'Inactive'}
@@ -1093,10 +1090,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                     </div>
                   ) : (
                     <div className="d-flex flex-column gap-3">
-                      <div>
-                        <div className="text-muted small">Article ID</div>
-                        <div className="fw-bold font-monospace text-primary">{selectedArticle.id}</div>
-                      </div>
                       <div>
                         <div className="text-muted small">Article Name</div>
                         <div className="fw-bold text-dark fs-16">{selectedArticle.name}</div>
@@ -1288,9 +1281,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
 
                     <div className="fs-1 mb-1 mt-1">{art.icon}</div>
                     <div className="fw-bold text-dark fs-14">{art.name}</div>
-                    <div className="text-muted small font-monospace" style={{ fontSize: '11px' }}>
-                      {art.id}
-                    </div>
 
                     {/* Actions Bar */}
                     <div

@@ -746,11 +746,7 @@ export default function SizeMasterView() {
               <form onSubmit={handleSaveSeries}>
                 <div className="modal-body p-4">
                   <div className="row g-3 mb-4">
-                    <div className="col-md-3">
-                      <label className="form-label small fw-semibold text-muted">Series ID</label>
-                      <input type="text" className="form-control form-control-sm bg-light font-monospace" value={seriesFormData.id} readOnly />
-                    </div>
-                    <div className="col-md-5">
+                    <div className="col-md-8">
                       <label className="form-label small fw-semibold text-muted">Series Name *</label>
                       <input
                         type="text"
@@ -762,17 +758,7 @@ export default function SizeMasterView() {
                       />
                       <div className="form-text small text-muted">Auto-capitalised word by word</div>
                     </div>
-                    <div className="col-md-2">
-                      <label className="form-label small fw-semibold text-muted">Display Order</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. 1"
-                        value={seriesFormData.displayOrder ?? ''}
-                        onChange={(e) => setSeriesFormData({ ...seriesFormData, displayOrder: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-2">
+                    <div className="col-md-4">
                       <label className="form-label small fw-semibold text-muted">Active Status</label>
                       <div className="form-check form-switch pt-1">
                         <input

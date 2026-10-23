@@ -244,39 +244,6 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
           />
         )}
       </div>
-
-      {!disabled && suggestions && suggestions.length > 0 && (
-        <div className="d-flex align-items-center gap-1.5 mt-2 flex-wrap">
-          <span className="text-muted fw-semibold" style={{ fontSize: '11px' }}>Quick:</span>
-          {suggestions.map((sug) => {
-            const isSelected = tags.includes(sug);
-            return (
-              <button
-                key={sug}
-                type="button"
-                className={`btn btn-xs py-0.5 px-2.5 rounded-pill border ${
-                  isSelected
-                    ? 'btn-primary text-white shadow-xs fw-semibold'
-                    : 'bg-white text-secondary'
-                }`}
-                style={{
-                  fontSize: '11.5px',
-                  borderColor: isSelected ? '#6366f1' : '#e2e8f0'
-                }}
-                onClick={() => {
-                  if (isSelected) {
-                    onChange(tags.filter((t) => t !== sug));
-                  } else {
-                    onChange([...tags, sug]);
-                  }
-                }}
-              >
-                {isSelected ? `✓ ${sug}` : `+ ${sug}`}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -2130,27 +2097,27 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   <div className="p-3 rounded-3 bg-light border">
                                     <div className="d-flex justify-content-between align-items-center mb-2">
                                       <label className="form-label text-dark small mb-0 fw-semibold">
-                                        Step 3: Fabric Consumption per Width (cm) <span className="text-danger">*</span>
+                                        Step 3: Fabric required per 1m Dori <span className="text-danger">*</span>
                                       </label>
-                                      <span className="text-muted" style={{ fontSize: '11px' }}>
+                                      {/* <span className="text-muted" style={{ fontSize: '11px' }}>
                                         Enter consumption in cm per dori
-                                      </span>
+                                      </span> */}
                                     </div>
                                     <div className="row g-2.5">
                                       {selectedWidths.map((w) => (
-                                        <div key={w} className={selectedWidths.length === 1 ? 'col-12' : (selectedWidths.length === 2 ? 'col-6' : 'col-12 col-sm-6 col-md-4')}>
-                                          <div className="input-group shadow-xs rounded-2 overflow-hidden border">
+                                        <div key={w} className="col-12 col-sm-6">
+                                          <div className="input-group shadow-xs rounded-2 overflow-hidden border bg-white">
                                             <span
-                                              className="input-group-text bg-white fw-bold font-monospace text-primary border-0 border-end px-2.5"
-                                              style={{ fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}
+                                              className="input-group-text bg-white fw-bold font-monospace text-primary border-0 border-end px-3"
+                                              style={{ fontSize: '13px', minWidth: '52px', justifyContent: 'center' }}
                                             >
                                               {w}
                                             </span>
                                             <input
                                               type="number"
-                                              step="0.1"
+                                              step="any"
                                               className="form-control border-0 text-center font-monospace fw-semibold px-2"
-                                              placeholder="e.g. 15"
+                                              placeholder="e.g. 0.025"
                                               value={fe.consumptions?.[w] ?? ''}
                                               onChange={(e) => {
                                                 const updated = [...doriEntries];
@@ -2162,7 +2129,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                               style={{ height: '38px', fontSize: '13px' }}
                                             />
                                             <span
-                                              className="input-group-text bg-light text-muted border-0 border-start px-2.5 fw-medium"
+                                              className="input-group-text bg-light text-muted border-0 border-start px-3 fw-medium"
                                               style={{ fontSize: '12px' }}
                                             >
                                               cm
@@ -2818,7 +2785,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light small text-uppercase fw-bold text-muted">
                 <tr>
-                  <th>ID</th>
                   <th>Brand Name</th>
                   <th>Color Number</th>
                   <th>Color Code (Hex)</th>
@@ -2830,7 +2796,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
               <tbody>
                 {threadColors.map((tbc) => (
                   <tr key={tbc.id}>
-                    <td className="font-monospace small">{tbc.id}</td>
                     <td className="fw-bold text-dark">{tbc.brandName}</td>
                     <td className="font-monospace fw-semibold">{tbc.colorNumber}</td>
                     <td className="font-monospace">{tbc.colorCode}</td>

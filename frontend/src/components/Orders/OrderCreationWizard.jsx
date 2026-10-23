@@ -28,22 +28,8 @@ export const deduplicateColors = (list) => {
     if (seen.has(norm)) return;
     seen.add(norm);
 
-    let quarterTag = col.quarterTag || col.quarter || '';
-    if (!quarterTag) {
-      if (norm.includes('charcoal') || norm.includes('green') || norm.includes('navy') || norm.includes('royal blue') || norm.includes('sea green')) {
-        quarterTag = 'Q1';
-      } else if (norm.includes('ivory') || norm.includes('pastel') || norm.includes('lavender') || norm.includes('lavendar') || norm.includes('white') || norm.includes('peach') || norm.includes('watermelon')) {
-        quarterTag = 'Q2';
-      } else if (norm.includes('jamun') || norm.includes('rama green') || norm.includes('yellow') || norm.includes('teal') || norm.includes('mustard') || norm.includes('pista')) {
-        quarterTag = 'Q3';
-      } else {
-        quarterTag = 'Q4';
-      }
-    }
-
-    const isTrending = col.isTrending !== undefined ? Boolean(col.isTrending) : (
-      ['charcoal', 'green', 'ivory', 'jamun', 'maroon', 'navy blue', 'rust', 'rama green', 'black', 'wine'].includes(norm)
-    );
+    let quarterTag = col.quarterTag || col.quarter || 'All Season';
+    const isTrending = Boolean(col.isTrending);
 
     result.push({
       id: col.id || `COL-${String(idx + 1).padStart(3, '0')}`,
@@ -94,29 +80,6 @@ const DEFAULT_FABRICS = [
   { id: 'FAB-003', quality: 'Cotton Cambric 60*60', qualityName: 'Cotton Cambric 60*60', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 4.0, maxBuffer: 2.0, defRate: 55, dyedRate: 70, active: true },
   { id: 'FAB-004', quality: 'Modal Satin Premium', qualityName: 'Modal Satin Premium', type: 'Silk/Modal', widths: ['44"', '58"'], shrinkage: 2.0, maxBuffer: 1.5, defRate: 85, dyedRate: 110, active: true }
 ];
-
-// Curated Seasonal Colors with Deduplication
-const DEFAULT_COLORS = deduplicateColors([
-  { id: 'COL-001', name: 'Charcoal', hex: '#333333', pantone: '19-4008', category: 'Dark', quarterTag: 'Q1', isTrending: true },
-  { id: 'COL-002', name: 'Green', hex: '#228B22', pantone: '18-6030', category: 'Primary', quarterTag: 'Q1', isTrending: true },
-  { id: 'COL-003', name: 'Navy Blue', hex: '#000080', pantone: '19-3832', category: 'Dark', quarterTag: 'Q1', isTrending: true },
-  { id: 'COL-004', name: 'Sea Green', hex: '#2E8B57', pantone: '16-5418', category: 'Cool', quarterTag: 'Q1', isTrending: false },
-  { id: 'COL-005', name: 'Royal Blue', hex: '#4169E1', pantone: '19-4052', category: 'Primary', quarterTag: 'Q1', isTrending: true },
-  { id: 'COL-006', name: 'Ivory', hex: '#FFFFF0', pantone: '11-0601', category: 'Pastel', quarterTag: 'Q2', isTrending: true },
-  { id: 'COL-007', name: 'Lavender', hex: '#E6E6FA', pantone: '14-3907', category: 'Pastel', quarterTag: 'Q2', isTrending: false },
-  { id: 'COL-008', name: 'Pastel Red', hex: '#FF6961', pantone: '16-1546', category: 'Pastel', quarterTag: 'Q2', isTrending: false },
-  { id: 'COL-009', name: 'White', hex: '#FFFFFF', pantone: '11-0601', category: 'Neutral', quarterTag: 'Q2', isTrending: true },
-  { id: 'COL-010', name: 'Watermelon', hex: '#FC6C85', pantone: '16-1735', category: 'Pastel', quarterTag: 'Q2', isTrending: true },
-  { id: 'COL-011', name: 'Jamun', hex: '#4B0082', pantone: '19-3518', category: 'Dark', quarterTag: 'Q3', isTrending: true },
-  { id: 'COL-012', name: 'Rama Green', hex: '#20B2AA', pantone: '16-5121', category: 'Cool', quarterTag: 'Q3', isTrending: true },
-  { id: 'COL-013', name: 'Teal', hex: '#008080', pantone: '19-4916', category: 'Dark', quarterTag: 'Q3', isTrending: false },
-  { id: 'COL-014', name: 'Yellow', hex: '#FFD700', pantone: '13-0858', category: 'Primary', quarterTag: 'Q3', isTrending: false },
-  { id: 'COL-015', name: 'Maroon', hex: '#800000', pantone: '19-1528', category: 'Dark', quarterTag: 'Q4', isTrending: true },
-  { id: 'COL-016', name: 'Rust', hex: '#B7410E', pantone: '18-1248', category: 'Warm', quarterTag: 'Q4', isTrending: true },
-  { id: 'COL-017', name: 'Rust Light', hex: '#C86D51', pantone: '17-1444', category: 'Warm', quarterTag: 'Q4', isTrending: true },
-  { id: 'COL-018', name: 'Wine', hex: '#722F37', pantone: '19-1815', category: 'Dark', quarterTag: 'Q4', isTrending: true },
-  { id: 'COL-019', name: 'Black', hex: '#111827', pantone: '19-4008', category: 'Neutral', quarterTag: 'Q4', isTrending: true },
-]);
 
 export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Master Data State
@@ -1118,7 +1081,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       pantone: (colorObj.pantone || colorObj.pantoneCode || '').trim(),
       pantoneCode: (colorObj.pantone || colorObj.pantoneCode || '').trim(),
       category: colorObj.category || 'Primary',
-      quarterTag: colorObj.quarterTag || 'Q1',
+      quarterTag: colorObj.quarterTag || 'All Season',
       isTrending: Boolean(colorObj.isTrending),
       active: true
     };
@@ -1812,11 +1775,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                               {(() => {
                                 const curQ = getCurrentQuarterTag();
                                 return [
-                                  { key: 'currentSeason', label: `Current Season (${curQ} + Trending)`, icon: '✨' },
-                                  { key: 'trending', label: '⭐ Trending Only', icon: '⭐' },
+                                  { key: 'currentSeason', label: `Current Season (${curQ})`, icon: '✨' },
+                                  { key: 'allSeason', label: 'All Season', icon: '☀️' },
                                   { key: 'Q4', label: 'Oct–Dec (Q4)', icon: '❄️' },
                                   { key: 'Q1', label: 'Jan–Mar (Q1)', icon: '🌸' },
-                                  { key: 'Q2', label: 'Apr–Jun (Q2)', icon: '☀️' },
+                                  { key: 'Q2', label: 'Apr–Jun (Q2)', icon: '🌱' },
                                   { key: 'Q3', label: 'Jul–Sep (Q3)', icon: '🌧️' },
                                   { key: 'all', label: `All Colours (${masterColors.length})`, icon: '🌈' },
                                 ];
@@ -1912,6 +1875,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                           const searchQuery = (customerColorSearch[ci] || '').trim().toLowerCase();
                           const curQ = getCurrentQuarterTag();
 
+                          if (masterColors.length === 0) {
+                            return (
+                              <div className="p-3 bg-white rounded-3 border text-center text-muted small my-2" style={{ borderColor: '#e2e8f0' }}>
+                                <i className="ti ti-palette fs-4 d-block mb-1 text-secondary opacity-75"></i>
+                                <span>No colours found in Colour Master yet. Click <strong>+ Add Colour</strong> above to add colours to your master palette.</span>
+                              </div>
+                            );
+                          }
+
                           const displayedColors = masterColors.filter(col => {
                             // Section 14.3: A colour with no Quarter/Season tag must still be selectable via search
                             if (searchQuery) {
@@ -1921,15 +1893,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                             // Section 14.3: A colour added via "+ Add Colour" mid-order must immediately appear in that order's colour list
                             if (newlyAddedColorNames.has(col.name)) return true;
 
+                            const qTag = (col.quarterTag || 'All Season').toLowerCase();
                             if (currentTab === 'currentSeason') {
-                              // Filter & display only colours belonging to the current active Quarter/Season, plus Trending Colours
-                              return col.quarterTag === curQ || Boolean(col.isTrending);
+                              return qTag === curQ.toLowerCase() || qTag === 'all' || qTag === 'all season';
                             }
-                            if (currentTab === 'trending') return Boolean(col.isTrending);
-                            if (currentTab === 'Q1') return col.quarterTag === 'Q1';
-                            if (currentTab === 'Q2') return col.quarterTag === 'Q2';
-                            if (currentTab === 'Q3') return col.quarterTag === 'Q3';
-                            if (currentTab === 'Q4') return col.quarterTag === 'Q4';
+                            if (currentTab === 'allSeason') {
+                              return qTag === 'all' || qTag === 'all season';
+                            }
+                            if (currentTab === 'Q1') return qTag === 'q1';
+                            if (currentTab === 'Q2') return qTag === 'q2';
+                            if (currentTab === 'Q3') return qTag === 'q3';
+                            if (currentTab === 'Q4') return qTag === 'q4';
                             return true;
                           });
 
@@ -1957,16 +1931,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                       borderColor: isSelected ? '#0f172a' : '#cbd5e1'
                                     }}
                                     onClick={() => toggleCustomerColor(ci, col.name)}
-                                    title={`${col.name} &bull; ${col.quarterTag || 'All'} ${col.isTrending ? '(⭐ Trending)' : ''}`}
+                                    title={`${col.name} • ${col.quarterTag || 'All Season'}`}
                                   >
                                     <span
                                       className="rounded-circle border"
                                       style={{ width: '12px', height: '12px', backgroundColor: col.hex }}
                                     ></span>
                                     <span className="fw-medium">{col.name}</span>
-                                    {col.isTrending && (
-                                      <span title="Trending Color" style={{ fontSize: '10px' }}>⭐</span>
-                                    )}
                                     {isSelected && <i className="ti ti-check small text-white ms-0.5"></i>}
                                   </button>
                                 );

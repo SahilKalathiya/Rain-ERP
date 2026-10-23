@@ -77,7 +77,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
       name: '',
       hex: '#000000',
       pantone: '',
-      quarterTag: 'Q1',
+      quarterTag: 'All Season',
       isTrending: false,
       active: true
     });
@@ -176,7 +176,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
 
       const matchQuarter =
         quarterFilter === 'All' ||
-        (quarterFilter === 'Trending' && c.isTrending) ||
+        (quarterFilter === 'All Season' && (c.quarterTag === 'All Season' || c.quarterTag === 'ALL')) ||
         (quarterFilter === 'Untagged' && !c.quarterTag) ||
         c.quarterTag === quarterFilter;
 
@@ -242,10 +242,10 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
             className="form-select rounded-pill bg-white border"
             value={quarterFilter}
             onChange={(e) => setQuarterFilter(e.target.value)}
-            style={{ borderColor: '#cbd5e1', fontSize: '13px', height: '38px', width: '150px' }}
+            style={{ borderColor: '#cbd5e1', fontSize: '13px', height: '38px', width: '160px' }}
           >
-            <option value="All">All Quarters</option>
-            <option value="Trending">⭐ Trending Only</option>
+            <option value="All">All Quarters & Seasons</option>
+            <option value="All Season">✨ All Season</option>
             <option value="Q1">Q1 (Jan–Mar)</option>
             <option value="Q2">Q2 (Apr–Jun)</option>
             <option value="Q3">Q3 (Jul–Sep)</option>
@@ -322,22 +322,9 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                     padding: '12px',
                     display: 'flex',
                     alignItems: 'flex-start',
-                    justifyContent: 'space-between'
+                    justifyContent: 'flex-end'
                   }}
                 >
-                  <span
-                    className="badge rounded-pill px-2 py-0.5"
-                    style={{
-                      backgroundColor: 'rgba(0,0,0,0.4)',
-                      color: '#ffffff',
-                      fontSize: '10.5px',
-                      fontWeight: 600,
-                      backdropFilter: 'blur(4px)'
-                    }}
-                  >
-                    {col.id}
-                  </span>
-
                   {/* Actions (Edit / Delete) */}
                   <div className="d-flex align-items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -393,11 +380,6 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
                       {col.quarterTag && (
                         <span className="badge rounded-pill bg-light text-primary border" style={{ fontSize: '10.5px' }}>
                           {col.quarterTag}
-                        </span>
-                      )}
-                      {col.isTrending && (
-                        <span className="badge rounded-pill bg-warning-subtle text-warning-emphasis border" style={{ fontSize: '10.5px' }}>
-                          ⭐ Trending
                         </span>
                       )}
                       {col.pantoneCode && (

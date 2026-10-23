@@ -197,7 +197,7 @@ export default function AddColorModal({
   const [isUserEditedName, setIsUserEditedName] = useState(Boolean(initialColor?.name));
   const [isUserEditedPantone, setIsUserEditedPantone] = useState(Boolean(initialColor?.pantone));
   const [category, setCategory] = useState(initialColor?.category || detectCategory(initHex));
-  const [quarterTag, setQuarterTag] = useState(initialColor?.quarterTag || 'Q1');
+  const [quarterTag, setQuarterTag] = useState(initialColor?.quarterTag || 'All Season');
   const [isTrending, setIsTrending] = useState(Boolean(initialColor?.isTrending));
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -378,7 +378,7 @@ export default function AddColorModal({
       hex: finalHex,
       pantone: pantoneCode.trim(),
       category: category || detectCategory(finalHex),
-      quarterTag: quarterTag || 'Q1',
+      quarterTag: quarterTag || 'All Season',
       isTrending: Boolean(isTrending)
     };
 
@@ -782,7 +782,7 @@ export default function AddColorModal({
               />
             </div>
 
-            {/* SEASON / QUARTER & TRENDING (Client Requirement: Jan-Mar, Apr-Jun, etc.) */}
+            {/* SEASON / QUARTER (All Season, Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec) */}
             <div className="mb-3 pt-2 border-top" style={{ borderColor: '#f1f5f9' }}>
               <label className="form-label fs-13 fw-semibold text-secondary mb-1">
                 Seasonal Quarter / Collection
@@ -793,7 +793,8 @@ export default function AddColorModal({
                 value={quarterTag}
                 onChange={(e) => setQuarterTag(e.target.value)}
               >
-                <option value="Q1">🌸 Jan – Mar (Q1 Spring / Trending)</option>
+                <option value="All Season">✨ All Season Color</option>
+                <option value="Q1">🌸 Jan – Mar (Q1 Spring)</option>
                 <option value="Q2">☀️ Apr – Jun (Q2 Summer Pastels)</option>
                 <option value="Q3">🌧️ Jul – Sep (Q3 Monsoon & Festive)</option>
                 <option value="Q4">❄️ Oct – Dec (Q4 Winter & Wedding)</option>

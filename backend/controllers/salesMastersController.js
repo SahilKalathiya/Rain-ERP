@@ -66,12 +66,9 @@ exports.getColors = async (req, res) => {
     let sql = 'SELECT * FROM colors WHERE active = TRUE';
     const params = [];
 
-    if (quarter) {
-      sql += ' AND (quarter_tag = ? OR is_trending = TRUE)';
+    if (quarter && quarter !== 'All') {
+      sql += ' AND (quarter_tag = ? OR quarter_tag = "All Season" OR quarter_tag = "ALL")';
       params.push(quarter);
-    }
-    if (trending_only === 'true') {
-      sql += ' AND is_trending = TRUE';
     }
 
     sql += ' ORDER BY name ASC';

@@ -502,7 +502,6 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                       ? 'Create New Customer Master'
                       : (isModalEditMode ? `Edit Full Customer: ${formData.name || ''}` : `Customer Details: ${formData.name || ''}`)}
                   </h5>
-                  <p className="text-muted small mb-0">Sequential ID: {formData.id}</p>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   {!isCreatingNew && (
@@ -788,7 +787,6 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
               <thead className="bg-light">
                 {/* Column Titles */}
                 <tr>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '120px' }}>CUSTOMER ID</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '200px' }}>CUSTOMER NAME</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '150px' }}>TYPE</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>PHONE</th>
@@ -812,7 +810,6 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                       setSelectedCustomer(null);
                     }}
                   >
-                    <td className="px-3 fw-bold text-primary font-monospace fs-13">{cust.id}</td>
                     <td className="px-3 fw-bold text-dark">{cust.name}</td>
                     <td className="px-3">
                       <span className="badge bg-light text-dark border px-2 py-1">{cust.type}</span>
@@ -857,7 +854,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
 
                 {filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-5 text-muted">
+                    <td colSpan={8} className="text-center py-5 text-muted">
                       <i className="ti ti-users-minus fs-1 d-block mb-2 text-secondary opacity-50"></i>
                       No customers found matching the search or column filter criteria.
                     </td>

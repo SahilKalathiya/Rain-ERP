@@ -772,13 +772,12 @@ export default function FabricMasterView({
               <table className="table table-hover align-middle mb-0 fs-13" style={{ width: '100%' }}>
                 <thead className="table-light text-secondary">
                   <tr style={{ fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-                    <th style={{ width: '15%' }}>FABRIC ID</th>
-                    <th style={{ width: '27%' }}>QUALITY NAME</th>
-                    <th style={{ width: '18%' }}>FABRIC TYPE</th>
-                    <th style={{ width: '11%' }}>GSM</th>
-                    <th style={{ width: '13%' }}>WIDTHS</th>
-                    <th style={{ width: '8%' }} className="text-center">STATUS</th>
-                    <th style={{ width: '8%' }} className="text-end">ACTION</th>
+                    <th style={{ width: '32%' }}>QUALITY NAME</th>
+                    <th style={{ width: '20%' }}>FABRIC TYPE</th>
+                    <th style={{ width: '13%' }}>GSM</th>
+                    <th style={{ width: '15%' }}>WIDTHS</th>
+                    <th style={{ width: '10%' }} className="text-center">STATUS</th>
+                    <th style={{ width: '10%' }} className="text-end">ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -790,7 +789,6 @@ export default function FabricMasterView({
                         className={`cursor-pointer ${isSelected ? 'table-primary fw-semibold' : ''}`}
                         onClick={() => handleSelectFabric(f)}
                       >
-                        <td className={`fw-semibold ${isSelected ? 'text-white' : 'text-primary'}`}>{f.id}</td>
                         <td className={`fw-medium ${isSelected ? 'text-white' : 'text-dark'}`}>
                           {f.qualityName || f.quality_name || '-'}
                         </td>
@@ -823,6 +821,17 @@ export default function FabricMasterView({
                         <td className="text-end" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
+                            className="btn btn-sm btn-light text-primary p-1.5 rounded-2 me-1"
+                            title="Edit Fabric"
+                            onClick={() => {
+                              handleSelectFabric(f);
+                              setIsEditing(true);
+                            }}
+                          >
+                            <i className="ti ti-edit fs-5"></i>
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
                             title="Delete Fabric"
                             onClick={(e) => handleDeleteFabric(f.id, f.qualityName || f.name || f.id, e)}
@@ -835,7 +844,7 @@ export default function FabricMasterView({
                   })}
                   {filteredFabrics.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-4 text-muted">
+                      <td colSpan={6} className="text-center py-4 text-muted">
                         No fabric qualities found matching criteria.
                       </td>
                     </tr>
@@ -858,9 +867,8 @@ export default function FabricMasterView({
                     </span>
                     <div>
                       <h5 className="fw-bold text-dark mb-0 fs-18">
-                        {isCreatingNew ? 'Create New Fabric' : formData.qualityName || formData.id}
+                        {isCreatingNew ? 'Create New Fabric' : formData.qualityName || 'Fabric Details'}
                       </h5>
-                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
                     </div>
                   </div>
 

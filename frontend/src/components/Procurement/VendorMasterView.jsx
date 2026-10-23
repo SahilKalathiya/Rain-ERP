@@ -270,15 +270,6 @@ export default function VendorMasterView({
                     <th>
                       <input
                         type="text"
-                        placeholder="Filter ID"
-                        className="form-control form-control-sm fs-11"
-                        value={colFilters.id}
-                        onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                      />
-                    </th>
-                    <th>
-                      <input
-                        type="text"
                         placeholder="Filter Name"
                         className="form-control form-control-sm fs-11"
                         value={colFilters.name}
@@ -341,7 +332,6 @@ export default function VendorMasterView({
                     <th style={{ width: '80px' }}></th>
                   </tr>
                   <tr>
-                    <th>Vendor ID</th>
                     <th>Vendor Name</th>
                     <th>Type</th>
                     <th>Phone</th>
@@ -360,7 +350,6 @@ export default function VendorMasterView({
                         className={`cursor-pointer ${isSelected ? 'table-primary' : ''}`}
                         onClick={() => handleSelectVendor(v)}
                       >
-                        <td className="fw-semibold text-primary">{v.id}</td>
                         <td className="fw-medium text-dark">{v.name}</td>
                         <td>
                           <span className="badge bg-light text-secondary border">{v.type}</span>
@@ -385,6 +374,14 @@ export default function VendorMasterView({
                         <td className="text-end" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
+                            className="btn btn-sm btn-light text-primary p-1.5 rounded-2 me-1"
+                            title="Edit Vendor"
+                            onClick={() => handleSelectVendor(v)}
+                          >
+                            <i className="ti ti-edit fs-5"></i>
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
                             title="Delete Vendor"
                             onClick={(e) => handleDeleteVendor(v.id, v.name || v.id, e)}
@@ -397,7 +394,7 @@ export default function VendorMasterView({
                   })}
                   {filteredVendors.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="text-center py-4 text-muted">
+                      <td colSpan={7} className="text-center py-4 text-muted">
                         No vendors found matching criteria.
                       </td>
                     </tr>
@@ -420,9 +417,8 @@ export default function VendorMasterView({
                     </span>
                     <div>
                       <h5 className="fw-bold text-dark mb-0 fs-18">
-                        {isCreatingNew ? 'Create New Vendor' : formData.name || formData.id}
+                        {isCreatingNew ? 'Create New Vendor' : formData.name || 'Vendor Details'}
                       </h5>
-                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
                     </div>
                   </div>
 

@@ -193,15 +193,6 @@ export default function TransporterMasterView({
                     <th>
                       <input
                         type="text"
-                        placeholder="Filter ID"
-                        className="form-control form-control-sm fs-11"
-                        value={colFilters.id}
-                        onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                      />
-                    </th>
-                    <th>
-                      <input
-                        type="text"
                         placeholder="Filter Name"
                         className="form-control form-control-sm fs-11"
                         value={colFilters.name}
@@ -231,7 +222,6 @@ export default function TransporterMasterView({
                     <th style={{ width: '80px' }}></th>
                   </tr>
                   <tr>
-                    <th>Transporter ID</th>
                     <th>Name</th>
                     <th>Phone</th>
                     <th>Status</th>
@@ -247,7 +237,6 @@ export default function TransporterMasterView({
                         className={`cursor-pointer ${isSelected ? 'table-primary' : ''}`}
                         onClick={() => handleSelect(t)}
                       >
-                        <td className="fw-semibold text-primary">{t.id}</td>
                         <td className="fw-medium text-dark">{t.name}</td>
                         <td>{t.phone || '-'}</td>
                         <td>
@@ -264,6 +253,17 @@ export default function TransporterMasterView({
                         <td className="text-end" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
+                            className="btn btn-sm btn-light text-primary p-1.5 rounded-2 me-1"
+                            title="Edit Transporter"
+                            onClick={() => {
+                              handleSelect(t);
+                              setIsEditing(true);
+                            }}
+                          >
+                            <i className="ti ti-edit fs-5"></i>
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
                             title="Delete Transporter"
                             onClick={(e) => handleDeleteTransporter(t.id, t.name || t.id, e)}
@@ -276,7 +276,7 @@ export default function TransporterMasterView({
                   })}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-4 text-muted">
+                      <td colSpan={4} className="text-center py-4 text-muted">
                         No transporters found matching criteria.
                       </td>
                     </tr>
@@ -299,9 +299,8 @@ export default function TransporterMasterView({
                     </span>
                     <div>
                       <h5 className="fw-bold text-dark mb-0 fs-18">
-                        {isCreatingNew ? 'Create New Transporter' : formData.name || formData.id}
+                        {isCreatingNew ? 'Create New Transporter' : formData.name || 'Transporter Details'}
                       </h5>
-                      <span className="badge bg-light text-secondary border mt-1">{formData.id}</span>
                     </div>
                   </div>
 
