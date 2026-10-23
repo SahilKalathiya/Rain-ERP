@@ -457,18 +457,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     fabricRows: [{ fabricQuality: '', fabricName: '', size: '', unit: cat === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: '' }],
     fabricEntries: [],
 
-    // Thread (PDF Section 7.1 - 7.5): Start clean, retaining only explicit PDF defaults
+    // Thread (PDF Section 7.1 - 7.5): Start clean without hardcoded prefilled values
     threadSize: '',
     threadSizeCustom: '',
     threadPattern: '',
-    threadPerStitch: 15, // Explicit PDF Default (Page 11 & 12)
-    metersPerMeterStitching: 15, // Single-time entry for Stitching
-    threadPerPiece: 60,  // Explicit PDF Default (Page 13)
+    threadPerStitch: '',
+    metersPerMeterStitching: '',
+    threadPerPiece: '',
     boxes: [{ reelsPerBox: '', metersPerReel: '' }],
     coneSizes: [],
     placements: [],
     articlePlacements: [],
-    globalThreadMetric: 15, // Explicit PDF Default (Page 12)
+    globalThreadMetric: '',
     stitchingArticles: [],
     consumptionPer100Pcs: {},
     processRemarks: ''
@@ -639,13 +639,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       threadPattern: acc.threadPattern || '',
       threadSize: acc.threadSize || acc.size || '',
       threadSizeCustom: acc.threadSizeCustom || '',
-      globalThreadMetric: acc.globalThreadMetric !== undefined ? acc.globalThreadMetric : 15,
+      globalThreadMetric: acc.globalThreadMetric !== undefined ? acc.globalThreadMetric : '',
       articlePlacements: acc.articlePlacements || [],
       stitchingArticles: acc.stitchingArticles || (acc.consumptionPer100Pcs ? Object.keys(acc.consumptionPer100Pcs) : []),
       consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
-      metersPerMeterStitching: acc.metersPerMeterStitching !== undefined ? acc.metersPerMeterStitching : (acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15),
-      threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : 15,
-      threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : 60,
+      metersPerMeterStitching: acc.metersPerMeterStitching !== undefined ? acc.metersPerMeterStitching : (acc.threadPerStitch !== undefined ? acc.threadPerStitch : ''),
+      threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : '',
+      threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : '',
       boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
       coneSizes: acc.coneSizes || [],
       placements: acc.placements || acc.availablePlacements || [],
@@ -724,10 +724,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       unitCustom: formData.unitCustom || '',
       piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
       threadPattern: formData.threadPattern || 'Stitching',
-      metersPerMeterStitching: parseFloat(formData.metersPerMeterStitching !== undefined ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
-      threadPerStitch: parseFloat(formData.metersPerMeterStitching !== undefined ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
-      threadPerPiece: parseFloat(formData.threadPerPiece) || 60,
-      globalThreadMetric: parseFloat(formData.globalThreadMetric) || 15,
+      metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? (parseFloat(formData.metersPerMeterStitching) || 0) : ((formData.threadPerStitch !== undefined && formData.threadPerStitch !== '') ? (parseFloat(formData.threadPerStitch) || 0) : ''),
+      threadPerStitch: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? (parseFloat(formData.metersPerMeterStitching) || 0) : ((formData.threadPerStitch !== undefined && formData.threadPerStitch !== '') ? (parseFloat(formData.threadPerStitch) || 0) : ''),
+      threadPerPiece: (formData.threadPerPiece !== undefined && formData.threadPerPiece !== '') ? (parseFloat(formData.threadPerPiece) || 0) : '',
+      globalThreadMetric: (formData.globalThreadMetric !== undefined && formData.globalThreadMetric !== '') ? (parseFloat(formData.globalThreadMetric) || 0) : '',
       articlePlacements: formData.articlePlacements || [],
       stitchingArticles: formData.stitchingArticles || [],
       consumptionPer100Pcs: formData.consumptionPer100Pcs || {},
@@ -1501,8 +1501,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   type="number"
                                   step="0.1"
                                   className="form-control fw-bold"
-                                  value={formData.threadPerStitch ?? 15}
-                                  onChange={(e) => setFormData({ ...formData, threadPerStitch: parseFloat(e.target.value) || 0 })}
+                                  placeholder="e.g. 15"
+                                  value={formData.threadPerStitch !== undefined && formData.threadPerStitch !== null ? formData.threadPerStitch : ''}
+                                  onChange={(e) => setFormData({ ...formData, threadPerStitch: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
                                   style={{ height: '36px' }}
                                 />
                                 <span className="input-group-text bg-white text-muted">m / stitch</span>
@@ -1796,8 +1797,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   type="number"
                                   step="0.1"
                                   className="form-control fw-bold"
-                                  value={formData.globalThreadMetric ?? 15}
-                                  onChange={(e) => setFormData({ ...formData, globalThreadMetric: parseFloat(e.target.value) || 0 })}
+                                  placeholder="e.g. 15"
+                                  value={formData.globalThreadMetric !== undefined && formData.globalThreadMetric !== null ? formData.globalThreadMetric : ''}
+                                  onChange={(e) => setFormData({ ...formData, globalThreadMetric: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
                                   style={{ height: '36px' }}
                                 />
                                 <span className="input-group-text bg-white text-muted">m / stitch metre</span>
@@ -1833,9 +1835,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   step="0.1"
                                   className="form-control fw-bold"
                                   placeholder="e.g. 15"
-                                  value={formData.metersPerMeterStitching ?? formData.threadPerStitch ?? 15}
+                                  value={formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== null && formData.metersPerMeterStitching !== '' ? formData.metersPerMeterStitching : (formData.threadPerStitch !== undefined && formData.threadPerStitch !== null && formData.threadPerStitch !== '' ? formData.threadPerStitch : '')}
                                   onChange={(e) => {
-                                    const val = parseFloat(e.target.value) || 0;
+                                    const val = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
                                     setFormData({ ...formData, metersPerMeterStitching: val, threadPerStitch: val });
                                   }}
                                   style={{ height: '36px' }}
@@ -1843,7 +1845,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 <span className="input-group-text bg-white text-muted">m / 1m stitch</span>
                               </div>
                               <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Single-time entry: Metres of thread required for 1m stitching (standard default: 15 m).
+                                Single-time entry: Metres of thread required for 1m stitching.
                               </div>
                             </div>
 
@@ -1857,14 +1859,15 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   type="number"
                                   step="1"
                                   className="form-control fw-bold"
-                                  value={formData.threadPerPiece ?? 60}
-                                  onChange={(e) => setFormData({ ...formData, threadPerPiece: parseFloat(e.target.value) || 0 })}
+                                  placeholder="e.g. 60"
+                                  value={formData.threadPerPiece !== undefined && formData.threadPerPiece !== null ? formData.threadPerPiece : ''}
+                                  onChange={(e) => setFormData({ ...formData, threadPerPiece: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
                                   style={{ height: '36px' }}
                                 />
                                 <span className="input-group-text bg-white text-muted">m / piece</span>
                               </div>
                               <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Default: 60 m, auto-populates BOM Quantity per Piece (editable).
+                                Auto-populates BOM Quantity per Piece (editable).
                               </div>
                             </div>
 
@@ -3595,11 +3598,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           <div className="row g-2">
                             <div className="col-6">
                               <div className="text-muted small">Thread Per Stitch</div>
-                              <div className="fw-bold text-dark">{selectedAccessory.threadPerStitch || 15} m / stitch</div>
+                              <div className="fw-bold text-dark">{selectedAccessory.threadPerStitch || '—'} m / stitch</div>
                             </div>
                             <div className="col-6">
                               <div className="text-muted small">Global Stitching Metric</div>
-                              <div className="fw-bold text-primary">{selectedAccessory.globalThreadMetric || 15} m / stitch metre</div>
+                              <div className="fw-bold text-primary">{selectedAccessory.globalThreadMetric || '—'} m / stitch metre</div>
                             </div>
                           </div>
 
@@ -3668,12 +3671,12 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             <div className="col-sm-6">
                               <div className="text-muted small">Meters of Thread for 1m Stitching</div>
                               <div className="fw-bold text-dark fs-14">
-                                {selectedAccessory.metersPerMeterStitching || selectedAccessory.threadPerStitch || 15} m / 1m stitch
+                                {selectedAccessory.metersPerMeterStitching || selectedAccessory.threadPerStitch || '—'} m / 1m stitch
                               </div>
                             </div>
                             <div className="col-sm-6">
                               <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                              <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || 60} m / piece</div>
+                              <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
                             </div>
                           </div>
 

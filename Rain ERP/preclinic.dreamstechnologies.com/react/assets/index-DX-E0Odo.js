@@ -27879,22 +27879,18 @@
       // Elastic (Section 6.5) & Beads & Sequins (Section 6.6)
       fabricRows: [{ fabricQuality: "", fabricName: "", size: "", unit: cat === "Beads & Sequins" ? "Gram" : "Meter", consumption: "" }],
       fabricEntries: [],
-      // Thread (PDF Section 7.1 - 7.5): Start clean, retaining only explicit PDF defaults
+      // Thread (PDF Section 7.1 - 7.5): Start clean without hardcoded prefilled values
       threadSize: "",
       threadSizeCustom: "",
       threadPattern: "",
-      threadPerStitch: 15,
-      // Explicit PDF Default (Page 11 & 12)
-      metersPerMeterStitching: 15,
-      // Single-time entry for Stitching
-      threadPerPiece: 60,
-      // Explicit PDF Default (Page 13)
+      threadPerStitch: "",
+      metersPerMeterStitching: "",
+      threadPerPiece: "",
       boxes: [{ reelsPerBox: "", metersPerReel: "" }],
       coneSizes: [],
       placements: [],
       articlePlacements: [],
-      globalThreadMetric: 15,
-      // Explicit PDF Default (Page 12)
+      globalThreadMetric: "",
       stitchingArticles: [],
       consumptionPer100Pcs: {},
       processRemarks: ""
@@ -28031,13 +28027,13 @@
         threadPattern: acc.threadPattern || "",
         threadSize: acc.threadSize || acc.size || "",
         threadSizeCustom: acc.threadSizeCustom || "",
-        globalThreadMetric: acc.globalThreadMetric !== void 0 ? acc.globalThreadMetric : 15,
+        globalThreadMetric: acc.globalThreadMetric !== void 0 ? acc.globalThreadMetric : "",
         articlePlacements: acc.articlePlacements || [],
         stitchingArticles: acc.stitchingArticles || (acc.consumptionPer100Pcs ? Object.keys(acc.consumptionPer100Pcs) : []),
         consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
-        metersPerMeterStitching: acc.metersPerMeterStitching !== void 0 ? acc.metersPerMeterStitching : acc.threadPerStitch !== void 0 ? acc.threadPerStitch : 15,
-        threadPerStitch: acc.threadPerStitch !== void 0 ? acc.threadPerStitch : 15,
-        threadPerPiece: acc.threadPerPiece !== void 0 ? acc.threadPerPiece : 60,
+        metersPerMeterStitching: acc.metersPerMeterStitching !== void 0 ? acc.metersPerMeterStitching : acc.threadPerStitch !== void 0 ? acc.threadPerStitch : "",
+        threadPerStitch: acc.threadPerStitch !== void 0 ? acc.threadPerStitch : "",
+        threadPerPiece: acc.threadPerPiece !== void 0 ? acc.threadPerPiece : "",
         boxes: acc.boxes && acc.boxes.length > 0 ? acc.boxes : acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: "", metersPerReel: "" }],
         coneSizes: acc.coneSizes || [],
         placements: acc.placements || acc.availablePlacements || [],
@@ -28096,10 +28092,10 @@
         unitCustom: formData.unitCustom || "",
         piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
         threadPattern: formData.threadPattern || "Stitching",
-        metersPerMeterStitching: parseFloat(formData.metersPerMeterStitching !== void 0 ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
-        threadPerStitch: parseFloat(formData.metersPerMeterStitching !== void 0 ? formData.metersPerMeterStitching : formData.threadPerStitch) || 15,
-        threadPerPiece: parseFloat(formData.threadPerPiece) || 60,
-        globalThreadMetric: parseFloat(formData.globalThreadMetric) || 15,
+        metersPerMeterStitching: formData.metersPerMeterStitching !== void 0 && formData.metersPerMeterStitching !== "" ? parseFloat(formData.metersPerMeterStitching) || 0 : formData.threadPerStitch !== void 0 && formData.threadPerStitch !== "" ? parseFloat(formData.threadPerStitch) || 0 : "",
+        threadPerStitch: formData.metersPerMeterStitching !== void 0 && formData.metersPerMeterStitching !== "" ? parseFloat(formData.metersPerMeterStitching) || 0 : formData.threadPerStitch !== void 0 && formData.threadPerStitch !== "" ? parseFloat(formData.threadPerStitch) || 0 : "",
+        threadPerPiece: formData.threadPerPiece !== void 0 && formData.threadPerPiece !== "" ? parseFloat(formData.threadPerPiece) || 0 : "",
+        globalThreadMetric: formData.globalThreadMetric !== void 0 && formData.globalThreadMetric !== "" ? parseFloat(formData.globalThreadMetric) || 0 : "",
         articlePlacements: formData.articlePlacements || [],
         stitchingArticles: formData.stitchingArticles || [],
         consumptionPer100Pcs: formData.consumptionPer100Pcs || {},
@@ -28636,8 +28632,9 @@
             type: "number",
             step: "0.1",
             className: "form-control fw-bold",
-            value: formData.threadPerStitch ?? 15,
-            onChange: (e) => setFormData({ ...formData, threadPerStitch: parseFloat(e.target.value) || 0 }),
+            placeholder: "e.g. 15",
+            value: formData.threadPerStitch !== void 0 && formData.threadPerStitch !== null ? formData.threadPerStitch : "",
+            onChange: (e) => setFormData({ ...formData, threadPerStitch: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 }),
             style: { height: "36px" }
           }
         ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / stitch")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11.5px" } }, "Default: 15 m per metre of stitching, remains editable.")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3 p-3 bg-white rounded-3 border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-bold text-dark small mb-0" }, "Available Boxes (Each box = 6000 m)"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "badge bg-light text-muted border", style: { fontSize: "11px" } }, "Reels Per Box \xD7 Metres Per Reel")), (() => {
@@ -28830,8 +28827,9 @@
             type: "number",
             step: "0.1",
             className: "form-control fw-bold",
-            value: formData.globalThreadMetric ?? 15,
-            onChange: (e) => setFormData({ ...formData, globalThreadMetric: parseFloat(e.target.value) || 0 }),
+            placeholder: "e.g. 15",
+            value: formData.globalThreadMetric !== void 0 && formData.globalThreadMetric !== null ? formData.globalThreadMetric : "",
+            onChange: (e) => setFormData({ ...formData, globalThreadMetric: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 }),
             style: { height: "36px" }
           }
         ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / stitch metre")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11px" } }, "Entered once and applies to both Kantha and Couching \u2014 separate from and in addition to per-placement Thread Required values."))), isStitching && /* @__PURE__ */ import_react14.default.createElement("div", { className: "card p-3.5 rounded-3 mb-3 border shadow-2xs", style: { backgroundColor: "#f8faff", borderColor: "#c7d2fe" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "badge rounded-pill px-2.5 py-1 text-white", style: { backgroundColor: "#2e37a4" } }, "Stitching"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "fw-bold text-dark fs-14" }, "Pattern Configuration")), /* @__PURE__ */ import_react14.default.createElement("span", { className: "small text-muted", style: { fontSize: "11.5px" } }, "Garment Assembly")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1" }, "Meters of thread required for 1m stitching (single\u2011time entry) ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "input-group input-group-sm", style: { maxWidth: "260px" } }, /* @__PURE__ */ import_react14.default.createElement(
@@ -28841,24 +28839,25 @@
             step: "0.1",
             className: "form-control fw-bold",
             placeholder: "e.g. 15",
-            value: formData.metersPerMeterStitching ?? formData.threadPerStitch ?? 15,
+            value: formData.metersPerMeterStitching !== void 0 && formData.metersPerMeterStitching !== null && formData.metersPerMeterStitching !== "" ? formData.metersPerMeterStitching : formData.threadPerStitch !== void 0 && formData.threadPerStitch !== null && formData.threadPerStitch !== "" ? formData.threadPerStitch : "",
             onChange: (e) => {
-              const val = parseFloat(e.target.value) || 0;
+              const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
               setFormData({ ...formData, metersPerMeterStitching: val, threadPerStitch: val });
             },
             style: { height: "36px" }
           }
-        ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / 1m stitch")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11.5px" } }, "Single-time entry: Metres of thread required for 1m stitching (standard default: 15 m).")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1" }, "Thread Per Piece (metres) ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "input-group input-group-sm", style: { maxWidth: "220px" } }, /* @__PURE__ */ import_react14.default.createElement(
+        ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / 1m stitch")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11.5px" } }, "Single-time entry: Metres of thread required for 1m stitching.")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1" }, "Thread Per Piece (metres) ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "input-group input-group-sm", style: { maxWidth: "220px" } }, /* @__PURE__ */ import_react14.default.createElement(
           "input",
           {
             type: "number",
             step: "1",
             className: "form-control fw-bold",
-            value: formData.threadPerPiece ?? 60,
-            onChange: (e) => setFormData({ ...formData, threadPerPiece: parseFloat(e.target.value) || 0 }),
+            placeholder: "e.g. 60",
+            value: formData.threadPerPiece !== void 0 && formData.threadPerPiece !== null ? formData.threadPerPiece : "",
+            onChange: (e) => setFormData({ ...formData, threadPerPiece: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 }),
             style: { height: "36px" }
           }
-        ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / piece")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11.5px" } }, "Default: 60 m, auto-populates BOM Quantity per Piece (editable).")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3 p-3 bg-white rounded-3 border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-bold text-dark small mb-0" }, "Available Boxes (Each box = 6000 m)"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "badge bg-light text-muted border", style: { fontSize: "11px" } }, "Reels Per Box \xD7 Metres Per Reel")), (() => {
+        ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "input-group-text bg-white text-muted" }, "m / piece")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text text-muted", style: { fontSize: "11.5px" } }, "Auto-populates BOM Quantity per Piece (editable).")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3 p-3 bg-white rounded-3 border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-bold text-dark small mb-0" }, "Available Boxes (Each box = 6000 m)"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "badge bg-light text-muted border", style: { fontSize: "11px" } }, "Reels Per Box \xD7 Metres Per Reel")), (() => {
           const boxList = formData.boxes && formData.boxes.length > 0 ? formData.boxes : [{ reelsPerBox: "", metersPerReel: "" }];
           return boxList.map((b, i, arr) => {
             const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
