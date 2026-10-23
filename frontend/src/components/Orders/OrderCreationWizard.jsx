@@ -82,10 +82,11 @@ const DEFAULT_FABRICS = [
 ];
 
 // Helper to capitalize the first character of each word (Title Case)
-export const capitalizeWords = (str) => {
+export const autoCapitalizeWords = (str) => {
   if (!str) return '';
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
 };
+export const capitalizeWords = autoCapitalizeWords;
 
 export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Master Data State
@@ -358,7 +359,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   };
 
   const updateArticleName = (artId, name) => {
-    setAddedArticles(prev => prev.map(a => a.id === artId ? { ...a, name } : a));
+    const capitalized = autoCapitalizeWords(name);
+    setAddedArticles(prev => prev.map(a => a.id === artId ? { ...a, name: capitalized } : a));
   };
 
   const updateArticleAvgLength = (artId, avgLength) => {
@@ -399,7 +401,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   };
 
   const updateFabricField = (artId, fi, field, val) => {
-    const finalVal = (field === 'role' && typeof val === 'string') ? capitalizeWords(val) : val;
+    const finalVal = (field === 'role' && typeof val === 'string') ? autoCapitalizeWords(val) : val;
     setAddedArticles(prev => prev.map(a => {
       if (a.id !== artId) return a;
       const updated = [...(a.fabrics || [])];
@@ -1037,7 +1039,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
             key: `${art.id}_${frIdx}_${colName}`,
             articleId: art.id,
             articleName: art.name,
-            role: fr.role || 'Main',
+            role: autoCapitalizeWords(fr.role || 'Main'),
             fabricId: fab?.id,
             fabricQuality: fab?.qualityName || fab?.quality || fab?.name || 'Suh Cotton',
             source: fr.source || 'Greige Fabric',
@@ -1165,9 +1167,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Handle Final Order Save
   const handleFinalSave = (status) => {
     // If user didn't enter a styleName, default it to article name or Kurta
-    const primaryArticleName = addedArticles[0]?.name || 'Kurta';
+    const primaryArticleName = autoCapitalizeWords(addedArticles[0]?.name || 'Kurta');
     const finalStyleName = (orderInfo.styleName && orderInfo.styleName.trim()) 
-      ? capitalizeWords(orderInfo.styleName.trim()) 
+      ? autoCapitalizeWords(orderInfo.styleName.trim()) 
       : `${primaryArticleName} Style (${orderInfo.orderId})`;
 
     // If no articles added explicitly, default to Kurta
@@ -1212,12 +1214,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
         const artPieces = getPiecesForArticle(art.id, art.name);
         return {
           ...art,
-          name: art.name || primaryArticleName,
+          name: autoCapitalizeWords(art.name || primaryArticleName),
           totalPieces: artPieces > 0 ? artPieces : Math.round((grandTotalOrderPieces || 0) / (finalArticles.length || 1)),
           fabricQuality: fabQuality,
           fabrics: (art.fabrics || []).map(f => ({
             ...f,
-            role: capitalizeWords(f.role || '')
+            role: autoCapitalizeWords(f.role || '')
           })),
           avgGarmentLength: avgLen,
           avgLength: avgLen
@@ -1314,7 +1316,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
               placeholder="e.g. Ikkat Black Kurta Set"
               style={{ textTransform: 'capitalize' }}
               value={orderInfo.styleName}
-              onChange={(e) => setOrderInfo({ ...orderInfo, styleName: capitalizeWords(e.target.value) })}
+              onChange={(e) => setOrderInfo({ ...orderInfo, styleName: autoCapitalizeWords(e.target.value) })}
+              onBlur={(e) => setOrderInfo({ ...orderInfo, styleName: autoCapitalizeWords((e.target.value || '').trim()) })}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -1323,6 +1326,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                 }
               }}
             />
+            <div className="form-text small text-muted" style={{ fontSize: '11px' }}>Auto-capitalised word by word</div>
           </div>
           <div className="col-6 col-md-3">
             <label className="form-label fw-semibold small text-muted mb-1">Order Date</label>
@@ -1541,8 +1545,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                       type="text"
                       className="form-control form-control-sm bg-white"
                       placeholder="e.g. Kurta"
+                      style={{ textTransform: 'capitalize' }}
                       value={art.name}
-                      onChange={(e) => updateArticleName(art.id, e.target.value)}
+                      onChange={(e) => updateArticleName(art.id, autoCapitalizeWords(e.target.value))}
+                      onBlur={(e) => updateArticleName(art.id, autoCapitalizeWords((e.target.value || '').trim()))}
                     />
                   </div>
                   <div className="col-12 col-md-3">
@@ -1572,7 +1578,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                         placeholder="e.g. Main, Outer, Lining"
                         style={{ textTransform: 'capitalize' }}
                         value={fr.role || ''}
-                        onChange={(e) => updateFabricField(art.id, fi, 'role', capitalizeWords(e.target.value))}
+                        onChange={(e) => updateFabricField(art.id, fi, 'role', autoCapitalizeWords(e.target.value))}
+                        onBlur={(e) => updateFabricField(art.id, fi, 'role', autoCapitalizeWords((e.target.value || '').trim()))}
                       />
                     </div>
                     <div className="col-12 col-md-8">

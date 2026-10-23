@@ -9,6 +9,11 @@ import {
   OrderPurchaseOrdersCard
 } from './AccessoryPOModals';
 
+const autoCapitalizeWords = (str) => {
+  if (!str) return '';
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function OrderDetailView({
   order,
   onBack,
@@ -1803,7 +1808,7 @@ export default function OrderDetailView({
           articleName: artName,
           articleCode: artName.toUpperCase(),
           articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
-          role: fc.role || artFab.pieceLabel || artFab.role || 'Main',
+          role: autoCapitalizeWords(fc.role || artFab.pieceLabel || artFab.role || 'Main'),
           fabricQuality: fabQuality,
           source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
           width: initialWidth,
@@ -1890,7 +1895,7 @@ export default function OrderDetailView({
       const artFab = art.fabrics?.[0] || {};
       const artName = art.name || (aIdx === 0 ? 'Kurta' : aIdx === 1 ? 'Pant' : 'Dupatta');
       const fabName = artFab.fabricName || artFab.quality || art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc');
-      const role = artFab.pieceLabel || artFab.role || 'Main';
+      const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || 'Main');
       const source = art.sourcing || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
       
       const initialWidth = resolveWidth(artFab.width) ||
@@ -2584,7 +2589,7 @@ export default function OrderDetailView({
           <div>
             <div className="d-flex align-items-center gap-2 flex-wrap">
               <h3 className="fw-bold text-dark mb-0" style={{ fontSize: '24px' }}>
-                {order.styleName || 'kurta'}
+                {autoCapitalizeWords(order.styleName || 'Kurta')}
               </h3>
               <span
                 className="badge border bg-light text-secondary rounded-2 px-2.5 py-1 fw-medium d-inline-flex align-items-center gap-1.5"
@@ -3018,6 +3023,11 @@ export default function OrderDetailView({
                       <span className="text-warning fs-5">🥞</span>
                       <span className="text-secondary small fw-medium">
                         Fabric: <strong className="text-dark">{art.fabricQuality}</strong>
+                        {art.fabrics?.[0]?.role && (
+                          <span className="badge bg-light text-secondary border ms-2">
+                            {autoCapitalizeWords(art.fabrics[0].role)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}
@@ -3300,7 +3310,7 @@ export default function OrderDetailView({
             </span>
             <div>
               <div className="fw-semibold text-dark" style={{ fontSize: '14px' }}>
-                Order {order.id || 'RD-2610-0002'} created ({(order.styleName || 'kurta').toLowerCase()})
+                Order {order.id || 'RD-2610-0002'} created ({autoCapitalizeWords(order.styleName || 'Kurta')})
               </div>
               <div className="text-muted small" style={{ fontSize: '12px' }}>
                 {formatDate(order.orderDate)} &bull; order

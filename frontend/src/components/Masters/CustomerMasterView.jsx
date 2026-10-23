@@ -59,6 +59,18 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
   // Global search inside master (Section 11.1)
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Column Filters for Table View
+  const [colFilters, setColFilters] = useState({
+    name: '',
+    type: '',
+    phone: '',
+    city: '',
+    state: '',
+    gstin: '',
+    notes: '',
+    status: ''
+  });
+
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
   const showToast = (msg) => {
@@ -286,8 +298,8 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
       const q = searchQuery.toLowerCase().trim();
-      if (!q) return true;
-      return (
+      const matchSearch =
+        !q ||
         (c.id || '').toLowerCase().includes(q) ||
         (c.name || '').toLowerCase().includes(q) ||
         (c.type || '').toLowerCase().includes(q) ||
@@ -295,10 +307,23 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
         (c.city || '').toLowerCase().includes(q) ||
         (c.state || '').toLowerCase().includes(q) ||
         (c.gstin || '').toLowerCase().includes(q) ||
-        (c.notes || '').toLowerCase().includes(q)
-      );
+        (c.notes || '').toLowerCase().includes(q);
+
+      if (!matchSearch) return false;
+
+      const matchesCol =
+        (!colFilters.name || (c.name || '').toLowerCase().includes(colFilters.name.toLowerCase().trim())) &&
+        (!colFilters.type || (c.type || '').toLowerCase().includes(colFilters.type.toLowerCase().trim())) &&
+        (!colFilters.phone || (c.phone || '').toLowerCase().includes(colFilters.phone.toLowerCase().trim())) &&
+        (!colFilters.city || (c.city || '').toLowerCase().includes(colFilters.city.toLowerCase().trim())) &&
+        (!colFilters.state || (c.state || '').toLowerCase().includes(colFilters.state.toLowerCase().trim())) &&
+        (!colFilters.gstin || (c.gstin || '').toLowerCase().includes(colFilters.gstin.toLowerCase().trim())) &&
+        (!colFilters.notes || (c.notes || '').toLowerCase().includes(colFilters.notes.toLowerCase().trim())) &&
+        (!colFilters.status || (colFilters.status === 'Active' ? c.active : !c.active));
+
+      return matchesCol;
     });
-  }, [customers, searchQuery]);
+  }, [customers, searchQuery, colFilters]);
 
   // Modal / Inline Container (Section 2.2)
   if (isInline) {
@@ -783,15 +808,116 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
               <thead className="bg-light">
                 {/* Column Titles */}
                 <tr>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '200px' }}>CUSTOMER NAME</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '150px' }}>TYPE</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>PHONE</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>CITY</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '130px' }}>STATE</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '160px' }}>GSTIN</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '180px' }}>CUSTOMER NAME</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '140px' }}>TYPE</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '120px' }}>PHONE</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '120px' }}>CITY</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '120px' }}>STATE</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '150px' }}>GSTIN</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '150px' }}>NOTES</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold text-center" style={{ minWidth: '100px' }}>STATUS</th>
-                  <th className="py-2.5 px-3 text-muted small fw-bold text-end" style={{ minWidth: '110px' }}>ACTIONS</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold text-center" style={{ minWidth: '110px' }}>STATUS</th>
+                  <th className="py-2.5 px-3 text-muted small fw-bold text-end" style={{ minWidth: '100px' }}>ACTIONS</th>
+                </tr>
+
+                {/* Column-wise Filter Row */}
+                <tr className="bg-white border-bottom">
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Filter name..."
+                      value={colFilters.name}
+                      onChange={(e) => setColFilters({ ...colFilters, name: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Filter type..."
+                      value={colFilters.type}
+                      onChange={(e) => setColFilters({ ...colFilters, type: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Phone..."
+                      value={colFilters.phone}
+                      onChange={(e) => setColFilters({ ...colFilters, phone: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="City..."
+                      value={colFilters.city}
+                      onChange={(e) => setColFilters({ ...colFilters, city: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="State..."
+                      value={colFilters.state}
+                      onChange={(e) => setColFilters({ ...colFilters, state: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="GSTIN..."
+                      value={colFilters.gstin}
+                      onChange={(e) => setColFilters({ ...colFilters, gstin: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Filter notes..."
+                      value={colFilters.notes}
+                      onChange={(e) => setColFilters({ ...colFilters, notes: e.target.value })}
+                    />
+                  </td>
+                  <td className="p-1.5 text-center">
+                    <select
+                      className="form-select form-select-sm"
+                      value={colFilters.status}
+                      onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
+                    >
+                      <option value="">All</option>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </td>
+                  <td className="p-1.5 text-end">
+                    {Object.values(colFilters).some(Boolean) && (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-link text-danger p-0 text-decoration-none fw-semibold"
+                        style={{ fontSize: '11px' }}
+                        onClick={() =>
+                          setColFilters({
+                            name: '',
+                            type: '',
+                            phone: '',
+                            city: '',
+                            state: '',
+                            gstin: '',
+                            notes: '',
+                            status: ''
+                          })
+                        }
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </td>
                 </tr>
               </thead>
               <tbody>
@@ -854,7 +980,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
 
                 {filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-5 text-muted">
+                    <td colSpan={9} className="text-center py-5 text-muted">
                       <i className="ti ti-users-minus fs-1 d-block mb-2 text-secondary opacity-50"></i>
                       No customers found matching the search or column filter criteria.
                     </td>

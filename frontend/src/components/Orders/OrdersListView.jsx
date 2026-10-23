@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
 
+const autoCapitalizeWords = (str) => {
+  if (!str) return '';
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export default function OrdersListView({ orders: propOrders, onNewOrder, onViewOrder, onEditOrder }) {
   const [orders, setOrders] = useState(() => {
     if (propOrders && propOrders.length > 0) return propOrders;
@@ -120,7 +125,7 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
                 <tr key={ord.id} style={{ cursor: 'pointer' }} onClick={() => onViewOrder(ord)}>
                   <td className="px-3 fw-bold text-primary font-monospace">{ord.id}</td>
                   <td className="px-3">
-                    <div className="fw-semibold text-dark">{ord.styleName}</div>
+                    <div className="fw-semibold text-dark">{autoCapitalizeWords(ord.styleName || '—')}</div>
                     <div className="text-muted small">{ord.sizeSeriesName || 'Alphabetic Series'}</div>
                   </td>
                   <td className="px-3 text-muted">{ord.orderDate}</td>

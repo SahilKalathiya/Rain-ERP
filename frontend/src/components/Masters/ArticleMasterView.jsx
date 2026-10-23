@@ -288,7 +288,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
 
   // Column Filters for Table View (Section 11.3)
   const [colFilters, setColFilters] = useState({
-    id: '',
     name: '',
     icon: '',
     sortOrder: '',
@@ -617,7 +616,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
       if (!matchGlobal) return false;
 
       return (
-        (art.id || '').toLowerCase().includes(colFilters.id.toLowerCase()) &&
         (art.name || '').toLowerCase().includes(colFilters.name.toLowerCase()) &&
         (art.icon || '').toLowerCase().includes(colFilters.icon.toLowerCase()) &&
         (String(art.sortOrder || '')).includes(colFilters.sortOrder) &&
@@ -1403,7 +1401,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
             <table className="table table-hover align-middle mb-0">
               <thead className="bg-light">
                 <tr>
-                  <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '110px' }}>ARTICLE ID</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '80px' }}>ICON</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold" style={{ minWidth: '180px' }}>ARTICLE NAME</th>
                   <th className="py-2.5 px-3 text-muted small fw-bold text-center" style={{ minWidth: '120px' }}>SORT ORDER</th>
@@ -1414,15 +1411,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
 
                 {/* Section 11.3: Column-wise Filters */}
                 <tr className="bg-white border-bottom">
-                  <td className="p-1.5">
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      placeholder="ID..."
-                      value={colFilters.id}
-                      onChange={(e) => setColFilters({ ...colFilters, id: e.target.value })}
-                    />
-                  </td>
                   <td className="p-1.5">
                     <input
                       type="text"
@@ -1471,13 +1459,12 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                     </select>
                   </td>
                   <td className="p-1.5 text-end">
-                    {(colFilters.id || colFilters.name || colFilters.icon || colFilters.sortOrder || colFilters.description || colFilters.status) && (
+                    {(colFilters.name || colFilters.icon || colFilters.sortOrder || colFilters.description || colFilters.status) && (
                       <button
                         type="button"
                         className="btn btn-xs btn-link text-muted p-0 text-decoration-none"
                         onClick={() =>
                           setColFilters({
-                            id: '',
                             name: '',
                             icon: '',
                             sortOrder: '',
@@ -1499,7 +1486,6 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                     style={{ cursor: 'pointer' }}
                     onClick={() => handleEditArticle(art, false)}
                   >
-                    <td className="px-3 fw-bold text-primary font-monospace fs-13">{art.id}</td>
                     <td className="px-3 fs-4">{art.icon}</td>
                     <td className="px-3 fw-bold text-dark">{art.name}</td>
                     <td className="px-3 text-center">
