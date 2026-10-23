@@ -529,9 +529,9 @@ export default function OrderDetailView({
     );
     if (fcRows.length > 0) {
       return fcRows.map(r => ({
-        color: r.colorName || 'Charcoal',
-        qty: r.pcs || Math.round((order?.totalGarments || 200) / fcRows.length),
-        display: `${r.colorName || 'Charcoal'} (${r.pcs || Math.round((order?.totalGarments || 200) / fcRows.length)} pcs)`
+        color: r.colorName || 'Standard',
+        qty: r.pcs !== undefined ? r.pcs : (order?.totalGarments || 0),
+        display: `${r.colorName || 'Standard'} (${r.pcs !== undefined ? r.pcs : (order?.totalGarments || 0)} pcs)`
       }));
     }
 
@@ -541,11 +541,11 @@ export default function OrderDetailView({
         if (!colors.includes(c)) colors.push(c);
       });
     });
-    const fallbackColors = colors.length > 0 ? colors : ['Charcoal', 'Green'];
+    const fallbackColors = colors.length > 0 ? colors : (order?.id ? ['Standard'] : ['Charcoal', 'Green']);
     const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
       (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
-    const qtyPerColor = Math.round(totalArtQty / fallbackColors.length);
+    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+    const qtyPerColor = fallbackColors.length > 0 ? Math.round(totalArtQty / fallbackColors.length) : 0;
 
     return fallbackColors.map(c => ({
       color: c,
@@ -561,7 +561,7 @@ export default function OrderDetailView({
     const colorOpts = getArticleColorOptions(articleName);
     const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
       (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
     const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
     const initialRows = colorOpts.map((co, idx) => ({
@@ -680,7 +680,7 @@ export default function OrderDetailView({
       const colorOpts = getArticleColorOptions(articleName);
       const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
         (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-      const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+      const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
       const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
       const updatedRows = currentRows.map((r, rIdx) => {
@@ -1025,7 +1025,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -1033,10 +1033,12 @@ export default function OrderDetailView({
                   const reqVal = parseFloat(row.reqPerPc) || 0;
                   const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
                   const packNum = parseFloat(packInput);
-                  const packMultiplier = (!isNaN(packNum) && packNum > 0) ? packNum : 1;
+                  const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
                   const bufVal = parseFloat(row.bufferPct) || 0;
                   const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
-                  const baseCalc = artPcs * reqVal * packMultiplier;
+                  const reqQty = artPcs * reqVal;
+                  const packQty = artPcs * packVal;
+                  const baseCalc = reqQty + packQty;
                   const bufQty = (baseCalc * bufVal) / 100;
                   const liveTotalNum = baseCalc + bufQty;
                   const liveTotal = liveTotalNum % 1 === 0 ? liveTotalNum.toFixed(0) : liveTotalNum.toFixed(1);
@@ -1216,12 +1218,12 @@ export default function OrderDetailView({
                             step="1"
                             className="form-control form-control-sm text-center"
                             value={row.extraPerPack ?? ''}
-                            placeholder="1"
+                            placeholder="0"
                             onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'extraPerPack', e.target.value)}
                             style={inputStyle}
                           />
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.extraPerPack || '1'}</span>
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.extraPerPack || '0'}</span>
                         )}
                       </td>
 
@@ -1293,7 +1295,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -1432,7 +1434,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -1584,7 +1586,7 @@ export default function OrderDetailView({
               const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
               const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                 (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-              const totalArtQty = artObj?.totalPieces || order?.totalGarments || 200;
+              const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
               const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
               return rows.map((row, rIdx) => {
@@ -1780,6 +1782,8 @@ export default function OrderDetailView({
       return '44"';
     };
 
+    const isMockSample = !order || (!order.id && !order.styleName && (!order.articles || order.articles.length === 0));
+
     // If order already has saved fabricConsumptions, initialize from them
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
       return order.fabricConsumptions.map((fc, idx) => {
@@ -1788,8 +1792,8 @@ export default function OrderDetailView({
           ? fc.articleIndex
           : (order?.articles ? order.articles.findIndex(a => a.name === artName) : idx);
         const art = (order?.articles && order.articles[artIdx]) || {};
-        const artFab = art.fabrics?.[0] || {};
-        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricName || artFab.quality || art.fabricQuality || (idx === 0 ? '100/100 Mulmul' : idx === 1 ? '2.40/20s CF' : '60os Cambryc');
+        const artFab = (art.fabrics || []).find(f => (f.fabricQuality || f.fabricName || '').toLowerCase() === (fc.fabricQuality || '').toLowerCase()) || art.fabrics?.[0] || {};
+        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || (idx === 0 ? '100/100 Mulmul' : idx === 1 ? '2.40/20s CF' : '60os Cambryc');
         
         // Priority for starting width: fabric's defined width from Fabric Master -> artFab.width -> art.width -> order.width -> default
         const initialWidth = resolveWidth(artFab.width) ||
@@ -1802,6 +1806,10 @@ export default function OrderDetailView({
         const shrink = parseFloat(fc.shrinkPercent || fc.shrinkPct || artFab.shrinkagePercent || artFab.shrinkage || (idx === 1 ? 3.5 : 4));
         const buf = parseFloat(fc.bufferPercent || fc.bufferPct || artFab.bufferPercent || 10);
 
+        const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
+        const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
+        const finalPcs = !isNaN(parsedPcs) ? parsedPcs : (isMockSample ? (idx === 0 ? 400 : 300) : 0);
+
         return {
           key: fc.key || `row_${idx}`,
           articleIndex: artIdx >= 0 ? artIdx : idx,
@@ -1812,12 +1820,12 @@ export default function OrderDetailView({
           fabricQuality: fabQuality,
           source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
           width: initialWidth,
-          colorName: fc.colorName || 'Charcoal',
-          colorHex: fc.colorHex || '#333333',
+          colorName: fc.colorName || (isMockSample ? 'Charcoal' : 'Standard'),
+          colorHex: fc.colorHex || (isMockSample ? '#333333' : '#94a3b8'),
           dyedRate: (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '') ? fc.dyedRate : (idx === 0 ? 1.5 : idx === 1 ? 3.0 : 0.0),
           shrinkPct: shrink,
           bufferPct: buf,
-          pcs: parseInt(fc.pcs || fc.pieces, 10) || (idx === 0 ? 400 : 300),
+          pcs: finalPcs,
           locked: fc.locked !== undefined ? !!fc.locked : false
         };
       });
@@ -1826,11 +1834,11 @@ export default function OrderDetailView({
     // Otherwise, generate rows from order.articles and customer orders or default matching Prototype Demo (Kurta, Pant, Dupatta)
     const articles = (order?.articles && order.articles.length > 0)
       ? order.articles
-      : [
+      : (isMockSample ? [
           { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
           { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
           { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
-        ];
+        ] : []);
 
     // Colors list from customer orders
     let colors = [];
@@ -1845,7 +1853,7 @@ export default function OrderDetailView({
       colors = [...order.colors];
     }
     if (colors.length === 0) {
-      colors = ['Charcoal', 'Green'];
+      colors = isMockSample ? ['Charcoal', 'Green'] : ['Standard'];
     }
 
     const colorHexMap = {
@@ -1860,7 +1868,8 @@ export default function OrderDetailView({
       'Sea Green': '#2E8B57',
       'Teal': '#008080',
       'Wine': '#722F37',
-      'Yellow': '#FFD700'
+      'Yellow': '#FFD700',
+      'Standard': '#94a3b8'
     };
 
     const getCustomerPcs = (artName, colName) => {
@@ -1892,46 +1901,58 @@ export default function OrderDetailView({
 
     const rows = [];
     articles.forEach((art, aIdx) => {
-      const artFab = art.fabrics?.[0] || {};
       const artName = art.name || (aIdx === 0 ? 'Kurta' : aIdx === 1 ? 'Pant' : 'Dupatta');
-      const fabName = artFab.fabricName || artFab.quality || art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc');
-      const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || 'Main');
-      const source = art.sourcing || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
-      
-      const initialWidth = resolveWidth(artFab.width) ||
-        getFabricDefaultWidth(fabName, artFab) ||
-        resolveWidth(art.width) ||
-        resolveWidth(order?.width) ||
-        (aIdx === 1 ? '47"' : aIdx === 2 ? '' : '44"');
+      const fabricsToIterate = (Array.isArray(art.fabrics) && art.fabrics.length > 0)
+        ? art.fabrics
+        : [{
+            fabricQuality: art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc'),
+            role: 'Main',
+            width: art.width,
+            source: art.sourcing || art.source,
+            shrinkage: art.shrinkage,
+            consumption: art.consumption
+          }];
 
-      const shrinkVal = parseFloat(artFab.shrinkagePercent || artFab.shrinkage || art.shrinkage || (aIdx === 1 ? 3.5 : aIdx === 2 ? 6 : 4));
-      const bufferVal = parseFloat(artFab.bufferPercent || 10);
-      const defaultDyed = art.consumption !== undefined ? art.consumption : (aIdx === 0 ? 1.5 : aIdx === 1 ? 3.0 : 0.0);
+      fabricsToIterate.forEach((artFab, fIdx) => {
+        const fabName = artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc');
+        const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || (fIdx === 0 ? 'Main' : 'Outer'));
+        const source = artFab.source || art.sourcing || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
+        
+        const initialWidth = resolveWidth(artFab.width) ||
+          getFabricDefaultWidth(fabName, artFab) ||
+          resolveWidth(art.width) ||
+          resolveWidth(order?.width) ||
+          (aIdx === 1 ? '47"' : aIdx === 2 ? '' : '44"');
 
-      // Dupatta might only have 1 color in sample
-      const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || 'Charcoal'] : colors;
+        const shrinkVal = parseFloat(artFab.shrinkagePercent || artFab.shrinkage || art.shrinkage || (aIdx === 1 ? 3.5 : aIdx === 2 ? 6 : 4));
+        const bufferVal = parseFloat(artFab.bufferPercent || 10);
+        const defaultDyed = artFab.consumption !== undefined ? artFab.consumption : (art.consumption !== undefined ? art.consumption : (isMockSample ? (aIdx === 0 ? 1.5 : aIdx === 1 ? 3.0 : 0.0) : 1.5));
 
-      artColors.forEach((col, cIdx) => {
-        const custPcs = getCustomerPcs(artName, col);
-        const pcsVal = custPcs > 0 ? custPcs : (cIdx === 0 ? 400 : 300);
+        // Dupatta might only have 1 color in sample
+        const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || (isMockSample ? 'Charcoal' : 'Standard')] : colors;
 
-        rows.push({
-          key: `${artName}_${role}_${col}`,
-          articleIndex: aIdx,
-          articleName: artName,
-          articleCode: (artName || '').toUpperCase(),
-          articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
-          role: role,
-          fabricQuality: fabName,
-          source: source,
-          width: initialWidth,
-          colorName: col,
-          colorHex: colorHexMap[col] || '#333333',
-          dyedRate: defaultDyed,
-          shrinkPct: shrinkVal,
-          bufferPct: bufferVal,
-          pcs: pcsVal,
-          locked: false
+        artColors.forEach((col, cIdx) => {
+          const custPcs = getCustomerPcs(artName, col);
+          const pcsVal = custPcs > 0 ? custPcs : (isMockSample ? (cIdx === 0 ? 400 : 300) : 0);
+
+          rows.push({
+            key: `${artName}_${fabName}_${role}_${col}_${fIdx}_${cIdx}`,
+            articleIndex: aIdx,
+            articleName: artName,
+            articleCode: (artName || '').toUpperCase(),
+            articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+            role: role,
+            fabricQuality: fabName,
+            source: source,
+            width: initialWidth,
+            colorName: col,
+            colorHex: colorHexMap[col] || '#94a3b8',
+            dyedRate: defaultDyed,
+            shrinkPct: shrinkVal,
+            bufferPct: bufferVal,
+            pcs: pcsVal,
+            locked: false
+          });
         });
       });
     });
@@ -1978,13 +1999,13 @@ export default function OrderDetailView({
     });
     if (allCols.length === 0) {
       consumptionRows.forEach((fc) => {
-        if (fc.colorName && !allCols.includes(fc.colorName)) allCols.push(fc.colorName);
+        if (fc.colorName && fc.colorName !== 'Standard' && fc.colorName !== '—' && !allCols.includes(fc.colorName)) allCols.push(fc.colorName);
       });
     }
     const unique = new Set(allCols);
     return {
-      totalColorsCount: allCols.length || 2,
-      uniqueColorsCount: 0 // Exactly matches reference server's 0 count
+      totalColorsCount: allCols.length,
+      uniqueColorsCount: unique.size
     };
   }, [order, consumptionRows]);
 
@@ -2044,7 +2065,7 @@ export default function OrderDetailView({
           } else if (rawPieces > 0) {
             finalPieces = rawPieces;
           } else {
-            finalPieces = Math.round((totalOrderGarments || 200) / (artCount || 1));
+            finalPieces = totalOrderGarments > 0 ? Math.round(totalOrderGarments / (artCount || 1)) : 0;
           }
         }
 
@@ -2052,6 +2073,7 @@ export default function OrderDetailView({
           id: item.id || `ART-${seen.size}`,
           name: name,
           fabricQuality: item.fabricQuality || item.fabricName || '',
+          fabrics: item.fabrics || [],
           avgGarmentLength: item.avgGarmentLength || item.avgLength || '',
           totalPieces: finalPieces
         });
@@ -2068,14 +2090,14 @@ export default function OrderDetailView({
       consumptionRows.forEach(r => add({ name: r.articleName, fabricQuality: r.fabricQuality, totalPieces: r.pcs }));
     }
     if (list.length === 0) {
-      add({ name: 'Kurta', fabricQuality: '', avgGarmentLength: '', totalPieces: 100 });
-      add({ name: 'Dupatta', fabricQuality: '', avgGarmentLength: '', totalPieces: 100 });
+      add({ name: 'Kurta', fabricQuality: '', avgGarmentLength: '', totalPieces: 0 });
+      add({ name: 'Dupatta', fabricQuality: '', avgGarmentLength: '', totalPieces: 0 });
     }
     return list;
   }, [order, consumptionRows]);
 
   const articlesCount = articlesList.length;
-  const totalQty = order.totalGarments || 200;
+  const totalQty = parseInt(order.totalGarments, 10) || 0;
 
   const toggleArticleAccordion = (idx) => {
     setExpandedArticles((prev) => ({ ...prev, [idx]: !prev[idx] }));
@@ -2162,10 +2184,14 @@ export default function OrderDetailView({
     setTimeout(() => setShowToast(false), 2000);
   };
 
-  const handleToggleArticleSourcing = (artName, mode) => {
-    setArticleSourcing(prev => ({ ...prev, [artName]: mode }));
+  const handleToggleArticleSourcing = (artName, mode, fabricQuality) => {
+    setArticleSourcing(prev => ({
+      ...prev,
+      [artName]: mode,
+      ...(fabricQuality ? { [`${artName}_${fabricQuality}`]: mode } : {})
+    }));
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName) {
+      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
         return {
           ...r,
           source: mode === 'Dyed' ? 'Dyed Fabric' : 'Greige Fabric'
@@ -2175,9 +2201,9 @@ export default function OrderDetailView({
     }));
   };
 
-  const handleUpdateArticleWidth = (artName, newWidth) => {
+  const handleUpdateArticleWidth = (artName, newWidth, fabricQuality) => {
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName) {
+      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
         return { ...r, width: newWidth === '—' ? '' : newWidth };
       }
       return r;
@@ -2264,10 +2290,10 @@ export default function OrderDetailView({
     return Array.from(new Set(resultWidths));
   };
 
-  const handleUpdateArticleDyedRate = (artName, val) => {
+  const handleUpdateArticleDyedRate = (artName, val, fabricQuality) => {
     const num = val === '' ? '' : (parseFloat(val) || 0);
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName) {
+      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
         return { ...r, dyedRate: num };
       }
       return r;
@@ -2277,20 +2303,27 @@ export default function OrderDetailView({
   const [showRateCalculation, setShowRateCalculation] = useState(false);
   const [customMarketRates, setCustomMarketRates] = useState({});
 
-  // Group consumption rows by Article for Image 3 layout (Rowspan per article)
+  // Group consumption rows by Article + Fabric Quality + Role for layout (Rowspan per article fabric requirement)
   const articleGroups = useMemo(() => {
     const map = new Map();
     consumptionRows.forEach((row, rIdx) => {
       const artName = row.articleName || 'Article';
-      if (!map.has(artName)) {
-        const sourcingMode = (articleSourcing[artName] || row.source || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+      const fabQuality = row.fabricQuality || '';
+      const role = row.role || '';
+      const groupKey = `${artName}___${fabQuality}___${role}`;
 
-        map.set(artName, {
+      if (!map.has(groupKey)) {
+        const sourcingKey = `${artName}_${fabQuality}`;
+        const sourcingMode = (articleSourcing[sourcingKey] || articleSourcing[artName] || row.source || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+
+        map.set(groupKey, {
+          key: groupKey,
           articleName: artName,
           articleCode: (row.articleCode || artName).toUpperCase(),
           articleIndex: row.articleIndex !== undefined ? row.articleIndex : map.size,
           icon: row.articleIcon || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
-          fabricQuality: row.fabricQuality || '',
+          fabricQuality: fabQuality,
+          role: role,
           width: row.width || '',
           sourcing: sourcingMode,
           shrinkPct: parseFloat(row.shrinkPct) || 4,
@@ -2298,7 +2331,7 @@ export default function OrderDetailView({
           rows: []
         });
       }
-      map.get(artName).rows.push({ ...row, originalIndex: rIdx });
+      map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
     });
     return Array.from(map.values());
   }, [consumptionRows, articleSourcing]);
@@ -3014,23 +3047,36 @@ export default function OrderDetailView({
               {/* Accordion Expanded Body */}
               {isExpanded && (
                 <div className="p-3 bg-white">
-                  {/* Fabric Banner — Only show if user actually configured fabric */}
-                  {hasFabric && (
-                    <div
-                      className="p-2.5 px-3 rounded-3 d-flex align-items-center gap-2 mb-2"
-                      style={{ backgroundColor: '#f8fafc', border: '1px solid #f1f5f9' }}
-                    >
-                      <span className="text-warning fs-5">🥞</span>
-                      <span className="text-secondary small fw-medium">
-                        Fabric: <strong className="text-dark">{art.fabricQuality}</strong>
-                        {art.fabrics?.[0]?.role && (
-                          <span className="badge bg-light text-secondary border ms-2">
-                            {autoCapitalizeWords(art.fabrics[0].role)}
+                  {/* Fabric Banner — Loop through all fabrics configured for this article */}
+                  {(() => {
+                    const fabricsToShow = (Array.isArray(art.fabrics) && art.fabrics.length > 0)
+                      ? art.fabrics
+                      : (art.fabricQuality ? [{ fabricQuality: art.fabricQuality, role: 'Main' }] : []);
+
+                    if (fabricsToShow.length === 0) return null;
+
+                    return fabricsToShow.map((fb, fbIdx) => {
+                      const fQuality = fb.fabricQuality || fb.fabricName || fb.quality || art.fabricQuality;
+                      if (!fQuality) return null;
+                      return (
+                        <div
+                          key={fbIdx}
+                          className="p-2.5 px-3 rounded-3 d-flex align-items-center gap-2 mb-2"
+                          style={{ backgroundColor: '#f8fafc', border: '1px solid #f1f5f9' }}
+                        >
+                          <span className="text-warning fs-5">🥞</span>
+                          <span className="text-secondary small fw-medium">
+                            Fabric: <strong className="text-dark">{fQuality}</strong>
+                            {fb.role && (
+                              <span className="badge bg-light text-secondary border ms-2">
+                                {autoCapitalizeWords(fb.role)}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
+                        </div>
+                      );
+                    });
+                  })()}
 
                   {/* Avg Length Bar — Only show if user actually entered avg length */}
                   {hasLength ? (
@@ -3457,7 +3503,7 @@ export default function OrderDetailView({
                                 backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
                                 border: 'none'
                               }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige')}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality)}
                               title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
                             >
                               Greige
@@ -3472,7 +3518,7 @@ export default function OrderDetailView({
                                 backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
                                 border: 'none'
                               }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed')}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality)}
                               title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
                             >
                               Dyed
@@ -3481,7 +3527,7 @@ export default function OrderDetailView({
                         </td>
                       )}
 
-                      {/* FABRIC (Rowspan per article) */}
+                      {/* FABRIC (Rowspan per article-fabric requirement) */}
                       {isFirstRow && (
                         <td
                           rowSpan={group.rows.length}
@@ -3494,11 +3540,16 @@ export default function OrderDetailView({
                         >
                           <div className="fw-semibold text-dark fs-13">
                             {group.fabricQuality || 'Grey Cotton Reyon'}
+                            {group.role && (
+                              <span className="badge bg-light text-secondary border ms-2" style={{ fontSize: '10.5px' }}>
+                                {autoCapitalizeWords(group.role)}
+                              </span>
+                            )}
                           </div>
                         </td>
                       )}
 
-                      {/* WIDTH (IN) (Rowspan per article - comes from selected fabric) */}
+                      {/* WIDTH (IN) (Rowspan per article fabric - comes from selected fabric) */}
                       {isFirstRow && (
                         <td
                           rowSpan={group.rows.length}
@@ -3522,29 +3573,29 @@ export default function OrderDetailView({
                                 fontWeight: 600,
                                 color: group.width && group.width !== '—' ? '#4361ee' : '#64748b',
                                 backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#ffffff',
-                                border: activeWidthDropdown === group.articleName
+                                border: activeWidthDropdown === group.key
                                   ? '1.5px solid #4361ee'
                                   : (group.width && group.width !== '—' ? '1.5px solid #c7d2fe' : '1.5px solid #cbd5e1'),
                                 borderRadius: '6px',
                                 cursor: 'pointer',
-                                boxShadow: activeWidthDropdown === group.articleName
+                                boxShadow: activeWidthDropdown === group.key
                                   ? '0 0 0 3px rgba(67, 97, 238, 0.15)'
                                   : 'none'
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setActiveWidthDropdown(activeWidthDropdown === group.articleName ? null : group.articleName);
+                                setActiveWidthDropdown(activeWidthDropdown === group.key ? null : group.key);
                               }}
                               title="Select fabric width from Fabric Master"
                             >
                               <span>{group.width || '—'}</span>
                               <i
-                                className={`ti ti-chevron-${activeWidthDropdown === group.articleName ? 'up' : 'down'}`}
+                                className={`ti ti-chevron-${activeWidthDropdown === group.key ? 'up' : 'down'}`}
                                 style={{ fontSize: '11px', color: '#4361ee', transition: 'transform 0.15s ease' }}
                               ></i>
                             </button>
 
-                            {activeWidthDropdown === group.articleName && (
+                            {activeWidthDropdown === group.key && (
                               <div
                                 className="position-absolute bg-white rounded-3 border py-1 animate__animated animate__fadeIn"
                                 style={{
@@ -3581,7 +3632,7 @@ export default function OrderDetailView({
                                     if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
                                   }}
                                   onClick={() => {
-                                    handleUpdateArticleWidth(group.articleName, '');
+                                    handleUpdateArticleWidth(group.articleName, '', group.fabricQuality);
                                     setActiveWidthDropdown(null);
                                   }}
                                 >
@@ -3610,7 +3661,7 @@ export default function OrderDetailView({
                                         if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                                       }}
                                       onClick={() => {
-                                        handleUpdateArticleWidth(group.articleName, w);
+                                        handleUpdateArticleWidth(group.articleName, w, group.fabricQuality);
                                         setActiveWidthDropdown(null);
                                       }}
                                     >
@@ -3684,7 +3735,7 @@ export default function OrderDetailView({
                             }}
                             placeholder="0.000"
                             value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
-                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value)}
+                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality)}
                           />
                         </td>
                       )}

@@ -127,8 +127,10 @@ export function calcShrinkagePO(reqPerPc, garments, shrinkagePct, bufferQty, ext
   };
 }
 
-export function calcRegularPO(reqPerPc, extraPerPacking, garments, extraQty, rate) {
-  const totalReq = (reqPerPc + (extraPerPacking || 0)) * garments;
+export function calcRegularPO(reqPerPc, extraPerPacking, garments, extraQty, rate, bufferPct = 0) {
+  const baseReq = (reqPerPc + (extraPerPacking || 0)) * garments;
+  const bufQty = (baseReq * (parseFloat(bufferPct) || 0)) / 100;
+  const totalReq = Math.round(baseReq + bufQty);
   const totalPOQty = totalReq + (parseFloat(extraQty) || 0);
   return {
     totalDyed: 0,
@@ -355,7 +357,7 @@ export function GenericAccessoryPOModal({
         } else if (isDori) {
           calcs = calcDoriPO(reqPerPc, extraPerPack, bufferQty, fabricPerUnit, maxGarments, 0, parseFloat(defaultRate) || 0);
         } else {
-          calcs = calcRegularPO(reqPerPc, extraPerPack, maxGarments, 0, parseFloat(defaultRate) || 0);
+          calcs = calcRegularPO(reqPerPc, extraPerPack, maxGarments, 0, parseFloat(defaultRate) || 0, bufferQty);
         }
 
         rows.push({
@@ -411,7 +413,7 @@ export function GenericAccessoryPOModal({
       } else if (isDori) {
         newCalcs = calcDoriPO(item.reqPerPc, item.extraPerPacking, item.bufferQty, item.fabricPerUnit, garments, extra, rateVal);
       } else {
-        newCalcs = calcRegularPO(item.reqPerPc, item.extraPerPacking, garments, extra, rateVal);
+        newCalcs = calcRegularPO(item.reqPerPc, item.extraPerPacking, garments, extra, rateVal, item.bufferQty);
       }
 
       copy[idx] = { ...item, ...newCalcs };

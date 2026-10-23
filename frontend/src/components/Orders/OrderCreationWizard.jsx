@@ -980,7 +980,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // =========================================================================
   const fabricConsumptionRows = useMemo(() => {
     const rows = [];
-    if (addedArticles.length === 0 || orderCustomers.length === 0) return rows;
+    if (addedArticles.length === 0) return rows;
 
     addedArticles.forEach(art => {
       (art.fabrics || []).forEach((fr, frIdx) => {
@@ -1022,9 +1022,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           }
         });
 
-        usedColors.forEach(colName => {
-          const pcs = getPiecesForArticleColor(art.id, colName);
-          const colorObj = masterColors.find(c => c.name === colName) || { hex: '#333333' };
+        const colorsToIterate = usedColors.size > 0 ? Array.from(usedColors) : ['Standard'];
+
+        colorsToIterate.forEach(colName => {
+          const pcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
+          const colorObj = masterColors.find(c => c.name === colName) || { hex: '#94a3b8' };
           const widthVal = fab?.widths?.[0] || '44"';
 
           // RULE 1: Greige length per piece = Avg. (dyed) Length * (1 + Shrinkage%) * (1 + Buffer%)
@@ -1041,11 +1043,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
             articleName: art.name,
             role: autoCapitalizeWords(fr.role || 'Main'),
             fabricId: fab?.id,
-            fabricQuality: fab?.qualityName || fab?.quality || fab?.name || 'Suh Cotton',
+            fabricQuality: fab?.qualityName || fab?.quality || fab?.name || fr.fabricQuality || 'Suh Cotton',
             source: fr.source || 'Greige Fabric',
             width: widthVal,
             colorName: colName,
-            colorHex: colorObj.hex,
+            colorHex: usedColors.size > 0 ? colorObj.hex : '#94a3b8',
             dyedPerPiece,
             shrinkPct,
             bufferPct,
@@ -1217,10 +1219,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           name: autoCapitalizeWords(art.name || primaryArticleName),
           totalPieces: artPieces > 0 ? artPieces : Math.round((grandTotalOrderPieces || 0) / (finalArticles.length || 1)),
           fabricQuality: fabQuality,
-          fabrics: (art.fabrics || []).map(f => ({
-            ...f,
-            role: autoCapitalizeWords(f.role || '')
-          })),
+          fabrics: (art.fabrics || []).map(f => {
+            const fMatch = fabrics.find(fx => fx.id === f.fabricId);
+            return {
+              ...f,
+              fabricQuality: fMatch?.qualityName || fMatch?.quality || fMatch?.name || f.fabricQuality || '',
+              role: autoCapitalizeWords(f.role || '')
+            };
+          }),
           avgGarmentLength: avgLen,
           avgLength: avgLen
         };
