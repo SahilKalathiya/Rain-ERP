@@ -16,6 +16,103 @@ export default function QualityCheckList({
   const [activeTabFilter, setActiveTabFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Expand QC records per fabric quality if a GRN inwarded multiple fabrics
+  // Expand QC records per fabric quality if a GRN inwarded multiple fabrics
+  const expandedQcRecords = React.useMemo(() => {
+    const result = [];
+    (qcRecords || []).forEach((qc) => {
+      if (!qc) return;
+      const matchedGrn = grns.find(
+        (g) => g && (g.id === qc.grnRef || (qc.grnRef && g.id.includes(qc.grnRef.replace('GRN-', ''))))
+      );
+      const againstRef =
+        qc.againstRef ||
+        (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.length > 0
+          ? matchedGrn.linkedPOs[0]
+          : matchedGrn?.poId || '');
+      const linkedPO = purchaseOrders.find(
+        (p) => p && (p.id === againstRef || (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.includes(p.id)))
+      );
+
+      // If qc is already a partitioned fabric batch record (e.g. QC-0001-F1), keep it directly
+      if (qc.id && (qc.id.includes('-F') || qc._isFabricPartition)) {
+        result.push(qc);
+        return;
+      }
+
+      // If partitioned records already exist for this GRN in qcRecords, skip the redundant parent record
+      const hasPartitionedSibling = (qcRecords || []).some(
+        (other) => other && other.id !== qc.id && other.grnRef === qc.grnRef && (other.id.includes('-F') || other._isFabricPartition)
+      );
+      if (hasPartitionedSibling) {
+        return;
+      }
+
+      const poItems = linkedPO?.items || [];
+      const baleFabrics = Array.from(new Set((matchedGrn?.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+
+      if (poItems.length > 1) {
+        // Expand per PO fabric line item
+        poItems.forEach((it, idx) => {
+          const fName = it.fabricName || it.fabricQuality || `Fabric Quality ${idx + 1}`;
+          let itMeters = 0;
+          (matchedGrn?.bales || []).forEach((b) => {
+            const bLbl = (b.fabricItemLabel || '').toLowerCase();
+            const itLbl = fName.toLowerCase();
+            if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
+              const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+              itMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+            }
+          });
+          if (itMeters <= 0) {
+            itMeters = Number(it.quantity) || (matchedGrn?.declaredTotalMeters ? Math.round(Number(matchedGrn.declaredTotalMeters) / poItems.length) : 1000);
+          }
+
+          result.push({
+            ...qc,
+            id: `${qc.id || 'QC'}-F${idx + 1}`,
+            originalQcId: qc.id,
+            fabricName: fName,
+            fabricId: it.fabricId || '',
+            colorName: it.color || it.colorName || it.shade || 'Grey / Natural',
+            expectedWidth: it.width ? String(it.width) : (qc.expectedWidth || '44'),
+            expectedFold: it.fold ? String(it.fold) : (qc.expectedFold || '100'),
+            totalReceivedMeters: itMeters,
+            receivedQty: itMeters,
+            _isFabricPartition: true,
+            _poItemIndex: idx
+          });
+        });
+      } else if (baleFabrics.length > 1) {
+        // Expand per distinct bale fabric
+        baleFabrics.forEach((fLbl, idx) => {
+          let itMeters = 0;
+          (matchedGrn?.bales || []).forEach((b) => {
+            if (b.fabricItemLabel === fLbl) {
+              const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+              itMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+            }
+          });
+          result.push({
+            ...qc,
+            id: `${qc.id || 'QC'}-F${idx + 1}`,
+            originalQcId: qc.id,
+            fabricName: fLbl,
+            expectedWidth: qc.expectedWidth || matchedGrn?.pannaWidth || '44',
+            expectedFold: qc.expectedFold || matchedGrn?.fabricFolding || '100',
+            totalReceivedMeters: itMeters || Math.round((Number(matchedGrn?.declaredTotalMeters) || 0) / baleFabrics.length),
+            receivedQty: itMeters || Math.round((Number(matchedGrn?.declaredTotalMeters) || 0) / baleFabrics.length),
+            _isFabricPartition: true,
+            _baleFabricIndex: idx
+          });
+        });
+      } else {
+        result.push(qc);
+      }
+    });
+    return result;
+  }, [qcRecords, grns, purchaseOrders]);
+
   // Helper to resolve GRN & PO details for each QC
   const getRecordDetails = (qc) => {
     const matchedGrn = grns.find(
@@ -54,7 +151,6 @@ export default function QualityCheckList({
       baleTotalMeters > 0 &&
       Math.abs(baleTotalMeters - declaredQty) < 0.01
     );
-      'Grey Cotton Fabrics (100*100)';
 
     let parsedFabric = rawFabricLabel;
     let extractedColor = '';
@@ -94,9 +190,7 @@ export default function QualityCheckList({
     const qty =
       Number(qc.totalReceivedMeters) ||
       Number(qc.receivedQty) ||
-      Number(matchedGrn?.declaredTotalMeters) ||
-      Number(matchedGrn?.totalMetersEntered) ||
-      (poItem?.quantity ? Number(poItem.quantity) : 2000);
+      (poItem?.quantity ? Number(poItem.quantity) : (Number(matchedGrn?.declaredTotalMeters) || 2000));
 
     const status = qc.qcStatus || 'Pending';
 
@@ -115,16 +209,16 @@ export default function QualityCheckList({
   };
 
   // Counts for each tab
-  const allCount = qcRecords.length;
-  const pendingCount = qcRecords.filter(
+  const allCount = expandedQcRecords.length;
+  const pendingCount = expandedQcRecords.filter(
     (qc) => qc.qcStatus === 'Pending' || !qc.qcStatus
   ).length;
-  const adminCount = qcRecords.filter(
+  const adminCount = expandedQcRecords.filter(
     (qc) =>
       qc.qcStatus === 'Send for Admin Approval' ||
       qc.qcStatus === 'Admin Approval'
   ).length;
-  const completedCount = qcRecords.filter(
+  const completedCount = expandedQcRecords.filter(
     (qc) =>
       qc.qcStatus === 'OK' ||
       qc.qcStatus === 'Approved' ||
@@ -134,7 +228,7 @@ export default function QualityCheckList({
   ).length;
   const damagedCount =
     damagedItems.length ||
-    qcRecords.filter(
+    expandedQcRecords.filter(
       (qc) =>
         Number(qc.defectQty) > 0 ||
         qc.qcStatus === 'Reject' ||
@@ -177,7 +271,7 @@ function parseDateForSort(d, id) {
 }
 
   // Filter records by tab and search term
-  const filtered = qcRecords.filter((qc) => {
+  const filtered = expandedQcRecords.filter((qc) => {
     const details = getRecordDetails(qc);
 
     // Tab filter
@@ -233,7 +327,7 @@ function parseDateForSort(d, id) {
     if (timeB && timeA && timeB !== timeA) return timeB - timeA;
 
     // 3. Third priority: maintain natural entry / list insertion order (newest on top)
-    return qcRecords.indexOf(a) - qcRecords.indexOf(b);
+    return expandedQcRecords.indexOf(a) - expandedQcRecords.indexOf(b);
   });
 
   return (

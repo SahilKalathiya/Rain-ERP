@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 /**
  * GRNDetailView - Step 3: GRN Details
@@ -91,8 +91,8 @@ export default function GRNDetailView({
     ].filter(Boolean))
   );
 
-  // Find QC record for this GRN
-  const qcRecs = qualityChecks.filter((q) => q.grnRef === grn.id);
+  // Find all QC records matching this GRN (both main and partitioned QC IDs)
+  const qcRecs = qualityChecks.filter((q) => q && (q.grnRef === grn.id || (grn.id && q.id && q.id.startsWith(`QC-${grn.id.replace('GRN-', '')}`))));
   const mainQC = qcRecs[0];
 
   const declaredBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
@@ -139,14 +139,14 @@ export default function GRNDetailView({
     grn.status === 'QC Passed' ||
     grn.status === 'Passed' ||
     grn.status === 'Completed' ||
-    (mainQC && (mainQC.qcStatus === 'Passed' || mainQC.qcStatus === 'QC Approved' || mainQC.qcStatus === 'Approved'))
+    (qcRecs.length > 0 && qcRecs.every((q) => q.qcStatus === 'Passed' || q.qcStatus === 'QC Approved' || q.qcStatus === 'Approved'))
   );
 
   const isQcStarted = Boolean(
     isQcPassedOrApproved ||
     grn.isQcActioned ||
-    (mainQC && mainQC.qcStatus && mainQC.qcStatus !== 'Pending' && mainQC.qcStatus !== 'Awaiting QC') ||
-    (mainQC && (mainQC.startedAt || mainQC.isStarted || mainQC.actualWidth || mainQC.actualFold || (mainQC.inspectedPieces && mainQC.inspectedPieces.length > 0))) ||
+    (qcRecs.some((q) => q.qcStatus && q.qcStatus !== 'Pending' && q.qcStatus !== 'Awaiting QC')) ||
+    (qcRecs.some((q) => q.startedAt || q.isStarted || q.actualWidth || q.actualFold || (q.inspectedPieces && q.inspectedPieces.length > 0))) ||
     grn.status === 'QC Rejected' ||
     grn.status === 'Pending Admin Approval' ||
     (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC'))
@@ -163,6 +163,173 @@ export default function GRNDetailView({
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
   const expectedFold = mainQC?.expectedFold || grn.foldingCms || linkedPO?.items?.[0]?.fold || '100';
+
+  const poItems = linkedPO?.items || [];
+  const baleFabrics = Array.from(new Set((grn.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+
+  // Requirement 38: Generate distinct QC inspection batches for each fabric quality
+  const qcInspectionBatches = useMemo(() => {
+    // If we have explicit multi-QC records in qualityChecks
+    if (qcRecs.length > 1) {
+      return qcRecs.map((q, idx) => {
+        let fName = q.fabricName || '';
+        if (!fName && poItems[idx]) {
+          fName = poItems[idx].fabricName || poItems[idx].fabricQuality || '';
+        }
+        if (!fName && baleFabrics[idx]) {
+          fName = baleFabrics[idx];
+        }
+        if (!fName) {
+          fName = grn.fabricName || `Fabric Quality ${idx + 1}`;
+        }
+        const bMeters = (grn.bales || []).reduce((sum, b) => {
+          const bLbl = (b.fabricItemLabel || '').toLowerCase();
+          const qLbl = fName.toLowerCase();
+          if (b.itemIdx === idx || (bLbl && (bLbl.includes(qLbl) || qLbl.includes(bLbl)))) {
+            const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            return sum + (bLen > 0 ? bLen : (Number(b.totalLength) || 0));
+          }
+          return sum;
+        }, 0);
+
+        return {
+          id: q.id,
+          fabricName: fName,
+          totalReceivedMeters: q.totalReceivedMeters || q.receivedQty || bMeters || 0,
+          expectedWidth: q.expectedWidth || linkedPO?.items?.[idx]?.width || grn.pannaWidth || '44',
+          expectedFold: q.expectedFold || linkedPO?.items?.[idx]?.fold || grn.fabricFolding || '100',
+          qcStatus: q.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Pending'),
+          qcRecord: q
+        };
+      });
+    }
+
+    // If multiple PO items exist
+    if (poItems.length > 1) {
+      return poItems.map((it, idx) => {
+        const fName = it.fabricName || it.fabricQuality || `Fabric Quality ${idx + 1}`;
+        const partitionId = `QC-${grn.id.replace('GRN-', '')}-F${idx + 1}`;
+        const existingQc = qcRecs.find((q) => q.id === partitionId || q.fabricName === fName) || (idx === 0 ? qcRecs[0] : null);
+
+        let fMeters = 0;
+        (grn.bales || []).forEach((b) => {
+          const bLbl = (b.fabricItemLabel || '').toLowerCase();
+          const itLbl = fName.toLowerCase();
+          if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
+            const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+          }
+        });
+        if (fMeters <= 0) {
+          fMeters = Number(it.quantity) || Math.round((Number(grn.declaredTotalMeters || grn.totalQty || 0)) / poItems.length);
+        }
+
+        const qcObj = existingQc ? {
+          ...existingQc,
+          id: existingQc.id || partitionId,
+          fabricName: existingQc.fabricName || fName,
+          totalReceivedMeters: existingQc.totalReceivedMeters || fMeters,
+          expectedWidth: existingQc.expectedWidth || String(it.width || '44'),
+          expectedFold: existingQc.expectedFold || String(it.fold || '100')
+        } : {
+          id: partitionId,
+          grnRef: grn.id,
+          againstRef: linkedPO?.id || grn.poId || '',
+          fabricName: fName,
+          fabricId: it.fabricId || '',
+          colorName: it.color || it.colorName || it.shade || grn.colorName || 'Grey / Natural',
+          expectedWidth: String(it.width || '44'),
+          expectedFold: String(it.fold || '100'),
+          totalReceivedMeters: fMeters,
+          receivedQty: fMeters,
+          qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending',
+          originalQcId: qcRecs[0]?.id
+        };
+
+        return {
+          id: qcObj.id,
+          fabricName: fName,
+          totalReceivedMeters: fMeters,
+          expectedWidth: it.width ? String(it.width) : (qcObj.expectedWidth || '44'),
+          expectedFold: it.fold ? String(it.fold) : (qcObj.expectedFold || '100'),
+          qcStatus: qcObj.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Pending'),
+          qcRecord: qcObj
+        };
+      });
+    }
+
+    // If multiple bale fabric labels exist
+    if (baleFabrics.length > 1) {
+      return baleFabrics.map((fLbl, idx) => {
+        const partitionId = `QC-${grn.id.replace('GRN-', '')}-F${idx + 1}`;
+        const existingQc = qcRecs.find((q) => q.id === partitionId || q.fabricName === fLbl) || (idx === 0 ? qcRecs[0] : null);
+
+        let fMeters = 0;
+        (grn.bales || []).forEach((b) => {
+          if (b.fabricItemLabel === fLbl) {
+            const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+          }
+        });
+        if (fMeters <= 0) {
+          fMeters = Math.round((Number(grn.declaredTotalMeters || grn.totalQty || 0)) / baleFabrics.length);
+        }
+
+        const qcObj = existingQc ? {
+          ...existingQc,
+          id: existingQc.id || partitionId,
+          fabricName: existingQc.fabricName || fLbl,
+          totalReceivedMeters: existingQc.totalReceivedMeters || fMeters
+        } : {
+          id: partitionId,
+          grnRef: grn.id,
+          againstRef: linkedPO?.id || grn.poId || '',
+          fabricName: fLbl,
+          expectedWidth: String(grn.pannaWidth || '44'),
+          expectedFold: String(grn.fabricFolding || '100'),
+          totalReceivedMeters: fMeters,
+          receivedQty: fMeters,
+          qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending',
+          originalQcId: qcRecs[0]?.id
+        };
+
+        return {
+          id: qcObj.id,
+          fabricName: fLbl,
+          totalReceivedMeters: fMeters,
+          expectedWidth: qcObj.expectedWidth || grn.pannaWidth || '44',
+          expectedFold: qcObj.expectedFold || grn.fabricFolding || '100',
+          qcStatus: qcObj.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Pending'),
+          qcRecord: qcObj
+        };
+      });
+    }
+
+    // Fallback: Single fabric item
+    const singleQc = qcRecs[0] || {
+      id: `QC-${grn.id.replace('GRN-', '')}`,
+      grnRef: grn.id,
+      againstRef: linkedPO?.id || grn.poId || '',
+      fabricName: grn.fabricName || 'Modal Satin Premium',
+      totalReceivedMeters: totalMeters,
+      receivedQty: totalMeters,
+      expectedWidth: String(expectedWidth).replace(/"/g, ''),
+      expectedFold: String(expectedFold).replace(/%/g, ''),
+      qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending'
+    };
+
+    return [
+      {
+        id: singleQc.id,
+        fabricName: grn.fabricName || singleQc.fabricName || 'Modal Satin Premium',
+        totalReceivedMeters: totalMeters,
+        expectedWidth: singleQc.expectedWidth || expectedWidth || '44',
+        expectedFold: singleQc.expectedFold || expectedFold || '100',
+        qcStatus: singleQc.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Pending'),
+        qcRecord: singleQc
+      }
+    ];
+  }, [qcRecs, poItems, baleFabrics, grn, linkedPO, totalMeters, expectedWidth, expectedFold]);
 
   const handleSaveHeader = (e) => {
     e.preventDefault();
@@ -408,7 +575,14 @@ export default function GRNDetailView({
       {/* CARD 3: Quality Check by Item (Clickable - Redirects to QC inspection) */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
         <div className="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
-          <h5 className="fw-bold text-dark mb-0 fs-16">Quality check by item</h5>
+          <div className="d-flex align-items-center gap-2">
+            <h5 className="fw-bold text-dark mb-0 fs-16">Quality check by item</h5>
+            {qcInspectionBatches.length > 1 && (
+              <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
+                {qcInspectionBatches.length} Fabric Qualities
+              </span>
+            )}
+          </div>
           {!isBaleEntriesComplete && !isQcStarted && (
             <span className="badge bg-warning-subtle text-dark border border-warning border-opacity-50 px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
               <i className="ti ti-alert-triangle text-warning"></i>
@@ -416,99 +590,125 @@ export default function GRNDetailView({
             </span>
           )}
         </div>
-        <div
-          className="border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white"
-          style={{
-            borderColor: !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0',
-            cursor: !isBaleEntriesComplete && !isQcStarted ? 'not-allowed' : 'pointer',
-            backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff',
-            transition: 'all 0.15s ease-in-out'
-          }}
-          onMouseEnter={(e) => {
-            if (isBaleEntriesComplete || isQcStarted) {
-              e.currentTarget.style.borderColor = '#5b47fb';
-              e.currentTarget.style.backgroundColor = '#faf9ff';
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(91, 71, 251, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0';
-            e.currentTarget.style.backgroundColor = !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-          onClick={() => {
-            if (!isBaleEntriesComplete && !isQcStarted) {
-              alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
-              return;
-            }
-            if (onSelectQCItem) {
-              onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
-            }
-          }}
-          title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : 'Click anywhere on this card to run quality check inspection'}
-        >
-          <div className="d-flex align-items-center gap-3">
-            <div
-              className="rounded-3 p-2.5 d-flex align-items-center justify-content-center flex-shrink-0"
-              style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}
-            >
-              <i className="ti ti-checklist fs-22"></i>
-            </div>
-            <div>
-              <div className="fw-bold text-dark fs-15 mb-0.5">
-                {grn.fabricName || 'Modal Satin Premium'} · {String(expectedWidth).replace(/"/g, '')}&quot;
-              </div>
-              <div className="text-secondary fs-13 mb-1">
-                Received: <strong>{totalMeters}m</strong> · Expected width {String(expectedWidth).replace(/"/g, '')}, expected fold {String(expectedFold).replace(/%/g, '')}%
-              </div>
-              <div className="d-inline-flex align-items-center gap-1.5 fs-13 text-secondary">
-                <i className="ti ti-sparkles fs-15" style={{ color: '#5b47fb' }}></i>
-                <span>
-                  {mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
-                    ? 'QC Inspection Completed'
-                    : (!isBaleEntriesComplete && !isQcStarted ? `Awaiting complete bale entries (${baleMetersEntered}m of ${declaredTotalQty}m)` : 'Awaiting quality check')}
-                </span>
-              </div>
-            </div>
-          </div>
 
-          <div className="d-flex align-items-center gap-3">
-            <span
-              className={`badge rounded-pill px-3 py-1.5 fs-12 fw-semibold ${
-                mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved'
-                  ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                  : (!isBaleEntriesComplete && !isQcStarted)
-                  ? 'bg-warning-subtle text-dark border border-warning border-opacity-50'
-                  : mainQC?.qcStatus === 'Reject' || mainQC?.qcStatus === 'Rejected'
-                  ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                  : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
-              }`}
-            >
-              {!isBaleEntriesComplete && !isQcStarted ? 'Incomplete Bales' : (mainQC?.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC'))}
-            </span>
-            <button
-              type="button"
-              className={`btn btn-sm rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white ${!isBaleEntriesComplete && !isQcStarted ? 'btn-secondary opacity-75' : 'btn-primary'}`}
-              style={{
-                backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb',
-                borderColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb'
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isBaleEntriesComplete && !isQcStarted) {
-                  alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
-                  return;
-                }
-                if (onSelectQCItem) {
-                  onSelectQCItem(mainQC || { id: `QC-${grn.id}`, grnRef: grn.id, qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending' });
-                }
-              }}
-              title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : ''}
-            >
-              <span>{mainQC?.qcStatus === 'OK' || mainQC?.qcStatus === 'Approved' || grn.status === 'QC Approved' ? 'View QC' : (!isBaleEntriesComplete && !isQcStarted ? 'Run Inspection (Bales Incomplete)' : 'Run Inspection')}</span>
-              <i className="ti ti-arrow-right fs-13"></i>
-            </button>
-          </div>
+        <div className="d-flex flex-column gap-3">
+          {qcInspectionBatches.map((item, idx) => {
+            const isItemQcDone = item.qcStatus === 'OK' || item.qcStatus === 'Approved' || item.qcStatus === 'Partial OK';
+            const isItemReject = item.qcStatus === 'Reject' || item.qcStatus === 'Rejected';
+            const isItemAdmin = item.qcStatus === 'Send for Admin Approval' || item.qcStatus === 'Pending Admin Approval' || item.qcStatus === 'Admin Approval';
+
+            return (
+              <div
+                key={item.id || idx}
+                className="border rounded-4 p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white"
+                style={{
+                  borderColor: !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0',
+                  cursor: !isBaleEntriesComplete && !isQcStarted ? 'not-allowed' : 'pointer',
+                  backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff',
+                  transition: 'all 0.15s ease-in-out'
+                }}
+                onMouseEnter={(e) => {
+                  if (isBaleEntriesComplete || isQcStarted) {
+                    e.currentTarget.style.borderColor = '#5b47fb';
+                    e.currentTarget.style.backgroundColor = '#faf9ff';
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(91, 71, 251, 0.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = !isBaleEntriesComplete && !isQcStarted ? '#fde68a' : '#e2e8f0';
+                  e.currentTarget.style.backgroundColor = !isBaleEntriesComplete && !isQcStarted ? '#fffdf0' : '#ffffff';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                onClick={() => {
+                  if (!isBaleEntriesComplete && !isQcStarted) {
+                    alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
+                    return;
+                  }
+                  if (onSelectQCItem) {
+                    onSelectQCItem(item.qcRecord);
+                  }
+                }}
+                title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : `Click anywhere on this card to run quality check for ${item.fabricName}`}
+              >
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-3 p-2.5 d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{
+                      backgroundColor: isItemQcDone ? '#dcfce7' : isItemReject ? '#fee2e2' : '#e0e7ff',
+                      color: isItemQcDone ? '#15803d' : isItemReject ? '#b91c1c' : '#4338ca'
+                    }}
+                  >
+                    <i className={`ti ${isItemQcDone ? 'ti-check' : isItemReject ? 'ti-x' : 'ti-checklist'} fs-22`}></i>
+                  </div>
+                  <div>
+                    <div className="fw-bold text-dark fs-15 mb-0.5 d-flex align-items-center gap-2 flex-wrap">
+                      <span>{item.fabricName} · {String(item.expectedWidth).replace(/"/g, '')}&quot;</span>
+                      {qcInspectionBatches.length > 1 && (
+                        <span className="badge bg-light text-secondary border px-2 py-0.5 fs-11 rounded-pill">
+                          Item {idx + 1}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-secondary fs-13 mb-1">
+                      Received: <strong>{Number(item.totalReceivedMeters || item.receivedQty || 0).toLocaleString()}m</strong> · Expected width {String(item.expectedWidth).replace(/"/g, '')}&quot;, expected fold {String(item.expectedFold).replace(/%/g, '')}%
+                    </div>
+                    <div className="d-inline-flex align-items-center gap-1.5 fs-13 text-secondary">
+                      <i className="ti ti-sparkles fs-15" style={{ color: '#5b47fb' }}></i>
+                      <span>
+                        {isItemQcDone
+                          ? 'QC Inspection Completed'
+                          : isItemReject
+                          ? 'QC Inspection Rejected'
+                          : isItemAdmin
+                          ? 'Submitted for Admin Approval'
+                          : (!isBaleEntriesComplete && !isQcStarted ? `Awaiting complete bale entries (${baleMetersEntered}m of ${declaredTotalQty}m)` : 'Awaiting quality check')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-3">
+                  <span
+                    className={`badge rounded-pill px-3 py-1.5 fs-12 fw-semibold ${
+                      isItemQcDone
+                        ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                        : (!isBaleEntriesComplete && !isQcStarted)
+                        ? 'bg-warning-subtle text-dark border border-warning border-opacity-50'
+                        : isItemReject
+                        ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                        : isItemAdmin
+                        ? 'bg-warning-subtle text-warning-emphasis border border-warning'
+                        : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                    }`}
+                  >
+                    {!isBaleEntriesComplete && !isQcStarted ? 'Incomplete Bales' : (item.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC'))}
+                  </span>
+                  <button
+                    type="button"
+                    className={`btn btn-sm rounded-3 px-3 py-1.5 fs-12 fw-semibold shadow-2xs d-inline-flex align-items-center gap-1.5 text-white ${!isBaleEntriesComplete && !isQcStarted ? 'btn-secondary opacity-75' : 'btn-primary'}`}
+                    style={{
+                      backgroundColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb',
+                      borderColor: !isBaleEntriesComplete && !isQcStarted ? '#6b7280' : '#5b47fb'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isBaleEntriesComplete && !isQcStarted) {
+                        alert(`QC cannot proceed: Total quantity entered in GRN (${declaredTotalQty}m) has incomplete bale entries (${baleMetersEntered}m). Please complete all bale entries in GRN first.`);
+                        return;
+                      }
+                      if (onSelectQCItem) {
+                        onSelectQCItem(item.qcRecord);
+                      }
+                    }}
+                    title={!isBaleEntriesComplete && !isQcStarted ? baleIncompleteReason : `Inspect ${item.fabricName}`}
+                  >
+                    <span>{isItemQcDone ? 'View QC' : (!isBaleEntriesComplete && !isQcStarted ? 'Run Inspection (Bales Incomplete)' : 'Run Inspection')}</span>
+                    <i className="ti ti-arrow-right fs-13"></i>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -44,7 +44,7 @@ export default function QCDetailView({
     );
   }
 
-  const fabricName = grn?.fabricName || 'Tussar Silk (42") — Ivory';
+  const fabricName = qc.fabricName || grn?.fabricName || 'Tussar Silk (42") — Ivory';
   const poId = grn?.linkedPOs?.[0] || 'PO-1001';
   const grnId = qc.grnRef || grn?.id || 'GRN-1002';
 

@@ -26,9 +26,10 @@ export default function PurchaseOrderList({
 
   const isPoGrnLocked = (po) => {
     if (!po) return false;
-    const isSent = po.status === 'Sent' || po.status === 'Partially Received' || po.status === 'Completed';
-    const grnStarted = po.status === 'Partially Received' || po.status === 'Completed' || (Number(po.receivedQty) > 0) ||
-      (grns || []).some((g) => (g.linkedPOs && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
+    const status = String(po.status || '').trim();
+    const isSent = status === 'Sent' || status === 'Sent to Vendor' || status === 'Partially Received' || status === 'Completed';
+    const grnStarted = status === 'Partially Received' || status === 'Completed' || (Number(po.receivedQty) > 0) ||
+      (grns || []).some((g) => g && ((Array.isArray(g.linkedPOs) && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id));
     return isSent && grnStarted;
   };
 
@@ -338,7 +339,7 @@ function parseDateForSort(d, id) {
                           type="button"
                           className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
                           style={{ width: '32px', height: '32px' }}
-                          title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable)" : "View / Edit PO Details"}
+                          title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onSelectPO) onSelectPO(po);

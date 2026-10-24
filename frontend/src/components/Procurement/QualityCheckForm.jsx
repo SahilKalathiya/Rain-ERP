@@ -31,14 +31,26 @@ export default function QualityCheckForm({
     if (foundGRN.linkedPOs && foundGRN.linkedPOs.length > 0) {
       const linkedPO = purchaseOrders.find((p) => foundGRN.linkedPOs.includes(p.id));
       if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
-        const item = linkedPO.items[0];
+        // Resolve item matching this specific QC's fabric quality
+        const targetFabric = qc?.fabricName || foundGRN.fabricName;
+        const matchedItem = targetFabric
+          ? linkedPO.items.find((it) => {
+              const itName = it.fabricName || it.fabricQuality || '';
+              return itName.toLowerCase() === targetFabric.toLowerCase() ||
+                targetFabric.toLowerCase().includes(itName.toLowerCase()) ||
+                itName.toLowerCase().includes(targetFabric.toLowerCase());
+            }) || linkedPO.items[0]
+          : linkedPO.items[0];
+
+        const item = matchedItem || linkedPO.items[0];
         if (item.fold) foundFold = String(item.fold);
         if (item.width) foundWidth = String(item.width);
       }
     }
 
-    if (!foundWidth && foundGRN.fabricName) {
-      const matchingFabric = fabrics.find((f) => f.qualityName === foundGRN.fabricName);
+    if (!foundWidth && (qc?.fabricName || foundGRN.fabricName)) {
+      const targetName = qc?.fabricName || foundGRN.fabricName;
+      const matchingFabric = fabrics.find((f) => f.qualityName === targetName);
       if (matchingFabric && matchingFabric.pannaWidth) {
         foundWidth = String(matchingFabric.pannaWidth);
       }
@@ -152,9 +164,18 @@ export default function QualityCheckForm({
 
   const selectedGRN = grns.find((g) => g.id === formData.grnRef) || grns[0];
 
-  // Extract all physical pieces from selected GRN bales
+  // Extract physical pieces from selected GRN bales (scoped to fabric when specified)
   const grnPieces = [];
   (selectedGRN?.bales || []).forEach((b, bIdx) => {
+    if (qc?.fabricName && b.fabricItemLabel) {
+      const normBale = b.fabricItemLabel.toLowerCase().trim();
+      const normQc = qc.fabricName.toLowerCase().trim();
+      const idxMatches = (qc._poItemIndex !== undefined && b.itemIdx === qc._poItemIndex) ||
+                         (qc.itemIdx !== undefined && b.itemIdx === qc.itemIdx);
+      if (!idxMatches && !normBale.includes(normQc) && !normQc.includes(normBale)) {
+        return;
+      }
+    }
     (b.pieces || []).forEach((p, pIdx) => {
       const m = typeof p === 'object' && p !== null ? (p.length || 0) : Number(p) || 0;
       grnPieces.push({
@@ -167,6 +188,23 @@ export default function QualityCheckForm({
       });
     });
   });
+
+  // Fallback: If no pieces matched specific fabric filter, show all pieces
+  if (grnPieces.length === 0 && (selectedGRN?.bales || []).length > 0) {
+    (selectedGRN?.bales || []).forEach((b, bIdx) => {
+      (b.pieces || []).forEach((p, pIdx) => {
+        const m = typeof p === 'object' && p !== null ? (p.length || 0) : Number(p) || 0;
+        grnPieces.push({
+          key: `${bIdx}_${pIdx}`,
+          baleIdx: bIdx,
+          pieceIdx: pIdx,
+          baleNo: b.baleNo || `${bIdx + 1}`,
+          pieceNo: (typeof p === 'object' && p?.pieceNo) ? p.pieceNo : `Piece ${pIdx + 1}`,
+          meters: m
+        });
+      });
+    });
+  }
 
   // Unique bale numbers for dropdown selection (Requirement 24)
   const uniqueBaleNumbers = Array.from(new Set(grnPieces.map((p) => String(p.baleNo)))).sort((a, b) => Number(a) - Number(b));
@@ -188,8 +226,8 @@ export default function QualityCheckForm({
       [key]: {
         ...(prev[key] || {
           checked: true,
-          actualWidth: formData.actualWidth || formData.expectedWidth,
-          actualFold: formData.actualFold || formData.expectedFold,
+          actualWidth: '',
+          actualFold: '',
           status: 'OK',
           notes: '',
           photos: []
@@ -283,15 +321,24 @@ export default function QualityCheckForm({
       };
     });
 
-  const totalReceivedMeters = Number(selectedGRN?.declaredTotalMeters) ||
-    Number(selectedGRN?.totalMetersEntered) ||
-    grnPieces.reduce((sum, p) => sum + (Number(p.meters) || 0), 0) || 0;
+  const totalReceivedMeters = Number(qc?.totalReceivedMeters) ||
+    Number(qc?.receivedQty) ||
+    (grnPieces.length > 0 ? grnPieces.reduce((sum, p) => sum + (Number(p.meters) || 0), 0) : 0) ||
+    Number(selectedGRN?.declaredTotalMeters) ||
+    Number(selectedGRN?.totalMetersEntered) || 0;
 
-  const declaredTotalMeters = Number(selectedGRN?.totalQty) || Number(selectedGRN?.declaredTotalMeters) || 0;
+  const declaredTotalMeters = Number(qc?.totalReceivedMeters) ||
+    Number(qc?.receivedQty) ||
+    Number(selectedGRN?.totalQty) ||
+    Number(selectedGRN?.declaredTotalMeters) || 0;
 
   // Requirement 21: QC should not proceed until total quantity entered in GRN has complete bale entries
+  const grnPiecesSum = grnPieces.reduce((sum, p) => sum + (Number(p.meters) || 0), 0);
   const isBaleCompletenessOk = declaredTotalMeters <= 0 || (
-    totalReceivedMeters > 0 && Math.abs(totalReceivedMeters - declaredTotalMeters) < 0.01
+    totalReceivedMeters > 0 && (
+      Math.abs(totalReceivedMeters - declaredTotalMeters) < 0.01 ||
+      (grnPiecesSum > 0 && Math.abs(grnPiecesSum - totalReceivedMeters) < 0.01)
+    )
   );
 
   // Pieces flagged for Admin Review or Rejection
@@ -516,7 +563,7 @@ export default function QualityCheckForm({
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
           <div>
             <h2 className="fw-bold text-dark mb-1 fs-24">
-              Quality Check &mdash; {selectedGRN?.fabricName || 'Tussar Silk (42")'} &middot; {selectedGRN?.colorName || 'Charcoal'}
+              Quality Check &mdash; {qc?.fabricName || selectedGRN?.fabricName || 'Tussar Silk (42")'} &middot; {qc?.colorName || selectedGRN?.colorName || 'Charcoal'}
             </h2>
             <p className="text-secondary fs-13 mb-0">
               {formData.grnRef} &middot; {againstPO} &middot; Received quantity <strong>{totalReceivedMeters.toLocaleString()}m</strong> across {grnPieces.length || 1} piece(s)
@@ -770,8 +817,8 @@ export default function QualityCheckForm({
                               ...prev,
                               [key]: {
                                 ...(prev[key] || {
-                                  actualWidth: formData.expectedWidth,
-                                  actualFold: formData.expectedFold,
+                                  actualWidth: '',
+                                  actualFold: '',
                                   status: 'OK',
                                   notes: '',
                                   photos: []
@@ -849,8 +896,8 @@ export default function QualityCheckForm({
                   displayedPieces.map((pc) => {
                   const pieceData = pieceInspections[pc.key] || {
                     checked: false,
-                    actualWidth: formData.expectedWidth,
-                    actualFold: formData.expectedFold,
+                    actualWidth: '',
+                    actualFold: '',
                     status: 'OK',
                     notes: '',
                     photos: []
@@ -905,7 +952,8 @@ export default function QualityCheckForm({
                                 type="number"
                                 step="0.5"
                                 className="form-control form-control-sm bg-white"
-                                value={pieceData.actualWidth}
+                                placeholder={`e.g. ${formData.expectedWidth || '44'}`}
+                                value={pieceData.actualWidth !== undefined ? pieceData.actualWidth : ''}
                                 onChange={(e) => updatePieceField(pc.key, 'actualWidth', e.target.value)}
                               />
                             </div>
@@ -920,7 +968,8 @@ export default function QualityCheckForm({
                               <input
                                 type="number"
                                 className="form-control form-control-sm bg-white"
-                                value={pieceData.actualFold}
+                                placeholder={`e.g. ${formData.expectedFold || '100'}`}
+                                value={pieceData.actualFold !== undefined ? pieceData.actualFold : ''}
                                 onChange={(e) => updatePieceField(pc.key, 'actualFold', e.target.value)}
                               />
                             </div>

@@ -216,13 +216,32 @@ const savePurchaseOrder = async (req, res) => {
     await conn.beginTransaction();
     const po = req.body;
 
-    const [existing] = await conn.query('SELECT id FROM purchase_orders WHERE id = ?', [po.id]);
+    const [existing] = await conn.query('SELECT id, status FROM purchase_orders WHERE id = ?', [po.id]);
 
     const expDate = po.expectedDeliveryDate ? po.expectedDeliveryDate : null;
     const poDate = po.date ? po.date : new Date().toISOString().split('T')[0];
     const terms = po.discountTerms || po.terms || '';
 
     if (existing.length > 0) {
+      const curPo = existing[0];
+      const curStatus = String(curPo.status || '').trim();
+      const isSentOrBeyond = ['Sent', 'Sent to Vendor', 'Partially Received', 'Completed'].includes(curStatus);
+
+      // Check if GRN process has started
+      const [grnMatches] = await conn.query(
+        'SELECT id FROM goods_receipt_notes WHERE linked_pos LIKE ?',
+        [`%${po.id}%`]
+      );
+      const hasGrnStarted = grnMatches.length > 0 || ['Partially Received', 'Completed'].includes(curStatus);
+
+      if (isSentOrBeyond && hasGrnStarted && !po.isSystemSync && !po.isStatusUpdateOnly) {
+        await conn.rollback();
+        return res.status(403).json({
+          success: false,
+          message: 'Purchase Order is locked and cannot be edited because its GRN process has already started.'
+        });
+      }
+
       await conn.query(
         'UPDATE purchase_orders SET date=?, vendor_id=?, vendor_name=?, expected_delivery_date=?, buffer_allowed=?, buffer_percent=?, terms=?, total_amount=?, status=? WHERE id=?',
         [poDate, po.vendorId, po.vendorName, expDate, po.bufferAllowed ? 1 : 0, po.bufferPercent || 0, terms, po.totalAmount, po.status, po.id]

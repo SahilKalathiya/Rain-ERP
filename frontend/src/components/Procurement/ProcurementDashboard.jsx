@@ -354,6 +354,105 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     } catch (e) { }
   }, [qualityChecks]);
 
+  // Requirement 38: Automatic synchronization to ensure multi-fabric GRNs have distinct QC records for each fabric quality
+  useEffect(() => {
+    if (!grns || grns.length === 0 || !purchaseOrders || purchaseOrders.length === 0) return;
+
+    let hasUpdates = false;
+    let updatedQCs = [...(qualityChecks || [])];
+
+    grns.forEach((g) => {
+      if (!g || !g.id) return;
+      const linkedPO = (g.linkedPOs && g.linkedPOs.length > 0)
+        ? purchaseOrders.find((p) => g.linkedPOs.includes(p.id))
+        : purchaseOrders.find((p) => p.id === g.poId);
+
+      const poItems = linkedPO?.items || [];
+      const baleFabrics = Array.from(new Set((g.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+
+      if (poItems.length > 1 || baleFabrics.length > 1) {
+        const matchingQCs = updatedQCs.filter((q) => q && (q.grnRef === g.id || (g.id && q.id && q.id.startsWith(`QC-${g.id.replace('GRN-', '')}`))));
+        const hasPartitions = matchingQCs.some((q) => q.id && q.id.includes('-F'));
+
+        // If only 1 unpartitioned QC exists for a multi-fabric GRN, expand it into separate fabric records!
+        if (!hasPartitions && matchingQCs.length > 0) {
+          const originalQC = matchingQCs[0];
+          const partitions = [];
+
+          if (poItems.length > 1) {
+            poItems.forEach((it, idx) => {
+              const fName = it.fabricName || it.fabricQuality || `Fabric Quality ${idx + 1}`;
+              let fMeters = 0;
+              (g.bales || []).forEach((b) => {
+                const bLbl = (b.fabricItemLabel || '').toLowerCase();
+                const itLbl = fName.toLowerCase();
+                if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
+                  const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+                  fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+                }
+              });
+              if (fMeters <= 0) {
+                fMeters = Number(it.quantity) || Math.round((Number(g.declaredTotalMeters || g.totalQty || 0)) / poItems.length);
+              }
+              partitions.push({
+                ...originalQC,
+                id: `QC-${g.id.replace('GRN-', '')}-F${idx + 1}`,
+                grnRef: g.id,
+                againstRef: linkedPO?.id || g.poId || '',
+                fabricName: fName,
+                fabricId: it.fabricId || '',
+                colorName: it.color || it.colorName || it.shade || g.colorName || 'Grey / Natural',
+                expectedWidth: String(it.width || '44'),
+                expectedFold: String(it.fold || '100'),
+                totalReceivedMeters: fMeters,
+                receivedQty: fMeters,
+                qcStatus: originalQC.qcStatus || 'Pending'
+              });
+            });
+          } else if (baleFabrics.length > 1) {
+            baleFabrics.forEach((fLbl, idx) => {
+              let fMeters = 0;
+              (g.bales || []).forEach((b) => {
+                if (b.fabricItemLabel === fLbl) {
+                  const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+                  fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+                }
+              });
+              if (fMeters <= 0) {
+                fMeters = Math.round((Number(g.declaredTotalMeters || g.totalQty || 0)) / baleFabrics.length);
+              }
+              partitions.push({
+                ...originalQC,
+                id: `QC-${g.id.replace('GRN-', '')}-F${idx + 1}`,
+                grnRef: g.id,
+                againstRef: g.poId || '',
+                fabricName: fLbl,
+                expectedWidth: String(g.pannaWidth || '44'),
+                expectedFold: String(g.fabricFolding || '100'),
+                totalReceivedMeters: fMeters,
+                receivedQty: fMeters,
+                qcStatus: originalQC.qcStatus || 'Pending'
+              });
+            });
+          }
+
+          if (partitions.length > 1) {
+            updatedQCs = updatedQCs.filter((q) => q.id !== originalQC.id && q.grnRef !== g.id);
+            updatedQCs = [...partitions, ...updatedQCs];
+            hasUpdates = true;
+            partitions.forEach((p) => {
+              api.saveQualityCheck(p).catch((err) => console.warn('Partition QC auto-sync error:', err));
+            });
+          }
+        }
+      }
+    });
+
+    if (hasUpdates) {
+      setQualityChecks(updatedQCs);
+    }
+  }, [grns, purchaseOrders]);
+
   // 7. Rejected Stock State
   const [rejectedStock, setRejectedStock] = useState(() => {
     try {
@@ -413,6 +512,26 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   // Handlers
   const handleSavePO = (poData) => {
     const isEdit = purchaseOrders.some((p) => p.id === poData.id);
+    const existingPo = purchaseOrders.find((p) => p.id === poData.id);
+
+    // Requirement 15: Check if PO is locked against edits
+    if (existingPo) {
+      const curStatus = String(existingPo.status || '').trim();
+      const isSentOrBeyond = ['Sent', 'Sent to Vendor', 'Partially Received', 'Completed'].includes(curStatus);
+      const hasGrnStarted = Boolean(
+        curStatus === 'Partially Received' ||
+        curStatus === 'Completed' ||
+        Number(existingPo.receivedQty) > 0 ||
+        (grns || []).some(
+          (g) => g && ((Array.isArray(g.linkedPOs) && g.linkedPOs.includes(existingPo.id)) || g.poId === existingPo.id || g.poNumber === existingPo.id || g.againstPo === existingPo.id)
+        )
+      );
+      if (isSentOrBeyond && hasGrnStarted) {
+        alert('This Purchase Order is locked and cannot be edited because its GRN process has already started.');
+        return;
+      }
+    }
+
     const now = Date.now();
     const enrichedPO = {
       ...poData,
@@ -437,6 +556,14 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setActiveGrnView('detail');
     setActiveTab('grn');
     if (onNavigate) onNavigate('/goods-inward');
+  };
+
+  const handleViewQC = (qc) => {
+    if (!qc) return;
+    setSelectedQC(qc);
+    setActiveQcView('detail');
+    setActiveTab('qc');
+    if (onNavigate) onNavigate('/fabric-qc');
   };
 
   const handleInwardFromPO = (po) => {
@@ -478,7 +605,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       vendorId: po.vendorId,
       vendorName: resolvedVendorName,
       fabricName: fabricItem,
-      status: 'Bale Entry in Progress',
+      status: 'Draft',
+      isNew: true,
+      isHeaderSaved: false,
       totalBales: '',
       poOrderedMeters: orderedMeters,
       totalQty: '',
@@ -516,7 +645,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
       if (targetPo) {
         const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-        const allGrnsForPo = updated.filter((g) => g.linkedPOs && g.linkedPOs.includes(linkedPoId));
+        const allGrnsForPo = updated.filter((g) => g && g.linkedPOs && g.linkedPOs.includes(linkedPoId));
         const totalReceivedForPo = allGrnsForPo.reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
         
         let newPoStatus = targetPo.status;
@@ -530,75 +659,157 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           ...targetPo,
           status: newPoStatus,
           receivedQty: totalReceivedForPo,
-          pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo)
+          pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo),
+          isSystemSync: true
         };
         setPurchaseOrders((prev) => prev.map((p) => (p.id === linkedPoId ? updatedPo : p)));
         api.savePurchaseOrder(updatedPo).catch((e) => console.warn('PO status sync error:', e));
       }
     }
 
-    // If completed, automatically generate QC record
+    // If completed, automatically generate QC record(s) per fabric quality
     if (isCompleted && enrichedGRN.status === 'Completed') {
-      let expFold = '3';
-      let expWidth = '42';
+      const linkedPO = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
+        ? purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id))
+        : purchaseOrders.find((p) => p.id === enrichedGRN.poId);
 
-      if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
-        const linkedPO = purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id));
+      const fabricBatches = [];
+
+      if (linkedPO && linkedPO.items && linkedPO.items.length > 1) {
+        // Multi-fabric PO items
+        linkedPO.items.forEach((item, idx) => {
+          const fName = item.fabricName || item.fabricQuality || `Fabric Quality ${idx + 1}`;
+          let fMeters = 0;
+          (enrichedGRN.bales || []).forEach((b) => {
+            const bLbl = (b.fabricItemLabel || '').toLowerCase();
+            const itLbl = fName.toLowerCase();
+            if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
+              const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+              fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+            }
+          });
+          if (fMeters <= 0) {
+            fMeters = Number(item.quantity) || Math.round((Number(enrichedGRN.declaredTotalMeters) || 0) / linkedPO.items.length);
+          }
+          fabricBatches.push({
+            fabricName: fName,
+            fabricId: item.fabricId || '',
+            colorName: item.color || item.colorName || item.shade || enrichedGRN.colorName || 'Grey / Natural',
+            expectedWidth: String(item.width || '44'),
+            expectedFold: String(item.fold || '100'),
+            totalReceivedMeters: fMeters,
+            itemIdx: idx
+          });
+        });
+      } else {
+        // Check bales for multiple distinct fabric labels
+        const baleFabrics = Array.from(new Set((enrichedGRN.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+        if (baleFabrics.length > 1) {
+          baleFabrics.forEach((fLbl, idx) => {
+            let fMeters = 0;
+            (enrichedGRN.bales || []).forEach((b) => {
+              if (b.fabricItemLabel === fLbl) {
+                const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+                fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+              }
+            });
+            fabricBatches.push({
+              fabricName: fLbl,
+              fabricId: '',
+              colorName: enrichedGRN.colorName || 'Grey / Natural',
+              expectedWidth: String(enrichedGRN.pannaWidth || '44'),
+              expectedFold: String(enrichedGRN.fabricFolding || '100'),
+              totalReceivedMeters: fMeters || Math.round((Number(enrichedGRN.declaredTotalMeters) || 0) / baleFabrics.length),
+              itemIdx: idx
+            });
+          });
+        }
+      }
+
+      // If single fabric (fallback or standard)
+      if (fabricBatches.length === 0) {
+        let expFold = '100';
+        let expWidth = '44';
+        let singleFabricName = enrichedGRN.fabricName || '';
+        let singleColorName = enrichedGRN.colorName || '';
+
         if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
           const item = linkedPO.items[0];
           if (item.fold) expFold = String(item.fold);
           if (item.width) expWidth = String(item.width);
+          if (item.fabricName || item.fabricQuality) singleFabricName = item.fabricName || item.fabricQuality;
+          if (item.color || item.colorName) singleColorName = item.color || item.colorName;
         }
-      }
 
-      if (!expWidth && enrichedGRN.fabricName) {
-        const matchingFabric = fabrics.find((f) => f.qualityName === enrichedGRN.fabricName);
-        if (matchingFabric && matchingFabric.pannaWidth) {
-          expWidth = String(matchingFabric.pannaWidth);
+        if (!expWidth && singleFabricName) {
+          const matchingFabric = fabrics.find((f) => f.qualityName === singleFabricName);
+          if (matchingFabric && matchingFabric.pannaWidth) {
+            expWidth = String(matchingFabric.pannaWidth);
+          }
         }
-      }
 
-      const existingQC = qualityChecks.find((q) => q.grnRef === enrichedGRN.id);
-      let targetQC;
-      if (existingQC) {
-        targetQC = {
-          ...existingQC,
+        fabricBatches.push({
+          fabricName: singleFabricName || 'Grey Cotton Fabrics (100*100)',
+          fabricId: enrichedGRN.fabricId || '',
+          colorName: singleColorName || 'Grey / Natural',
           expectedWidth: expWidth,
           expectedFold: expFold,
-          qcStatus: 'Pending',
-          updatedAt: now
-        };
-        setQualityChecks((prev) => prev.map((q) => (q.id === existingQC.id ? targetQC : q)));
-      } else {
-        targetQC = {
-          id: `QC-${String(Math.floor(1000 + Math.random() * 9000))}`,
+          totalReceivedMeters: Number(enrichedGRN.declaredTotalMeters) || Number(enrichedGRN.totalQty) || 2000,
+          itemIdx: 0
+        });
+      }
+
+      // Create or update QC records for each fabric batch
+      const newOrUpdatedQCs = [];
+      fabricBatches.forEach((batch, bIdx) => {
+        const qcId = fabricBatches.length > 1
+          ? `QC-${enrichedGRN.id.replace('GRN-', '')}-F${bIdx + 1}`
+          : `QC-${String(Math.floor(1000 + Math.random() * 9000))}`;
+
+        const existingQC = qualityChecks.find((q) => q.id === qcId || (fabricBatches.length === 1 && q.grnRef === enrichedGRN.id));
+
+        const qcRecord = {
+          id: existingQC ? existingQC.id : qcId,
           grnRef: enrichedGRN.id,
+          againstRef: linkedPO?.id || enrichedGRN.poId || '',
+          fabricName: batch.fabricName,
+          fabricId: batch.fabricId,
+          colorName: batch.colorName,
           inspectionScope: 'Whole Shipment',
           baleRef: '',
           pieceRef: '',
           inspectorName: '',
-          expectedWidth: expWidth,
+          expectedWidth: batch.expectedWidth,
           actualWidth: '',
-          expectedFold: expFold,
+          expectedFold: batch.expectedFold,
           actualFold: '',
+          totalReceivedMeters: batch.totalReceivedMeters,
+          receivedQty: batch.totalReceivedMeters,
           photos: [],
           notes: '',
-          qcStatus: 'Pending',
+          qcStatus: existingQC?.qcStatus || 'Pending',
           adminDecision: '',
           adminRemarks: '',
-          createdAt: now,
+          createdAt: existingQC?.createdAt || now,
           updatedAt: now,
           dateTime: new Date().toLocaleString('en-GB'),
           createdBy: 'System QC Agent'
         };
-        setQualityChecks((prev) => [targetQC, ...prev]);
-      }
-      api.saveQualityCheck(targetQC).catch((e) => console.warn('Auto QC save sync error:', e));
-      addAuditLog('Create', 'Quality Check', targetQC.id, 'Auto QC Record', 'None', `Generated from ${enrichedGRN.id} (Awaiting QC)`);
+
+        newOrUpdatedQCs.push(qcRecord);
+        api.saveQualityCheck(qcRecord).catch((e) => console.warn('Auto QC save sync error:', e));
+        addAuditLog('Create', 'Quality Check', qcRecord.id, 'Auto QC Record', 'None', `Generated from ${enrichedGRN.id} (${batch.fabricName})`);
+      });
+
+      setQualityChecks((prev) => {
+        const targetIds = new Set(newOrUpdatedQCs.map((q) => q.id));
+        const filteredPrev = prev.filter((q) => !targetIds.has(q.id) && q.grnRef !== enrichedGRN.id);
+        return [...newOrUpdatedQCs, ...filteredPrev];
+      });
 
       // Open GRN Detail View with full QC status and inspection section
       setSelectedGRN(enrichedGRN);
-      setSelectedQC(targetQC);
+      setSelectedQC(newOrUpdatedQCs[0]);
       setActiveTab('grn');
       setActiveGrnView('detail');
       return;
@@ -623,6 +834,89 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     };
     if (isEdit) {
       setQualityChecks((prev) => prev.map((q) => (q.id === enrichedQC.id ? enrichedQC : q)));
+    } else if (qcData.originalQcId) {
+      const targetGrn = grns.find((g) => g && (g.id === qcData.grnRef || (qcData.grnRef && g.id.includes(qcData.grnRef.replace('GRN-', '')))));
+      const linkedPO = targetGrn ? purchaseOrders.find((p) => p && (p.id === targetGrn.poId || (targetGrn.linkedPOs && targetGrn.linkedPOs.includes(p.id)))) : null;
+      const poItems = linkedPO?.items || [];
+      const baleFabrics = Array.from(new Set((targetGrn?.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+
+      const siblingBatches = [];
+      if (poItems.length > 1) {
+        poItems.forEach((it, idx) => {
+          const sId = `QC-${(targetGrn?.id || qcData.grnRef || '').replace('GRN-', '')}-F${idx + 1}`;
+          if (sId !== enrichedQC.id) {
+            let sMeters = 0;
+            (targetGrn?.bales || []).forEach((b) => {
+              const bLbl = (b.fabricItemLabel || '').toLowerCase();
+              const itLbl = (it.fabricName || it.fabricQuality || '').toLowerCase();
+              if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
+                const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+                sMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+              }
+            });
+            if (sMeters <= 0) {
+              sMeters = Number(it.quantity) || Math.round((Number(targetGrn?.declaredTotalMeters || targetGrn?.totalQty || 0)) / poItems.length);
+            }
+            siblingBatches.push({
+              id: sId,
+              grnRef: targetGrn?.id || qcData.grnRef,
+              againstRef: linkedPO?.id || targetGrn?.poId || '',
+              fabricName: it.fabricName || it.fabricQuality || `Fabric Quality ${idx + 1}`,
+              fabricId: it.fabricId || '',
+              colorName: it.color || it.colorName || it.shade || 'Grey / Natural',
+              expectedWidth: String(it.width || '44'),
+              expectedFold: String(it.fold || '100'),
+              totalReceivedMeters: sMeters,
+              receivedQty: sMeters,
+              qcStatus: 'Pending',
+              createdAt: now,
+              updatedAt: now,
+              dateTime: new Date().toLocaleString('en-GB'),
+              createdBy: 'System QC Agent'
+            });
+          }
+        });
+      } else if (baleFabrics.length > 1) {
+        baleFabrics.forEach((fLbl, idx) => {
+          const sId = `QC-${(targetGrn?.id || qcData.grnRef || '').replace('GRN-', '')}-F${idx + 1}`;
+          if (sId !== enrichedQC.id) {
+            let sMeters = 0;
+            (targetGrn?.bales || []).forEach((b) => {
+              if (b.fabricItemLabel === fLbl) {
+                const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+                sMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+              }
+            });
+            if (sMeters <= 0) {
+              sMeters = Math.round((Number(targetGrn?.declaredTotalMeters || targetGrn?.totalQty || 0)) / baleFabrics.length);
+            }
+            siblingBatches.push({
+              id: sId,
+              grnRef: targetGrn?.id || qcData.grnRef,
+              againstRef: targetGrn?.poId || '',
+              fabricName: fLbl,
+              expectedWidth: String(targetGrn?.pannaWidth || '44'),
+              expectedFold: String(targetGrn?.fabricFolding || '100'),
+              totalReceivedMeters: sMeters,
+              receivedQty: sMeters,
+              qcStatus: 'Pending',
+              createdAt: now,
+              updatedAt: now,
+              dateTime: new Date().toLocaleString('en-GB'),
+              createdBy: 'System QC Agent'
+            });
+          }
+        });
+      }
+
+      setQualityChecks((prev) => {
+        const remaining = prev.filter((q) => q.id !== qcData.originalQcId && q.id !== enrichedQC.id);
+        const missingSiblings = siblingBatches.filter((s) => !remaining.some((r) => r.id === s.id));
+        missingSiblings.forEach((s) => {
+          api.saveQualityCheck(s).catch((e) => console.warn('Sibling QC auto-save error:', e));
+        });
+        return [enrichedQC, ...missingSiblings, ...remaining];
+      });
     } else {
       setQualityChecks((prev) => [enrichedQC, ...prev]);
     }
@@ -977,6 +1271,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               vendors={vendors}
               fabrics={fabrics}
               grns={grns}
+              qualityChecks={qualityChecks}
               onBack={() => setActivePoView('list')}
               onSavePO={handleSavePO}
               onPrintPO={(po) => {
@@ -985,6 +1280,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               }}
               onInwardGRN={handleInwardFromPO}
               onViewGRN={handleViewGRN}
+              onViewQC={handleViewQC}
               onSaveVendor={(v) => {
                 setVendors((prev) => {
                   const exists = prev.some((item) => item.id === v.id);

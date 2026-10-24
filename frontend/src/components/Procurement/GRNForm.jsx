@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TransporterMasterView from './TransporterMasterView';
 
 /**
@@ -20,7 +20,7 @@ import TransporterMasterView from './TransporterMasterView';
  *       * Dynamic piece meter inputs (Pc 1, Pc 2, ...) with live sum
  *       * Summary verification bar: Entered total vs Declared total (live match status)
  *   - Section 3: Bottom action buttons
- *       * Save Header (add bales later)
+ *       * Save Progress (Finish Later)
  *       * Submit GRN & Send to QC
  *       * Cancel (clears all fields and exits back to GRN list)
  */
@@ -36,7 +36,12 @@ export default function GRNForm({
   onSaveGRN,
   onSaveTransporter
 }) {
-  const isExisting = Boolean(grn && grn.id);
+  const isExisting = Boolean(
+    grn &&
+    grn.id &&
+    !grn.isNew &&
+    (grns || []).some((g) => g && g.id === grn.id)
+  );
 
   const getPoVendorName = (po) => {
     if (!po) return '';
@@ -159,6 +164,19 @@ export default function GRNForm({
   const [showInlineTransporterModal, setShowInlineTransporterModal] = useState(false);
   const [toastNotification, setToastNotification] = useState(null);
 
+  // Receipt details edit/view state toggle (Image 1 vs Image 2)
+  const [isHeaderEditing, setIsHeaderEditing] = useState(() => {
+    // When creating a new GRN (e.g. from + GRN on PO), always open Section 1 in Edit mode
+    if (!isExisting || grn?.isNew || grn?.isHeaderSaved === false) {
+      return true;
+    }
+    // Only show read-only summary card if header has actually been saved
+    if (grn?.isHeaderSaved === true || grn?.status === 'Header Saved' || (isExisting && (grn?.status === 'Completed' || (grn?.bales && grn.bales.length > 0)))) {
+      return false;
+    }
+    return true;
+  });
+
   const showToast = (message, type = 'success') => {
     setToastNotification({ message, type });
     setTimeout(() => {
@@ -166,91 +184,108 @@ export default function GRNForm({
     }, 3200);
   };
 
+  // Track last synced GRN id to prevent overwriting user's active edits on re-render
+  const lastGrnIdRef = useRef(grn?.id || null);
+
   // Sync if grn prop changes
   useEffect(() => {
     if (grn && grn.id) {
-      const matchedPO = purchaseOrders.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)));
-      const vName = grn.vendorName || (matchedPO ? getPoVendorName(matchedPO) : '');
+      if (lastGrnIdRef.current !== grn.id) {
+        lastGrnIdRef.current = grn.id;
+        const matchedPO = purchaseOrders.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)));
+        const vName = grn.vendorName || (matchedPO ? getPoVendorName(matchedPO) : '');
 
-      const cleanDate = (d) => {
-        if (!d) return '';
-        return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : String(d);
-      };
+        const cleanDate = (d) => {
+          if (!d) return '';
+          return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : String(d);
+        };
 
-      const targetBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
-      let initialBales = [];
-      if (grn.bales && grn.bales.length > 0) {
-        initialBales = grn.bales.map((b, idx) => {
-          const rawPieces = b.pieces || [];
-          const normPieces = rawPieces.map((p, pIdx) => {
-            if (typeof p === 'object' && p !== null) {
+        const targetBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
+        let initialBales = [];
+        if (grn.bales && grn.bales.length > 0) {
+          initialBales = grn.bales.map((b, idx) => {
+            const rawPieces = b.pieces || [];
+            const normPieces = rawPieces.map((p, pIdx) => {
+              if (typeof p === 'object' && p !== null) {
+                return {
+                  pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
+                  length: p.length !== undefined && p.length !== null ? p.length : ''
+                };
+              }
               return {
-                pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-                length: p.length !== undefined && p.length !== null ? p.length : ''
+                pieceNo: `Pc ${pIdx + 1}`,
+                length: p !== undefined && p !== null ? p : ''
               };
-            }
+            });
+
+            const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
+              ? String(b.piecesCount)
+              : (normPieces.length > 0 ? String(normPieces.length) : '');
+            const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+
             return {
-              pieceNo: `Pc ${pIdx + 1}`,
-              length: p !== undefined && p !== null ? p : ''
+              baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
+              itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
+              fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
+              piecesCount,
+              totalLength,
+              pieces: normPieces
             };
           });
+        }
 
-          const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
-            ? String(b.piecesCount)
-            : (normPieces.length > 0 ? String(normPieces.length) : '');
-          const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+        // Auto-fill remaining bales up to targetBaleCount
+        if (targetBaleCount > initialBales.length) {
+          for (let i = initialBales.length; i < targetBaleCount; i++) {
+            initialBales.push({
+              baleNo: String(i + 1),
+              itemIdx: 0,
+              fabricItemLabel: '',
+              piecesCount: '',
+              pieces: [],
+              totalLength: 0
+            });
+          }
+        }
 
-          return {
-            baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
-            itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
-            fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
-            piecesCount,
-            totalLength,
-            pieces: normPieces
-          };
-        });
-      }
+        setFormData((prev) => ({
+          ...prev,
+          id: grn.id,
+          poId: matchedPO ? matchedPO.id : (grn.poId || prev.poId),
+          linkedPOs: grn.linkedPOs || (matchedPO ? [matchedPO.id] : prev.linkedPOs),
+          vendorId: grn.vendorId || (matchedPO ? matchedPO.vendorId : prev.vendorId),
+          vendorName: vName || prev.vendorName,
+          receivedDate: cleanDate(grn.receivedDate || grn.date) || prev.receivedDate,
+          vendorChallanNo: grn.vendorChallanNo || grn.challan || prev.vendorChallanNo,
+          vendorChallanDate: cleanDate(grn.vendorChallanDate) || prev.vendorChallanDate,
+          vendorInvoiceNo: grn.vendorInvoiceNo || grn.invoice || prev.vendorInvoiceNo,
+          vendorInvoiceDate: cleanDate(grn.vendorInvoiceDate) || prev.vendorInvoiceDate,
+          transporterId: grn.transporterId || prev.transporterId,
+          transporterName: grn.transporterName || prev.transporterName,
+          lrNo: grn.lrNo || grn.lrNumber || prev.lrNo || '',
+          lrNumber: grn.lrNumber || grn.lrNo || prev.lrNumber || '',
+          lrDate: cleanDate(grn.lrDate) || prev.lrDate,
+          weight: grn.weight !== undefined ? grn.weight : prev.weight,
+          totalQty: (grn && grn.totalQty !== undefined && grn.totalQty !== '')
+            ? String(grn.totalQty)
+            : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')),
+          declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0),
+          totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
+          status: grn.status || prev.status,
+          bales: initialBales.length > 0 ? initialBales : prev.bales
+        }));
 
-      // Auto-fill remaining bales up to targetBaleCount
-      if (targetBaleCount > initialBales.length) {
-        for (let i = initialBales.length; i < targetBaleCount; i++) {
-          initialBales.push({
-            baleNo: String(i + 1),
-            itemIdx: 0,
-            fabricItemLabel: '',
-            piecesCount: '',
-            pieces: [],
-            totalLength: 0
-          });
+        const isHeaderActuallySaved = Boolean(
+          isExisting &&
+          !grn.isNew &&
+          (grn.isHeaderSaved === true || grn.status === 'Header Saved' || (grn.status === 'Completed' || (grn.bales && grn.bales.length > 0)))
+        );
+        if (isHeaderActuallySaved) {
+          setIsHeaderEditing(false);
+        } else {
+          setIsHeaderEditing(true);
         }
       }
-
-      setFormData((prev) => ({
-        ...prev,
-        id: grn.id,
-        poId: matchedPO ? matchedPO.id : (grn.poId || prev.poId),
-        linkedPOs: grn.linkedPOs || (matchedPO ? [matchedPO.id] : prev.linkedPOs),
-        vendorId: grn.vendorId || (matchedPO ? matchedPO.vendorId : prev.vendorId),
-        vendorName: vName || prev.vendorName,
-        receivedDate: cleanDate(grn.receivedDate || grn.date) || prev.receivedDate,
-        vendorChallanNo: grn.vendorChallanNo || grn.challan || prev.vendorChallanNo,
-        vendorChallanDate: cleanDate(grn.vendorChallanDate) || prev.vendorChallanDate,
-        vendorInvoiceNo: grn.vendorInvoiceNo || grn.invoice || prev.vendorInvoiceNo,
-        vendorInvoiceDate: cleanDate(grn.vendorInvoiceDate) || prev.vendorInvoiceDate,
-        transporterId: grn.transporterId || prev.transporterId,
-        transporterName: grn.transporterName || prev.transporterName,
-        lrNo: grn.lrNo || grn.lrNumber || prev.lrNo || '',
-        lrNumber: grn.lrNumber || grn.lrNo || prev.lrNumber || '',
-        lrDate: cleanDate(grn.lrDate) || prev.lrDate,
-        weight: grn.weight !== undefined ? grn.weight : prev.weight,
-        totalQty: (grn && grn.totalQty !== undefined && grn.totalQty !== '')
-          ? String(grn.totalQty)
-          : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')),
-        declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0),
-        totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
-        status: grn.status || prev.status,
-        bales: initialBales.length > 0 ? initialBales : prev.bales
-      }));
     }
   }, [grn, purchaseOrders]);
 
@@ -554,18 +589,22 @@ export default function GRNForm({
     }
   };
 
-  // Save Header Only (add bales later)
+  // Save Progress (Finish Later) / Save This Section
   const handleSaveHeaderOnly = () => {
     if (isQcActioned) {
       showToast('Receipt details are locked because Quality Check has already started or been completed.', 'warning');
       return;
     }
-    if (!formData.poId) {
+
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || '';
+    if (!resolvedPoId) {
       showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
     }
 
-    const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
+    const currentBales = formData.bales || [];
+
+    const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
     const firstPoItem = selectedPO?.items?.[0];
     const fabricItem = firstPoItem
       ? firstPoItem.fabricName || firstPoItem.fabricQuality
@@ -574,10 +613,18 @@ export default function GRNForm({
     const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
     const widthVal = firstPoItem?.width || formData.width || '';
+    const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || ''));
+    const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || '';
 
     const payload = {
       ...formData,
-      status: 'Header Saved',
+      poId: resolvedPoId,
+      linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : (resolvedPoId ? [resolvedPoId] : []),
+      vendorId: vId,
+      vendorName: vName,
+      status: formData.status === 'Completed' ? 'Completed' : 'Header Saved',
+      isHeaderSaved: true,
+      isNew: false,
       date: formData.receivedDate,
       fabricName: fabricItem,
       fabricId: fabricIdVal,
@@ -588,13 +635,27 @@ export default function GRNForm({
       totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
-      totalMetersEntered
+      totalMetersEntered,
+      bales: currentBales
     };
 
+    // Update local state immediately with complete saved details
+    setFormData((prev) => ({
+      ...prev,
+      ...payload
+    }));
+
+    // Instantly toggle Section 1 to read-only Summary Card view (Image 1) with Edit button
+    setIsHeaderEditing(false);
+
     if (onSaveGRN) {
-      onSaveGRN(payload, false);
-      showToast('GRN Header saved successfully! Bale & piece entry can be resumed anytime.', 'success');
+      try {
+        onSaveGRN(payload, false);
+      } catch (err) {
+        console.warn('Error saving GRN header:', err);
+      }
     }
+    showToast('Receipt details saved successfully!', 'success');
   };
 
   // Save all bales draft progress (including any individual bale saves)
@@ -786,304 +847,440 @@ export default function GRNForm({
 
       {/* SECTION 1: RECEIPT DETAILS */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <h5 className="fw-bold text-dark mb-4 pb-2 border-bottom fs-16 d-flex align-items-center justify-content-between">
-          <span>Receipt details</span>
-          {isQcActioned && (
-            <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal">
-              <i className="ti ti-lock me-1 text-warning"></i> Read Only
-            </span>
-          )}
-        </h5>
-
-        <div className="row g-3 mb-2">
-          {/* Row 1: Source document & Received date */}
-          <div className="col-12 col-md-8">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Source document <span className="text-danger">*</span>
-            </label>
-            {isLinkedFromPO ? (
-              <div
-                className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium"
-                style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px', cursor: 'default' }}
-              >
-                <div className="d-flex align-items-center gap-2 text-truncate">
-                  <i className="ti ti-file-description text-primary fs-16"></i>
-                  <span className="fw-semibold text-dark">
-                    {currentPO
-                      ? `${currentPO.id} — ${getPoVendorName(currentPO) || 'Vendor'} (fabric purchase)`
-                      : (formData.poId ? `${formData.poId} — ${formData.vendorName || 'Vendor'} (fabric purchase)` : 'Purchase Order')}
-                  </span>
-                </div>
-                <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium">
-                  <i className="ti ti-lock me-1 text-muted"></i> Linked PO
-                </span>
-              </div>
-            ) : (
-              <select
-                className="form-select bg-white fs-13"
-                style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                disabled={isQcActioned}
-                value={formData.poId || ''}
-                onChange={(e) => handlePOChange(e.target.value)}
-              >
-                <option value="">Select Source Document (PO)...</option>
-                {eligiblePOs.map((po) => {
-                  const vName = getPoVendorName(po);
-                  return (
-                    <option key={po.id} value={po.id}>
-                      {po.id} — {vName || 'Vendor'} (fabric purchase)
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-          </div>
-
-          <div className="col-12 col-md-4">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Received date <span className="text-danger">*</span>
-            </label>
-            <input
-              type="date"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.receivedDate}
-              onChange={(e) => setFormData({ ...formData, receivedDate: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="row g-3 mb-2">
-          {/* Row 2: Vendor Challan & Invoice */}
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Vendor challan no. (optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. 1360"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.vendorChallanNo}
-              onChange={(e) => setFormData({ ...formData, vendorChallanNo: e.target.value })}
-            />
-          </div>
-
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Vendor challan date (optional)
-            </label>
-            <input
-              type="date"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.vendorChallanDate}
-              onChange={(e) => setFormData({ ...formData, vendorChallanDate: e.target.value })}
-            />
-          </div>
-
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Vendor invoice no. (optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. MST/1360/26-27"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.vendorInvoiceNo}
-              onChange={(e) => setFormData({ ...formData, vendorInvoiceNo: e.target.value })}
-            />
-          </div>
-
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Vendor invoice date (optional)
-            </label>
-            <input
-              type="date"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.vendorInvoiceDate}
-              onChange={(e) => setFormData({ ...formData, vendorInvoiceDate: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="row g-3 mb-3">
-          {/* Row 3: Transporter (with clean + New link), LR No, LR Date */}
-          <div className="col-12 col-lg-6">
-            <div className="d-flex align-items-center justify-content-between mb-1">
-              <label className="form-label fs-13 fw-semibold text-secondary mb-0">Transporter</label>
+        <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+          <h5 className="fw-bold text-dark mb-0 fs-16 d-flex align-items-center gap-2">
+            <span>Receipt details</span>
+          </h5>
+          {!isHeaderEditing ? (
+            !isQcActioned ? (
               <button
                 type="button"
-                className="btn btn-link btn-sm p-0 text-decoration-none fs-12 fw-semibold"
-                style={{ color: '#5b47fb' }}
-                onClick={() => setShowInlineTransporterModal(true)}
+                className="btn btn-sm btn-white border px-3 py-1 fs-12 fw-semibold rounded-2 text-dark shadow-xs d-inline-flex align-items-center gap-1.5"
+                style={{ borderColor: '#cbd5e1' }}
+                onClick={() => setIsHeaderEditing(true)}
+                title="Edit Receipt Details"
               >
-                + New
+                <i className="ti ti-edit fs-14" style={{ color: '#f97316' }}></i>
+                <span>Edit</span>
+              </button>
+            ) : (
+              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal">
+                <i className="ti ti-lock me-1 text-warning"></i> Read Only (QC Actioned)
+              </span>
+            )
+          ) : (
+            isQcActioned && (
+              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal">
+                <i className="ti ti-lock me-1 text-warning"></i> Read Only
+              </span>
+            )
+          )}
+        </div>
+
+        {!isHeaderEditing ? (
+          /* READ-ONLY / SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
+          <div className="row g-4 fs-13 pt-1">
+            {/* 1. SOURCE DOCUMENT */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '150px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                SOURCE DOCUMENT
+              </div>
+              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.poId}>
+                {formData.poId || '—'}
+              </div>
+              {currentPO && getPoVendorName(currentPO) && (
+                <div className="text-muted fs-11 text-truncate" title={getPoVendorName(currentPO)}>
+                  {getPoVendorName(currentPO)}
+                </div>
+              )}
+            </div>
+
+            {/* 2. RECEIVED DATE */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '130px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                RECEIVED DATE
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {formData.receivedDate || '—'}
+              </div>
+            </div>
+
+            {/* 3. VENDOR CHALLAN */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                VENDOR CHALLAN
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {formData.vendorChallanNo || '—'}
+              </div>
+              {formData.vendorChallanDate && (
+                <div className="text-muted fs-11">{formData.vendorChallanDate}</div>
+              )}
+            </div>
+
+            {/* 4. VENDOR INVOICE */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                VENDOR INVOICE
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {formData.vendorInvoiceNo || '—'}
+              </div>
+              {formData.vendorInvoiceDate && (
+                <div className="text-muted fs-11">{formData.vendorInvoiceDate}</div>
+              )}
+            </div>
+
+            {/* 5. TRANSPORTER */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '150px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                TRANSPORTER
+              </div>
+              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.transporterName || (transporters.find((t) => t.id === formData.transporterId)?.name) || '—'}>
+                {formData.transporterName || (transporters.find((t) => t.id === formData.transporterId)?.name) || '—'}
+              </div>
+            </div>
+
+            {/* Row 2 */}
+            {/* 6. LR NO. / DATE */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '150px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                LR NO. / DATE
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {formData.lrNo || formData.lrNumber ? (
+                  formData.lrDate ? `${formData.lrNo || formData.lrNumber} / ${formData.lrDate}` : (formData.lrNo || formData.lrNumber)
+                ) : '—'}
+              </div>
+            </div>
+
+            {/* 7. WEIGHT */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '130px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                WEIGHT
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {formData.weight ? `${formData.weight} kg` : '— kg'}
+              </div>
+            </div>
+
+            {/* 8. FABRIC FOLDING */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                FABRIC FOLDING
+              </div>
+              <div className="fw-bold text-dark fs-13">
+                {currentPO?.items?.[0]?.fold ? `${currentPO.items[0].fold}%` : (formData.fabricFolding ? `${formData.fabricFolding} cms` : '—')}
+              </div>
+            </div>
+
+            {/* 9. TOTAL QTY / BALES */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
+              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                TOTAL QTY / BALES
+              </div>
+              <div className="fw-bold text-dark fs-13 font-monospace">
+                {Number(formData.totalQty || formData.declaredTotalMeters || 0).toLocaleString()}m / {formData.totalBales || (formData.bales ? formData.bales.length : 0)}
+              </div>
+            </div>
+
+            {/* 5th column spacer for alignment on large screens */}
+            <div className="col-12 col-sm-6 col-md-3 col-lg d-none d-lg-block" style={{ minWidth: '150px' }}></div>
+          </div>
+        ) : (
+          /* EDITING FORM INPUTS (Image 1) */
+          <div>
+            <div className="row g-3 mb-2">
+              {/* Row 1: Source document & Received date */}
+              <div className="col-12 col-md-8">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Source document <span className="text-danger">*</span>
+                </label>
+                {isLinkedFromPO ? (
+                  <div
+                    className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium"
+                    style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px', cursor: 'default' }}
+                  >
+                    <div className="d-flex align-items-center gap-2 text-truncate">
+                      <i className="ti ti-file-description text-primary fs-16"></i>
+                      <span className="fw-semibold text-dark">
+                        {currentPO
+                          ? `${currentPO.id} — ${getPoVendorName(currentPO) || 'Vendor'} (fabric purchase)`
+                          : (formData.poId ? `${formData.poId} — ${formData.vendorName || 'Vendor'} (fabric purchase)` : 'Purchase Order')}
+                      </span>
+                    </div>
+                    <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium">
+                      <i className="ti ti-lock me-1 text-muted"></i> Linked PO
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    className="form-select bg-white fs-13"
+                    style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                    disabled={isQcActioned}
+                    value={formData.poId || ''}
+                    onChange={(e) => handlePOChange(e.target.value)}
+                  >
+                    <option value="">Select Source Document (PO)...</option>
+                    {eligiblePOs.map((po) => {
+                      const vName = getPoVendorName(po);
+                      return (
+                        <option key={po.id} value={po.id}>
+                          {po.id} — {vName || 'Vendor'} (fabric purchase)
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+
+              <div className="col-12 col-md-4">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Received date <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.receivedDate}
+                  onChange={(e) => setFormData({ ...formData, receivedDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="row g-3 mb-2">
+              {/* Row 2: Vendor Challan & Invoice */}
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Vendor challan no. (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1360"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.vendorChallanNo}
+                  onChange={(e) => setFormData({ ...formData, vendorChallanNo: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Vendor challan date (optional)
+                </label>
+                <input
+                  type="date"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.vendorChallanDate}
+                  onChange={(e) => setFormData({ ...formData, vendorChallanDate: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Vendor invoice no. (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. MST/1360/26-27"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.vendorInvoiceNo}
+                  onChange={(e) => setFormData({ ...formData, vendorInvoiceNo: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Vendor invoice date (optional)
+                </label>
+                <input
+                  type="date"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.vendorInvoiceDate}
+                  onChange={(e) => setFormData({ ...formData, vendorInvoiceDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="row g-3 mb-3">
+              {/* Row 3: Transporter (with clean + New link), LR No, LR Date */}
+              <div className="col-12 col-lg-6">
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <label className="form-label fs-13 fw-semibold text-secondary mb-0">Transporter</label>
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-decoration-none fs-12 fw-semibold"
+                    style={{ color: '#5b47fb' }}
+                    onClick={() => setShowInlineTransporterModal(true)}
+                  >
+                    + New
+                  </button>
+                </div>
+                <select
+                  className="form-select bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.transporterId || ''}
+                  onChange={(e) => {
+                    const trn = transporters.find((t) => t.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      transporterId: e.target.value,
+                      transporterName: trn ? trn.name : ''
+                    });
+                  }}
+                >
+                  <option value="">Select Transporter...</option>
+                  {transporters.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">LR no.</label>
+                <input
+                  type="text"
+                  placeholder="e.g. LR-98210"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.lrNo}
+                  onChange={(e) => setFormData({ ...formData, lrNo: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 col-sm-6 col-lg-3">
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">LR date</label>
+                <input
+                  type="date"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.lrDate}
+                  onChange={(e) => setFormData({ ...formData, lrDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Partial Inward Notice Banner */}
+            {formData.poId && alreadyReceivedMeters > 0 && (
+              <div className="alert alert-info py-2 px-3 rounded-3 fs-13 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 border-info border-opacity-25 shadow-xs">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="ti ti-truck-delivery fs-18 text-info"></i>
+                  <span>
+                    <strong>Partial Inward for PO {formData.poId}:</strong> {alreadyReceivedMeters.toLocaleString()}m already received in {previousGrnsForPo.map(g => g.id).join(', ')}. <strong>Remaining to Inward: {poPendingMeters.toLocaleString()}m</strong> of {poOrderedMeters.toLocaleString()}m ordered.
+                  </span>
+                </div>
+                <span className="badge bg-info text-white fs-11 px-2.5 py-1 rounded-pill">
+                  {poPendingMeters.toLocaleString()}m Balance
+                </span>
+              </div>
+            )}
+
+            {/* Row 4: Weight, Total qty, No. of bales, Generate Bales, Save Section */}
+            <div className="d-flex flex-wrap align-items-end gap-3 pt-2">
+              <div style={{ flex: '1 1 140px', minWidth: '130px', maxWidth: '200px' }}>
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 450"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.weight}
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                />
+              </div>
+
+              <div style={{ flex: '1 1 180px', minWidth: '160px', maxWidth: '240px' }}>
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  Total qty {poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : (poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : '(m)')} <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder={poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `e.g. ${poPendingMeters}` : (poOrderedMeters > 0 ? `e.g. ${poOrderedMeters}` : "e.g. 1000")}
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.totalQty}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({
+                      ...formData,
+                      totalQty: val,
+                      declaredTotalMeters: Number(val) || 0
+                    });
+                  }}
+                />
+              </div>
+
+              <div style={{ flex: '1 1 130px', minWidth: '120px', maxWidth: '180px' }}>
+                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
+                  No. of bales <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 2"
+                  className="form-control bg-white fs-13"
+                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                  value={formData.totalBales}
+                  onChange={(e) => handleBaleCountChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleGenerateBales();
+                    }
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 text-white shadow-sm"
+                style={{
+                  height: '40px',
+                  backgroundColor: isQcActioned ? '#94a3b8' : '#5b47fb',
+                  borderColor: isQcActioned ? '#94a3b8' : '#5b47fb',
+                  borderRadius: '8px',
+                  cursor: isQcActioned ? 'not-allowed' : 'pointer'
+                }}
+                disabled={isQcActioned}
+                onClick={handleGenerateBales}
+                title={isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales'}
+              >
+                <i className={`ti ${isQcActioned ? 'ti-lock' : 'ti-package'} fs-15`}></i>
+                <span>Generate Bales</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-white border d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-medium fs-13 shadow-sm text-dark"
+                style={{
+                  height: '40px',
+                  borderColor: '#cbd5e1',
+                  borderRadius: '8px',
+                  backgroundColor: isQcActioned ? '#f1f5f9' : '#ffffff',
+                  cursor: isQcActioned ? 'not-allowed' : 'pointer',
+                  opacity: isQcActioned ? 0.6 : 1
+                }}
+                disabled={isQcActioned}
+                onClick={handleSaveHeaderOnly}
+                title={isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header'}
+              >
+                <i className="ti ti-device-floppy fs-15" style={{ color: isQcActioned ? '#94a3b8' : '#5b47fb' }}></i>
+                <span>Save This Section</span>
               </button>
             </div>
-            <select
-              className="form-select bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.transporterId || ''}
-              onChange={(e) => {
-                const trn = transporters.find((t) => t.id === e.target.value);
-                setFormData({
-                  ...formData,
-                  transporterId: e.target.value,
-                  transporterName: trn ? trn.name : ''
-                });
-              }}
-            >
-              <option value="">Select Transporter...</option>
-              {transporters.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">LR no.</label>
-            <input
-              type="text"
-              placeholder="e.g. LR-98210"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.lrNo}
-              onChange={(e) => setFormData({ ...formData, lrNo: e.target.value })}
-            />
-          </div>
-
-          <div className="col-12 col-sm-6 col-lg-3">
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">LR date</label>
-            <input
-              type="date"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.lrDate}
-              onChange={(e) => setFormData({ ...formData, lrDate: e.target.value })}
-            />
-          </div>
-        </div>
-
-        {/* Partial Inward Notice Banner */}
-        {formData.poId && alreadyReceivedMeters > 0 && (
-          <div className="alert alert-info py-2 px-3 rounded-3 fs-13 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 border-info border-opacity-25 shadow-xs">
-            <div className="d-flex align-items-center gap-2">
-              <i className="ti ti-truck-delivery fs-18 text-info"></i>
-              <span>
-                <strong>Partial Inward for PO {formData.poId}:</strong> {alreadyReceivedMeters.toLocaleString()}m already received in {previousGrnsForPo.map(g => g.id).join(', ')}. <strong>Remaining to Inward: {poPendingMeters.toLocaleString()}m</strong> of {poOrderedMeters.toLocaleString()}m ordered.
-              </span>
-            </div>
-            <span className="badge bg-info text-white fs-11 px-2.5 py-1 rounded-pill">
-              {poPendingMeters.toLocaleString()}m Balance
-            </span>
+            <p className="text-muted fs-12 mt-2 mb-0">
+              Enter the number of bales and click &quot;Generate Bales&quot; (or press Enter) to create bale entries below.
+            </p>
           </div>
         )}
-
-        {/* Row 4: Weight, Total qty, No. of bales, Generate Bales, Save Section */}
-        <div className="d-flex flex-wrap align-items-end gap-3 pt-2">
-          <div style={{ flex: '1 1 140px', minWidth: '130px', maxWidth: '200px' }}>
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">Weight (kg)</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="e.g. 450"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.weight}
-              onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-            />
-          </div>
-
-          <div style={{ flex: '1 1 180px', minWidth: '160px', maxWidth: '240px' }}>
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              Total qty {poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : (poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : '(m)')} <span className="text-danger">*</span>
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder={poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `e.g. ${poPendingMeters}` : (poOrderedMeters > 0 ? `e.g. ${poOrderedMeters}` : "e.g. 1000")}
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.totalQty}
-              onChange={(e) => {
-                const val = e.target.value;
-                setFormData({
-                  ...formData,
-                  totalQty: val,
-                  declaredTotalMeters: Number(val) || 0
-                });
-              }}
-            />
-          </div>
-
-          <div style={{ flex: '1 1 130px', minWidth: '120px', maxWidth: '180px' }}>
-            <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-              No. of bales <span className="text-danger">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              placeholder="e.g. 2"
-              className="form-control bg-white fs-13"
-              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-              value={formData.totalBales}
-              onChange={(e) => handleBaleCountChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleGenerateBales();
-                }
-              }}
-            />
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 text-white shadow-sm"
-            style={{
-              height: '40px',
-              backgroundColor: isQcActioned ? '#94a3b8' : '#5b47fb',
-              borderColor: isQcActioned ? '#94a3b8' : '#5b47fb',
-              borderRadius: '8px',
-              cursor: isQcActioned ? 'not-allowed' : 'pointer'
-            }}
-            disabled={isQcActioned}
-            onClick={handleGenerateBales}
-            title={isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales'}
-          >
-            <i className={`ti ${isQcActioned ? 'ti-lock' : 'ti-package'} fs-15`}></i>
-            <span>Generate Bales</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-white border d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-medium fs-13 shadow-sm text-dark"
-            style={{
-              height: '40px',
-              borderColor: '#cbd5e1',
-              borderRadius: '8px',
-              backgroundColor: isQcActioned ? '#f1f5f9' : '#ffffff',
-              cursor: isQcActioned ? 'not-allowed' : 'pointer',
-              opacity: isQcActioned ? 0.6 : 1
-            }}
-            disabled={isQcActioned}
-            onClick={handleSaveHeaderOnly}
-            title={isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header'}
-          >
-            <i className="ti ti-device-floppy fs-15" style={{ color: isQcActioned ? '#94a3b8' : '#5b47fb' }}></i>
-            <span>Save This Section</span>
-          </button>
-        </div>
-
-        <p className="text-muted fs-12 mt-2 mb-0">
-          Enter the number of bales and click &quot;Generate Bales&quot; (or press Enter) to create bale entries below.
-        </p>
       </div>
 
       {/* SECTION 2: BALE-WISE INWARD ENTRY */}
@@ -1494,9 +1691,10 @@ export default function GRNForm({
               backgroundColor: '#ffffff'
             }}
             onClick={handleSaveHeaderOnly}
+            title="Save draft progress and finish entering bales later"
           >
             <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
-            <span>Save Header (add bales later)</span>
+            <span>Save Progress (Finish Later)</span>
           </button>
 
 

@@ -14,6 +14,15 @@ const autoCapitalizeWords = (str) => {
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+// Preset Master Fabrics with genuine fabric master properties
+const DEFAULT_FABRICS = [
+  { id: 'FAB-001', quality: 'Grey Cotton Fabrics (100*100)', qualityName: 'Grey Cotton Fabrics (100*100)', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 3.5, defaultShrinkage: 3.5, maxBuffer: 2.0, defRate: 50, dyedRate: 65, active: true },
+  { id: 'FAB-002', quality: 'Rayon 14kg Liva', qualityName: 'Rayon 14kg Liva', type: 'Rayon', widths: ['44"', '48"', '58"'], shrinkage: 4.5, defaultShrinkage: 4.5, maxBuffer: 2.0, defRate: 58, dyedRate: 76, active: true },
+  { id: 'FAB-003', quality: 'Cotton Cambric 60*60', qualityName: 'Cotton Cambric 60*60', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 4.0, defaultShrinkage: 4.0, maxBuffer: 2.0, defRate: 55, dyedRate: 70, active: true },
+  { id: 'FAB-004', quality: 'Modal Satin Premium', qualityName: 'Modal Satin Premium', type: 'Silk/Modal', widths: ['44"', '58"'], shrinkage: 2.0, defaultShrinkage: 2.0, maxBuffer: 1.5, defRate: 85, dyedRate: 110, active: true },
+  { id: 'FAB-005', quality: 'Gey Cotton Reyon', qualityName: 'Gey Cotton Reyon', type: 'Cotton/Rayon', widths: ['44"', '58"'], shrinkage: 3.5, defaultShrinkage: 3.5, maxBuffer: 2.0, defRate: 50, dyedRate: 65, active: true }
+];
+
 export default function OrderDetailView({
   order,
   onBack,
@@ -1741,13 +1750,102 @@ export default function OrderDetailView({
   // Edit mode vs Saved mode for Fabric Colour & Consumption table
   const [isConsumptionEditing, setIsConsumptionEditing] = useState(false);
 
-  // Sourcing mode per article: { [artKey]: 'Greige' | 'Dyed' }
+  // Sourced directly from Fabric Master (Shrinkage % allowance per fabric quality)
+  const getFabricMasterShrinkage = (fabricQuality) => {
+    let allFabrics = Array.isArray(masterFabricsList) && masterFabricsList.length > 0 ? [...masterFabricsList] : [];
+    try {
+      const stored = getStoredData('raindrop_fabrics_v1', null);
+      if (Array.isArray(stored) && stored.length > 0) {
+        allFabrics = [...allFabrics, ...stored];
+      }
+    } catch (e) {}
+    if (Array.isArray(procurementFabrics) && procurementFabrics.length > 0) {
+      allFabrics = [...allFabrics, ...procurementFabrics];
+    }
+    allFabrics = [...allFabrics, ...DEFAULT_FABRICS];
+
+    const fqClean = String(fabricQuality || '').toLowerCase().trim();
+    if (!fqClean) return 3.5;
+
+    // 1. Direct or fuzzy match with Fabric Master
+    let matched = allFabrics.find(f => {
+      const q = String(f.qualityName || f.quality_name || f.quality || f.name || '').toLowerCase().trim();
+      const id = String(f.id || '').toLowerCase().trim();
+      return (q && (q === fqClean || id === fqClean)) || (q && (fqClean.includes(q) || q.includes(fqClean)));
+    });
+
+    // 2. Check if order articles contain genuine shrinkage for this fabric
+    if (!matched && Array.isArray(order?.articles)) {
+      for (const art of order.articles) {
+        if (Array.isArray(art.fabrics)) {
+          const found = art.fabrics.find(f => {
+            const fn = String(f.fabricQuality || f.fabricName || f.quality || '').toLowerCase().trim();
+            return fn && (fn === fqClean || fqClean.includes(fn) || fn.includes(fqClean));
+          });
+          if (found) {
+            const raw = found.defaultShrinkage !== undefined && found.defaultShrinkage !== null && found.defaultShrinkage !== ''
+              ? found.defaultShrinkage
+              : (found.shrinkage !== undefined && found.shrinkage !== null && found.shrinkage !== ''
+                  ? found.shrinkage
+                  : found.shrinkagePercent);
+            if (raw !== undefined && raw !== null && raw !== '') {
+              const parsed = parseFloat(String(raw).replace('%', ''));
+              if (!isNaN(parsed) && parsed >= 0) return parsed;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. If matched in Fabric Master, read shrinkage or defaultShrinkage
+    if (matched) {
+      const raw = matched.defaultShrinkage !== undefined && matched.defaultShrinkage !== null && matched.defaultShrinkage !== ''
+        ? matched.defaultShrinkage
+        : (matched.shrinkage !== undefined && matched.shrinkage !== null && matched.shrinkage !== ''
+            ? matched.shrinkage
+            : (matched.shrinkage_percent !== undefined ? matched.shrinkage_percent : matched.shrinkPct));
+      if (raw !== undefined && raw !== null && raw !== '') {
+        const parsed = parseFloat(String(raw).replace('%', ''));
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+    }
+
+    // 4. Keyword fallback matching genuine industry standards from Fabric Master presets
+    if (fqClean.includes('modal') || fqClean.includes('satin')) {
+      return 2.0; // Modal Satin Premium default shrinkage is 2.0%
+    } else if (fqClean.includes('rayon') || fqClean.includes('reyon') || fqClean.includes('liva')) {
+      return 4.5; // Rayon 14kg Liva default shrinkage is 4.5%
+    } else if (fqClean.includes('cambric') || fqClean.includes('cambryc')) {
+      return 4.0; // Cotton Cambric 60*60 is 4.0%
+    } else if (fqClean.includes('cotton') || fqClean.includes('mulmul') || fqClean.includes('voile') || fqClean.includes('gey') || fqClean.includes('grey')) {
+      return 3.5; // Grey Cotton Fabrics is 3.5%
+    }
+
+    return 3.5;
+  };
+
+  // Sourcing mode per article/fabric: { [key]: 'Greige' | 'Dyed' }
   const [articleSourcing, setArticleSourcing] = useState(() => {
     const init = {};
+    if (order?.articleSourcing && typeof order.articleSourcing === 'object') {
+      return { ...order.articleSourcing };
+    }
     const arts = order?.articles || [{ name: 'Kurta' }, { name: 'Plazo' }];
     arts.forEach((a, i) => {
-      init[a.name || i] = a.sourcing || 'Greige';
-      init[i] = a.sourcing || 'Greige';
+      const artName = a.name || i;
+      if (Array.isArray(a.fabrics) && a.fabrics.length > 0) {
+        a.fabrics.forEach(f => {
+          const fn = f.fabricQuality || f.fabricName || '';
+          const role = f.pieceLabel || f.role || '';
+          const mode = (f.source || a.sourcing || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+          if (role) init[`${artName}___${fn}___${role}`] = mode;
+          if (fn) init[`${artName}_${fn}`] = mode;
+        });
+      } else {
+        const mode = (a.sourcing || a.source || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+        init[artName] = mode;
+        init[i] = mode;
+      }
     });
     return init;
   });
@@ -1803,7 +1901,8 @@ export default function OrderDetailView({
           resolveWidth(order?.width) ||
           '44"';
 
-        const shrink = parseFloat(fc.shrinkPercent || fc.shrinkPct || artFab.shrinkagePercent || artFab.shrinkage || (idx === 1 ? 3.5 : 4));
+        const masterShrink = getFabricMasterShrinkage(fabQuality);
+        const shrink = masterShrink;
         const buf = parseFloat(fc.bufferPercent || fc.bufferPct || artFab.bufferPercent || 10);
 
         const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
@@ -1924,7 +2023,8 @@ export default function OrderDetailView({
           resolveWidth(order?.width) ||
           (aIdx === 1 ? '47"' : aIdx === 2 ? '' : '44"');
 
-        const shrinkVal = parseFloat(artFab.shrinkagePercent || artFab.shrinkage || art.shrinkage || (aIdx === 1 ? 3.5 : aIdx === 2 ? 6 : 4));
+        const masterShrink = getFabricMasterShrinkage(fabName);
+        const shrinkVal = masterShrink;
         const bufferVal = parseFloat(artFab.bufferPercent || 10);
         const defaultDyed = artFab.consumption !== undefined ? artFab.consumption : (art.consumption !== undefined ? art.consumption : (isMockSample ? (aIdx === 0 ? 1.5 : aIdx === 1 ? 3.0 : 0.0) : 1.5));
 
@@ -2132,10 +2232,13 @@ export default function OrderDetailView({
       return sum + (dyedRate * pcs);
     }, 0);
     const totalGreigeCalculated = consumptionRows.reduce((sum, r) => {
-      const artSourcing = (articleSourcing[r.articleName] || r.source || 'Greige').toLowerCase();
+      const groupKey = `${r.articleName}___${r.fabricQuality}___${r.role}`;
+      const sourcingKey = `${r.articleName}_${r.fabricQuality}`;
+      const artSourcing = (articleSourcing[groupKey] || articleSourcing[sourcingKey] || r.source || 'Greige').toLowerCase();
       const isDyed = artSourcing.includes('dyed');
       const dyedRate = parseFloat(r.dyedRate) || 0;
-      const shrink = isDyed ? 0 : (parseFloat(r.shrinkPct) || 0);
+      const masterShrink = getFabricMasterShrinkage(r.fabricQuality);
+      const shrink = isDyed ? 0 : masterShrink;
       const greigeRate = isDyed ? dyedRate : (shrink < 100 ? dyedRate * (1 + shrink / 100) : dyedRate);
       const pcs = parseInt(r.pcs, 10) || 0;
       return sum + (greigeRate * pcs);
@@ -2184,14 +2287,24 @@ export default function OrderDetailView({
     setTimeout(() => setShowToast(false), 2000);
   };
 
-  const handleToggleArticleSourcing = (artName, mode, fabricQuality) => {
-    setArticleSourcing(prev => ({
-      ...prev,
-      [artName]: mode,
-      ...(fabricQuality ? { [`${artName}_${fabricQuality}`]: mode } : {})
-    }));
+  const handleToggleArticleSourcing = (artName, mode, fabricQuality, role) => {
+    const groupKey = `${artName}___${fabricQuality}___${role || ''}`;
+    const fabricKey = `${artName}_${fabricQuality}`;
+
+    setArticleSourcing(prev => {
+      const next = { ...prev };
+      next[groupKey] = mode;
+      next[fabricKey] = mode;
+      // Do NOT set [artName]: mode so that different fabrics of the same article (e.g. Kurta Main vs Kurta Outer) stay completely independent
+      delete next[artName];
+      return next;
+    });
+
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
+      const matchArt = r.articleName === artName;
+      const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+      const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+      if (matchArt && matchFab && matchRole) {
         return {
           ...r,
           source: mode === 'Dyed' ? 'Dyed Fabric' : 'Greige Fabric'
@@ -2201,9 +2314,12 @@ export default function OrderDetailView({
     }));
   };
 
-  const handleUpdateArticleWidth = (artName, newWidth, fabricQuality) => {
+  const handleUpdateArticleWidth = (artName, newWidth, fabricQuality, role) => {
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
+      const matchArt = r.articleName === artName;
+      const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+      const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+      if (matchArt && matchFab && matchRole) {
         return { ...r, width: newWidth === '—' ? '' : newWidth };
       }
       return r;
@@ -2290,10 +2406,13 @@ export default function OrderDetailView({
     return Array.from(new Set(resultWidths));
   };
 
-  const handleUpdateArticleDyedRate = (artName, val, fabricQuality) => {
+  const handleUpdateArticleDyedRate = (artName, val, fabricQuality, role) => {
     const num = val === '' ? '' : (parseFloat(val) || 0);
     setConsumptionRows(prev => prev.map(r => {
-      if (r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality)) {
+      const matchArt = r.articleName === artName;
+      const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+      const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+      if (matchArt && matchFab && matchRole) {
         return { ...r, dyedRate: num };
       }
       return r;
@@ -2314,7 +2433,17 @@ export default function OrderDetailView({
 
       if (!map.has(groupKey)) {
         const sourcingKey = `${artName}_${fabQuality}`;
-        const sourcingMode = (articleSourcing[sourcingKey] || articleSourcing[artName] || row.source || 'Greige').toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+        // Prioritize independent fabric/role sourcing mode, then row.source, then Greige (DO NOT fall back to artName)
+        const sourcingMode = (
+          articleSourcing[groupKey] ||
+          articleSourcing[sourcingKey] ||
+          row.source ||
+          'Greige'
+        ).toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+
+        // Sourced directly from Fabric Master (or genuine industry standard)
+        const masterShrink = getFabricMasterShrinkage(fabQuality);
+        const shrinkPct = masterShrink;
 
         map.set(groupKey, {
           key: groupKey,
@@ -2326,7 +2455,7 @@ export default function OrderDetailView({
           role: role,
           width: row.width || '',
           sourcing: sourcingMode,
-          shrinkPct: parseFloat(row.shrinkPct) || 4,
+          shrinkPct: shrinkPct,
           dyedRate: row.dyedRate,
           rows: []
         });
@@ -2334,7 +2463,7 @@ export default function OrderDetailView({
       map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
     });
     return Array.from(map.values());
-  }, [consumptionRows, articleSourcing]);
+  }, [consumptionRows, articleSourcing, masterFabricsList]);
 
   // Group subtotals for bottom summary rows matching Image 4
   const fabricSummaryRows = useMemo(() => {
@@ -2343,9 +2472,12 @@ export default function OrderDetailView({
       const fabName = r.fabricQuality || 'Fabric';
       const width = r.width && r.width !== '—' ? r.width : '';
       const key = `${fabName}_${width}`;
-      const artSourcing = (articleSourcing[r.articleName] || r.source || 'Greige').toLowerCase();
+      const groupKey = `${r.articleName}___${r.fabricQuality}___${r.role}`;
+      const sourcingKey = `${r.articleName}_${r.fabricQuality}`;
+      const artSourcing = (articleSourcing[groupKey] || articleSourcing[sourcingKey] || r.source || 'Greige').toLowerCase();
       const isDyed = artSourcing.includes('dyed');
-      const shrink = isDyed ? 0 : (parseFloat(r.shrinkPct) || 0);
+      const masterShrink = getFabricMasterShrinkage(fabName);
+      const shrink = isDyed ? 0 : masterShrink;
       const dyed = parseFloat(r.dyedRate) || 0;
       const pcs = parseInt(r.pcs, 10) || 0;
       const greigePerPc = dyed > 0 ? (isDyed ? dyed : dyed * (1 + shrink / 100)) : 0;
@@ -2369,7 +2501,7 @@ export default function OrderDetailView({
       if (dyed > 0) cur.hasValues = true;
     });
     return Array.from(map.values());
-  }, [consumptionRows, articleSourcing]);
+  }, [consumptionRows, articleSourcing, masterFabricsList]);
 
   // Section 8 Rate Calculations & Intelligent Recommendation Engine (Calculates across ALL available widths)
   const rateCalculations = useMemo(() => {
@@ -2387,7 +2519,11 @@ export default function OrderDetailView({
 
     fabricsInOrder.forEach((summaryList, fabricName) => {
       const matchingRows = consumptionRows.filter(r => (r.fabricQuality || '').toLowerCase() === fabricName.toLowerCase());
-      const isDyed = matchingRows.some(r => (articleSourcing[r.articleName] || r.source || '').toLowerCase().includes('dyed'));
+      const isDyed = matchingRows.some(r => {
+        const groupKey = `${r.articleName}___${r.fabricQuality}___${r.role}`;
+        const sourcingKey = `${r.articleName}_${r.fabricQuality}`;
+        return (articleSourcing[groupKey] || articleSourcing[sourcingKey] || r.source || '').toLowerCase().includes('dyed');
+      });
 
       let baseGreigeRate = 145;
       let dyeingCost = 35;
@@ -3503,7 +3639,7 @@ export default function OrderDetailView({
                                 backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
                                 border: 'none'
                               }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality)}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality, group.role)}
                               title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
                             >
                               Greige
@@ -3518,7 +3654,7 @@ export default function OrderDetailView({
                                 backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
                                 border: 'none'
                               }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality)}
+                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality, group.role)}
                               title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
                             >
                               Dyed
@@ -3632,7 +3768,7 @@ export default function OrderDetailView({
                                     if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
                                   }}
                                   onClick={() => {
-                                    handleUpdateArticleWidth(group.articleName, '', group.fabricQuality);
+                                    handleUpdateArticleWidth(group.articleName, '', group.fabricQuality, group.role);
                                     setActiveWidthDropdown(null);
                                   }}
                                 >
@@ -3661,7 +3797,7 @@ export default function OrderDetailView({
                                         if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                                       }}
                                       onClick={() => {
-                                        handleUpdateArticleWidth(group.articleName, w, group.fabricQuality);
+                                        handleUpdateArticleWidth(group.articleName, w, group.fabricQuality, group.role);
                                         setActiveWidthDropdown(null);
                                       }}
                                     >
@@ -3735,7 +3871,7 @@ export default function OrderDetailView({
                             }}
                             placeholder="0.000"
                             value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
-                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality)}
+                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality, group.role)}
                           />
                         </td>
                       )}
