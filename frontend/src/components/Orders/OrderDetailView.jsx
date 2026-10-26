@@ -2,11 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getStoredData, setStoredData, initialAccessoryMasters, getStoredAccessoriesMaster } from '../../data/salesOrderData';
 import { initialVendors, initialPurchaseOrders, initialFabrics as procurementFabrics } from '../../data/procurementData';
 import {
-  AccessoryPOButtonsBar,
   GenericAccessoryPOModal,
   TasselPOModal,
-  ThreadPOModal,
-  OrderPurchaseOrdersCard
+  ThreadPOModal
 } from './AccessoryPOModals';
 
 const autoCapitalizeWords = (str) => {
@@ -315,14 +313,7 @@ export default function OrderDetailView({
         }
       });
 
-      if (varieties.length === 0) {
-        varieties.push({
-          name: `Standard ${catName}`,
-          hasSizes: false,
-          sizes: [],
-          unit: meta.defaultUnit
-        });
-      }
+      // No dummy/fallback variety pushed: only display varieties that genuinely exist in Accessories Master
 
       return {
         id: catName,
@@ -1861,23 +1852,7 @@ export default function OrderDetailView({
     const getFabricDefaultWidth = (fq, artFab) => {
       const fromFab = resolveWidth(artFab?.width);
       if (fromFab) return fromFab;
-      if (!fq) return '44"';
-      let allF = procurementFabrics || [];
-      try {
-        const stored = getStoredData('raindrop_fabrics_v1', null);
-        if (Array.isArray(stored) && stored.length > 0) allF = stored;
-      } catch (e) {}
-      const matched = allF?.find(f => 
-        (f.qualityName || f.quality || f.name)?.toLowerCase() === fq.toLowerCase() ||
-        f.id === artFab?.fabricId
-      );
-      if (matched?.widths?.[0]) {
-        const wClean = String(matched.widths[0]).replace(/"/g, '').trim();
-        return `${wClean}"`;
-      }
-      if (fq.toLowerCase().includes('liva') || fq.toLowerCase().includes('pant') || fq.toLowerCase().includes('2.40')) return '47"';
-      if (fq.toLowerCase().includes('cambryc') || fq.toLowerCase().includes('cambric')) return '';
-      return '44"';
+      return '';
     };
 
     const isMockSample = !order || (!order.id && !order.styleName && (!order.articles || order.articles.length === 0));
@@ -1891,15 +1866,17 @@ export default function OrderDetailView({
           : (order?.articles ? order.articles.findIndex(a => a.name === artName) : idx);
         const art = (order?.articles && order.articles[artIdx]) || {};
         const artFab = (art.fabrics || []).find(f => (f.fabricQuality || f.fabricName || '').toLowerCase() === (fc.fabricQuality || '').toLowerCase()) || art.fabrics?.[0] || {};
-        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || (idx === 0 ? '100/100 Mulmul' : idx === 1 ? '2.40/20s CF' : '60os Cambryc');
+        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || '';
         
-        // Priority for starting width: fabric's defined width from Fabric Master -> artFab.width -> art.width -> order.width -> default
-        const initialWidth = resolveWidth(artFab.width) ||
-          getFabricDefaultWidth(fabQuality, artFab) ||
-          resolveWidth(fc.width) ||
-          resolveWidth(art.width) ||
-          resolveWidth(order?.width) ||
-          '44"';
+        // Priority for starting width: do NOT default to 44" unless user selected or explicitly specified
+        let initialWidth = '';
+        if (fc._userSelectedWidth) {
+          initialWidth = resolveWidth(fc.width);
+        } else if (resolveWidth(artFab.width)) {
+          initialWidth = resolveWidth(artFab.width);
+        } else if (resolveWidth(fc.width) && resolveWidth(fc.width) !== '44"' && resolveWidth(fc.width) !== '47"') {
+          initialWidth = resolveWidth(fc.width);
+        }
 
         const masterShrink = getFabricMasterShrinkage(fabQuality);
         const shrink = masterShrink;
@@ -1907,7 +1884,23 @@ export default function OrderDetailView({
 
         const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
         const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
-        const finalPcs = !isNaN(parsedPcs) ? parsedPcs : (isMockSample ? (idx === 0 ? 400 : 300) : 0);
+        const finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+
+        // Dyed Rate: do NOT pre-fill dummy 1.5, 2.5, 3.0 unless explicitly edited by user
+        let rawDyed = '';
+        if (fc._userEditedDyed) {
+          rawDyed = fc.dyedRate;
+        } else if (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '' &&
+                   fc.dyedRate !== 1.5 && fc.dyedRate !== '1.5' &&
+                   fc.dyedRate !== 2.5 && fc.dyedRate !== '2.5' &&
+                   fc.dyedRate !== 2.0 && fc.dyedRate !== '2.0' &&
+                   fc.dyedRate !== 3.0 && fc.dyedRate !== '3.0' &&
+                   fc.dyedRate !== 2.25 && fc.dyedRate !== '2.25') {
+          rawDyed = fc.dyedRate;
+        } else if (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' &&
+                   artFab.consumption !== 1.5 && artFab.consumption !== '1.5') {
+          rawDyed = artFab.consumption;
+        }
 
         return {
           key: fc.key || `row_${idx}`,
@@ -1919,13 +1912,15 @@ export default function OrderDetailView({
           fabricQuality: fabQuality,
           source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
           width: initialWidth,
-          colorName: fc.colorName || (isMockSample ? 'Charcoal' : 'Standard'),
-          colorHex: fc.colorHex || (isMockSample ? '#333333' : '#94a3b8'),
-          dyedRate: (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '') ? fc.dyedRate : (idx === 0 ? 1.5 : idx === 1 ? 3.0 : 0.0),
+          colorName: fc.colorName || 'Standard',
+          colorHex: fc.colorHex || '#94a3b8',
+          dyedRate: rawDyed !== '' ? rawDyed : '',
           shrinkPct: shrink,
           bufferPct: buf,
           pcs: finalPcs,
-          locked: fc.locked !== undefined ? !!fc.locked : false
+          locked: fc.locked !== undefined ? !!fc.locked : false,
+          _userSelectedWidth: Boolean(initialWidth),
+          _userEditedDyed: Boolean(rawDyed !== '')
         };
       });
     }
@@ -2017,23 +2012,21 @@ export default function OrderDetailView({
         const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || (fIdx === 0 ? 'Main' : 'Outer'));
         const source = artFab.source || art.sourcing || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
         
-        const initialWidth = resolveWidth(artFab.width) ||
-          getFabricDefaultWidth(fabName, artFab) ||
-          resolveWidth(art.width) ||
-          resolveWidth(order?.width) ||
-          (aIdx === 1 ? '47"' : aIdx === 2 ? '' : '44"');
+        const initialWidth = resolveWidth(artFab.width) || '';
 
         const masterShrink = getFabricMasterShrinkage(fabName);
         const shrinkVal = masterShrink;
         const bufferVal = parseFloat(artFab.bufferPercent || 10);
-        const defaultDyed = artFab.consumption !== undefined ? artFab.consumption : (art.consumption !== undefined ? art.consumption : (isMockSample ? (aIdx === 0 ? 1.5 : aIdx === 1 ? 3.0 : 0.0) : 1.5));
+        const defaultDyed = (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' && artFab.consumption !== 1.5 && artFab.consumption !== '1.5') 
+          ? artFab.consumption 
+          : (art.consumption !== undefined && art.consumption !== null && art.consumption !== '' && art.consumption !== 1.5 && art.consumption !== '1.5' ? art.consumption : '');
 
         // Dupatta might only have 1 color in sample
-        const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || (isMockSample ? 'Charcoal' : 'Standard')] : colors;
+        const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || 'Standard'] : colors;
 
         artColors.forEach((col, cIdx) => {
           const custPcs = getCustomerPcs(artName, col);
-          const pcsVal = custPcs > 0 ? custPcs : (isMockSample ? (cIdx === 0 ? 400 : 300) : 0);
+          const pcsVal = custPcs > 0 ? custPcs : 0;
 
           rows.push({
             key: `${artName}_${fabName}_${role}_${col}_${fIdx}_${cIdx}`,
@@ -2320,7 +2313,7 @@ export default function OrderDetailView({
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
-        return { ...r, width: newWidth === '—' ? '' : newWidth };
+        return { ...r, width: newWidth === '—' ? '' : newWidth, _userSelectedWidth: true };
       }
       return r;
     }));
@@ -2413,7 +2406,7 @@ export default function OrderDetailView({
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
-        return { ...r, dyedRate: num };
+        return { ...r, dyedRate: num, _userEditedDyed: true };
       }
       return r;
     }));
@@ -4191,19 +4184,6 @@ export default function OrderDetailView({
                 </tfoot>
               </table>
             </div>
-
-            {/* Section 8 Intelligent Recommendation */}
-            <div className="p-3 rounded-3 border d-flex align-items-start gap-2.5" style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}>
-              <i className="ti ti-bulb text-success fs-4 mt-0.5"></i>
-              <div>
-                <div className="fw-bold text-success fs-13 mb-1">
-                  Intelligent Procurement &amp; Marker Optimization Recommendation
-                </div>
-                <div className="text-dark small" style={{ fontSize: '12.5px', lineHeight: 1.5 }}>
-                  {rateTotals.recommendation}
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -4353,7 +4333,7 @@ export default function OrderDetailView({
             <i className={activeCategoryObj.icon} style={{ fontSize: '14px' }}></i>
           </div>
           <span className="fw-semibold text-dark" style={{ fontSize: '14.5px' }}>
-            {activeCategoryObj.name} — click one to add and configure it:
+            {activeCategoryObj.name} {(activeCategoryObj?.varieties?.length > 0) ? '— click one to add and configure it:' : ''}
           </span>
         </div>
 
@@ -4399,39 +4379,46 @@ export default function OrderDetailView({
         </div>
 
         {/* 4. Quick Variety Pills — click one to open popover */}
-        <div className="position-relative d-flex flex-wrap" style={{ gap: '10px', marginBottom: '24px' }}>
-          {(activeCategoryObj?.varieties || []).map((v, vIdx) => (
-            <button
-              key={vIdx}
-              type="button"
-              className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill transition-all"
-              style={{
-                fontSize: '12.5px',
-                fontWeight: 500,
-                padding: '7px 16px',
-                backgroundColor: '#ffffff',
-                borderColor: '#c7d2fe',
-                color: '#2e37a4',
-                boxShadow: 'none',
-                borderRadius: '50px',
-                cursor: 'pointer'
-              }}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
-                setPopoverState({
-                  catId: activeCategoryObj?.id || activeCategory,
-                  varName: v.name,
-                  x: rect.left - containerRect.left,
-                  y: rect.bottom - containerRect.top + 6
-                });
-              }}
-              title={`Add ${v.name}`}
-            >
-              <span style={{ color: '#2e37a4', fontWeight: 700 }}>+</span>
-              <span>{v.name}</span>
-            </button>
-          ))}
+        <div className="position-relative d-flex flex-wrap align-items-center" style={{ gap: '10px', marginBottom: '24px' }}>
+          {(activeCategoryObj?.varieties || []).length === 0 ? (
+            <div className="text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '13px' }}>
+              <i className="ti ti-info-circle" style={{ color: '#94a3b8', fontSize: '16px' }}></i>
+              <span>No accessories added in <strong>{activeCategoryObj?.name || activeCategory} Master</strong> yet. Add items in Accessories Master to select them here.</span>
+            </div>
+          ) : (
+            (activeCategoryObj?.varieties || []).map((v, vIdx) => (
+              <button
+                key={vIdx}
+                type="button"
+                className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill transition-all"
+                style={{
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  padding: '7px 16px',
+                  backgroundColor: '#ffffff',
+                  borderColor: '#c7d2fe',
+                  color: '#2e37a4',
+                  boxShadow: 'none',
+                  borderRadius: '50px',
+                  cursor: 'pointer'
+                }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
+                  setPopoverState({
+                    catId: activeCategoryObj?.id || activeCategory,
+                    varName: v.name,
+                    x: rect.left - containerRect.left,
+                    y: rect.bottom - containerRect.top + 6
+                  });
+                }}
+                title={`Add ${v.name}`}
+              >
+                <span style={{ color: '#2e37a4', fontWeight: 700 }}>+</span>
+                <span>{v.name}</span>
+              </button>
+            ))
+          )}
 
           {/* How many to add? Popover */}
           {popoverState && (
@@ -4636,15 +4623,6 @@ export default function OrderDetailView({
           </button>
         </div>
       </div>
-
-      {/* 7 Colorful Accessory PO Generation Buttons matching live ERP & user screenshot */}
-      <AccessoryPOButtonsBar
-        onOpenModal={(catKey) => setActivePOModalCategory(catKey)}
-      />
-
-
-
-
 
       {/* =========================================================================
        * BOTTOM ACTION BUTTONS ROW (No background card, clean direct buttons)

@@ -50,21 +50,10 @@ export default function GRNForm({
     return found ? found.name : (po.vendorId || '');
   };
 
-  // Find eligible POs (exclude POs that already have an existing GRN, unless editing the current GRN)
+  // Find eligible POs: all non-cancelled purchase orders
   const eligiblePOs = (purchaseOrders || []).filter((p) => {
     if (!p) return false;
-    const isCurrentPo = Boolean(grn && (grn.poId === p.id || (grn.linkedPOs && grn.linkedPOs.includes(p.id))));
-    if (isCurrentPo) return true;
-    const hasExistingGrn = (grns || []).some(
-      (g) => g && g.id !== grn?.id && (
-        (g.linkedPOs && g.linkedPOs.includes(p.id)) ||
-        g.poId === p.id ||
-        g.poNumber === p.id ||
-        g.againstPo === p.id
-      )
-    );
-    const poAlreadyReceived = p.status === 'Completed' || p.status === 'Partially Received' || Number(p.receivedQty) > 0;
-    return !hasExistingGrn && !poAlreadyReceived && p.status !== 'Draft' && p.status !== 'Cancelled';
+    return p.status !== 'Cancelled';
   });
 
   // Initialize form state
@@ -72,11 +61,11 @@ export default function GRNForm({
     const isFromPO = Boolean(grn?.poId || (grn?.linkedPOs && grn.linkedPOs.length > 0));
     const defaultPO = isFromPO
       ? eligiblePOs.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)))
-      : null;
+      : (eligiblePOs.length > 0 ? eligiblePOs[0] : null);
 
     const resolvedPoId = defaultPO ? defaultPO.id : (grn?.poId || grn?.linkedPOs?.[0] || '');
-    const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || '');
-    const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : '');
+    const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || (vendors[0]?.id || ''));
+    const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : (vendors[0]?.name || ''));
 
     const defaultDeclared = (grn && grn.totalQty !== undefined && grn.totalQty !== '')
       ? grn.totalQty
@@ -278,7 +267,7 @@ export default function GRNForm({
         const isHeaderActuallySaved = Boolean(
           isExisting &&
           !grn.isNew &&
-          (grn.isHeaderSaved === true || grn.status === 'Header Saved' || (grn.status === 'Completed' || (grn.bales && grn.bales.length > 0)))
+          grn.status === 'Completed'
         );
         if (isHeaderActuallySaved) {
           setIsHeaderEditing(false);
@@ -289,22 +278,35 @@ export default function GRNForm({
     }
   }, [grn, purchaseOrders]);
 
-  // Link to Quality Check and verify if QC has started or taken action (Requirement 21)
-  const linkedQC = (qualityChecks || []).find((q) => q.grnRef === formData.id);
-  const isQcActioned = Boolean(
+  // Link to Quality Check and verify if QC inspection has actually started or taken action
+  const linkedQCs = (qualityChecks || []).filter((q) => q && (q.grnRef === formData.id || q.grnId === formData.id));
+  const linkedQC = linkedQCs[0] || null;
+
+  const isInspectionStarted = Boolean(
     formData.isQcActioned ||
-    (linkedQC && (linkedQC.qcStatus === 'Passed' || linkedQC.qcStatus === 'QC Approved' || linkedQC.qcStatus === 'Approved')) ||
-    (linkedQC && linkedQC.qcStatus && linkedQC.qcStatus !== 'Pending' && linkedQC.qcStatus !== 'Awaiting QC') ||
-    (linkedQC && (linkedQC.startedAt || linkedQC.isStarted || linkedQC.actualWidth || linkedQC.actualFold || (linkedQC.inspectedPieces && linkedQC.inspectedPieces.length > 0))) ||
-    formData.status === 'QC Approved' ||
-    formData.status === 'QC Rejected' ||
-    formData.status === 'QC Passed' ||
-    formData.status === 'Passed' ||
-    formData.status === 'Completed' ||
-    formData.status === 'Pending Admin Approval' ||
-    (formData.status && formData.status.includes('QC'))
+    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(formData.status) ||
+    linkedQCs.some((q) => {
+      const isStatusActioned = Boolean(
+        q.qcStatus &&
+        q.qcStatus !== 'Pending' &&
+        q.qcStatus !== 'Awaiting QC' &&
+        q.qcStatus !== 'Draft'
+      );
+      const isStartedFlag = Boolean(q.startedAt || q.isStarted);
+      const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
+      const hasPieces = Boolean(
+        (Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0) ||
+        (q.pieceInspections && Object.keys(q.pieceInspections).length > 0)
+      );
+      return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
+    })
   );
+
+  const isQcActioned = isInspectionStarted;
   const isLinkedFromPO = Boolean(grn && ((grn.linkedPOs && grn.linkedPOs.length > 0) || grn.poId));
+
+  // Visual save feedback for Section 1 (Receipt details)
+  const [isSectionSaved, setIsSectionSaved] = useState(false);
 
   // Visual save feedback per bale
   const [savedBaleMap, setSavedBaleMap] = useState({});
@@ -372,6 +374,18 @@ export default function GRNForm({
         vendorName: '',
         totalQty: '',
         declaredTotalMeters: 0
+      }));
+      return;
+    }
+
+    if (newPoId === 'PO-DIRECT') {
+      const defaultV = vendors[0] || {};
+      setFormData((prev) => ({
+        ...prev,
+        poId: 'PO-DIRECT',
+        linkedPOs: [],
+        vendorId: prev.vendorId || defaultV.id || 'DIRECT',
+        vendorName: prev.vendorName || defaultV.name || 'Direct Vendor'
       }));
       return;
     }
@@ -596,36 +610,32 @@ export default function GRNForm({
       return;
     }
 
-    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || '';
-    if (!resolvedPoId) {
-      showToast('Please select a Source document (Purchase Order).', 'warning');
-      return;
-    }
-
-    const currentBales = formData.bales || [];
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || (eligiblePOs[0]?.id) || 'PO-DIRECT';
 
     const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
     const firstPoItem = selectedPO?.items?.[0];
     const fabricItem = firstPoItem
       ? firstPoItem.fabricName || firstPoItem.fabricQuality
-      : (formData.fabricName || '');
-    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
-    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
+      : (formData.fabricName || (fabrics[0]?.qualityName || 'Fabric'));
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || 'Natural';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '#ffffff';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
-    const widthVal = firstPoItem?.width || formData.width || '';
-    const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || ''));
-    const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || '';
+    const widthVal = firstPoItem?.width || formData.width || '44';
+    const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
+    const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
+
+    const currentBales = formData.bales || [];
 
     const payload = {
       ...formData,
       poId: resolvedPoId,
-      linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : (resolvedPoId ? [resolvedPoId] : []),
+      linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : (resolvedPoId && resolvedPoId !== 'PO-DIRECT' ? [resolvedPoId] : []),
       vendorId: vId,
       vendorName: vName,
       status: formData.status === 'Completed' ? 'Completed' : 'Header Saved',
       isHeaderSaved: true,
       isNew: false,
-      date: formData.receivedDate,
+      date: formData.receivedDate || new Date().toISOString().split('T')[0],
       fabricName: fabricItem,
       fabricId: fabricIdVal,
       colorName: colorVal,
@@ -645,8 +655,10 @@ export default function GRNForm({
       ...payload
     }));
 
-    // Instantly toggle Section 1 to read-only Summary Card view (Image 1) with Edit button
-    setIsHeaderEditing(false);
+    setIsSectionSaved(true);
+    setTimeout(() => {
+      setIsSectionSaved(false);
+    }, 3000);
 
     if (onSaveGRN) {
       try {
@@ -660,25 +672,57 @@ export default function GRNForm({
 
   // Save all bales draft progress (including any individual bale saves)
   const handleSaveAllBales = (specificBaleIdx = null) => {
-    if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
-      showToast('Please select a Source document (Purchase Order) before saving.', 'warning');
-      return;
-    }
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || (eligiblePOs[0]?.id) || 'PO-DIRECT';
 
-    const selectedPO = purchaseOrders.find((p) => p.id === formData.poId);
+    const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
     const firstPoItem = selectedPO?.items?.[0];
     const fabricItem = firstPoItem
       ? firstPoItem.fabricName || firstPoItem.fabricQuality
-      : (formData.fabricName || '');
-    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
-    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
+      : (formData.fabricName || (fabrics[0]?.qualityName || 'Fabric'));
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || 'Natural';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '#ffffff';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
-    const widthVal = firstPoItem?.width || formData.width || '';
+    const widthVal = firstPoItem?.width || formData.width || '44';
+    const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
+    const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
+
+    // Normalize bales so every bale has updated totalLength and clean piece entries
+    const normalizedBales = (formData.bales || []).map((b, idx) => {
+      const rawPieces = b.pieces || [];
+      const normPieces = rawPieces.map((p, pIdx) => {
+        if (typeof p === 'object' && p !== null) {
+          return {
+            pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
+            length: p.length !== undefined && p.length !== null ? p.length : ''
+          };
+        }
+        return {
+          pieceNo: `Pc ${pIdx + 1}`,
+          length: p !== undefined && p !== null ? p : ''
+        };
+      });
+      const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+      return {
+        ...b,
+        baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
+        pieces: normPieces,
+        totalLength: bTotal,
+        piecesCount: b.piecesCount !== undefined && b.piecesCount !== '' ? String(b.piecesCount) : String(normPieces.length)
+      };
+    });
+
+    const liveTotalMeters = Math.round(
+      normalizedBales.reduce((sum, b) => sum + (Number(b.totalLength) || 0), 0) * 100
+    ) / 100;
 
     const payload = {
       ...formData,
-      status: 'Bale Entry in Progress',
-      date: formData.receivedDate,
+      poId: resolvedPoId,
+      linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : (resolvedPoId && resolvedPoId !== 'PO-DIRECT' ? [resolvedPoId] : []),
+      vendorId: vId,
+      vendorName: vName,
+      status: formData.status === 'Completed' ? 'Completed' : 'Bale Entry in Progress',
+      date: formData.receivedDate || new Date().toISOString().split('T')[0],
       fabricName: fabricItem,
       fabricId: fabricIdVal,
       colorName: colorVal,
@@ -688,31 +732,42 @@ export default function GRNForm({
       totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
-      totalMetersEntered
+      totalMetersEntered: liveTotalMeters,
+      bales: normalizedBales
     };
 
+    setFormData((prev) => ({
+      ...prev,
+      ...payload
+    }));
+
     if (onSaveGRN) {
-      onSaveGRN(payload, false);
-      if (specificBaleIdx !== null && specificBaleIdx !== undefined) {
-        const targetBale = formData.bales[specificBaleIdx];
-        const bNo = targetBale?.baleNo || (specificBaleIdx + 1);
-        const pLen = (targetBale?.pieces || []).length;
-        const bTot = targetBale?.totalLength || 0;
-        setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
-        showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
-        setTimeout(() => {
-          setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: false }));
-        }, 3000);
-      } else {
-        const totalCount = (formData.bales || []).length;
-        const configuredCount = (formData.bales || []).filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
-        showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${totalMetersEntered}m entered)`, 'success');
+      try {
+        onSaveGRN(payload, false);
+      } catch (err) {
+        console.warn('Error saving GRN bale record:', err);
       }
+    }
+
+    if (specificBaleIdx !== null && specificBaleIdx !== undefined) {
+      const targetBale = normalizedBales[specificBaleIdx] || formData.bales[specificBaleIdx];
+      const bNo = targetBale?.baleNo || (specificBaleIdx + 1);
+      const pLen = (targetBale?.pieces || []).length;
+      const bTot = targetBale?.totalLength || 0;
+      setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
+      showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
+      setTimeout(() => {
+        setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: false }));
+      }, 3000);
+    } else {
+      const totalCount = normalizedBales.length;
+      const configuredCount = normalizedBales.filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
+      showToast(`All ${totalCount} Bales saved successfully! (${configuredCount} configured, ${liveTotalMeters}m entered)`, 'success');
     }
   };
 
   // Keep alias for backward-compatible call sites
-  const handleSaveSingleBale = handleSaveAllBales;
+  const handleSaveSingleBale = (bIdx) => handleSaveAllBales(bIdx);
 
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
@@ -828,7 +883,7 @@ export default function GRNForm({
       </div>
 
       {/* QC ACTIONED LOCK BANNER */}
-      {isQcActioned && (
+      {isQcActioned ? (
         <div className="alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark">
           <i className="ti ti-lock fs-24 text-warning"></i>
           <div className="flex-grow-1">
@@ -843,7 +898,17 @@ export default function GRNForm({
             Locked (QC Processed)
           </span>
         </div>
-      )}
+      ) : (formData.status === 'Completed' || formData.isHeaderSaved) ? (
+        <div className="alert alert-info border border-info border-opacity-25 d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-2.5 bg-info-subtle text-dark">
+          <i className="ti ti-info-circle fs-20 text-info"></i>
+          <div className="flex-grow-1 fs-13">
+            <span className="fw-semibold">Shipment Inwarded:</span> You can edit this GRN record and container bales anytime <strong>until the inspection starts</strong>.
+          </div>
+          <span className="badge bg-white text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold">
+            Editable (Awaiting QC)
+          </span>
+        </div>
+      ) : null}
 
       {/* SECTION 1: RECEIPT DETAILS */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
@@ -1022,6 +1087,7 @@ export default function GRNForm({
                     onChange={(e) => handlePOChange(e.target.value)}
                   >
                     <option value="">Select Source Document (PO)...</option>
+                    <option value="PO-DIRECT">Direct Inward (Without PO)</option>
                     {eligiblePOs.map((po) => {
                       const vName = getPoVendorName(po);
                       return (
@@ -1258,21 +1324,24 @@ export default function GRNForm({
 
               <button
                 type="button"
-                className="btn btn-white border d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-medium fs-13 shadow-sm text-dark"
+                className={`btn d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-medium fs-13 shadow-sm ${
+                  isSectionSaved ? 'btn-success text-white' : 'btn-white border text-dark'
+                }`}
                 style={{
                   height: '40px',
-                  borderColor: '#cbd5e1',
+                  borderColor: isSectionSaved ? '#10b981' : '#cbd5e1',
                   borderRadius: '8px',
-                  backgroundColor: isQcActioned ? '#f1f5f9' : '#ffffff',
+                  backgroundColor: isQcActioned ? '#f1f5f9' : (isSectionSaved ? '#10b981' : '#ffffff'),
                   cursor: isQcActioned ? 'not-allowed' : 'pointer',
-                  opacity: isQcActioned ? 0.6 : 1
+                  opacity: isQcActioned ? 0.6 : 1,
+                  transition: 'all 0.2s ease-in-out'
                 }}
                 disabled={isQcActioned}
                 onClick={handleSaveHeaderOnly}
                 title={isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header'}
               >
-                <i className="ti ti-device-floppy fs-15" style={{ color: isQcActioned ? '#94a3b8' : '#5b47fb' }}></i>
-                <span>Save This Section</span>
+                <i className={`ti ${isSectionSaved ? 'ti-check' : 'ti-device-floppy'} fs-15`} style={{ color: isSectionSaved ? '#ffffff' : (isQcActioned ? '#94a3b8' : '#5b47fb') }}></i>
+                <span>{isSectionSaved ? 'Section Saved' : 'Save This Section'}</span>
               </button>
             </div>
 

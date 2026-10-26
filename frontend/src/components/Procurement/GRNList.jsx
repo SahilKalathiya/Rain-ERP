@@ -4,7 +4,7 @@ import React, { useState } from 'react';
  * GRNList - 5.0 Goods Receipt Note Management List
  * Column-wise filtering, status tracking, Draft resume support, and view/edit actions.
  */
-export default function GRNList({ grns = [], onNewGRN, onSelectGRN }) {
+export default function GRNList({ grns = [], onNewGRN, onSelectGRN, onEditGRN, qualityChecks = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'completed', 'drafts'
 
@@ -51,6 +51,31 @@ function parseDateForSort(d, id) {
   const timestamp = Date.parse(str);
   return isNaN(timestamp) ? 0 : timestamp;
 }
+
+  // Check if quality inspection has actually started or been completed for a GRN
+  const isRowInspectionStarted = (item) => {
+    if (!item) return false;
+    if (item.isQcActioned) return true;
+    if (['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(item.status)) {
+      return true;
+    }
+    const itemQcs = (qualityChecks || []).filter((q) => q && (q.grnRef === item.id || q.grnId === item.id));
+    return itemQcs.some((q) => {
+      const isStatusActioned = Boolean(
+        q.qcStatus &&
+        q.qcStatus !== 'Pending' &&
+        q.qcStatus !== 'Awaiting QC' &&
+        q.qcStatus !== 'Draft'
+      );
+      const isStartedFlag = Boolean(q.startedAt || q.isStarted);
+      const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
+      const hasPieces = Boolean(
+        (Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0) ||
+        (q.pieceInspections && Object.keys(q.pieceInspections).length > 0)
+      );
+      return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
+    });
+  };
 
   const filtered = (grns || []).filter((g) => {
     if (!g) return false;
@@ -204,7 +229,7 @@ function parseDateForSort(d, id) {
                 <th className="py-3" style={{ minWidth: '120px' }}>RECEIVED</th>
                 <th className="py-3 text-end" style={{ minWidth: '120px' }}>TOTAL QTY</th>
                 <th className="py-3 text-center" style={{ minWidth: '130px' }}>STATUS</th>
-                <th className="pe-4 py-3 text-end" style={{ width: '50px' }}></th>
+                <th className="pe-4 py-3 text-end" style={{ width: '130px' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -275,9 +300,43 @@ function parseDateForSort(d, id) {
                         </span>
                       </td>
 
-                      {/* Chevron */}
-                      <td className="pe-4 py-3 text-end text-muted">
-                        <i className="ti ti-chevron-right fs-15 text-secondary"></i>
+                      {/* Actions */}
+                      <td className="pe-4 py-3 text-end text-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {!isRowInspectionStarted(g) ? (
+                          <div className="d-inline-flex align-items-center gap-1.5">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-white border px-2.5 py-1 fs-12 fw-semibold rounded-2 text-dark shadow-xs d-inline-flex align-items-center gap-1"
+                              onClick={() => onEditGRN ? onEditGRN(g) : (onSelectGRN && onSelectGRN(g))}
+                              title="Edit GRN record"
+                            >
+                              <i className="ti ti-edit text-primary fs-13"></i>
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-link text-muted p-1"
+                              onClick={() => onSelectGRN && onSelectGRN(g)}
+                              title="View GRN Details"
+                            >
+                              <i className="ti ti-chevron-right fs-15 text-secondary"></i>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="d-inline-flex align-items-center gap-1.5">
+                            <span className="badge bg-light text-muted border px-2 py-0.5 fs-10 rounded-pill" title="Locked: QC Inspection started or actioned">
+                              <i className="ti ti-lock me-1 text-warning"></i> Locked
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-link text-muted p-1"
+                              onClick={() => onSelectGRN && onSelectGRN(g)}
+                              title="View GRN Details"
+                            >
+                              <i className="ti ti-chevron-right fs-15 text-secondary"></i>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

@@ -412,6 +412,12 @@ const saveTransporter = async (req, res) => {
   }
 };
 
+const sanitizeDate = (d) => {
+  if (!d || d === '' || d === 'null' || d === 'undefined') return null;
+  if (typeof d === 'string' && d.includes('T')) return d.split('T')[0];
+  return d;
+};
+
 const saveGRN = async (req, res) => {
   const conn = await pool.getConnection();
   try {
@@ -420,17 +426,26 @@ const saveGRN = async (req, res) => {
     const [existing] = await conn.query('SELECT id FROM goods_receipt_notes WHERE id = ?', [g.id]);
     const linkedPosJson = JSON.stringify(g.linkedPOs || []);
 
+    const grnDate = sanitizeDate(g.date) || new Date().toISOString().split('T')[0];
+    const vendorInvDate = sanitizeDate(g.vendorInvoiceDate);
+    const vendorChallanDate = sanitizeDate(g.vendorChallanDate);
+    const vId = g.vendorId || 'DIRECT';
+    const vName = g.vendorName || 'Direct Vendor';
+    const tBales = parseInt(g.totalBales, 10) || (g.bales ? g.bales.length : 0);
+    const declMeters = parseFloat(g.declaredTotalMeters || g.totalQty) || 0;
+    const totEntered = parseFloat(g.totalMetersEntered) || 0;
+
     if (existing.length > 0) {
       await conn.query(
         'UPDATE goods_receipt_notes SET date=?, vendor_id=?, vendor_name=?, transporter_id=?, transporter_name=?, vendor_invoice_no=?, vendor_invoice_date=?, vendor_challan_no=?, vendor_challan_date=?, total_bales=?, declared_total_meters=?, total_meters_entered=?, status=?, admin_approval_needed=?, admin_justification=?, linked_pos=? WHERE id=?',
-        [g.date, g.vendorId, g.vendorName, g.transporterId, g.transporterName, g.vendorInvoiceNo, g.vendorInvoiceDate, g.vendorChallanNo, g.vendorChallanDate, g.totalBales, g.declaredTotalMeters, g.totalMetersEntered || 0, g.status, g.adminApprovalNeeded ? 1 : 0, g.adminJustification || '', linkedPosJson, g.id]
+        [grnDate, vId, vName, g.transporterId || null, g.transporterName || null, g.vendorInvoiceNo || null, vendorInvDate, g.vendorChallanNo || null, vendorChallanDate, tBales, declMeters, totEntered, g.status || 'Bale Entry in Progress', g.adminApprovalNeeded ? 1 : 0, g.adminJustification || '', linkedPosJson, g.id]
       );
       await conn.query('DELETE FROM grn_pieces WHERE grn_id = ?', [g.id]);
       await conn.query('DELETE FROM grn_bales WHERE grn_id = ?', [g.id]);
     } else {
       await conn.query(
         'INSERT INTO goods_receipt_notes (id, date, vendor_id, vendor_name, transporter_id, transporter_name, vendor_invoice_no, vendor_invoice_date, vendor_challan_no, vendor_challan_date, total_bales, declared_total_meters, total_meters_entered, status, admin_approval_needed, admin_justification, linked_pos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [g.id, g.date, g.vendorId, g.vendorName, g.transporterId, g.transporterName, g.vendorInvoiceNo, g.vendorInvoiceDate, g.vendorChallanNo, g.vendorChallanDate, g.totalBales, g.declaredTotalMeters, g.totalMetersEntered || 0, g.status || 'Completed', g.adminApprovalNeeded ? 1 : 0, g.adminJustification || '', linkedPosJson]
+        [g.id, grnDate, vId, vName, g.transporterId || null, g.transporterName || null, g.vendorInvoiceNo || null, vendorInvDate, g.vendorChallanNo || null, vendorChallanDate, tBales, declMeters, totEntered, g.status || 'Bale Entry in Progress', g.adminApprovalNeeded ? 1 : 0, g.adminJustification || '', linkedPosJson]
       );
     }
 

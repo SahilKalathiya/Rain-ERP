@@ -256,7 +256,7 @@ function SearchableColorInput({
                             backgroundColor: col.hex,
                             border:
                               col.hex?.toLowerCase() === '#ffffff' ||
-                              col.hex?.toLowerCase() === '#fffff0'
+                                col.hex?.toLowerCase() === '#fffff0'
                                 ? '1px solid #cbd5e1'
                                 : '1px solid rgba(0,0,0,0.1)',
                             display: 'inline-block',
@@ -685,44 +685,43 @@ export default function PurchaseOrderForm({
   }));
 
   // Requirement 15: Once a Purchase Order is sent to the vendor and its GRN process has started, the Purchase Order should no longer be editable.
-  const activePoId = po?.id || formData?.id;
-  const currentStatus = String(po?.status || formData?.status || '').trim();
-  const isSentOrBeyond =
-    currentStatus === 'Sent' ||
-    currentStatus === 'Sent to Vendor' ||
-    currentStatus === 'Partially Received' ||
-    currentStatus === 'Completed';
+  const poNumbersToCheck = [
+    po?.id,
+    po?.poNumber,
+    po?.po_number,
+    formData?.id
+  ].filter(Boolean);
 
-  const linkedGrn = activePoId
-    ? (grns || []).find((g) =>
-        g && (
-          (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(activePoId)) ||
-          g.poId === activePoId ||
-          g.poNumber === activePoId ||
-          g.againstPo === activePoId
-        )
-      )
-    : null;
+  const currentStatus = String(po?.status || formData?.status || '').trim();
+  const isSentOrBeyond = /sent|partially|received|completed/i.test(currentStatus);
+
+  const isGrnLinkedToPo = (g) => {
+    if (!g) return false;
+    return poNumbersToCheck.some((pid) =>
+      (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(pid)) ||
+      g.poId === pid ||
+      g.poNumber === pid ||
+      g.againstPo === pid ||
+      g.poRef === pid ||
+      g.purchaseOrderId === pid ||
+      g.purchaseOrderNumber === pid
+    );
+  };
+
+  const linkedGrn = poNumbersToCheck.length > 0 ? (grns || []).find(isGrnLinkedToPo) : null;
+
+  // Requirement 17: Complete GRN & QC History after GRN starts
+  const allPoGrns = poNumbersToCheck.length > 0 ? (grns || []).filter(isGrnLinkedToPo) : [];
 
   const hasGrnStarted = Boolean(
     linkedGrn ||
-    currentStatus === 'Partially Received' ||
-    currentStatus === 'Completed' ||
+    allPoGrns.length > 0 ||
+    /partially|received|completed/i.test(currentStatus) ||
     (Number(po?.receivedQty) > 0) ||
     (Number(formData?.receivedQty) > 0)
   );
 
-  const isPoLocked = isSentOrBeyond && hasGrnStarted;
-
-  // Requirement 17: Complete GRN & QC History after GRN starts
-  const allPoGrns = (grns || []).filter((g) =>
-    g && (
-      (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(activePoId)) ||
-      g.poId === activePoId ||
-      g.poNumber === activePoId ||
-      g.againstPo === activePoId
-    )
-  );
+  const isPoLocked = Boolean(hasGrnStarted || (isSentOrBeyond && hasGrnStarted));
 
   const totalOrderedMtrs = (formData.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
 
@@ -1189,14 +1188,14 @@ export default function PurchaseOrderForm({
               {isExisting && (
                 <span
                   className={`badge px-2 py-1 rounded-pill fs-12 fw-semibold ${formData.status === 'Sent'
-                      ? 'bg-primary text-white'
-                      : formData.status === 'Completed'
-                        ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                        : formData.status === 'Partially Received'
-                          ? 'bg-info-subtle text-info border border-info border-opacity-25'
-                          : formData.status === 'Cancelled'
-                            ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                            : 'bg-secondary-subtle text-secondary border'
+                    ? 'bg-primary text-white'
+                    : formData.status === 'Completed'
+                      ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                      : formData.status === 'Partially Received'
+                        ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                        : formData.status === 'Cancelled'
+                          ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                          : 'bg-secondary-subtle text-secondary border'
                     }`}
                 >
                   {formData.status === 'Sent'
@@ -1283,27 +1282,6 @@ export default function PurchaseOrderForm({
         )}
       </div>
 
-      {/* Locked Notice Banner (Requirement 15) */}
-      {isPoLocked && (
-        <div className="alert alert-warning d-flex align-items-center justify-content-between gap-3 rounded-3 py-2.5 px-3 mb-3 fs-13 border-warning border-opacity-50 shadow-sm">
-          <div className="d-flex align-items-center gap-2">
-            <i className="ti ti-lock fs-20 text-warning flex-shrink-0"></i>
-            <div>
-              <span className="fw-bold">Purchase Order Locked (Non-Editable):</span> This Purchase Order has been sent to the vendor and its GRN inward delivery process has already started ({linkedGrn ? `linked to GRN: ${linkedGrn.id}` : formData.status}). As per procurement control rules, further edits to this Purchase Order are locked.
-            </div>
-          </div>
-          {linkedGrn && onViewGRN && (
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-dark d-flex align-items-center gap-1 text-nowrap rounded-2 fs-12 fw-medium"
-              onClick={() => onViewGRN(linkedGrn)}
-            >
-              <i className="ti ti-external-link fs-13"></i>
-              <span>View GRN ({linkedGrn.id})</span>
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Cancellation Notice Banner */}
       {formData.status === 'Cancelled' && (
@@ -1311,6 +1289,19 @@ export default function PurchaseOrderForm({
           <i className="ti ti-ban fs-18 text-danger"></i>
           <div>
             <span className="fw-bold">Purchase Order Cancelled:</span> This purchase order has been marked as cancelled. It is closed and cannot be modified or processed for inward GRN deliveries.
+          </div>
+        </div>
+      )}
+
+      {/* Requirement 15: Locked Notice Banner */}
+      {isPoLocked && (
+        <div className="alert alert-warning border border-warning border-opacity-50 rounded-3 py-2.5 px-3 mb-3 fs-13 d-flex align-items-center gap-2.5 shadow-xs bg-warning-subtle text-dark">
+          <i className="ti ti-lock fs-18 text-warning flex-shrink-0"></i>
+          <div>
+            <strong className="text-dark">Purchase Order Locked (Non-Editable):</strong>{' '}
+            <span className="text-secondary">
+              This Purchase Order is sent to vendor and its GRN process has started (GRN: <strong>{linkedGrn?.id || allPoGrns[0]?.id || 'In progress'}</strong>). In accordance with system Requirement 15, this record is locked in read-only View Mode and can no longer be edited.
+            </span>
           </div>
         </div>
       )}
@@ -1532,275 +1523,6 @@ export default function PurchaseOrderForm({
         </div>
       </div>
 
-      {/* SECTION 1.5: GRN INWARD & QC COMPLETE HISTORY (Requirement 17) */}
-      {hasGrnStarted && (
-        <div
-          className="card mb-4 shadow-sm border-0"
-          style={{
-            borderRadius: '12px',
-            background: 'linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Card Header with Icon, Title, and Completion Status Badge */}
-          <div
-            className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-4 py-3 border-bottom"
-            style={{ backgroundColor: '#f8fafc' }}
-          >
-            <div className="d-flex align-items-center gap-2.5">
-              <div
-                className="d-inline-flex align-items-center justify-content-center rounded-3 shadow-xs"
-                style={{ width: '32px', height: '32px', backgroundColor: '#eef2ff', color: '#4f46e5' }}
-              >
-                <i className="ti ti-history fs-16"></i>
-              </div>
-              <div>
-                <h6 className="fw-bold text-dark mb-0 fs-14 text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                  GRN Inward &amp; Quality Inspection History
-                </h6>
-                <span className="text-muted fs-11">
-                  Complete audit trail of received fabric quantities, inward GRN shipments, and Quality Check inspections for this Purchase Order
-                </span>
-              </div>
-            </div>
-            <span className={`badge px-2.5 py-1.5 rounded-pill fs-12 fw-semibold d-inline-flex align-items-center gap-1.5 ${qcCompletionBadgeClass}`}>
-              <i className={qcCompletionStatus.includes('100% Completed') ? 'ti ti-circle-check fs-13' : 'ti ti-clock fs-13'}></i>
-              <span>{qcCompletionStatus}</span>
-            </span>
-          </div>
-
-          {/* 4 Metric Summary KPI Cards (The 4 exact required metrics) */}
-          <div className="p-4">
-            <div className="row g-3 mb-4">
-              {/* 1. Quantity received */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border"
-                  style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-1">
-                    <span className="text-secondary fs-12 fw-semibold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      Quantity Received
-                    </span>
-                    <span className="badge bg-success-subtle text-success fs-10 px-1.5 py-0.5 rounded-pill fw-medium">
-                      {fulfillmentPercent}% fulfilled
-                    </span>
-                  </div>
-                  <div className="fs-22 fw-bold text-success font-monospace mb-1">
-                    {totalQuantityReceived.toLocaleString()} <span className="fs-13 fw-normal text-muted">Mtrs</span>
-                  </div>
-                  <div className="text-muted fs-11">
-                    Ordered: <strong className="text-dark">{totalOrderedMtrs.toLocaleString()}m</strong>
-                    {pendingQuantityToReceive > 0 ? (
-                      <span className="text-danger ms-1">• {pendingQuantityToReceive.toLocaleString()}m pending</span>
-                    ) : (
-                      <span className="text-success ms-1">• Fully Received</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Number of GRNs created */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border"
-                  style={{ backgroundColor: '#eef2ff', borderColor: '#c7d2fe' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-1">
-                    <span className="text-secondary fs-12 fw-semibold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      Number of GRNs Created
-                    </span>
-                    <i className="ti ti-package fs-16 text-primary"></i>
-                  </div>
-                  <div className="fs-22 fw-bold text-primary font-monospace mb-1">
-                    {numGrnsCreated} <span className="fs-13 fw-normal text-muted">{numGrnsCreated === 1 ? 'GRN' : 'GRNs'}</span>
-                  </div>
-                  <div className="text-muted fs-11 text-truncate">
-                    {numGrnsCreated > 0
-                      ? allPoGrns.map((g) => g.id).join(', ')
-                      : 'No GRN shipments created'}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Quantity pending in QC */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border"
-                  style={{
-                    backgroundColor: quantityPendingInQC > 0 ? '#fffbeb' : '#f8fafc',
-                    borderColor: quantityPendingInQC > 0 ? '#fde68a' : '#e2e8f0'
-                  }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-1">
-                    <span className="text-secondary fs-12 fw-semibold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      Quantity Pending in QC
-                    </span>
-                    <i className={`ti ti-flask fs-16 ${quantityPendingInQC > 0 ? 'text-warning' : 'text-muted'}`}></i>
-                  </div>
-                  <div className={`fs-22 fw-bold font-monospace mb-1 ${quantityPendingInQC > 0 ? 'text-warning-emphasis' : 'text-dark'}`}>
-                    {quantityPendingInQC.toLocaleString()} <span className="fs-13 fw-normal text-muted">Mtrs</span>
-                  </div>
-                  <div className="text-muted fs-11">
-                    {quantityPendingInQC > 0 ? (
-                      <span className="text-warning-emphasis fw-medium">Awaiting Quality Check inspection</span>
-                    ) : (
-                      <span className="text-success fw-medium">0m pending — All received stock inspected</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. QC completion status */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border"
-                  style={{
-                    backgroundColor: qcCompletionStatus.includes('100% Completed') ? '#f0fdf4' : '#faf5ff',
-                    borderColor: qcCompletionStatus.includes('100% Completed') ? '#bbf7d0' : '#e9d5ff'
-                  }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-1">
-                    <span className="text-secondary fs-12 fw-semibold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      QC Completion Status
-                    </span>
-                    <i className={`ti ti-circle-check fs-16 ${qcCompletionStatus.includes('100% Completed') ? 'text-success' : 'text-info'}`}></i>
-                  </div>
-                  <div className="fs-13 fw-bold text-dark mb-1 d-flex align-items-center gap-1.5 pt-1">
-                    <span className={`badge px-2 py-1 rounded-pill fs-11 fw-semibold ${qcCompletionBadgeClass}`}>
-                      {qcCompletionStatus}
-                    </span>
-                  </div>
-                  <div className="text-muted fs-11">
-                    Inspected &amp; Passed: <strong className="text-success">{quantityPassedQC.toLocaleString()}m</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Inward Shipments & Inspection Breakdown Table */}
-            {allPoGrns.length > 0 && (
-              <div className="border rounded-3 overflow-hidden bg-white shadow-xs">
-                <div className="px-3 py-2 bg-light border-bottom d-flex align-items-center justify-content-between">
-                  <span className="fs-12 fw-bold text-secondary text-uppercase" style={{ letterSpacing: '0.03em' }}>
-                    Linked Inward Shipments &amp; QC Breakdown
-                  </span>
-                  <span className="fs-11 text-muted">
-                    {allPoGrns.length} {allPoGrns.length === 1 ? 'GRN Shipment' : 'GRN Shipments'}
-                  </span>
-                </div>
-                <div className="table-responsive mb-0">
-                  <table className="table table-hover align-middle mb-0 fs-12">
-                    <thead className="table-light text-secondary">
-                      <tr>
-                        <th style={{ padding: '8px 12px' }}>GRN No.</th>
-                        <th style={{ padding: '8px 12px' }}>Inward Date</th>
-                        <th style={{ padding: '8px 12px' }}>Vendor Challan</th>
-                        <th style={{ padding: '8px 12px' }}>Bales</th>
-                        <th style={{ padding: '8px 12px' }} className="text-end">Meters Inwarded</th>
-                        <th style={{ padding: '8px 12px' }}>QC Reference</th>
-                        <th style={{ padding: '8px 12px' }}>QC Status</th>
-                        <th style={{ padding: '8px 12px' }} className="text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allPoGrns.map((g) => {
-                        const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
-                        const gQc = (qualityChecks || []).find(
-                          (q) => q && (
-                            q.grnRef === g.id ||
-                            (Array.isArray(q.linkedGRNs) && q.linkedGRNs.includes(g.id)) ||
-                            q.id === g.qcId ||
-                            q.grnId === g.id
-                          )
-                        );
-                        const isQcDone = gQc && (
-                          ['Passed', 'Passed with Deviation', 'Rejected', 'Approved'].includes(gQc.qcStatus) ||
-                          ['Passed', 'Passed with Deviation', 'Rejected', 'Approved'].includes(gQc.status) ||
-                          Boolean(gQc.adminDecision)
-                        );
-                        const qcStatusLabel = gQc?.qcStatus || (isQcDone ? 'Passed' : 'Pending QC');
-
-                        return (
-                          <tr key={g.id}>
-                            <td className="fw-bold font-monospace text-primary">
-                              {g.id}
-                            </td>
-                            <td>
-                              {g.date || g.receivedDate ? (typeof (g.date || g.receivedDate) === 'string' && (g.date || g.receivedDate).includes('T') ? (g.date || g.receivedDate).split('T')[0] : String(g.date || g.receivedDate)) : '-'}
-                            </td>
-                            <td>
-                              <span className="text-dark">{g.vendorChallanNo || g.challan || '-'}</span>
-                              {g.vendorInvoiceNo && <span className="text-muted fs-11 d-block">Inv: {g.vendorInvoiceNo}</span>}
-                            </td>
-                            <td>
-                              <span className="badge bg-light text-dark border">
-                                {g.totalBales || (g.bales ? g.bales.length : 0)} Bales
-                              </span>
-                            </td>
-                            <td className="text-end fw-bold text-dark font-monospace">
-                              {gMeters.toLocaleString()} Mtrs
-                            </td>
-                            <td>
-                              {gQc ? (
-                                <span className="font-monospace text-dark fw-medium">{gQc.id}</span>
-                              ) : (
-                                <span className="text-muted fst-italic fs-11">QC Queued</span>
-                              )}
-                            </td>
-                            <td>
-                              <span
-                                className={`badge px-2 py-1 rounded-pill fw-semibold ${
-                                  qcStatusLabel === 'Passed'
-                                    ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                                    : qcStatusLabel === 'Rejected'
-                                    ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                                    : qcStatusLabel === 'Passed with Deviation'
-                                    ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
-                                    : 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-50'
-                                }`}
-                              >
-                                {qcStatusLabel}
-                              </span>
-                            </td>
-                            <td className="text-center">
-                              <div className="d-inline-flex align-items-center gap-1">
-                                {onViewGRN && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-outline-primary px-2 py-0.5 rounded fs-11 d-inline-flex align-items-center gap-1"
-                                    onClick={() => onViewGRN(g)}
-                                    title="View Inward Delivery GRN Record"
-                                  >
-                                    <i className="ti ti-eye fs-11"></i>
-                                    <span>GRN</span>
-                                  </button>
-                                )}
-                                {gQc && onViewQC && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-outline-info px-2 py-0.5 rounded fs-11 d-inline-flex align-items-center gap-1"
-                                    onClick={() => onViewQC(gQc)}
-                                    title="View Quality Check Record"
-                                  >
-                                    <i className="ti ti-flask fs-11"></i>
-                                    <span>QC</span>
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* SECTION 2: Fabric Line Items (FULL BORDERED GRID - Image 3 Style) */}
       <div className="mb-4">

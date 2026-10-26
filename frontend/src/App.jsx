@@ -29,7 +29,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem('erp_user');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) { }
     return {
       name: 'Saksham Garg',
       role: 'Procurement & Quality Manager',
@@ -52,7 +52,7 @@ export default function App() {
     try {
       const s = sessionStorage.getItem('erp_route_extra_data');
       if (s) return JSON.parse(s);
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -82,7 +82,7 @@ export default function App() {
     setRouteExtraData(null);
     try {
       sessionStorage.removeItem('erp_route_extra_data');
-    } catch (e) {}
+    } catch (e) { }
     setSidebarClickCount((prev) => prev + 1);
     if (typeof window !== 'undefined' && window.history?.pushState) {
       window.history.pushState(null, '', `/react${route}`);
@@ -99,7 +99,7 @@ export default function App() {
       } else {
         sessionStorage.removeItem('erp_route_extra_data');
       }
-    } catch (e) {}
+    } catch (e) { }
     if (typeof window !== 'undefined' && window.history?.pushState) {
       window.history.pushState(null, '', `/react${route}`);
     }
@@ -206,7 +206,7 @@ export default function App() {
       localStorage.removeItem('erp_auth_status');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('auth');
-    } catch (e) {}
+    } catch (e) { }
     setIsAuthenticated(false);
   };
 
@@ -220,7 +220,7 @@ export default function App() {
             if (user) {
               localStorage.setItem('erp_user', JSON.stringify(user));
             }
-          } catch (e) {}
+          } catch (e) { }
           if (user) setCurrentUser(user);
           setIsAuthenticated(true);
           setCurrentRoute('/dashboard');

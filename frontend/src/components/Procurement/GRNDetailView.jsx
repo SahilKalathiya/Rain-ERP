@@ -133,21 +133,20 @@ export default function GRNDetailView({
     ? `Bale entries total (${baleMetersEntered}m) does not match total quantity (${declaredTotalQty}m)`
     : '';
 
-  // Requirement 21 & Header Lock: Once QC starts, passes, or is actioned, both bale entries and receipt details are locked / non-editable.
+  // Requirement 21 & Header Lock: Only once QC inspection actually starts or is actioned are both bale entries and receipt details locked.
   const isQcPassedOrApproved = Boolean(
     grn.status === 'QC Approved' ||
     grn.status === 'QC Passed' ||
-    grn.status === 'Passed' ||
-    grn.status === 'Completed' ||
     (qcRecs.length > 0 && qcRecs.every((q) => q.qcStatus === 'Passed' || q.qcStatus === 'QC Approved' || q.qcStatus === 'Approved'))
   );
 
   const isQcStarted = Boolean(
     isQcPassedOrApproved ||
     grn.isQcActioned ||
-    (qcRecs.some((q) => q.qcStatus && q.qcStatus !== 'Pending' && q.qcStatus !== 'Awaiting QC')) ||
-    (qcRecs.some((q) => q.startedAt || q.isStarted || q.actualWidth || q.actualFold || (q.inspectedPieces && q.inspectedPieces.length > 0))) ||
+    (qcRecs.some((q) => q.qcStatus && q.qcStatus !== 'Pending' && q.qcStatus !== 'Awaiting QC' && q.qcStatus !== 'Draft')) ||
+    (qcRecs.some((q) => q.startedAt || q.isStarted || q.actualWidth || q.actualFold || (q.inspectedPieces && q.inspectedPieces.length > 0) || (q.pieceInspections && Object.keys(q.pieceInspections).length > 0))) ||
     grn.status === 'QC Rejected' ||
+    grn.status === 'QC In Progress' ||
     grn.status === 'Pending Admin Approval' ||
     (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC'))
   );
@@ -381,19 +380,41 @@ export default function GRNDetailView({
               <span>{grn.id}</span>
               <span
                 className={`badge px-2.5 py-1 fs-11 rounded-pill ${
-                  grn.status === 'Completed' || grn.status === 'QC Approved'
+                  grn.status === 'QC Approved'
                     ? 'bg-success-subtle text-success border border-success border-opacity-25'
                     : grn.status === 'QC Rejected'
                     ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                    : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                    : grn.status === 'Completed'
+                    ? 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                    : 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
                 }`}
               >
-                {grn.status || 'Completed'}
+                {grn.status || 'Draft'}
               </span>
+              {!isQcStarted && (
+                <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-medium">
+                  <i className="ti ti-check me-1"></i> Editable (Awaiting Inspection)
+                </span>
+              )}
             </h2>
             <p className="text-secondary fs-13 mb-0">
               Against <strong>{linkedPoId ? `${linkedPoId}` : 'Direct Inward'}</strong> · {grn.vendorName || 'Vendor'}
             </p>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            {!isQcStarted && (
+              <button
+                type="button"
+                className="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-1.5 fw-semibold fs-13 rounded-2 shadow-sm text-white"
+                style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                onClick={() => onEditBales && onEditBales(grn)}
+                title="Edit GRN record and container bales"
+              >
+                <i className="ti ti-edit fs-15"></i>
+                <span>Edit GRN</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

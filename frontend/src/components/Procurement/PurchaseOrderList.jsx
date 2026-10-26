@@ -27,9 +27,26 @@ export default function PurchaseOrderList({
   const isPoGrnLocked = (po) => {
     if (!po) return false;
     const status = String(po.status || '').trim();
-    const isSent = status === 'Sent' || status === 'Sent to Vendor' || status === 'Partially Received' || status === 'Completed';
-    const grnStarted = status === 'Partially Received' || status === 'Completed' || (Number(po.receivedQty) > 0) ||
-      (grns || []).some((g) => g && ((Array.isArray(g.linkedPOs) && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id));
+    const isSent = /sent|partially|received|completed/i.test(status);
+    const poIds = [po.id, po.poNumber, po.po_number].filter(Boolean);
+
+    const hasLinkedGrn = (grns || []).some((g) =>
+      g && poIds.some((pid) =>
+        (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(pid)) ||
+        g.poId === pid ||
+        g.poNumber === pid ||
+        g.againstPo === pid ||
+        g.poRef === pid ||
+        g.purchaseOrderId === pid ||
+        g.purchaseOrderNumber === pid
+      )
+    );
+
+    const grnStarted = hasLinkedGrn ||
+      status === 'Partially Received' ||
+      status === 'Completed' ||
+      (Number(po.receivedQty) > 0);
+
     return isSent && grnStarted;
   };
 
@@ -39,40 +56,40 @@ export default function PurchaseOrderList({
     return found ? found.name : (po.vendorId || 'Unknown Vendor');
   };
 
-function parseDateForSort(d, id) {
-  if (!d) {
-    if (id) {
-      const match = String(id).match(/\d+/g);
-      if (match) return Number(match.join(''));
+  function parseDateForSort(d, id) {
+    if (!d) {
+      if (id) {
+        const match = String(id).match(/\d+/g);
+        if (match) return Number(match.join(''));
+      }
+      return 0;
     }
-    return 0;
-  }
-  if (typeof d === 'number') return d;
-  const str = String(d).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    const time = new Date(str).getTime();
-    if (!isNaN(time)) return time;
-  }
-  const parts = str.split(/[\/\- :]/);
-  if (parts.length >= 3) {
-    let day = parseInt(parts[0], 10);
-    let month = parseInt(parts[1], 10) - 1;
-    let year = parseInt(parts[2], 10);
-    if (parts[0].length === 4) {
-      year = parseInt(parts[0], 10);
-      month = parseInt(parts[1], 10) - 1;
-      day = parseInt(parts[2], 10);
-    } else if (year < 100) {
-      year += 2000;
+    if (typeof d === 'number') return d;
+    const str = String(d).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      const time = new Date(str).getTime();
+      if (!isNaN(time)) return time;
     }
-    const hour = parts[3] ? parseInt(parts[3], 10) : 0;
-    const min = parts[4] ? parseInt(parts[4], 10) : 0;
-    const dt = new Date(year, month, day, hour, min);
-    if (!isNaN(dt.getTime())) return dt.getTime();
+    const parts = str.split(/[\/\- :]/);
+    if (parts.length >= 3) {
+      let day = parseInt(parts[0], 10);
+      let month = parseInt(parts[1], 10) - 1;
+      let year = parseInt(parts[2], 10);
+      if (parts[0].length === 4) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+      } else if (year < 100) {
+        year += 2000;
+      }
+      const hour = parts[3] ? parseInt(parts[3], 10) : 0;
+      const min = parts[4] ? parseInt(parts[4], 10) : 0;
+      const dt = new Date(year, month, day, hour, min);
+      if (!isNaN(dt.getTime())) return dt.getTime();
+    }
+    const timestamp = Date.parse(str);
+    return isNaN(timestamp) ? 0 : timestamp;
   }
-  const timestamp = Date.parse(str);
-  return isNaN(timestamp) ? 0 : timestamp;
-}
 
   const filtered = purchaseOrders.filter((po) => {
     if (!po) return false;
@@ -251,23 +268,32 @@ function parseDateForSort(d, id) {
                       <td>
                         <div className="d-flex flex-column align-items-start gap-1">
                           <span
-                            className={`badge px-2 py-1 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-12 ${
-                              po.status === 'Completed'
+                            className={`badge px-2 py-1 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-12 ${po.status === 'Completed'
                                 ? 'bg-success-subtle text-success border border-success border-opacity-25'
                                 : po.status === 'Partially Received'
-                                ? 'bg-info-subtle text-info border border-info border-opacity-25'
-                                : po.status === 'Sent'
-                                ? 'bg-primary text-white shadow-sm'
-                                : po.status === 'Draft'
-                                ? 'bg-secondary-subtle text-secondary border'
-                                : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
-                            }`}
+                                  ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                                  : po.status === 'Sent'
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : po.status === 'Draft'
+                                      ? 'bg-secondary-subtle text-secondary border'
+                                      : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                              }`}
                           >
                             {po.status === 'Sent' && <i className="ti ti-send fs-11"></i>}
                             {po.status === 'Completed' && <i className="ti ti-check fs-11"></i>}
                             {po.status === 'Draft' && <i className="ti ti-file fs-11"></i>}
                             <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
                           </span>
+
+                          {isPoGrnLocked(po) && (
+                            <span
+                              className="badge bg-light text-secondary border px-1.5 py-0.5 rounded-pill fs-11 d-inline-flex align-items-center gap-1 shadow-2xs"
+                              title="Requirement 15: Non-editable (GRN process started)"
+                            >
+                              <i className="ti ti-lock text-warning fs-11"></i>
+                              <span>Locked (GRN Started)</span>
+                            </span>
+                          )}
 
                           {po.status === 'Partially Received' && (
                             <div className="mt-0.5" style={{ fontSize: '11px', lineHeight: 1.35 }}>
@@ -286,85 +312,85 @@ function parseDateForSort(d, id) {
                           )}
                         </div>
                       </td>
-                    <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
-                      <div className="d-inline-flex align-items-center justify-content-center gap-1">
-                        {poGrns.length > 0 ? (
+                      <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
+                        <div className="d-inline-flex align-items-center justify-content-center gap-1">
+                          {poGrns.length > 0 ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                              style={{
+                                background: '#f0fdf4',
+                                color: '#16a34a',
+                                border: '1px solid #bbf7d0',
+                                height: '32px',
+                                lineHeight: 1,
+                                whiteSpace: 'nowrap'
+                              }}
+                              title={`GRN ${poGrns[0].id} already created for this PO. Click to view.`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onViewGRN) {
+                                  onViewGRN(poGrns[0]);
+                                } else if (onInwardGRN) {
+                                  onInwardGRN(po);
+                                }
+                              }}
+                            >
+                              <i className="ti ti-check fs-13"></i>
+                              <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>{poGrns[0].id}</span>
+                            </button>
+                          ) : !hasExistingGrn && po.status !== 'Completed' && po.status !== 'Draft' ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                              style={{
+                                background: '#ecfdf5',
+                                color: '#059669',
+                                border: '1px solid #a7f3d0',
+                                height: '32px',
+                                lineHeight: 1,
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Create Inward Delivery GRN for this PO"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onInwardGRN) onInwardGRN(po);
+                              }}
+                            >
+                              <i className="ti ti-package fs-13"></i>
+                              <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
+                            </button>
+                          ) : null}
                           <button
                             type="button"
-                            className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
-                            style={{
-                              background: '#f0fdf4',
-                              color: '#16a34a',
-                              border: '1px solid #bbf7d0',
-                              height: '32px',
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap'
-                            }}
-                            title={`GRN ${poGrns[0].id} already created for this PO. Click to view.`}
+                            className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
+                            style={{ width: '32px', height: '32px' }}
+                            title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (onViewGRN) {
-                                onViewGRN(poGrns[0]);
-                              } else if (onInwardGRN) {
-                                onInwardGRN(po);
-                              }
+                              if (onSelectPO) onSelectPO(po);
                             }}
                           >
-                            <i className="ti ti-check fs-13"></i>
-                            <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>{poGrns[0].id}</span>
+                            <i className="ti ti-eye fs-15"></i>
                           </button>
-                        ) : !hasExistingGrn && po.status !== 'Completed' && po.status !== 'Draft' ? (
                           <button
                             type="button"
-                            className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
-                            style={{
-                              background: '#ecfdf5',
-                              color: '#059669',
-                              border: '1px solid #a7f3d0',
-                              height: '32px',
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap'
-                            }}
-                            title="Create Inward Delivery GRN for this PO"
+                            className="btn btn-outline-secondary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
+                            style={{ width: '32px', height: '32px' }}
+                            title="Print PO Invoice"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (onInwardGRN) onInwardGRN(po);
+                              if (onPrintPO) onPrintPO(po);
                             }}
                           >
-                            <i className="ti ti-package fs-13"></i>
-                            <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
+                            <i className="ti ti-printer fs-15"></i>
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
-                          style={{ width: '32px', height: '32px' }}
-                          title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onSelectPO) onSelectPO(po);
-                          }}
-                        >
-                          <i className="ti ti-eye fs-15"></i>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
-                          style={{ width: '32px', height: '32px' }}
-                          title="Print PO Invoice"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onPrintPO) onPrintPO(po);
-                          }}
-                        >
-                          <i className="ti ti-printer fs-15"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

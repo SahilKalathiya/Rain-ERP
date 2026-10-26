@@ -369,11 +369,26 @@ export default function QualityCheckForm({
   const isFoldMismatch = hasFold && (actualFoldNum === null || expFoldNum === null || Math.abs(actualFoldNum - expFoldNum) > 0.01);
   const isFoldMatch = hasFold && !isFoldMismatch;
 
+  // Requirement: Checker Name, Width, and Fold are strictly MANDATORY before stock can be added
+  const hasChecker = Boolean(formData.inspectorName && formData.inspectorName.trim() !== '');
+  const isInspectionDetailsComplete = hasChecker && hasWidth && hasFold;
+
+  const missingInspectionFields = [];
+  if (!hasChecker) missingInspectionFields.push('Checker Name');
+  if (!hasWidth) missingInspectionFields.push('Width found');
+  if (!hasFold) missingInspectionFields.push('Fold found');
+
   // Requirement 23: Exception mismatch detection
   const hasAnyMismatch = isWidthMismatch || isFoldMismatch;
 
   const handleSubmit = (statusOverride) => {
     const effectiveStatus = (typeof statusOverride === 'string') ? statusOverride : formData.qcStatus;
+
+    // Strict validation: Until Checker Name, Width, and Fold are entered, NO action can proceed
+    if (!isInspectionDetailsComplete) {
+      showToast(`Please enter ${missingInspectionFields.join(', ')} before proceeding.`, 'warning');
+      return;
+    }
 
     if (effectiveStatus === 'OK' && flatDefectQty > 0 && !formData.defectReason.trim()) {
       showToast('Please enter a defect reason for the defective quantity in the flat entry box.', 'warning');
@@ -493,6 +508,12 @@ export default function QualityCheckForm({
   };
 
   const handleRejectAll = () => {
+    // Strict validation: Until Checker Name, Width, and Fold are entered, Reject cannot proceed
+    if (!isInspectionDetailsComplete) {
+      showToast(`Please enter ${missingInspectionFields.join(', ')} before proceeding.`, 'warning');
+      return;
+    }
+
     const updated = {};
     grnPieces.forEach((p, idx) => {
       const key = p.key || `pc_${idx}`;
@@ -607,9 +628,20 @@ export default function QualityCheckForm({
       {/* Main Form */}
       <div style={{ maxWidth: '960px' }}>
         <form onSubmit={handleSubmit}>
-          {/* CARD 1: Inspection (Matches Screenshot 2) */}
+          {/* CARD 1: Inspection */}
           <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-            <h5 className="fw-bold text-dark mb-3 fs-16 border-bottom pb-2">Inspection</h5>
+            <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+              <h5 className="fw-bold text-dark mb-0 fs-16">Inspection</h5>
+              {isInspectionDetailsComplete ? (
+                <span className="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-11 fw-semibold d-inline-flex align-items-center gap-1">
+                  <i className="ti ti-check fs-12"></i> Ready for Action
+                </span>
+              ) : (
+                <span className="badge bg-light text-secondary border rounded-pill px-2.5 py-1 fs-11 fw-semibold d-inline-flex align-items-center gap-1">
+                  <i className="ti ti-lock fs-12 text-primary"></i> 3 Required Fields
+                </span>
+              )}
+            </div>
 
             {/* Checker Name */}
             <div className="mb-3">
@@ -618,9 +650,9 @@ export default function QualityCheckForm({
               </label>
               <input
                 type="text"
-                className="form-control form-control-sm bg-light fs-13"
-                style={{ textTransform: 'capitalize' }}
-                placeholder="Name of person on shift"
+                className="form-control fs-13 rounded-3 bg-white border"
+                style={{ textTransform: 'capitalize', borderColor: '#cbd5e1' }}
+                placeholder="Name of person on shift (Required)"
                 value={formData.inspectorName}
                 onChange={(e) => {
                   const val = e.target.value.replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
@@ -633,16 +665,16 @@ export default function QualityCheckForm({
             <div className="row g-3 align-items-center mb-3">
               <div className="col-12 col-sm-auto">
                 <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
-                  Width found
+                  Width found <span className="text-danger">*</span>
                 </label>
                 <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
                   Expected: {expWidthClean}&quot;
                 </div>
                 <input
                   type="text"
-                  className={`form-control fs-13 rounded-3 ${isWidthMismatch ? 'border-danger bg-danger-subtle bg-opacity-10' : 'bg-white border'}`}
-                  style={{ width: '160px' }}
-                  placeholder="e.g. 42"
+                  className="form-control fs-13 rounded-3 bg-white border"
+                  style={{ width: '160px', borderColor: '#cbd5e1' }}
+                  placeholder="e.g. 42 (Required)"
                   value={formData.actualWidth}
                   onChange={(e) => setFormData({ ...formData, actualWidth: e.target.value })}
                 />
@@ -650,16 +682,16 @@ export default function QualityCheckForm({
 
               <div className="col-12 col-sm-auto">
                 <label className="form-label fs-12 fw-semibold text-secondary mb-1 d-block">
-                  Fold found (%)
+                  Fold found (%) <span className="text-danger">*</span>
                 </label>
                 <div className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 mb-1.5 d-inline-block">
                   Expected: {expFoldClean}%
                 </div>
                 <input
                   type="text"
-                  className={`form-control fs-13 rounded-3 ${isFoldMismatch ? 'border-danger bg-danger-subtle bg-opacity-10' : 'bg-white border'}`}
-                  style={{ width: '160px' }}
-                  placeholder="e.g. 100"
+                  className="form-control fs-13 rounded-3 bg-white border"
+                  style={{ width: '160px', borderColor: '#cbd5e1' }}
+                  placeholder="e.g. 100 (Required)"
                   value={formData.actualFold}
                   onChange={(e) => setFormData({ ...formData, actualFold: e.target.value })}
                 />
@@ -681,10 +713,15 @@ export default function QualityCheckForm({
                       )}
                     </div>
                   </div>
-                ) : hasWidth && isWidthMatch && (!hasFold || isFoldMatch) ? (
+                ) : hasWidth && isWidthMatch && hasFold && isFoldMatch ? (
                   <div className="d-flex align-items-center gap-1.5 text-success fw-semibold fs-13">
                     <i className="ti ti-check fs-16"></i>
                     <span>Matches PO expectation (Width: {expWidthClean}&quot;, Fold: {expFoldClean}%)</span>
+                  </div>
+                ) : !isInspectionDetailsComplete ? (
+                  <div className="d-flex align-items-center gap-1.5 text-secondary fs-12">
+                    <i className="ti ti-info-circle text-primary fs-14"></i>
+                    <span>Fill Checker name, Width ({expWidthClean}&quot;), and Fold ({expFoldClean}%) to unlock actions.</span>
                   </div>
                 ) : null}
               </div>
@@ -1062,77 +1099,136 @@ export default function QualityCheckForm({
 
 
 
-          {/* Bottom Action Buttons */}
-          <div className="d-flex flex-wrap align-items-center gap-3 pt-3">
-            {/* Requirement 23: During QC, if exceptions do not match, the option to add stock should be hidden or disabled */}
-            {hasAnyMismatch || !isBaleCompletenessOk ? (
-              <div className="d-inline-flex flex-column align-items-start gap-1">
+          {/* Bottom Action Section */}
+          <div className="pt-3">
+            {!isInspectionDetailsComplete ? (
+              <div
+                className="card border-0 shadow-sm rounded-4 p-4"
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px dashed #cbd5e1'
+                }}
+              >
+                <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        backgroundColor: '#eef2ff',
+                        color: '#2e37a4'
+                      }}
+                    >
+                      <i className="ti ti-lock fs-20"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark fs-14 mb-0.5">
+                        Inspection Details Required to Unlock Actions
+                      </div>
+                      <div className="text-secondary fs-12">
+                        Please enter <strong>{missingInspectionFields.join(', ')}</strong> in the Inspection section above. The action buttons (Mark OK, Admin Approval, Reject) will appear once all required fields are filled.
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-white border px-4 py-2 fs-13 text-secondary shadow-sm rounded-3 text-nowrap"
+                      style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
+                      onClick={onBack}
+                    >
+                      Back
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="d-flex flex-wrap align-items-center gap-3">
+                {/* Button 1: Mark OK (Mark All) — Visible once fields are filled */}
                 <button
                   type="button"
-                  className="btn btn-secondary px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 opacity-50 cursor-not-allowed"
-                  disabled
+                  className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
+                  style={{
+                    backgroundColor: '#15803d',
+                    borderColor: '#15803d',
+                    opacity: (hasAnyMismatch || !isBaleCompletenessOk) ? 0.45 : 1,
+                    cursor: (hasAnyMismatch || !isBaleCompletenessOk) ? 'not-allowed' : 'pointer'
+                  }}
+                  disabled={hasAnyMismatch || !isBaleCompletenessOk}
+                  onClick={() => {
+                    setFormData({ ...formData, qcStatus: 'OK' });
+                    handleSubmit('OK');
+                  }}
                   title={
                     hasAnyMismatch
                       ? "Option to add stock is disabled because Width or Fold exception does not match PO specification"
-                      : "Option to add stock is disabled because total quantity declared in GRN has incomplete bale entries"
+                      : !isBaleCompletenessOk
+                        ? "Option to add stock is disabled because total quantity declared in GRN has incomplete bale entries"
+                        : "Mark OK — Add Good Qty to Stock Pool"
                   }
                 >
-                  <i className="ti ti-lock fs-16"></i>
-                  <span>Mark OK &mdash; Add Good Qty to Stock Pool (Disabled &mdash; Exception Mismatch)</span>
+                  <i className="ti ti-check fs-16"></i>
+                  <span>Mark OK &mdash; Add Good Qty to Stock Pool</span>
                 </button>
-                <span className="small text-danger fw-semibold d-flex align-items-center gap-1">
-                  <i className="ti ti-alert-triangle fs-12"></i>
-                  {hasAnyMismatch
-                    ? "Add stock disabled: Exceptions (Width/Fold) do not match PO specification. Must send for Admin Approval or Reject."
-                    : "Add stock disabled: Complete all bale entries in GRN before completing QC."}
-                </span>
+
+                {/* Button 2: Send Whole Item for Admin Approval */}
+                <button
+                  type="button"
+                  className={`btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 ${hasAnyMismatch ? 'border-2 border-danger text-danger bg-danger-subtle' : ''}`}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderColor: '#b91c1c',
+                    color: '#b91c1c'
+                  }}
+                  onClick={() => {
+                    setFormData({ ...formData, qcStatus: 'Send for Admin Approval' });
+                    handleSubmit('Send for Admin Approval');
+                  }}
+                  title="Send Whole Item for Admin Approval"
+                >
+                  <i className="ti ti-shield-alert fs-16"></i>
+                  <span>Send Whole Item for Admin Approval</span>
+                </button>
+
+                {/* Button 3: Reject Item (Reject All) */}
+                <button
+                  type="button"
+                  className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
+                  style={{
+                    backgroundColor: '#dc2626',
+                    borderColor: '#dc2626'
+                  }}
+                  onClick={handleRejectAll}
+                  title="Reject Item (Reject All)"
+                >
+                  <i className="ti ti-x fs-16"></i>
+                  <span>Reject Item (Reject All)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-white border px-4 py-2.5 fs-13 text-secondary shadow-sm rounded-3"
+                  style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
+                  onClick={onBack}
+                >
+                  Back
+                </button>
+
+                {/* Clear Status / Warning messages when buttons are visible */}
+                {hasAnyMismatch ? (
+                  <div className="w-100 mt-2 p-2.5 rounded-3 bg-warning-subtle border border-warning border-opacity-50 text-dark d-flex align-items-center gap-2 fs-13 fw-medium">
+                    <i className="ti ti-alert-triangle fs-16 text-warning"></i>
+                    <span>Add stock disabled: Exceptions (Width/Fold) do not match PO specification. Must send for Admin Approval or Reject.</span>
+                  </div>
+                ) : !isBaleCompletenessOk ? (
+                  <div className="w-100 mt-2 p-2.5 rounded-3 bg-warning-subtle border border-warning border-opacity-50 text-dark d-flex align-items-center gap-2 fs-13 fw-medium">
+                    <i className="ti ti-alert-triangle fs-16 text-warning"></i>
+                    <span>Add stock disabled: Complete all bale entries in GRN before completing QC.</span>
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <button
-                type="button"
-                className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
-                style={{ backgroundColor: '#15803d', borderColor: '#15803d' }}
-                onClick={() => {
-                  setFormData({ ...formData, qcStatus: 'OK' });
-                  handleSubmit('OK');
-                }}
-              >
-                <i className="ti ti-check fs-16"></i>
-                <span>Mark OK &mdash; Add Good Qty to Stock Pool</span>
-              </button>
             )}
-
-            <button
-              type="button"
-              className={`btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 ${hasAnyMismatch ? 'border-2 border-danger text-danger bg-danger-subtle' : ''}`}
-              style={!hasAnyMismatch ? { backgroundColor: '#ffffff', borderColor: '#b91c1c', color: '#b91c1c' } : {}}
-              onClick={() => {
-                setFormData({ ...formData, qcStatus: 'Send for Admin Approval' });
-                handleSubmit('Send for Admin Approval');
-              }}
-            >
-              <i className="ti ti-shield-alert fs-16"></i>
-              <span>Send Whole Item for Admin Approval</span>
-            </button>
-
-            <button
-              type="button"
-              className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
-              style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
-              onClick={handleRejectAll}
-            >
-              <i className="ti ti-x fs-16"></i>
-              <span>Reject Item (Reject All)</span>
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-white border px-4 py-2.5 fs-13 text-secondary shadow-sm rounded-3"
-              style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
-              onClick={onBack}
-            >
-              Back
-            </button>
           </div>
         </form>
       </div>

@@ -581,7 +581,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
     if (existingGrnsForPo.length > 0) {
       const existing = existingGrnsForPo[0];
-      alert(`PO ${po.id} માટે GRN (${existing.id}) પહેલેથી જ બની ગયું છે. એક PO માટે માત્ર એક જ વાર GRN બની શકે છે.`);
+      alert(`GRN (${existing.id}) has already been created for PO ${po.id}. Only one GRN can be created per PO.`);
       setSelectedGRN(existing);
       setActiveGrnView('detail');
       setActiveTab('grn');
@@ -647,7 +647,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
         const allGrnsForPo = updated.filter((g) => g && g.linkedPOs && g.linkedPOs.includes(linkedPoId));
         const totalReceivedForPo = allGrnsForPo.reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
-        
+
         let newPoStatus = targetPo.status;
         if (totalReceivedForPo >= poOrderedMeters) {
           newPoStatus = 'Completed';
@@ -1321,6 +1321,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           {activeGrnView === 'list' && (
             <GRNList
               grns={grns}
+              qualityChecks={qualityChecks}
               onNewGRN={() => {
                 setSelectedGRN(null);
                 setActiveGrnView('form');
@@ -1328,6 +1329,10 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               onSelectGRN={(g) => {
                 setSelectedGRN(g);
                 setActiveGrnView('detail');
+              }}
+              onEditGRN={(g) => {
+                setSelectedGRN(g);
+                setActiveGrnView('form');
               }}
             />
           )}

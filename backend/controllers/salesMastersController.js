@@ -67,8 +67,12 @@ exports.getColors = async (req, res) => {
     const params = [];
 
     if (quarter && quarter !== 'All') {
-      sql += ' AND (quarter_tag = ? OR quarter_tag = "All Season" OR quarter_tag = "ALL")';
-      params.push(quarter);
+      if (quarter === 'All Season' || quarter === 'ALL' || quarter === 'allSeason') {
+        sql += ' AND (quarter_tag = "All Season" OR quarter_tag = "ALL" OR quarter_tag IS NULL OR quarter_tag = "")';
+      } else {
+        sql += ' AND quarter_tag = ?';
+        params.push(quarter);
+      }
     }
 
     sql += ' ORDER BY name ASC';

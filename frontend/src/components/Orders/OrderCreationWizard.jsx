@@ -47,6 +47,15 @@ export const deduplicateColors = (list) => {
   return result;
 };
 
+// Returns normalized quarter category: 'Q1', 'Q2', 'Q3', 'Q4', or 'ALL_SEASON'
+export const getColorQuarterTag = (col) => {
+  const raw = (col?.quarterTag || col?.quarter_tag || col?.quarter || '').trim().toUpperCase();
+  if (raw === 'Q1' || raw === 'Q2' || raw === 'Q3' || raw === 'Q4') {
+    return raw;
+  }
+  return 'ALL_SEASON';
+};
+
 // Synchronize articles directly from Article Master (erp_articles_v1 / initialArticles)
 export const loadSyncedArticles = () => {
   const stored = getStoredData('erp_articles_v1', null);
@@ -704,11 +713,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
         if (ratioUsed && ratioStr) {
           const parts = ratioStr.split(':').map(p => p.trim());
           if (parts.length === selectedSizes.length && parts.every(p => !isNaN(parseInt(p, 10)))) {
-            const baseNum = parseInt(baseQty, 10) || 100;
-            newQtys = {};
-            selectedSizes.forEach((sz, sIdx) => {
-              newQtys[sz] = String(baseNum * (parseInt(parts[sIdx], 10) || 1));
-            });
+            const baseNum = parseInt(baseQty, 10);
+            if (!isNaN(baseNum) && baseNum > 0) {
+              newQtys = {};
+              selectedSizes.forEach((sz, sIdx) => {
+                newQtys[sz] = String(baseNum * (parseInt(parts[sIdx], 10) || 1));
+              });
+            }
           }
         }
         return {
@@ -742,25 +753,30 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const cleanRatio = ratioStr !== undefined ? ratioStr : (sc.ratioString || '');
-        const cleanBase = baseQty !== undefined ? baseQty : (sc.baseSetQty || '');
+        const cleanBase = baseQty !== undefined ? String(baseQty) : (sc.baseSetQty || '');
         const parts = cleanRatio.split(':').map(p => p.trim());
         const selectedSizes = sc.selectedSizes || [];
 
         let newQtys = { ...(sc.sizeQtys || {}) };
         // Section 14.4: A ratio string must be validated as a genuine ratio matching the number of selected sizes
         if (parts.length === selectedSizes.length && parts.every(p => p !== '' && !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0)) {
-          const baseNum = parseInt(cleanBase, 10) || 100;
-          newQtys = {};
-          selectedSizes.forEach((sz, sIdx) => {
-            const mult = parseInt(parts[sIdx], 10) || 0;
-            newQtys[sz] = String(baseNum * mult);
-          });
+          const baseNum = parseInt(cleanBase, 10);
+          if (!isNaN(baseNum) && baseNum > 0) {
+            newQtys = {};
+            selectedSizes.forEach((sz, sIdx) => {
+              const mult = parseInt(parts[sIdx], 10) || 0;
+              newQtys[sz] = String(baseNum * mult);
+            });
+          } else {
+            // No multiplier entered yet -> keep size quantities empty instead of defaulting to 100
+            newQtys = {};
+          }
         }
         return {
           ...sc,
           ratioString: cleanRatio,
           baseSetQty: cleanBase,
-          _userEditedBase: userEdited || Boolean(cleanBase && cleanBase !== '100') || sc._userEditedBase,
+          _userEditedBase: userEdited || Boolean(cleanBase),
           sizeQtys: newQtys
         };
       });
@@ -1000,18 +1016,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           : 2.0;
 
         // Default or parsed dyed length in meters
-        let dyedPerPiece = 0;
+        let dyedPerPiece = '';
         const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
         if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
           // If entered in inches, convert to meters (1 in = 0.0254 m)
           dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
+        } else if (fr.consumption !== undefined && fr.consumption !== null && fr.consumption !== '') {
+          dyedPerPiece = parseFloat(fr.consumption) || '';
+        } else if (art.consumption !== undefined && art.consumption !== null && art.consumption !== '') {
+          dyedPerPiece = parseFloat(art.consumption) || '';
         } else {
-          // Fallback based on garment type
-          const lowerName = (art.name || '').toLowerCase();
-          if (lowerName.includes('kurta')) dyedPerPiece = 2.500;
-          else if (lowerName.includes('pant') || lowerName.includes('pajama')) dyedPerPiece = 2.000;
-          else if (lowerName.includes('dupatta')) dyedPerPiece = 2.250;
-          else dyedPerPiece = 1.500;
+          dyedPerPiece = '';
         }
 
         // Gather all colors used across customers for this article
@@ -1027,14 +1042,20 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
         colorsToIterate.forEach(colName => {
           const pcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
           const colorObj = masterColors.find(c => c.name === colName) || { hex: '#94a3b8' };
-          const widthVal = fab?.widths?.[0] || '44"';
+          const widthVal = fr.width || art.width || '';
 
           // RULE 1: Greige length per piece = Avg. (dyed) Length * (1 + Shrinkage%) * (1 + Buffer%)
-          const greigeLengthPerPiece = Number((dyedPerPiece * (1 + shrinkPct / 100) * (1 + bufferPct / 100)).toFixed(3));
+          const greigeLengthPerPiece = (dyedPerPiece && dyedPerPiece > 0)
+            ? Number((dyedPerPiece * (1 + shrinkPct / 100) * (1 + bufferPct / 100)).toFixed(3))
+            : 0;
 
           // RULE 2: Total Greige = Greige length per piece * Pieces
-          const totalDyed = Number((dyedPerPiece * pcs).toFixed(1));
-          const totalGreige = Number((greigeLengthPerPiece * pcs).toFixed(1));
+          const totalDyed = (dyedPerPiece && dyedPerPiece > 0)
+            ? Number((dyedPerPiece * pcs).toFixed(1))
+            : 0;
+          const totalGreige = (greigeLengthPerPiece && greigeLengthPerPiece > 0)
+            ? Number((greigeLengthPerPiece * pcs).toFixed(1))
+            : 0;
           const orderQty = totalGreige;
 
           rows.push({
@@ -1161,6 +1182,16 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       if (!(curCust.selectedColors || []).includes(created.name)) {
         toggleCustomerColor(activeCustomerIndexForNewColor, created.name);
       }
+    }
+
+    // Automatically switch active customer's tab to the created color's section so it is immediately visible
+    const targetQuarter = getColorQuarterTag(created);
+    const targetTab = targetQuarter === 'ALL_SEASON' ? 'allSeason' : targetQuarter;
+    if (activeCustomerIndexForNewColor !== null && activeCustomerIndexForNewColor !== undefined) {
+      setCustomerColorTab(prev => ({
+        ...prev,
+        [activeCustomerIndexForNewColor]: targetTab
+      }));
     }
 
     setShowNewColorModal(false);
@@ -1848,35 +1879,50 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                             {/* Filter Tabs */}
                             <div className="d-flex flex-wrap gap-1">
                               {(() => {
-                                return [
+                                const tabDefinitions = [
                                   { key: 'allSeason', label: 'All Season', icon: '☀️' },
                                   { key: 'Q4', label: 'Oct–Dec (Q4)', icon: '❄️' },
                                   { key: 'Q1', label: 'Jan–Mar (Q1)', icon: '🌸' },
                                   { key: 'Q2', label: 'Apr–Jun (Q2)', icon: '🌱' },
                                   { key: 'Q3', label: 'Jul–Sep (Q3)', icon: '🌧️' },
                                 ];
-                              })().map(tab => {
-                                const currentTab = customerColorTab[ci] || 'allSeason';
-                                const isActive = currentTab === tab.key;
-                                return (
-                                  <button
-                                    key={tab.key}
-                                    type="button"
-                                    className={`btn btn-sm py-1 px-2.5 rounded-pill fw-semibold transition ${
-                                      isActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
-                                    }`}
-                                    style={{
-                                      fontSize: '12px',
-                                      backgroundColor: isActive ? '#2e37a4' : '#ffffff',
-                                      borderColor: isActive ? '#2e37a4' : '#cbd5e1'
-                                    }}
-                                    onClick={() => setCustomerColorTab(prev => ({ ...prev, [ci]: tab.key }))}
-                                  >
-                                    <span className="me-1">{tab.icon}</span>
-                                    <span>{tab.label}</span>
-                                  </button>
-                                );
-                              })}
+                                return tabDefinitions.map(tab => {
+                                  const currentTab = customerColorTab[ci] || 'allSeason';
+                                  const isActive = currentTab === tab.key;
+                                  const count = masterColors.filter(col => {
+                                    const q = getColorQuarterTag(col);
+                                    if (tab.key === 'allSeason') return q === 'ALL_SEASON';
+                                    return q === tab.key;
+                                  }).length;
+
+                                  return (
+                                    <button
+                                      key={tab.key}
+                                      type="button"
+                                      className={`btn btn-sm py-1 px-2.5 rounded-pill fw-semibold transition d-inline-flex align-items-center gap-1.5 ${
+                                        isActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                      }`}
+                                      style={{
+                                        fontSize: '12px',
+                                        backgroundColor: isActive ? '#2e37a4' : '#ffffff',
+                                        borderColor: isActive ? '#2e37a4' : '#cbd5e1'
+                                      }}
+                                      onClick={() => setCustomerColorTab(prev => ({ ...prev, [ci]: tab.key }))}
+                                    >
+                                      <span>{tab.icon}</span>
+                                      <span>{tab.label}</span>
+                                      <span
+                                        className={`badge rounded-pill px-1.5 py-0.5 ${
+                                          isActive ? 'bg-white text-primary' : 'bg-light text-muted border'
+                                        }`}
+                                        style={{ fontSize: '10px' }}
+                                      >
+                                        {count}
+                                      </span>
+                                    </button>
+                                  );
+                                });
+                              })()}
                             </div>
 
                             {/* Search filter input */}
@@ -1959,28 +2005,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                           const displayedColors = masterColors.filter(col => {
                             // Section 14.3: A colour with no Quarter/Season tag must still be selectable via search
                             if (searchQuery) {
-                              return col.name.toLowerCase().includes(searchQuery) ||
+                              return (col.name || '').toLowerCase().includes(searchQuery) ||
                                      (col.pantone || '').toLowerCase().includes(searchQuery);
                             }
-                            // Section 14.3: A colour added via "+ Add Colour" mid-order must immediately appear in that order's colour list
-                            if (newlyAddedColorNames.has(col.name)) return true;
 
-                            const qTag = (col.quarterTag || 'All Season').toLowerCase();
-                            // All Season shows all colors in palette
+                            const qTag = getColorQuarterTag(col);
+                            // All-season colors are displayed ONLY in the all-season section and NOT mixed in every quarter
                             if (currentTab === 'allSeason') {
-                              return true;
+                              return qTag === 'ALL_SEASON';
                             }
-                            if (currentTab === 'Q1') return qTag === 'q1' || qTag === 'all' || qTag === 'all season';
-                            if (currentTab === 'Q2') return qTag === 'q2' || qTag === 'all' || qTag === 'all season';
-                            if (currentTab === 'Q3') return qTag === 'q3' || qTag === 'all' || qTag === 'all season';
-                            if (currentTab === 'Q4') return qTag === 'q4' || qTag === 'all' || qTag === 'all season';
-                            return true;
+                            if (currentTab === 'Q1') return qTag === 'Q1';
+                            if (currentTab === 'Q2') return qTag === 'Q2';
+                            if (currentTab === 'Q3') return qTag === 'Q3';
+                            if (currentTab === 'Q4') return qTag === 'Q4';
+                            return false;
                           });
 
                           if (displayedColors.length === 0) {
                             return (
                               <div className="text-muted small py-2 px-1 fst-italic">
-                                No colors match this filter. Try switching tabs or clearing search.
+                                No colors found in this section. Click <strong>+ Add Colour</strong> above to add colors for this section.
                               </div>
                             );
                           }
@@ -2329,7 +2373,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
                                                           <div className="row g-2.5 align-items-end">
                                                             {/* Ratio String Input */}
-                                                            <div className="col-md-5">
+                                                            <div className="col-md-6">
                                                               <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
                                                                 Ratio (Numbers only, e.g. {(sc.selectedSizes || []).map((_, i) => i === 1 || i === 2 ? '2' : '1').join(':')})
                                                               </label>
@@ -2347,7 +2391,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                             </div>
 
                                                             {/* Base Set Quantity */}
-                                                            <div className="col-md-4">
+                                                            <div className="col-md-6">
                                                               <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
                                                                 Base Set Quantity (Multiplier)
                                                               </label>
@@ -2355,27 +2399,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                                 type="number"
                                                                 min="1"
                                                                 className="form-control form-control-sm fw-bold"
-                                                                placeholder="100"
-                                                                value={sc.baseSetQty && (sc._userEditedBase || sc.baseSetQty !== '100') ? sc.baseSetQty : ''}
+                                                                placeholder="e.g. 50"
+                                                                value={sc.baseSetQty || ''}
                                                                 onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true)}
                                                                 style={{ fontSize: '13px', borderColor: '#cbd5e1', borderRadius: '7px', height: '36px' }}
                                                               />
-                                                            </div>
-
-                                                            {/* Recalculate Button */}
-                                                            <div className="col-md-3">
-                                                              <button
-                                                                type="button"
-                                                                className="btn btn-sm text-white w-100 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-xs"
-                                                                style={{ height: '36px', fontSize: '12.5px', backgroundColor: '#2e37a4', borderColor: '#2e37a4', borderRadius: '7px' }}
-                                                                onClick={() => {
-                                                                  const base = parseInt(sc.baseSetQty, 10) || 100;
-                                                                  updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, sc.baseSetQty || '', true);
-                                                                }}
-                                                              >
-                                                                <i className="ti ti-refresh" style={{ fontSize: '14px' }}></i>
-                                                                <span>Apply Ratio</span>
-                                                              </button>
                                                             </div>
                                                           </div>
 
@@ -2431,9 +2459,41 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                               );
                                                             }
 
-                                                            const base = parseInt(sc.baseSetQty, 10) || 100;
+                                                            const baseNum = parseInt(sc.baseSetQty, 10);
+                                                            const hasBase = !isNaN(baseNum) && baseNum > 0;
                                                             const totalMultiplier = parts.reduce((acc, p) => acc + (parseInt(p, 10) || 0), 0);
-                                                            const totalOrderPieces = totalMultiplier * base;
+
+                                                            if (!hasBase) {
+                                                              return (
+                                                                <div className="mt-3 pt-2.5 border-top" style={{ borderColor: '#e2e8f0', fontSize: '12px' }}>
+                                                                  <div className="d-flex align-items-center justify-content-between mb-2">
+                                                                    <span className="text-muted fw-semibold">
+                                                                      Size Ratio ({totalMultiplier} pcs/set):
+                                                                    </span>
+                                                                    <span className="badge bg-secondary-subtle text-secondary fw-semibold px-2 py-1" style={{ fontSize: '11px' }}>
+                                                                      Enter Base Set Quantity to calculate pieces
+                                                                    </span>
+                                                                  </div>
+                                                                  <div className="d-flex flex-wrap align-items-center gap-2">
+                                                                    {selectedSizes.map((sz, idx) => {
+                                                                      const mult = parseInt(parts[idx], 10) || 0;
+                                                                      return (
+                                                                        <span
+                                                                          key={sz}
+                                                                          className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1"
+                                                                          style={{ borderColor: '#cbd5e1', borderRadius: '6px', fontSize: '12px' }}
+                                                                        >
+                                                                          <span className="fw-bold text-dark">{sz}:</span>
+                                                                          <span className="text-muted">{mult} ratio</span>
+                                                                        </span>
+                                                                      );
+                                                                    })}
+                                                                  </div>
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            const totalOrderPieces = totalMultiplier * baseNum;
 
                                                             return (
                                                               <div className="mt-3 pt-2.5 border-top" style={{ borderColor: '#e2e8f0', fontSize: '12px' }}>
@@ -2442,13 +2502,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                                     Size Ratio Breakdown ({totalMultiplier} pcs/set):
                                                                   </span>
                                                                   <span className="badge bg-primary-subtle text-primary fw-bold px-2 py-1">
-                                                                    Total: {totalOrderPieces.toLocaleString()} Pieces ({base} Sets)
+                                                                    Total: {totalOrderPieces.toLocaleString()} Pieces ({baseNum} Sets)
                                                                   </span>
                                                                 </div>
                                                                 <div className="d-flex flex-wrap align-items-center gap-2">
                                                                   {selectedSizes.map((sz, idx) => {
                                                                     const mult = parseInt(parts[idx], 10) || 0;
-                                                                    const res = base * mult;
+                                                                    const res = baseNum * mult;
                                                                     return (
                                                                       <span
                                                                         key={sz}
@@ -2456,7 +2516,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
                                                                         style={{ borderColor: '#cbd5e1', borderRadius: '6px', fontSize: '12px' }}
                                                                       >
                                                                         <span className="fw-bold text-dark">{sz}:</span>
-                                                                        <span className="text-muted">{mult} &times; {base} =</span>
+                                                                        <span className="text-muted">{mult} &times; {baseNum} =</span>
                                                                         <span className="fw-bold" style={{ color: '#2e37a4' }}>{res} pcs</span>
                                                                       </span>
                                                                     );
@@ -2685,6 +2745,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       {showNewColorModal && (
         <AddColorModal
           colors={masterColors}
+          initialColor={(() => {
+            const activeCustTab = customerColorTab[activeCustomerIndexForNewColor] || 'allSeason';
+            const quarterTag = (activeCustTab === 'allSeason') ? 'All Season' : activeCustTab;
+            return { quarterTag };
+          })()}
           onSave={(newColor) => {
             handleSaveInlineColor(newColor);
           }}
