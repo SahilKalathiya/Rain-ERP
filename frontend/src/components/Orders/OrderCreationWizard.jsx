@@ -83,12 +83,7 @@ export const filterRealFabrics = (list) => {
 };
 
 // Preset Master Fabrics with genuine fabric master properties
-const DEFAULT_FABRICS = [
-  { id: 'FAB-001', quality: 'Grey Cotton Fabrics (100*100)', qualityName: 'Grey Cotton Fabrics (100*100)', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 3.5, maxBuffer: 2.0, defRate: 50, dyedRate: 65, active: true },
-  { id: 'FAB-002', quality: 'Rayon 14kg Liva', qualityName: 'Rayon 14kg Liva', type: 'Rayon', widths: ['44"', '48"', '58"'], shrinkage: 4.5, maxBuffer: 2.0, defRate: 58, dyedRate: 76, active: true },
-  { id: 'FAB-003', quality: 'Cotton Cambric 60*60', qualityName: 'Cotton Cambric 60*60', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 4.0, maxBuffer: 2.0, defRate: 55, dyedRate: 70, active: true },
-  { id: 'FAB-004', quality: 'Modal Satin Premium', qualityName: 'Modal Satin Premium', type: 'Silk/Modal', widths: ['44"', '58"'], shrinkage: 2.0, maxBuffer: 1.5, defRate: 85, dyedRate: 110, active: true }
-];
+const DEFAULT_FABRICS = [];
 
 // Helper to capitalize the first character of each word (Title Case)
 export const autoCapitalizeWords = (str) => {
@@ -101,7 +96,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Master Data State
   const [masterSizeSeries, setMasterSizeSeries] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
-    if (Array.isArray(stored) && stored.length > 0) {
+    if (Array.isArray(stored)) {
       return stored;
     }
     return Array.isArray(initialSizeSeries) ? initialSizeSeries : [];
@@ -137,12 +132,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   const [articleTypes, setArticleTypes] = useState(() => loadSyncedArticles());
   const [fabrics, setFabrics] = useState(() => {
     let raw = getStoredData('raindrop_fabrics_v1', null);
-    if (!Array.isArray(raw) || raw.length === 0) {
-      raw = procurementFabrics;
+    if (!Array.isArray(raw)) {
+      raw = procurementFabrics || [];
     }
     const filtered = filterRealFabrics(raw);
-    const finalFabrics = filtered.length > 0 ? filtered : filterRealFabrics(DEFAULT_FABRICS);
-    return finalFabrics.map(f => ({
+    return filtered.map(f => ({
       ...f,
       quality: f.qualityName || f.quality || f.name || '',
       qualityName: f.qualityName || f.quality || f.name || '',
@@ -213,6 +207,34 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     return () => {
       window.removeEventListener('storage', handleSizeSeriesSync);
       window.removeEventListener('erp_size_series_updated', handleSizeSeriesSync);
+    };
+  }, []);
+
+  // Real-time synchronization with Fabric Master
+  useEffect(() => {
+    const handleFabricsSync = () => {
+      const stored = getStoredData('raindrop_fabrics_v1', null);
+      if (Array.isArray(stored)) {
+        const filtered = filterRealFabrics(stored);
+        setFabrics(filtered.map(f => ({
+          ...f,
+          quality: f.qualityName || f.quality || f.name || '',
+          qualityName: f.qualityName || f.quality || f.name || '',
+          type: f.fabricType || f.type || 'Cotton',
+          widths: Array.isArray(f.widths) ? f.widths : (typeof f.widths === 'string' ? f.widths.split(',').map(w => w.trim()).filter(Boolean) : ['44"', '58"']),
+          shrinkage: parseFloat(f.defaultShrinkage || f.shrinkage) || 3.5,
+          maxBuffer: parseFloat(f.maxBuffer) || 2.0,
+          defRate: parseFloat(f.fabricRate || f.defRate) || 50,
+          dyedRate: parseFloat(f.dyedRate) || 65,
+          active: f.active !== false
+        })));
+      }
+    };
+    window.addEventListener('storage', handleFabricsSync);
+    window.addEventListener('raindrop_fabrics_updated', handleFabricsSync);
+    return () => {
+      window.removeEventListener('storage', handleFabricsSync);
+      window.removeEventListener('raindrop_fabrics_updated', handleFabricsSync);
     };
   }, []);
 
@@ -312,7 +334,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
 
       try {
         const storedSeries = getStoredData('erp_size_series_v1', null);
-        if (Array.isArray(storedSeries) && storedSeries.length > 0) {
+        if (Array.isArray(storedSeries)) {
           setMasterSizeSeries(storedSeries);
         }
       } catch (e) {}

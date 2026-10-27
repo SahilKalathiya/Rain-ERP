@@ -55,7 +55,7 @@ export default function SizeMasterView() {
 
   const [seriesList, setSeriesList] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
-    if (Array.isArray(stored) && stored.length > 0) {
+    if (Array.isArray(stored)) {
       const normalized = normalize(stored);
       setStoredData('erp_size_series_v1', normalized);
       return normalized;
@@ -68,7 +68,7 @@ export default function SizeMasterView() {
   useEffect(() => {
     const handleUpdate = () => {
       const stored = getStoredData('erp_size_series_v1', null);
-      if (Array.isArray(stored) && stored.length > 0) {
+      if (Array.isArray(stored)) {
         setSeriesList(normalize(stored));
       }
     };
@@ -725,7 +725,22 @@ export default function SizeMasterView() {
         {filteredSeries.length === 0 && (
           <div className="card border-0 shadow-sm rounded-4 p-5 text-center text-muted bg-white">
             <i className="ti ti-ruler-off fs-1 d-block mb-2 text-secondary opacity-50"></i>
-            No size series found matching "{searchTerm}". Click "+ Add New Size Series" above.
+            <h6 className="fw-bold text-dark fs-14 mb-1">
+              {searchTerm ? `No size series found matching "${searchTerm}"` : 'No size series configured yet'}
+            </h6>
+            <p className="text-secondary fs-12 mb-3">
+              {searchTerm ? 'Try a different search term or clear the filter.' : 'Start fresh by adding your customized size series and individual sizes.'}
+            </p>
+            <div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm rounded-3 px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                onClick={handleAddNewSeries}
+              >
+                <i className="ti ti-plus"></i>
+                <span>Add New Size Series</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

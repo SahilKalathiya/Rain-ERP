@@ -27,7 +27,7 @@ import {
 export function resetExampleDataToDefaults(force = false) {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
 
-  const CLEANUP_KEY = 'erp_blank_state_clean_v8';
+  const CLEANUP_KEY = 'erp_blank_state_clean_v12';
   if (!force && localStorage.getItem(CLEANUP_KEY) === 'true') {
     return;
   }

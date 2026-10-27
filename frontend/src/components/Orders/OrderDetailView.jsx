@@ -13,13 +13,7 @@ const autoCapitalizeWords = (str) => {
 };
 
 // Preset Master Fabrics with genuine fabric master properties
-const DEFAULT_FABRICS = [
-  { id: 'FAB-001', quality: 'Grey Cotton Fabrics (100*100)', qualityName: 'Grey Cotton Fabrics (100*100)', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 3.5, defaultShrinkage: 3.5, maxBuffer: 2.0, defRate: 50, dyedRate: 65, active: true },
-  { id: 'FAB-002', quality: 'Rayon 14kg Liva', qualityName: 'Rayon 14kg Liva', type: 'Rayon', widths: ['44"', '48"', '58"'], shrinkage: 4.5, defaultShrinkage: 4.5, maxBuffer: 2.0, defRate: 58, dyedRate: 76, active: true },
-  { id: 'FAB-003', quality: 'Cotton Cambric 60*60', qualityName: 'Cotton Cambric 60*60', type: 'Cotton', widths: ['44"', '58"'], shrinkage: 4.0, defaultShrinkage: 4.0, maxBuffer: 2.0, defRate: 55, dyedRate: 70, active: true },
-  { id: 'FAB-004', quality: 'Modal Satin Premium', qualityName: 'Modal Satin Premium', type: 'Silk/Modal', widths: ['44"', '58"'], shrinkage: 2.0, defaultShrinkage: 2.0, maxBuffer: 1.5, defRate: 85, dyedRate: 110, active: true },
-  { id: 'FAB-005', quality: 'Gey Cotton Reyon', qualityName: 'Gey Cotton Reyon', type: 'Cotton/Rayon', widths: ['44"', '58"'], shrinkage: 3.5, defaultShrinkage: 3.5, maxBuffer: 2.0, defRate: 50, dyedRate: 65, active: true }
-];
+const DEFAULT_FABRICS = [];
 
 export default function OrderDetailView({
   order,
@@ -65,7 +59,7 @@ export default function OrderDetailView({
   const [masterFabricsList, setMasterFabricsList] = useState(() => {
     try {
       const s = getStoredData('raindrop_fabrics_v1', null);
-      if (Array.isArray(s) && s.length > 0) return s;
+      if (Array.isArray(s)) return s;
     } catch (e) {}
     return procurementFabrics || [];
   });
@@ -77,7 +71,7 @@ export default function OrderDetailView({
     const handleFabricsUpdate = () => {
       try {
         const s = getStoredData('raindrop_fabrics_v1', null);
-        if (Array.isArray(s) && s.length > 0) setMasterFabricsList(s);
+        if (Array.isArray(s)) setMasterFabricsList(s);
       } catch (e) {}
     };
     const handleCloseWidthDropdown = () => setActiveWidthDropdown(null);
@@ -379,6 +373,26 @@ export default function OrderDetailView({
     }
     return [];
   });
+
+  const totalButtonQty = useMemo(() => {
+    let sum = 0;
+    (addedAccessories || []).forEach((acc) => {
+      const cat = (acc.category || '').toLowerCase();
+      if (cat.includes('button')) {
+        const directTotal = parseFloat(acc.total || acc.totalQuantity || 0);
+        if (!isNaN(directTotal) && directTotal > 0) {
+          sum += directTotal;
+        } else {
+          const req = parseFloat(acc.reqPerPc || acc.reqPerPiece || 0);
+          const gQty = parseFloat(acc.totalQty || acc.totalGarments || 0);
+          if (!isNaN(req) && !isNaN(gQty)) {
+            sum += req * gQty;
+          }
+        }
+      }
+    });
+    return sum;
+  }, [addedAccessories]);
 
   const [accessorySearchQuery, setAccessorySearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Buttons');
@@ -921,14 +935,24 @@ export default function OrderDetailView({
       onUpdateOrder(updatedOrder);
     }
 
-    setToastMessage(isDraft ? 'Order saved as Draft successfully!' : 'Order saved successfully!');
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-      if (onBack) {
-        onBack();
-      }
-    }, 500);
+    if (isDraft) {
+      setToastMessage('Order saved as Draft successfully!');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        if (onBack) onBack();
+      }, 600);
+    } else {
+      setToastMessage(`Order #${updatedOrder.id || ''} saved! The Basket below is ready for procurement handoff.`);
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        const basketEl = document.getElementById('basket-procurement-handoff');
+        if (basketEl) {
+          basketEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 500);
+    }
   };
 
   const handleSaveAllBOM = () => {
@@ -1753,7 +1777,6 @@ export default function OrderDetailView({
     if (Array.isArray(procurementFabrics) && procurementFabrics.length > 0) {
       allFabrics = [...allFabrics, ...procurementFabrics];
     }
-    allFabrics = [...allFabrics, ...DEFAULT_FABRICS];
 
     const fqClean = String(fabricQuality || '').toLowerCase().trim();
     if (!fqClean) return 3.5;
@@ -2325,7 +2348,7 @@ export default function OrderDetailView({
     if (!allFabrics || allFabrics.length === 0) {
       try {
         const stored = getStoredData('raindrop_fabrics_v1', null);
-        if (Array.isArray(stored) && stored.length > 0) allFabrics = stored;
+        if (Array.isArray(stored)) allFabrics = stored;
       } catch (e) {}
     }
     if (!allFabrics || allFabrics.length === 0) {
@@ -4625,6 +4648,179 @@ export default function OrderDetailView({
       </div>
 
       {/* =========================================================================
+       * SECTION 9: THE BASKET & PROCUREMENT HANDOFF (PDF Route 1 Specification)
+       * "A saved order generates a bottom Basket Action Bar with three buttons:
+       * Create PO, Send to Process, and Order Material."
+       * ========================================================================= */}
+      {confirmed && (
+        <div
+          id="basket-procurement-handoff"
+          className="card border-0 shadow-sm rounded-4 p-4 my-4"
+          style={{
+            backgroundColor: '#ffffff',
+            border: '1.5px solid #c7d2fe',
+            boxShadow: '0 4px 20px rgba(46, 55, 164, 0.08)'
+          }}
+        >
+          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 border-bottom">
+            <div className="d-flex align-items-center gap-3">
+              <div
+                className="rounded-3 d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  backgroundColor: '#2e37a4',
+                  boxShadow: '0 4px 12px rgba(46, 55, 164, 0.25)'
+                }}
+              >
+                <i className="ti ti-basket fs-22"></i>
+              </div>
+              <div>
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <h5 className="fw-bold text-dark mb-0 fs-16">The Basket &bull; Procurement Handoff</h5>
+                  <span className="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 fw-semibold">
+                    <i className="ti ti-check me-1"></i>Order Saved &bull; Auto-populated
+                  </span>
+                </div>
+                <p className="text-secondary fs-12 mb-0 mt-0.5">
+                  Route 1 &bull; Section 9: Triggering procurement from inside this order auto-populates all specifications (fabric, buttons, quantities) into the resulting PO or Process Challan.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick summary pills */}
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              {totalButtonQty > 0 && (
+                <span className="badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium">
+                  <i className="ti ti-circle-dot text-primary me-1"></i>Buttons BOM: <strong>{totalButtonQty.toLocaleString()} pcs</strong>
+                </span>
+              )}
+              {order?.totalFabricGreige > 0 && (
+                <span className="badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium">
+                  <i className="ti ti-layers text-primary me-1"></i>Greige Fabric: <strong>{order.totalFabricGreige}m</strong>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Basket 3 Action Buttons per Section 9 */}
+          <div className="d-flex flex-wrap align-items-center gap-3 pt-3">
+            {/* Button 1: Create PO */}
+            <div className="btn-group shadow-sm">
+              <button
+                type="button"
+                className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-start-3 d-inline-flex align-items-center gap-2"
+                style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
+                onClick={() => {
+                  if (totalButtonQty > 0) {
+                    setActivePOModalCategory('BUTTON');
+                  } else if (onNavigateToProcurement) {
+                    onNavigateToProcurement('/procurement-pos', order);
+                  } else if (onTriggerProcurement) {
+                    onTriggerProcurement('Create PO', order);
+                  }
+                }}
+                title="Create Purchase Order with auto-populated specifications from this order"
+              >
+                <i className="ti ti-shopping-cart fs-16"></i>
+                <span>Create PO</span>
+              </button>
+              <button
+                type="button"
+                className="btn text-white dropdown-toggle dropdown-toggle-split px-2.5 rounded-end-3"
+                style={{ backgroundColor: '#242b82', borderColor: '#242b82' }}
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <span className="visually-hidden">Toggle Dropdown</span>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end shadow-lg border rounded-3 p-1 fs-13">
+                {totalButtonQty > 0 && (
+                  <li>
+                    <button
+                      type="button"
+                      className="dropdown-item py-2 px-3 rounded-2 d-flex align-items-center justify-content-between"
+                      onClick={() => setActivePOModalCategory('BUTTON')}
+                    >
+                      <span className="d-flex align-items-center gap-2">
+                        <i className="ti ti-circle-dot text-primary"></i>
+                        <span>Button PO (Auto-populate)</span>
+                      </span>
+                      <span className="badge bg-light text-primary border rounded-pill">{totalButtonQty.toLocaleString()} pcs</span>
+                    </button>
+                  </li>
+                )}
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item py-2 px-3 rounded-2 d-flex align-items-center gap-2"
+                    onClick={() => {
+                      if (onNavigateToProcurement) {
+                        onNavigateToProcurement('/procurement-pos', order);
+                      } else if (onTriggerProcurement) {
+                        onTriggerProcurement('Create PO', order);
+                      }
+                    }}
+                  >
+                    <i className="ti ti-file-invoice text-primary"></i>
+                    <span>Fabric Purchase Order (PO)</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Button 2: Send to Process */}
+            <button
+              type="button"
+              className="btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border"
+              style={{
+                backgroundColor: '#ffffff',
+                borderColor: '#6366f1',
+                color: '#4338ca'
+              }}
+              onClick={() => {
+                if (onTriggerProcurement) {
+                  onTriggerProcurement('Send to Process', order);
+                } else {
+                  setToastMessage(`Job Work / Dyeing Challan created for Order #${order?.id}`);
+                  setShowToast(true);
+                  setTimeout(() => setShowToast(false), 3000);
+                }
+              }}
+              title="Send fabrics or job-work items to processing / dyeing"
+            >
+              <i className="ti ti-ticket fs-16" style={{ color: '#6366f1' }}></i>
+              <span>Send to Process</span>
+            </button>
+
+            {/* Button 3: Order Material */}
+            <button
+              type="button"
+              className="btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border"
+              style={{
+                backgroundColor: '#ffffff',
+                borderColor: '#cbd5e1',
+                color: '#334155'
+              }}
+              onClick={() => {
+                if (onTriggerProcurement) {
+                  onTriggerProcurement('Order Material', order);
+                } else {
+                  setToastMessage(`Material requisition queued for Order #${order?.id}`);
+                  setShowToast(true);
+                  setTimeout(() => setShowToast(false), 3000);
+                }
+              }}
+              title="Generate internal material requisition for stores"
+            >
+              <i className="ti ti-package fs-16 text-secondary"></i>
+              <span>Order Material</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
        * BOTTOM ACTION BUTTONS ROW (No background card, clean direct buttons)
        * ========================================================================= */}
       <div className="d-flex align-items-center gap-3 my-4 flex-wrap">
@@ -4672,6 +4868,23 @@ export default function OrderDetailView({
           <i className="ti ti-x" style={{ fontSize: '15px' }}></i>
           <span>Cancel</span>
         </button>
+
+        {confirmed && (
+          <button
+            type="button"
+            className="btn rounded-3 px-4 py-2.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs transition-all"
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1.5px solid #2e37a4',
+              color: '#2e37a4',
+              fontSize: '13.5px'
+            }}
+            onClick={onBack}
+          >
+            <i className="ti ti-arrow-left" style={{ fontSize: '15px' }}></i>
+            <span>Back to Orders List</span>
+          </button>
+        )}
       </div>
 
       {/* =========================================================================

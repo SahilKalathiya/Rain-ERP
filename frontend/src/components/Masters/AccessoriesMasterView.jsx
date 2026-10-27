@@ -132,15 +132,7 @@ const ACCESSORY_UNITS = ['Piece', 'Meter', 'Packet', 'Box', 'Cone', 'Kilogram', 
 const CONTINUOUS_UNITS = ['Meter', 'Kilogram', 'Cone', 'Box', 'Packet'];
 const SIZE_UNITS = ['mm', 'cm', 'inch'];
 
-const FABRIC_QUALITIES = [
-  'Grey Cotton Fabrics (100*100)',
-  'Mulmul Cotton (100/100)',
-  'Tussar Silk 42"',
-  'Chanderi Silk 44"',
-  'Suh Cotton 44"',
-  '2.40/20s CF Cotton 47"',
-  'Cotton Cambric 60*60'
-];
+const FABRIC_QUALITIES = [];
 
 const STANDARD_WIDTHS = ['42"', '44"', '48"', '58"'];
 
@@ -295,7 +287,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   const [masterFabrics, setMasterFabrics] = useState(() => {
     try {
       const stored = getStoredData('raindrop_fabrics_v1', null);
-      if (Array.isArray(stored) && stored.length > 0) return stored;
+      if (Array.isArray(stored)) return stored;
     } catch (e) {}
     return initialFabrics || [];
   });
@@ -383,11 +375,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       const n = f.qualityName || f.quality || f.name;
       if (n && !names.includes(n)) names.push(n);
     });
-    if (names.length === 0) {
-      FABRIC_QUALITIES.forEach(q => {
-        if (!names.includes(q)) names.push(q);
-      });
-    }
     return names;
   }, [masterFabrics]);
 
