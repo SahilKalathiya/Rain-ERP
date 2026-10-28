@@ -15442,7 +15442,8 @@
   };
   function calcShrinkagePO(reqPerPc, garments, shrinkagePct, bufferQty, extraQty, rate) {
     const totalDyed = reqPerPc * garments;
-    const totalGreige = totalDyed * (1 + (shrinkagePct || 0) / 100) + (bufferQty || 0);
+    const greigeBase = totalDyed * (1 + (parseFloat(shrinkagePct) || 0) / 100);
+    const totalGreige = greigeBase * (1 + (parseFloat(bufferQty) || 0) / 100);
     const totalPOQty = totalGreige + (parseFloat(extraQty) || 0);
     return {
       totalDyed,
@@ -15480,7 +15481,8 @@
     };
   }
   function calcDoriPO(reqPerPc, extraPerPacking, bufferQty, fabricPerUnit, garments, extraQty, rate) {
-    const totalReq = (reqPerPc + (extraPerPacking || 0)) * garments + (bufferQty || 0);
+    const baseReq = (reqPerPc + (extraPerPacking || 0)) * garments;
+    const totalReq = baseReq * (1 + (parseFloat(bufferQty) || 0) / 100);
     const totalPOQty = totalReq + (parseFloat(extraQty) || 0);
     const totalFabric = totalPOQty * (fabricPerUnit || 0);
     return {
@@ -16077,9 +16079,9 @@
                 },
                 /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-left px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 14px", textAlign: "left", fontSize: "12px", color: "#475569" } }, "Article"),
                 /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "No. of Garments"),
-                isLaceOrElastic && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Dyed/Pc"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Dyed"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Shrinkage%"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Buffer"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Greige")),
+                isLaceOrElastic && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Dyed/Pc"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Dyed"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Shrinkage%"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Buffer %"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Greige")),
                 isBeads && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "g/100pc"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "g/pc"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total g")),
-                isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Req/Pc (m)"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra/Pack"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Buffer"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Dori"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Fabric/m")),
+                isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Req/Pc (m)"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra/Pack"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Buffer %"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Dori"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Fabric/m")),
                 !isLaceOrElastic && !isBeads && !isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Req/Pc"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra/Pack"), /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Req")),
                 /* @__PURE__ */ import_react4.default.createElement("th", { className: "text-center px-3 py-2.5 font-semibold text-gray-600 text-xs", style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra Qty"),
                 /* @__PURE__ */ import_react4.default.createElement(
@@ -16132,9 +16134,9 @@
                       }
                     }
                   ), /* @__PURE__ */ import_react4.default.createElement("div", { className: "text-[10px] text-gray-400 mt-0.5", style: { fontSize: "10px", color: "#94a3b8" } }, "max ", row.maxGarments)),
-                  isLaceOrElastic && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.reqPerPc), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.totalDyed?.toFixed(1)), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.shrinkagePct, "%"), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.bufferQty), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalGreige?.toFixed(1))),
+                  isLaceOrElastic && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.reqPerPc), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.totalDyed?.toFixed(1)), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.shrinkagePct, "%"), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.bufferQty !== void 0 && row.bufferQty !== "" ? row.bufferQty + "%" : "0%"), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalGreige?.toFixed(1))),
                   isBeads && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.consumptionPer100), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, (row.consumptionPer100 / 100).toFixed(2)), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalRequired?.toFixed(1))),
-                  isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.reqPerPc), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.extraPerPacking), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.bufferQty), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalRequired?.toFixed(1)), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.fabricPerUnit)),
+                  isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.reqPerPc), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.extraPerPacking), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.bufferQty !== void 0 && row.bufferQty !== "" ? row.bufferQty + "%" : "0%"), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalRequired?.toFixed(1)), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.fabricPerUnit)),
                   !isLaceOrElastic && !isBeads && !isDori && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.reqPerPc), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-600", style: { padding: "10px 12px", textAlign: "center", color: "#475569" } }, row.extraPerPacking), /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center text-gray-800 font-medium", style: { padding: "10px 12px", textAlign: "center", color: "#1e293b", fontWeight: 600 } }, row.totalRequired?.toFixed(1))),
                   /* @__PURE__ */ import_react4.default.createElement("td", { className: "px-3 py-2.5 text-center", style: { padding: "10px 12px", textAlign: "center" } }, /* @__PURE__ */ import_react4.default.createElement(
                     "input",
@@ -17474,7 +17476,26 @@
             });
           }
         });
-        return flattened;
+        return flattened.map((item) => {
+          if (item.articleRows && typeof item.articleRows === "object") {
+            const cleanRows = {};
+            Object.entries(item.articleRows).forEach(([art, rList]) => {
+              if (Array.isArray(rList)) {
+                const seen = /* @__PURE__ */ new Set();
+                cleanRows[art] = rList.filter((r) => {
+                  const raw = (r.articleColor || "").trim();
+                  const base = raw.replace(/\s*\(\d+\s*pcs\)/i, "").trim().toLowerCase();
+                  const key = base || raw.toLowerCase();
+                  if (seen.has(key)) return false;
+                  seen.add(key);
+                  return true;
+                });
+              }
+            });
+            return { ...item, articleRows: cleanRows };
+          }
+          return item;
+        });
       }
       return [];
     });
@@ -17483,19 +17504,39 @@
       (addedAccessories || []).forEach((acc) => {
         const cat = (acc.category || "").toLowerCase();
         if (cat.includes("button")) {
-          const directTotal = parseFloat(acc.total || acc.totalQuantity || 0);
-          if (!isNaN(directTotal) && directTotal > 0) {
-            sum += directTotal;
+          if (acc.articleRows && typeof acc.articleRows === "object") {
+            Object.values(acc.articleRows).forEach((rows) => {
+              if (Array.isArray(rows)) {
+                rows.forEach((r) => {
+                  const reqVal = parseFloat(r.reqPerPc) || 0;
+                  const packInput = r.extraPerPack !== void 0 && r.extraPerPack !== null ? String(r.extraPerPack).trim() : "";
+                  const packNum = parseFloat(packInput);
+                  const packVal = !isNaN(packNum) && packNum >= 0 ? packNum : 0;
+                  const bufVal = parseFloat(r.bufferPct) || 0;
+                  const artPcs = parseFloat(r.totalQty) || 0;
+                  const reqQty = artPcs * reqVal;
+                  const packQty = artPcs * packVal;
+                  const baseCalc = reqQty + packQty;
+                  const bufQty = baseCalc * bufVal / 100;
+                  sum += baseCalc + bufQty;
+                });
+              }
+            });
           } else {
-            const req = parseFloat(acc.reqPerPc || acc.reqPerPiece || 0);
-            const gQty = parseFloat(acc.totalQty || acc.totalGarments || 0);
-            if (!isNaN(req) && !isNaN(gQty)) {
-              sum += req * gQty;
+            const directTotal = parseFloat(acc.total || acc.totalQuantity || 0);
+            if (!isNaN(directTotal) && directTotal > 0) {
+              sum += directTotal;
+            } else {
+              const req = parseFloat(acc.reqPerPc || acc.reqPerPiece || 0);
+              const gQty = parseFloat(acc.totalQty || acc.totalGarments || 0);
+              if (!isNaN(req) && !isNaN(gQty)) {
+                sum += req * gQty;
+              }
             }
           }
         }
       });
-      return sum;
+      return Math.round(sum);
     }, [addedAccessories]);
     const [accessorySearchQuery, setAccessorySearchQuery] = (0, import_react5.useState)("");
     const [activeCategory, setActiveCategory] = (0, import_react5.useState)("Buttons");
@@ -17625,14 +17666,27 @@
     };
     const getArticleColorOptions = (articleName) => {
       const fcRows = (order?.fabricConsumptions || []).filter(
-        (fc) => (fc.articleName || fc.article || "").toLowerCase() === (articleName || "").toLowerCase()
+        (fc) => (fc.articleName || fc.article || "").toLowerCase().trim() === (articleName || "").toLowerCase().trim()
       );
       if (fcRows.length > 0) {
-        return fcRows.map((r) => ({
-          color: r.colorName || "Standard",
-          qty: r.pcs !== void 0 ? r.pcs : order?.totalGarments || 0,
-          display: `${r.colorName || "Standard"} (${r.pcs !== void 0 ? r.pcs : order?.totalGarments || 0} pcs)`
-        }));
+        const colorMap = /* @__PURE__ */ new Map();
+        fcRows.forEach((r) => {
+          const cName = (r.colorName || "Standard").trim();
+          const key = cName.toLowerCase();
+          if (!colorMap.has(key)) {
+            const rawPcs = r.pcs !== void 0 && r.pcs !== null && r.pcs !== "" ? parseInt(r.pcs, 10) : order?.totalGarments || 0;
+            const pcsVal = isNaN(rawPcs) ? 0 : rawPcs;
+            colorMap.set(key, {
+              color: cName,
+              qty: pcsVal,
+              display: `${cName} (${pcsVal} pcs)`
+            });
+          }
+        });
+        const uniqueColors = Array.from(colorMap.values());
+        if (uniqueColors.length > 0) {
+          return uniqueColors;
+        }
       }
       const colors = [];
       (order?.customerOrders || []).forEach((co) => {
@@ -17651,13 +17705,30 @@
       }));
     };
     const getCardArticleRows = (item, articleName) => {
-      if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
-        return item.articleRows[articleName];
-      }
       const colorOpts = getArticleColorOptions(articleName);
       const artObj = (orderArticles || []).find((a) => (a.name || "").toLowerCase() === (articleName || "").toLowerCase()) || (order?.articles || []).find((a) => (a.name || "").toLowerCase() === (articleName || "").toLowerCase());
       const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
       const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
+      if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
+        const seen = /* @__PURE__ */ new Set();
+        const deduped = [];
+        item.articleRows[articleName].forEach((r) => {
+          const raw = (r.articleColor || "").trim();
+          const base = raw.replace(/\s*\(\d+\s*pcs\)/i, "").trim().toLowerCase();
+          const key = base || raw.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            const matchedOpt = colorOpts.find((co) => co.color.toLowerCase() === key || co.display.toLowerCase() === raw.toLowerCase());
+            deduped.push({
+              ...r,
+              totalQty: matchedOpt ? matchedOpt.qty : key === "all colours" ? totalAllQty : r.totalQty
+            });
+          }
+        });
+        if (deduped.length > 0) {
+          return deduped;
+        }
+      }
       const initialRows = colorOpts.map((co, idx) => ({
         id: `row_${articleName}_${idx}`,
         articleColor: co.display,
@@ -17974,15 +18045,11 @@
           if (onBack) onBack();
         }, 600);
       } else {
-        setToastMessage(`Order #${updatedOrder.id || ""} saved! The Basket below is ready for procurement handoff.`);
+        setToastMessage(`Order #${updatedOrder.id || ""} saved successfully!`);
         setShowToast(true);
         setTimeout(() => {
           setShowToast(false);
-          const basketEl = document.getElementById("basket-procurement-handoff");
-          if (basketEl) {
-            basketEl.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 500);
+        }, 1500);
       }
     };
     const handleSaveAllBOM = () => {
@@ -18198,12 +18265,12 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct !== void 0 && row.bufferPct !== "" ? row.bufferPct + "%" : "0%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
           });
         }))));
       }
       if (cat.id === "Lace") {
-        return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Dyed mtr/pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Shrink%"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Greige/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
+        return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Dyed mtr/pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Shrink%"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Greige/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer %"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
           const rows = getCardArticleRows(item, currentArticle);
           const colorOptions = getArticleColorOptions(currentArticle);
           const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || "");
@@ -18237,12 +18304,12 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct !== void 0 && row.bufferPct !== "" ? row.bufferPct + "%" : "0%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
           });
         }))));
       }
       if (cat.id === "Tassels") {
-        return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Source"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Fabric Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Size"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Req/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Thread Req. (mts)"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
+        return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Source"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Fabric Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Size"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Req/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Thread Req. (mts)"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer %"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
           const rows = getCardArticleRows(item, currentArticle);
           const colorOptions = getArticleColorOptions(currentArticle);
           const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || "");
@@ -18255,7 +18322,7 @@
             const bufferVal = parseFloat(row.bufferPct) || 0;
             const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
             const totalValNum = reqVal * qtyVal * (1 + bufferVal / 100);
-            const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
+            const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
             const isJobWork = /job/i.test(row.source || "");
             return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Front..", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? isJobWork ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: isJobWork ? "text-dark" : "text-muted d-block text-center", style: { fontSize: "13px" } }, isJobWork ? row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014" : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "70px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "95px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
               "input",
@@ -18275,11 +18342,11 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct !== void 0 && row.bufferPct !== "" ? row.bufferPct + "%" : "0%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
           });
         }))));
       }
-      return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Size"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Source"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Fabric Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Req/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
+      return /* @__PURE__ */ import_react5.default.createElement("div", { className: "table-responsive", style: { overflowX: "auto", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react5.default.createElement("table", { className: "table table-borderless align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", { className: "text-muted text-uppercase", style: { fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", borderBottom: "1.5px solid #e2e8f0", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Article Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Total Quantity"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Placement"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Accessory Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Size"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Source"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px" } }, "Fabric Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Req/Pc"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center" } }, "Buffer %"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { padding: "8px 10px", textAlign: "center", color: "#2e37a4" } }, "Total"))), /* @__PURE__ */ import_react5.default.createElement("tbody", null, articlesToRender.map((currentArticle) => {
         const rows = getCardArticleRows(item, currentArticle);
         const colorOptions = getArticleColorOptions(currentArticle);
         const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || "");
@@ -18322,7 +18389,7 @@
               onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
               style: inputStyle
             }
-          ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct ? row.bufferPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+          ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max 10")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.bufferPct !== void 0 && row.bufferPct !== "" ? row.bufferPct + "%" : "0%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
         });
       }))));
     };
@@ -19165,7 +19232,17 @@
       },
       /* @__PURE__ */ import_react5.default.createElement("i", { className: confirmed ? "ti ti-check text-success" : "ti ti-file-text text-muted", style: { fontSize: "13px", lineHeight: 1 } }),
       confirmed ? "Confirmed" : order.status || "Draft"
-    )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-3 text-muted small mt-1" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-flex align-items-center gap-1.5 font-monospace" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-hash", style: { fontSize: "14px", lineHeight: 1 } }), " ", order.id || "RD-2610-0002"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-calendar", style: { fontSize: "14px", lineHeight: 1 } }), " ", formatDate(order.orderDate))))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "dropdown" }, /* @__PURE__ */ import_react5.default.createElement(
+    )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-3 text-muted small mt-1" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-flex align-items-center gap-1.5 font-monospace" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-hash", style: { fontSize: "14px", lineHeight: 1 } }), " ", order.id || "RD-2610-0002"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-calendar", style: { fontSize: "14px", lineHeight: 1 } }), " ", formatDate(order.orderDate))))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, onEditSection && /* @__PURE__ */ import_react5.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-primary btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fw-semibold shadow-xs",
+        onClick: () => onEditSection("all"),
+        title: "Edit order details, styles, and customer quantities"
+      },
+      /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-edit fs-14" }),
+      /* @__PURE__ */ import_react5.default.createElement("span", null, order?.status === "Draft" ? "Edit Draft Order" : "Edit Order")
+    ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "dropdown" }, /* @__PURE__ */ import_react5.default.createElement(
       "button",
       {
         type: "button",
@@ -19202,7 +19279,18 @@
       },
       /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-printer", style: { fontSize: "16px", lineHeight: 1 } }),
       " Print Order"
-    ))))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-6 col-lg" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-3 bg-white h-100 d-flex flex-row align-items-center gap-3" }, /* @__PURE__ */ import_react5.default.createElement(
+    )))))), order?.status === "Draft" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "alert border-0 shadow-xs rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2", style: { backgroundColor: "#fffbeb", border: "1px solid #fef3c7" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "p-2 rounded-3 text-warning bg-white shadow-xs d-flex align-items-center justify-content-center", style: { width: "38px", height: "38px" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-file-text fs-5" })), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "This Sales Order is currently saved as a Draft"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small", style: { fontSize: "12px" } }, "You can edit style info, configure articles, size matrices, and customer breakdowns to proceed to the next step."))), onEditSection && /* @__PURE__ */ import_react5.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn text-white btn-sm px-3 py-2 rounded-3 fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5",
+        style: { backgroundColor: "#2e37a4", borderColor: "#2e37a4" },
+        onClick: () => onEditSection("all")
+      },
+      /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-edit" }),
+      /* @__PURE__ */ import_react5.default.createElement("span", null, "Continue Editing Draft"),
+      /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-arrow-right" })
+    )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "row g-3 mb-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-6 col-lg" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-3 bg-white h-100 d-flex flex-row align-items-center gap-3" }, /* @__PURE__ */ import_react5.default.createElement(
       "div",
       {
         className: "rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0",
@@ -20557,130 +20645,6 @@
         },
         /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-device-floppy", style: { fontSize: "18px" } }),
         /* @__PURE__ */ import_react5.default.createElement("span", null, "Save Accessories BOM")
-      ))
-    ), confirmed && /* @__PURE__ */ import_react5.default.createElement(
-      "div",
-      {
-        id: "basket-procurement-handoff",
-        className: "card border-0 shadow-sm rounded-4 p-4 my-4",
-        style: {
-          backgroundColor: "#ffffff",
-          border: "1.5px solid #c7d2fe",
-          boxShadow: "0 4px 20px rgba(46, 55, 164, 0.08)"
-        }
-      },
-      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 border-bottom" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react5.default.createElement(
-        "div",
-        {
-          className: "rounded-3 d-flex align-items-center justify-content-center text-white flex-shrink-0",
-          style: {
-            width: "46px",
-            height: "46px",
-            backgroundColor: "#2e37a4",
-            boxShadow: "0 4px 12px rgba(46, 55, 164, 0.25)"
-          }
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-basket fs-22" })
-      ), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react5.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "The Basket \u2022 Procurement Handoff"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 fw-semibold" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check me-1" }), "Order Saved \u2022 Auto-populated")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "text-secondary fs-12 mb-0 mt-0.5" }, "Route 1 \u2022 Section 9: Triggering procurement from inside this order auto-populates all specifications (fabric, buttons, quantities) into the resulting PO or Process Challan."))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, totalButtonQty > 0 && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-circle-dot text-primary me-1" }), "Buttons BOM: ", /* @__PURE__ */ import_react5.default.createElement("strong", null, totalButtonQty.toLocaleString(), " pcs")), order?.totalFabricGreige > 0 && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-layers text-primary me-1" }), "Greige Fabric: ", /* @__PURE__ */ import_react5.default.createElement("strong", null, order.totalFabricGreige, "m")))),
-      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-3 pt-3" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "btn-group shadow-sm" }, /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-start-3 d-inline-flex align-items-center gap-2",
-          style: { backgroundColor: "#2e37a4", borderColor: "#2e37a4" },
-          onClick: () => {
-            if (totalButtonQty > 0) {
-              setActivePOModalCategory("BUTTON");
-            } else if (onNavigateToProcurement) {
-              onNavigateToProcurement("/procurement-pos", order);
-            } else if (onTriggerProcurement) {
-              onTriggerProcurement("Create PO", order);
-            }
-          },
-          title: "Create Purchase Order with auto-populated specifications from this order"
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-shopping-cart fs-16" }),
-        /* @__PURE__ */ import_react5.default.createElement("span", null, "Create PO")
-      ), /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn text-white dropdown-toggle dropdown-toggle-split px-2.5 rounded-end-3",
-          style: { backgroundColor: "#242b82", borderColor: "#242b82" },
-          "data-bs-toggle": "dropdown",
-          "aria-expanded": "false"
-        },
-        /* @__PURE__ */ import_react5.default.createElement("span", { className: "visually-hidden" }, "Toggle Dropdown")
-      ), /* @__PURE__ */ import_react5.default.createElement("ul", { className: "dropdown-menu dropdown-menu-end shadow-lg border rounded-3 p-1 fs-13" }, totalButtonQty > 0 && /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "dropdown-item py-2 px-3 rounded-2 d-flex align-items-center justify-content-between",
-          onClick: () => setActivePOModalCategory("BUTTON")
-        },
-        /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-circle-dot text-primary" }), /* @__PURE__ */ import_react5.default.createElement("span", null, "Button PO (Auto-populate)")),
-        /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-light text-primary border rounded-pill" }, totalButtonQty.toLocaleString(), " pcs")
-      )), /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "dropdown-item py-2 px-3 rounded-2 d-flex align-items-center gap-2",
-          onClick: () => {
-            if (onNavigateToProcurement) {
-              onNavigateToProcurement("/procurement-pos", order);
-            } else if (onTriggerProcurement) {
-              onTriggerProcurement("Create PO", order);
-            }
-          }
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-file-invoice text-primary" }),
-        /* @__PURE__ */ import_react5.default.createElement("span", null, "Fabric Purchase Order (PO)")
-      )))), /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border",
-          style: {
-            backgroundColor: "#ffffff",
-            borderColor: "#6366f1",
-            color: "#4338ca"
-          },
-          onClick: () => {
-            if (onTriggerProcurement) {
-              onTriggerProcurement("Send to Process", order);
-            } else {
-              setToastMessage(`Job Work / Dyeing Challan created for Order #${order?.id}`);
-              setShowToast(true);
-              setTimeout(() => setShowToast(false), 3e3);
-            }
-          },
-          title: "Send fabrics or job-work items to processing / dyeing"
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-ticket fs-16", style: { color: "#6366f1" } }),
-        /* @__PURE__ */ import_react5.default.createElement("span", null, "Send to Process")
-      ), /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border",
-          style: {
-            backgroundColor: "#ffffff",
-            borderColor: "#cbd5e1",
-            color: "#334155"
-          },
-          onClick: () => {
-            if (onTriggerProcurement) {
-              onTriggerProcurement("Order Material", order);
-            } else {
-              setToastMessage(`Material requisition queued for Order #${order?.id}`);
-              setShowToast(true);
-              setTimeout(() => setShowToast(false), 3e3);
-            }
-          },
-          title: "Generate internal material requisition for stores"
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-package fs-16 text-secondary" }),
-        /* @__PURE__ */ import_react5.default.createElement("span", null, "Order Material")
       ))
     ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-3 my-4 flex-wrap" }, /* @__PURE__ */ import_react5.default.createElement(
       "button",
@@ -24333,7 +24297,7 @@
     if (!str) return "";
     return str.replace(/\b\w/g, (char) => char.toUpperCase());
   };
-  function OrderCreationWizard({ onSaveOrder, onCancel }) {
+  function OrderCreationWizard({ onSaveOrder, onCancel, editingOrder = null }) {
     const [masterSizeSeries, setMasterSizeSeries] = (0, import_react10.useState)(() => {
       const stored = getStoredData("erp_size_series_v1", null);
       if (Array.isArray(stored)) {
@@ -24477,6 +24441,15 @@
     const [activeCustomerIndexForNewColor, setActiveCustomerIndexForNewColor] = (0, import_react10.useState)(0);
     const [copySizesModal, setCopySizesModal] = (0, import_react10.useState)(null);
     const [orderInfo, setOrderInfo] = (0, import_react10.useState)(() => {
+      if (editingOrder) {
+        return {
+          orderId: editingOrder.id || editingOrder.orderId || "",
+          styleName: editingOrder.styleName || "",
+          orderDate: editingOrder.orderDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+          expectedDelivery: editingOrder.expectedDelivery || "",
+          priority: editingOrder.priority || "Normal"
+        };
+      }
       const today = /* @__PURE__ */ new Date();
       const mm = String(today.getMonth() + 1).padStart(2, "0");
       const yy = String(today.getFullYear()).slice(-2);
@@ -24491,9 +24464,92 @@
         priority: "Normal"
       };
     });
-    const [addedArticles, setAddedArticles] = (0, import_react10.useState)([]);
-    const [orderCustomers, setOrderCustomers] = (0, import_react10.useState)([]);
-    const [expandedCustomerIdx, setExpandedCustomerIdx] = (0, import_react10.useState)(-1);
+    const [addedArticles, setAddedArticles] = (0, import_react10.useState)(() => {
+      if (editingOrder && Array.isArray(editingOrder.articles) && editingOrder.articles.length > 0) {
+        return editingOrder.articles.map((art) => ({
+          id: art.id || `ART-${Date.now()}-${Math.floor(Math.random() * 100)}`,
+          articleTypeId: art.articleTypeId || art.id,
+          name: art.name || "",
+          avgLength: art.avgLength || art.avgGarmentLength || "",
+          fabrics: Array.isArray(art.fabrics) && art.fabrics.length > 0 ? art.fabrics.map((f) => ({
+            role: f.role || "",
+            fabricId: f.fabricId || "",
+            fabricQuality: f.fabricQuality || "",
+            avgLength: f.avgLength || art.avgLength || ""
+          })) : [
+            {
+              role: "",
+              fabricId: art.fabricId || "",
+              fabricQuality: art.fabricQuality || "",
+              avgLength: art.avgLength || ""
+            }
+          ]
+        }));
+      }
+      return [];
+    });
+    const [orderCustomers, setOrderCustomers] = (0, import_react10.useState)(() => {
+      const rawCusts = editingOrder?.customerOrders || editingOrder?.customers;
+      if (Array.isArray(rawCusts) && rawCusts.length > 0) {
+        return rawCusts.map((c) => ({
+          id: c.id || `ORD-CUST-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
+          customerId: c.customerId || "",
+          customerName: c.customerName || "",
+          assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
+          selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
+          sizeConfigs: c.sizeConfigs || {}
+        }));
+      }
+      return [];
+    });
+    const [expandedCustomerIdx, setExpandedCustomerIdx] = (0, import_react10.useState)(() => {
+      const rawCusts = editingOrder?.customerOrders || editingOrder?.customers;
+      return Array.isArray(rawCusts) && rawCusts.length > 0 ? 0 : -1;
+    });
+    (0, import_react10.useEffect)(() => {
+      if (editingOrder) {
+        setOrderInfo({
+          orderId: editingOrder.id || editingOrder.orderId || "",
+          styleName: editingOrder.styleName || "",
+          orderDate: editingOrder.orderDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+          expectedDelivery: editingOrder.expectedDelivery || "",
+          priority: editingOrder.priority || "Normal"
+        });
+        if (Array.isArray(editingOrder.articles) && editingOrder.articles.length > 0) {
+          setAddedArticles(editingOrder.articles.map((art) => ({
+            id: art.id || `ART-${Date.now()}-${Math.floor(Math.random() * 100)}`,
+            articleTypeId: art.articleTypeId || art.id,
+            name: art.name || "",
+            avgLength: art.avgLength || art.avgGarmentLength || "",
+            fabrics: Array.isArray(art.fabrics) && art.fabrics.length > 0 ? art.fabrics.map((f) => ({
+              role: f.role || "",
+              fabricId: f.fabricId || "",
+              fabricQuality: f.fabricQuality || "",
+              avgLength: f.avgLength || art.avgLength || ""
+            })) : [
+              {
+                role: "",
+                fabricId: art.fabricId || "",
+                fabricQuality: art.fabricQuality || "",
+                avgLength: art.avgLength || ""
+              }
+            ]
+          })));
+        }
+        const rawCusts = editingOrder.customerOrders || editingOrder.customers;
+        if (Array.isArray(rawCusts) && rawCusts.length > 0) {
+          setOrderCustomers(rawCusts.map((c) => ({
+            id: c.id || `ORD-CUST-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
+            customerId: c.customerId || "",
+            customerName: c.customerName || "",
+            assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
+            selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
+            sizeConfigs: c.sizeConfigs || {}
+          })));
+          setExpandedCustomerIdx(0);
+        }
+      }
+    }, [editingOrder]);
     (0, import_react10.useEffect)(() => {
       async function loadMasters() {
         try {
@@ -25328,14 +25384,14 @@
         };
       });
       const payload = {
+        ...editingOrder || {},
         id: orderInfo.orderId,
         styleName: finalStyleName,
         orderDate: orderInfo.orderDate,
         expectedDelivery: orderInfo.expectedDelivery || "",
         priority: orderInfo.priority || "Normal",
-        status: status || "Saved",
-        // 'Draft' | 'Saved'
-        stage: status === "Draft" ? "Draft" : "Confirmed",
+        status: status || (editingOrder?.status === "Draft" && status !== "Saved" ? "Draft" : "Saved"),
+        stage: status === "Draft" || editingOrder?.status === "Draft" && status !== "Saved" ? "Draft" : "Confirmed",
         totalGarments: grandTotalOrderPieces || 0,
         totalFabricGreige: parseFloat(totalGreigeFabric) || 0,
         totalFabricDyed: parseFloat(totalDyedFabric) || 0,
@@ -25365,7 +25421,7 @@
         customerOrders: mappedCustomerOrders,
         fabricConsumptions: fabricConsumptionRows,
         fabricQualityGroups: fabricGroups,
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       const saved = getStoredData("erp_sales_orders_v1", []);
       const updated = [payload, ...saved.filter((o) => o.id !== payload.id)];
@@ -25410,7 +25466,7 @@
       },
       /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-arrow-left" }),
       " Back to Orders"
-    ), /* @__PURE__ */ import_react10.default.createElement("h4", { className: "fw-bold text-dark mb-0 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "p-2 rounded-3 text-white d-inline-flex align-items-center justify-content-center", style: { backgroundColor: "#2e37a4", width: "36px", height: "36px" } }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-file-plus fs-5" })), "New Sales Order"), /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-muted small mb-0 mt-1" }, "Order intake with article, fabric requirement (incl. dyeing shrinkage & buffer), size series and per-customer colour/quantity breakdown."))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3" }, /* @__PURE__ */ import_react10.default.createElement("h6", { className: "fw-bold text-dark mb-0 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge text-white rounded-circle p-1", style: { backgroundColor: "#2e37a4" } }, "1"), " Order Information"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge font-monospace px-2.5 py-1 rounded-2", style: { backgroundColor: "#eef2ff", color: "#4338ca" } }, orderInfo.orderId)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-5" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Style Name ", /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react10.default.createElement(
+    ), /* @__PURE__ */ import_react10.default.createElement("h4", { className: "fw-bold text-dark mb-0 d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "p-2 rounded-3 text-white d-inline-flex align-items-center justify-content-center", style: { backgroundColor: "#2e37a4", width: "36px", height: "36px" } }, /* @__PURE__ */ import_react10.default.createElement("i", { className: editingOrder ? "ti ti-edit fs-5" : "ti ti-file-plus fs-5" })), /* @__PURE__ */ import_react10.default.createElement("span", null, editingOrder ? editingOrder.status === "Draft" ? "Edit Draft Sales Order" : "Edit Sales Order" : "New Sales Order"), editingOrder && /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge font-monospace px-2.5 py-1 rounded-2 ms-1 fs-12 fw-normal", style: { backgroundColor: "#eef2ff", color: "#4338ca", border: "1px solid #c7d2fe" } }, editingOrder.id, " \u2022 ", editingOrder.status || "Draft")), /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-muted small mb-0 mt-1" }, "Order intake with article, fabric requirement (incl. dyeing shrinkage & buffer), size series and per-customer colour/quantity breakdown."))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3" }, /* @__PURE__ */ import_react10.default.createElement("h6", { className: "fw-bold text-dark mb-0 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge text-white rounded-circle p-1", style: { backgroundColor: "#2e37a4" } }, "1"), " Order Information"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge font-monospace px-2.5 py-1 rounded-2", style: { backgroundColor: "#eef2ff", color: "#4338ca" } }, orderInfo.orderId)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-5" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Style Name ", /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react10.default.createElement(
       "input",
       {
         type: "text",
@@ -26336,12 +26392,13 @@
         "button",
         {
           type: "button",
-          className: "btn text-white rounded-3 px-4 py-2 fw-semibold shadow-sm",
+          className: "btn text-white rounded-3 px-4 py-2 fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5",
           style: { backgroundColor: "#2e37a4", borderColor: "#2e37a4" },
           onClick: () => handleFinalSave("Saved")
         },
-        /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-        " Save Order"
+        /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check" }),
+        /* @__PURE__ */ import_react10.default.createElement("span", null, editingOrder ? "Save & Proceed to Next Step" : "Save Order"),
+        editingOrder && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-arrow-right" })
       ))
     )), copySizesModal && /* @__PURE__ */ import_react10.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15, 23, 42, 0.5)" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "modal-dialog modal-dialog-centered" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 p-3" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "modal-header border-0 pb-0" }, /* @__PURE__ */ import_react10.default.createElement("h5", { className: "modal-title fw-bold text-dark" }, "Copy sizes & quantities to other colours"), /* @__PURE__ */ import_react10.default.createElement(
       "button",
@@ -26880,23 +26937,15 @@
     return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, viewMode === "create" && /* @__PURE__ */ import_react12.default.createElement(
       OrderCreationWizard,
       {
+        editingOrder: selectedOrder,
         onSaveOrder: (newOrder, action) => handleSaveOrder(newOrder, action, true),
         onCancel: () => {
-          if (selectedOrder) {
-            setViewMode("detail");
-            if (onNavigate) {
-              onNavigate(`/orders/${selectedOrder.id}`);
-            } else if (typeof window !== "undefined" && window.history?.pushState) {
-              window.history.pushState(null, "", `/react/orders/${selectedOrder.id}`);
-            }
-          } else {
-            setSelectedOrder(null);
-            setViewMode("list");
-            if (onNavigate) {
-              onNavigate("/orders");
-            } else if (typeof window !== "undefined" && window.history?.pushState) {
-              window.history.pushState(null, "", "/react/orders");
-            }
+          setSelectedOrder(null);
+          setViewMode("list");
+          if (onNavigate) {
+            onNavigate("/orders");
+          } else if (typeof window !== "undefined" && window.history?.pushState) {
+            window.history.pushState(null, "", "/react/orders");
           }
         }
       }
@@ -32929,6 +32978,10 @@
           ]
         });
         setIsEditing(isPoLocked ? false : Boolean(po.isAutoGenerated || po.isNew));
+        const hasColors = checkHasColors(po.items);
+        const allRaw = checkAllRawFabrics(po.items);
+        userToggledColorRef.current = false;
+        setShowColorColumn(hasColors ? true : allRaw ? false : true);
       } else {
         setIsEditing(!isPoLocked);
       }
@@ -32948,6 +33001,12 @@
     const handleNewFabricCreated = (newFabric) => {
       if (!newFabric) return;
       if (onSaveFabric) onSaveFabric(newFabric);
+      if (!userToggledColorRef.current) {
+        const isRaw = isRawFabricQuality(newFabric.qualityName, newFabric);
+        if (isRaw) {
+          setShowColorColumn(false);
+        }
+      }
       setFormData((prev) => {
         let targetRowId = activeFabricRowId;
         if (!targetRowId) {
@@ -33081,6 +33140,12 @@
               } else {
                 updated.width = "";
               }
+              if (!userToggledColorRef.current) {
+                const isRaw = isRawFabricQuality(matchedFabric.qualityName, matchedFabric);
+                if (isRaw) {
+                  setShowColorColumn(false);
+                }
+              }
             } else {
               updated.fabricName = "";
               updated.width = "";
@@ -33120,10 +33185,6 @@
         }
         if (!it.rate || Number(it.rate) <= 0) {
           alert(`Line ${i + 1}: Please enter a valid rate per meter.`);
-          return;
-        }
-        if (!isRaw && (!it.colorName || !it.colorName.trim())) {
-          alert(`Line ${i + 1}: Color name is required for finished / dyed fabric "${it.fabricName || "Selected Fabric"}". Color is only optional when ordering raw / greige fabric.`);
           return;
         }
       }
@@ -33182,6 +33243,8 @@
           }
         ]
       });
+      setShowColorColumn(true);
+      userToggledColorRef.current = false;
       if (onBack) {
         onBack();
       } else {
@@ -33386,7 +33449,7 @@
           onChange: (e) => setFormData({ ...formData, bufferPercent: Number(e.target.value) })
         }
       ), /* @__PURE__ */ import_react19.default.createElement("span", { className: "input-group-text bg-white" }, "%")) : /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-info-subtle text-info fw-bold fs-12" }, "\xB1", formData.bufferPercent, "%"))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "form-text fs-11 text-muted mt-1" }, "When enabled, GRN delivery within \xB1", formData.bufferPercent || 0, "% will be accepted automatically without requiring Admin variance sign-off.")))
-    ), /* @__PURE__ */ import_react19.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react19.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Fabric Line Items"), isEditing && /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react19.default.createElement(
+    ), /* @__PURE__ */ import_react19.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react19.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Fabric Line Items")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isEditing && /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
         type: "button",
@@ -33406,7 +33469,7 @@
           background: "#ffffff"
         }
       },
-      /* @__PURE__ */ import_react19.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("tr", { style: { color: "#475569", fontSize: "12px", fontWeight: "600", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "23%", minWidth: "170px", padding: "10px 10px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "FABRIC QUALITY *"), isEditing && /* @__PURE__ */ import_react19.default.createElement(
+      /* @__PURE__ */ import_react19.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("tr", { style: { color: "#475569", fontSize: "12px", fontWeight: "600", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "22%", minWidth: "170px", padding: "10px 10px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "FABRIC QUALITY *"), isEditing && /* @__PURE__ */ import_react19.default.createElement(
         "button",
         {
           type: "button",
@@ -33415,7 +33478,7 @@
           title: "Add new fabric to master"
         },
         "+ New Fabric"
-      ))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "18%", minWidth: "160px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "COLOR NAME"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-danger fw-bold" }, "*"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border fs-10 px-1.5 py-0.5 fw-normal ms-1" }, "Not required for Raw"))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "13%", minWidth: "115px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-start" }, "WIDTH (PANNA) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "12%", minWidth: "95px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "QUANTITY (MTRS) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "11%", minWidth: "90px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "RATE / MTR (\u20B9) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "10%", minWidth: "90px", padding: "10px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "FOLD %"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "12%", minWidth: "100px", padding: "10px 10px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-end" }, "AMOUNT (\u20B9)"), isEditing && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "36px", padding: "10px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }))),
+      ))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "18%", minWidth: "160px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "COLOR NAME"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border fs-10 px-1 py-0 fw-normal" }, "Optional"))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "13%", minWidth: "115px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-start" }, "WIDTH (PANNA) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "12%", minWidth: "95px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "QUANTITY (MTRS) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "11%", minWidth: "90px", padding: "10px 8px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "RATE / MTR (\u20B9) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "10%", minWidth: "90px", padding: "10px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "FOLD %"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "14%", minWidth: "100px", padding: "10px 10px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-end" }, "AMOUNT (\u20B9)"), isEditing && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "36px", padding: "10px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }))),
       /* @__PURE__ */ import_react19.default.createElement("tbody", null, formData.items.map((row) => {
         const currentFabric = fabrics.find(
           (f) => f.id === row.fabricId || f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || "").toLowerCase()
@@ -33441,12 +33504,12 @@
           SearchableColorInput,
           {
             value: row.colorName || "",
-            placeholder: !hasFabricSelected ? "Color name..." : isRaw ? "Optional (Raw fabric)..." : "Color name *",
+            placeholder: !hasFabricSelected ? "Color name (optional)..." : isRaw ? "Optional (Raw fabric)..." : "Color name (optional)...",
             colors: masterColorList,
             onChange: (newColorName) => handleItemChange(row.id, "colorName", newColorName),
             onAddNew: () => handleOpenNewColorModal(row.id)
           }
-        ), hasFabricSelected ? isRaw ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "fs-10 text-muted mt-0.5 ps-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-info-circle text-primary" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "Raw/Greige fabric (Color not required)")) : !row.colorName && /* @__PURE__ */ import_react19.default.createElement("div", { className: "fs-10 text-danger mt-0.5 ps-1" }, "* Required for dyed fabric") : null) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, row.colorName ? (() => {
+        ), hasFabricSelected && isRaw && /* @__PURE__ */ import_react19.default.createElement("div", { className: "fs-10 text-muted mt-0.5 ps-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-info-circle text-primary" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "Raw/Greige fabric (No color needed)"))) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, row.colorName ? (() => {
           const matchedColor = masterColorList.find(
             (c) => c.name.toLowerCase() === (row.colorName || "").toLowerCase() || c.hex.toLowerCase() === (row.colorName || "").toLowerCase()
           );
@@ -33545,7 +33608,7 @@
       /* @__PURE__ */ import_react19.default.createElement("tfoot", { style: { background: "#f8fafc", borderTop: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("tr", null, /* @__PURE__ */ import_react19.default.createElement(
         "td",
         {
-          colSpan: 6,
+          colSpan: showColorColumn ? 6 : 5,
           className: "text-end fw-bold text-dark fs-14",
           style: { border: "1px solid #dee2e6", padding: "10px 14px" }
         },
@@ -33562,7 +33625,18 @@
           maximumFractionDigits: 2
         })
       ), isEditing && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6" } })))
-    )), /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-end text-muted fs-11 mt-1.5", style: { color: "#94a3b8" } }, "GST will be added per-line based on vendor state")), /* @__PURE__ */ import_react19.default.createElement(
+    )), !showColorColumn ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between mt-1.5 text-muted fs-11 px-1" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-info-circle text-primary" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "Color column is hidden for raw / greige fabric."), /* @__PURE__ */ import_react19.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-link btn-sm p-0 text-primary text-decoration-underline fs-11 fw-medium",
+        onClick: () => {
+          userToggledColorRef.current = true;
+          setShowColorColumn(true);
+        }
+      },
+      "Show Color Column"
+    )), /* @__PURE__ */ import_react19.default.createElement("span", { style: { color: "#94a3b8" } }, "GST will be added per-line based on vendor state")) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-end text-muted fs-11 mt-1.5", style: { color: "#94a3b8" } }, "GST will be added per-line based on vendor state")), /* @__PURE__ */ import_react19.default.createElement(
       "div",
       {
         className: "card mb-4 shadow-none",
@@ -33820,22 +33894,16 @@
     }
     const isRowInspectionStarted = (item) => {
       if (!item) return false;
-      if (item.isQcActioned) return true;
-      if (["QC Approved", "QC Rejected", "QC Passed", "QC In Progress", "Pending Admin Approval"].includes(item.status)) {
+      if (item.isQcActioned || item.isSubmittedToQC) return true;
+      if (["Completed", "QC Approved", "QC Rejected", "QC Passed", "QC In Progress", "Pending Admin Approval"].includes(item.status)) {
+        return true;
+      }
+      if (item.status && (item.status.includes("QC") || item.status === "Under QC")) {
         return true;
       }
       const itemQcs = (qualityChecks || []).filter((q) => q && (q.grnRef === item.id || q.grnId === item.id));
-      return itemQcs.some((q) => {
-        const isStatusActioned = Boolean(
-          q.qcStatus && q.qcStatus !== "Pending" && q.qcStatus !== "Awaiting QC" && q.qcStatus !== "Draft"
-        );
-        const isStartedFlag = Boolean(q.startedAt || q.isStarted);
-        const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
-        const hasPieces = Boolean(
-          Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0 || q.pieceInspections && Object.keys(q.pieceInspections).length > 0
-        );
-        return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
-      });
+      if (itemQcs.length > 0) return true;
+      return false;
     };
     const filtered = (grns || []).filter((g) => {
       if (!g) return false;
@@ -34482,20 +34550,14 @@
     }, [grn, purchaseOrders]);
     const linkedQCs = (qualityChecks || []).filter((q) => q && (q.grnRef === formData.id || q.grnId === formData.id));
     const linkedQC = linkedQCs[0] || null;
-    const isInspectionStarted = Boolean(
-      formData.isQcActioned || ["QC Approved", "QC Rejected", "QC Passed", "QC In Progress", "Pending Admin Approval"].includes(formData.status) || linkedQCs.some((q) => {
-        const isStatusActioned = Boolean(
-          q.qcStatus && q.qcStatus !== "Pending" && q.qcStatus !== "Awaiting QC" && q.qcStatus !== "Draft"
-        );
-        const isStartedFlag = Boolean(q.startedAt || q.isStarted);
-        const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
-        const hasPieces = Boolean(
-          Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0 || q.pieceInspections && Object.keys(q.pieceInspections).length > 0
-        );
-        return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
-      })
+    const isQcActioned = Boolean(
+      formData.isQcActioned || formData.isSubmittedToQC || formData.status === "Completed" || formData.status && (formData.status.includes("QC") || formData.status === "Under QC") || grn && (grn.status === "Completed" || grn.isSubmittedToQC || grn.isQcActioned) || linkedQCs.length > 0 || ["QC Approved", "QC Rejected", "QC Passed", "QC In Progress", "Pending Admin Approval", "Completed"].includes(formData.status)
     );
-    const isQcActioned = isInspectionStarted;
+    (0, import_react23.useEffect)(() => {
+      if (isQcActioned && isHeaderEditing) {
+        setIsHeaderEditing(false);
+      }
+    }, [isQcActioned, isHeaderEditing]);
     const isLinkedFromPO = Boolean(grn && (grn.linkedPOs && grn.linkedPOs.length > 0 || grn.poId));
     const [isSectionSaved, setIsSectionSaved] = (0, import_react23.useState)(false);
     const [savedBaleMap, setSavedBaleMap] = (0, import_react23.useState)({});
@@ -34593,6 +34655,10 @@
       }));
     };
     const handleGenerateBales = () => {
+      if (isQcActioned) {
+        showToast("Bales cannot be altered because this GRN is locked.", "warning");
+        return;
+      }
       const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
       if (count <= 0) {
         showToast("Please enter a valid number of bales (greater than 0).", "warning");
@@ -34738,7 +34804,7 @@
     };
     const handleSaveHeaderOnly = () => {
       if (isQcActioned) {
-        showToast("Receipt details are locked because Quality Check has already started or been completed.", "warning");
+        showToast("Receipt details are locked because this GRN has been submitted to QC.", "warning");
         return;
       }
       const resolvedPoId = formData.poId || formData.linkedPOs && formData.linkedPOs[0] || grn?.poId || grn?.linkedPOs && grn.linkedPOs[0] || currentPO?.id || eligiblePOs[0]?.id || "PO-DIRECT";
@@ -34792,6 +34858,10 @@
       showToast("Receipt details saved successfully!", "success");
     };
     const handleSaveAllBales = (specificBaleIdx = null) => {
+      if (isQcActioned) {
+        showToast("Bale entries are locked because this GRN has been submitted to QC.", "warning");
+        return;
+      }
       const resolvedPoId = formData.poId || formData.linkedPOs && formData.linkedPOs[0] || grn?.poId || grn?.linkedPOs && grn.linkedPOs[0] || currentPO?.id || eligiblePOs[0]?.id || "PO-DIRECT";
       const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
       const firstPoItem = selectedPO?.items?.[0];
@@ -34877,6 +34947,10 @@
     };
     const handleSaveSingleBale = (bIdx) => handleSaveAllBales(bIdx);
     const handleCompleteGRN = () => {
+      if (isQcActioned) {
+        showToast("This GRN is already completed and submitted to Quality Check (QC).", "warning");
+        return;
+      }
       if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
         showToast("Please select a Source document (Purchase Order).", "warning");
         return;
@@ -34918,6 +34992,9 @@
       const payload = {
         ...formData,
         status: "Completed",
+        isSubmittedToQC: true,
+        isQcActioned: true,
+        isHeaderSaved: true,
         date: formData.receivedDate,
         fabricName: fabricItem,
         fabricId: fabricIdVal,
@@ -34930,6 +35007,14 @@
         lrNo: formData.lrNo || formData.lrNumber || "",
         totalMetersEntered
       };
+      setFormData((prev) => ({
+        ...prev,
+        status: "Completed",
+        isSubmittedToQC: true,
+        isQcActioned: true,
+        isHeaderSaved: true
+      }));
+      setIsHeaderEditing(false);
       if (onSaveGRN) {
         onSaveGRN(payload, true);
         showToast(`GRN ${formData.id} (${totalMetersEntered}m) submitted successfully and sent to Quality Check (QC)!`, "success");
@@ -34951,7 +35036,7 @@
         className: `badge px-2.5 py-1 fs-12 rounded-pill ${formData.status === "Completed" ? "bg-success-subtle text-success border border-success border-opacity-25" : "bg-primary-subtle text-primary border border-primary border-opacity-25"}`
       },
       formData.status
-    )), /* @__PURE__ */ import_react23.default.createElement("p", { className: "text-secondary mb-0 fs-13 mt-1" }, "Recording receipt against", " ", /* @__PURE__ */ import_react23.default.createElement("strong", null, "PO-", currentPO ? currentPO.id : formData.poId || "\u2014"), formData.vendorName ? ` (${formData.vendorName})` : "", ". Full or partial quantity is allowed.")))), isQcActioned ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock fs-24 text-warning" }), /* @__PURE__ */ import_react23.default.createElement("div", { className: "flex-grow-1" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold fs-14" }, "GRN Locked \u2014 Quality Check Actioned (", linkedQC ? linkedQC.qcStatus : formData.status, ")"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fs-12 text-secondary" }, "Quality Check has already been completed or actioned for this shipment. Bale entries, piece quantities, and inward receipt details cannot be edited.")), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-warning text-dark px-3 py-1.5 rounded-pill fs-12 fw-semibold" }, "Locked (QC Processed)")) : formData.status === "Completed" || formData.isHeaderSaved ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "alert alert-info border border-info border-opacity-25 d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-2.5 bg-info-subtle text-dark" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-info-circle fs-20 text-info" }), /* @__PURE__ */ import_react23.default.createElement("div", { className: "flex-grow-1 fs-13" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fw-semibold" }, "Shipment Inwarded:"), " You can edit this GRN record and container bales anytime ", /* @__PURE__ */ import_react23.default.createElement("strong", null, "until the inspection starts"), "."), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-white text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, "Editable (Awaiting QC)")) : null, /* @__PURE__ */ import_react23.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react23.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "Receipt details")), !isHeaderEditing ? !isQcActioned ? /* @__PURE__ */ import_react23.default.createElement(
+    )), /* @__PURE__ */ import_react23.default.createElement("p", { className: "text-secondary mb-0 fs-13 mt-1" }, "Recording receipt against", " ", /* @__PURE__ */ import_react23.default.createElement("strong", null, "PO-", currentPO ? currentPO.id : formData.poId || "\u2014"), formData.vendorName ? ` (${formData.vendorName})` : "", ". Full or partial quantity is allowed.")))), isQcActioned ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock fs-24 text-warning" }), /* @__PURE__ */ import_react23.default.createElement("div", { className: "flex-grow-1" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold fs-14" }, "GRN Locked \u2014 Submitted to Quality Check (", linkedQC ? linkedQC.qcStatus || "Pending" : formData.status || "Completed", ")"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fs-12 text-secondary" }, "This shipment has been submitted to Quality Check (QC). Bale entries, piece quantities, and inward receipt details are locked and cannot be edited.")), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-warning text-dark px-3 py-1.5 rounded-pill fs-12 fw-semibold" }, "Locked (Non-editable)")) : null, /* @__PURE__ */ import_react23.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react23.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "Receipt details")), !isHeaderEditing ? !isQcActioned ? /* @__PURE__ */ import_react23.default.createElement(
       "button",
       {
         type: "button",
@@ -34962,7 +35047,7 @@
       },
       /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-edit fs-14", style: { color: "#f97316" } }),
       /* @__PURE__ */ import_react23.default.createElement("span", null, "Edit")
-    ) : /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock me-1 text-warning" }), " Read Only (QC Actioned)") : isQcActioned && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock me-1 text-warning" }), " Read Only")), !isHeaderEditing ? (
+    ) : /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-3 d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock text-warning" }), /* @__PURE__ */ import_react23.default.createElement("span", null, "Locked (Submitted to QC \u2014 Non-editable)")) : isQcActioned && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock me-1 text-warning" }), " Read Only")), !isHeaderEditing ? (
       /* READ-ONLY / SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
       /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-4 fs-13 pt-1" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "150px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "SOURCE DOCUMENT"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 text-truncate", title: formData.poId }, formData.poId || "\u2014"), currentPO && getPoVendorName(currentPO) && /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11 text-truncate", title: getPoVendorName(currentPO) }, getPoVendorName(currentPO))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "130px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "RECEIVED DATE"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, formData.receivedDate || "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "140px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "VENDOR CHALLAN"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, formData.vendorChallanNo || "\u2014"), formData.vendorChallanDate && /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, formData.vendorChallanDate)), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "140px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "VENDOR INVOICE"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, formData.vendorInvoiceNo || "\u2014"), formData.vendorInvoiceDate && /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, formData.vendorInvoiceDate)), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "150px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "TRANSPORTER"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 text-truncate", title: formData.transporterName || transporters.find((t) => t.id === formData.transporterId)?.name || "\u2014" }, formData.transporterName || transporters.find((t) => t.id === formData.transporterId)?.name || "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "150px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "LR NO. / DATE"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, formData.lrNo || formData.lrNumber ? formData.lrDate ? `${formData.lrNo || formData.lrNumber} / ${formData.lrDate}` : formData.lrNo || formData.lrNumber : "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "130px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "WEIGHT"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, formData.weight ? `${formData.weight} kg` : "\u2014 kg")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "140px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "FABRIC FOLDING"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, currentPO?.items?.[0]?.fold ? `${currentPO.items[0].fold}%` : formData.fabricFolding ? `${formData.fabricFolding} cms` : "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg", style: { minWidth: "140px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "TOTAL QTY / BALES"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 font-monospace" }, Number(formData.totalQty || formData.declaredTotalMeters || 0).toLocaleString(), "m / ", formData.totalBales || (formData.bales ? formData.bales.length : 0))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3 col-lg d-none d-lg-block", style: { minWidth: "150px" } }))
     ) : (
@@ -35380,7 +35465,7 @@
       },
       /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-arrow-left fs-15" }),
       /* @__PURE__ */ import_react23.default.createElement("span", null, "Back to GRN Register")
-    ), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2 text-muted fs-13" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock text-warning fs-18" }), /* @__PURE__ */ import_react23.default.createElement("span", null, "This shipment is locked because Quality Check has been actioned (", linkedQC?.qcStatus || formData.status, ")."))) : /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-3 pt-1 mb-5" }, /* @__PURE__ */ import_react23.default.createElement(
+    ), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2 text-muted fs-13" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-lock text-warning fs-18" }), /* @__PURE__ */ import_react23.default.createElement("span", null, "This shipment is locked because it has been submitted to Quality Check (Non-editable)."))) : /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-3 pt-1 mb-5" }, /* @__PURE__ */ import_react23.default.createElement(
       "button",
       {
         type: "button",
@@ -35568,7 +35653,7 @@
       grn.status === "QC Approved" || grn.status === "QC Passed" || qcRecs.length > 0 && qcRecs.every((q) => q.qcStatus === "Passed" || q.qcStatus === "QC Approved" || q.qcStatus === "Approved")
     );
     const isQcStarted = Boolean(
-      isQcPassedOrApproved || grn.isQcActioned || qcRecs.some((q) => q.qcStatus && q.qcStatus !== "Pending" && q.qcStatus !== "Awaiting QC" && q.qcStatus !== "Draft") || qcRecs.some((q) => q.startedAt || q.isStarted || q.actualWidth || q.actualFold || q.inspectedPieces && q.inspectedPieces.length > 0 || q.pieceInspections && Object.keys(q.pieceInspections).length > 0) || grn.status === "QC Rejected" || grn.status === "QC In Progress" || grn.status === "Pending Admin Approval" || grn.status && (grn.status.includes("QC") || grn.status === "Under QC")
+      isQcPassedOrApproved || grn.isQcActioned || grn.isSubmittedToQC || grn.status === "Completed" || grn.status && (grn.status.includes("QC") || grn.status === "Under QC") || grn.status === "QC Rejected" || grn.status === "QC In Progress" || grn.status === "Pending Admin Approval" || qcRecs && qcRecs.length > 0
     );
     const canEditHeader = !isQcStarted;
     const canEditBales = !isQcStarted;
@@ -35771,7 +35856,7 @@
         className: `badge px-2.5 py-1 fs-11 rounded-pill ${grn.status === "QC Approved" ? "bg-success-subtle text-success border border-success border-opacity-25" : grn.status === "QC Rejected" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : grn.status === "Completed" ? "bg-primary-subtle text-primary border border-primary border-opacity-25" : "bg-secondary-subtle text-secondary border border-secondary border-opacity-25"}`
       },
       grn.status || "Draft"
-    ), !isQcStarted && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-medium" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-check me-1" }), " Editable (Awaiting Inspection)")), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, "Against ", /* @__PURE__ */ import_react24.default.createElement("strong", null, linkedPoId ? `${linkedPoId}` : "Direct Inward"), " \xB7 ", grn.vendorName || "Vendor")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isQcStarted && /* @__PURE__ */ import_react24.default.createElement(
+    ), isQcStarted ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock text-warning" }), " Locked (Submitted to QC \u2014 Non-editable)") : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-medium" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-check me-1" }), " Editable (Draft)")), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, "Against ", /* @__PURE__ */ import_react24.default.createElement("strong", null, linkedPoId ? `${linkedPoId}` : "Direct Inward"), " \xB7 ", grn.vendorName || "Vendor")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isQcStarted ? /* @__PURE__ */ import_react24.default.createElement(
       "button",
       {
         type: "button",
@@ -35782,7 +35867,7 @@
       },
       /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-edit fs-15" }),
       /* @__PURE__ */ import_react24.default.createElement("span", null, "Edit GRN")
-    )))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-3" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Receipt details"), canEditHeader ? /* @__PURE__ */ import_react24.default.createElement(
+    ) : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-2 fs-12 rounded-2 d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock text-warning fs-14" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Locked (Non-editable)"))))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-3" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Receipt details"), canEditHeader ? /* @__PURE__ */ import_react24.default.createElement(
       "button",
       {
         type: "button",
@@ -35791,7 +35876,7 @@
       },
       /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-edit me-1" }),
       "Edit"
-    ) : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-13 text-muted" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Locked (", isQcPassedOrApproved ? "QC Approved" : "QC Actioned", " \u2014 Non-editable)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-4 fs-13" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "RECEIVED DATE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.date || "2026-10-07")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "VENDOR CHALLAN"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.vendorChallanNo || "\u2014", grn.vendorChallanDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.vendorChallanDate))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "VENDOR INVOICE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.vendorInvoiceNo || "\u2014", grn.vendorInvoiceDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.vendorInvoiceDate), grn.invoiceValue && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-success fs-11 fw-semibold" }, "\u20B9", Number(grn.invoiceValue).toLocaleString()))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TRANSPORTER"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.transporterName || transporterObj?.name || "Bhiwandi Roadlines")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "LR NO. / DATE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.lrNumber || grn.lrNo || "\u2014", grn.lrDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.lrDate))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "WEIGHT"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.weightKg || grn.weight || "\u2014", " kg")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "FABRIC FOLDING"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.foldingCms || grn.fabricFolding || expectedFold || "\u2014", " cms")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TOTAL QUANTITY"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, totalMeters, "m")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "NO. OF BALES"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, bales.length || grn.totalBales || 0)), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TOTAL PIECES"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, totalPiecesCount)))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Bale-wise breakdown"), canEditBales && onEditBales ? /* @__PURE__ */ import_react24.default.createElement(
+    ) : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-13 text-muted" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Locked (Submitted to QC \u2014 Non-editable)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-4 fs-13" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "RECEIVED DATE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.date || "2026-10-07")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "VENDOR CHALLAN"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.vendorChallanNo || "\u2014", grn.vendorChallanDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.vendorChallanDate))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "VENDOR INVOICE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.vendorInvoiceNo || "\u2014", grn.vendorInvoiceDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.vendorInvoiceDate), grn.invoiceValue && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-success fs-11 fw-semibold" }, "\u20B9", Number(grn.invoiceValue).toLocaleString()))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TRANSPORTER"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.transporterName || transporterObj?.name || "Bhiwandi Roadlines")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "LR NO. / DATE"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.lrNumber || grn.lrNo || "\u2014", grn.lrDate && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 fw-normal" }, grn.lrDate))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "WEIGHT"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.weightKg || grn.weight || "\u2014", " kg")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "FABRIC FOLDING"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, grn.foldingCms || grn.fabricFolding || expectedFold || "\u2014", " cms")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TOTAL QUANTITY"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, totalMeters, "m")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "NO. OF BALES"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, bales.length || grn.totalBales || 0)), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "TOTAL PIECES"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark" }, totalPiecesCount)))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Bale-wise breakdown"), canEditBales && onEditBales ? /* @__PURE__ */ import_react24.default.createElement(
       "button",
       {
         type: "button",
@@ -35801,7 +35886,7 @@
       },
       /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-edit me-1" }),
       " Edit Bale Entries"
-    ) : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-13 text-muted" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Locked (QC Started \u2014 Non-editable)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react24.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13" }, /* @__PURE__ */ import_react24.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("th", { className: "ps-4 py-3", style: { minWidth: "100px" } }, "BALE NO."), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3", style: { minWidth: "220px" } }, "FABRIC ITEM"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "90px" } }, "PIECES"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end", style: { minWidth: "120px" } }, "METERS"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "120px" } }, "QC STATUS"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "pe-4 py-3 text-end", style: { minWidth: "110px" } }, "LOCK STATUS"))), /* @__PURE__ */ import_react24.default.createElement("tbody", null, bales.length === 0 ? /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("td", { colSpan: "6", className: "text-center py-4 text-muted" }, "No bales entered yet.")) : bales.map((bale, idx) => {
+    ) : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-lock fs-13 text-muted" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Locked (Submitted to QC \u2014 Non-editable)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react24.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13" }, /* @__PURE__ */ import_react24.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("th", { className: "ps-4 py-3", style: { minWidth: "100px" } }, "BALE NO."), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3", style: { minWidth: "220px" } }, "FABRIC ITEM"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "90px" } }, "PIECES"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end", style: { minWidth: "120px" } }, "METERS"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-center", style: { minWidth: "120px" } }, "QC STATUS"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "pe-4 py-3 text-end", style: { minWidth: "110px" } }, "LOCK STATUS"))), /* @__PURE__ */ import_react24.default.createElement("tbody", null, bales.length === 0 ? /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("td", { colSpan: "6", className: "text-center py-4 text-muted" }, "No bales entered yet.")) : bales.map((bale, idx) => {
       const bNo = bale.baleNo || `Bale ${idx + 1}`;
       const fabricLabel = bale.fabricItemLabel || bale.fabric || grn.fabricName || "Grey Cotton Rayon";
       const pcsCount = bale.pieces && bale.pieces.length > 0 ? bale.pieces.length : Number(bale.piecesCount) || 0;
@@ -35819,7 +35904,7 @@
           className: `badge rounded-pill px-2.5 py-1 fs-11 ${isQcLocked ? "bg-secondary-subtle text-secondary border border-secondary border-opacity-25" : "bg-info-subtle text-info border border-info border-opacity-25"}`
         },
         /* @__PURE__ */ import_react24.default.createElement("i", { className: `ti ${isQcLocked ? "ti-lock" : "ti-pencil"} me-1 fs-10` }),
-        isQcLocked ? "Locked (QC started)" : "Editable"
+        isQcLocked ? "Locked (Submitted to QC)" : "Editable"
       )));
     }))))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Quality check by item"), qcInspectionBatches.length > 1 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, qcInspectionBatches.length, " Fabric Qualities")), !isBaleEntriesComplete && !isQcStarted && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning border-opacity-50 px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "QC Locked: Complete Bale Entries Required (", baleMetersEntered, "m / ", declaredTotalQty, "m)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex flex-column gap-3" }, qcInspectionBatches.map((item, idx) => {
       const isItemQcDone = item.qcStatus === "OK" || item.qcStatus === "Approved" || item.qcStatus === "Partial OK";
@@ -36167,7 +36252,7 @@
         extractedColor = parts[1].trim();
       }
       const poItem = linkedPO?.items?.find((it) => it.fabricName === parsedFabric || it.fabricQuality === parsedFabric) || linkedPO?.items?.[0];
-      const color = qc.colorName || qc.color || extractedColor || matchedGrn?.colorName || matchedGrn?.color || poItem?.color || poItem?.colorName || poItem?.shade || (parsedFabric.toLowerCase().includes("grey") ? "Grey / Natural" : "White");
+      const color = qc.colorName || qc.color || extractedColor || matchedGrn?.colorName || matchedGrn?.color || poItem?.color || poItem?.colorName || poItem?.shade || (parsedFabric.toLowerCase().includes("grey") || parsedFabric.toLowerCase().includes("greige") || parsedFabric.toLowerCase().includes("raw") ? "Grey / Natural" : "");
       const width = qc.actualWidth || qc.expectedWidth || poItem?.width || matchedGrn?.pannaWidth || "44";
       const qty = Number(qc.totalReceivedMeters) || Number(qc.receivedQty) || (poItem?.quantity ? Number(poItem.quantity) : Number(matchedGrn?.declaredTotalMeters) || 2e3);
       const status = qc.qcStatus || "Pending";
@@ -36189,10 +36274,10 @@
       (qc) => qc.qcStatus === "Pending" || !qc.qcStatus
     ).length;
     const adminCount = expandedQcRecords.filter(
-      (qc) => qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval"
+      (qc) => (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval") && !qc.adminDecision
     ).length;
     const completedCount = expandedQcRecords.filter(
-      (qc) => qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK"
+      (qc) => qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK" || Boolean(qc.adminDecision)
     ).length;
     const damagedCount = damagedItems.length || expandedQcRecords.filter(
       (qc) => Number(qc.defectQty) > 0 || qc.qcStatus === "Reject" || qc.issuePieces && qc.issuePieces.length > 0
@@ -36237,9 +36322,9 @@
       if (activeTabFilter === "pending") {
         matchesTab = qc.qcStatus === "Pending" || !qc.qcStatus;
       } else if (activeTabFilter === "admin") {
-        matchesTab = qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval";
+        matchesTab = (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval") && !qc.adminDecision;
       } else if (activeTabFilter === "completed") {
-        matchesTab = qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK";
+        matchesTab = qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK" || Boolean(qc.adminDecision);
       } else if (activeTabFilter === "damaged") {
         matchesTab = Number(qc.defectQty) > 0 || qc.qcStatus === "Reject" || qc.issuePieces && qc.issuePieces.length > 0 || damagedItems.some((d) => d.sourceQcRef === qc.id || d.grnRef === qc.grnRef);
       }
@@ -36377,9 +36462,9 @@
         /* @__PURE__ */ import_react25.default.createElement("td", { className: "fw-bold text-dark font-monospace fs-13" }, qc.grnRef || d.matchedGrn?.id || "GRN-1002"),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-secondary font-monospace fs-13" }, d.againstRef)),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-medium text-dark" }, d.fabricName)),
-        /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-secondary" }, d.width ? `${String(d.width).replace(/"/g, "")}"` : '42"', " \xB7 ", d.color)),
+        /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-secondary" }, d.width ? `${String(d.width).replace(/"/g, "")}"` : '42"', " \xB7 ", d.color || "Raw / Greige")),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-medium text-dark" }, Number(d.qty).toLocaleString(), "m")),
-        /* @__PURE__ */ import_react25.default.createElement("td", null, d.status === "OK" || d.status === "Approved" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "OK") : d.status === "Partial OK" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Partial OK") : d.status === "Send for Admin Approval" || d.status === "Admin Approval" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Admin Approval") : d.status === "Reject" || d.status === "Rejected" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Rejected") : isPending && !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "Incomplete Bales")) : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge px-3 py-1 fs-11 rounded-pill", style: { backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" } }, "Pending")),
+        /* @__PURE__ */ import_react25.default.createElement("td", null, d.status === "OK" || d.status === "Approved" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "OK") : d.status === "Partial OK" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Partial OK") : d.status === "Send for Admin Approval" || d.status === "Admin Approval" ? qc.adminDecision ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, "Approved by Admin") : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Admin Approval") : d.status === "Reject" || d.status === "Rejected" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Rejected") : isPending && !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "Incomplete Bales")) : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge px-3 py-1 fs-11 rounded-pill", style: { backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" } }, "Pending")),
         /* @__PURE__ */ import_react25.default.createElement("td", { className: "text-center", onClick: (e) => e.stopPropagation() }, isPending ? !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement(
           "button",
           {
@@ -36724,6 +36809,7 @@
     if (!hasWidth) missingInspectionFields.push("Width found");
     if (!hasFold) missingInspectionFields.push("Fold found");
     const hasAnyMismatch = isWidthMismatch || isFoldMismatch;
+    const isQcFinalized = Boolean(qc && (qc.adminDecision || qc.qcStatus === "Approved" || qc.qcStatus === "OK" || qc.qcStatus === "Reject" || qc.qcStatus === "Partial OK"));
     const handleSubmit = (statusOverride) => {
       const effectiveStatus = typeof statusOverride === "string" ? statusOverride : formData.qcStatus;
       if (!isInspectionDetailsComplete) {
@@ -37180,7 +37266,22 @@
           }
         ), /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)))))
       );
-    }))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "pt-3" }, !isInspectionDetailsComplete ? /* @__PURE__ */ import_react26.default.createElement(
+    }))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "pt-3" }, isQcFinalized ? /* @__PURE__ */ import_react26.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 bg-light border" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react26.default.createElement(
+      "div",
+      {
+        className: "rounded-circle d-flex align-items-center justify-content-center bg-success text-white flex-shrink-0 shadow-xs",
+        style: { width: "40px", height: "40px" }
+      },
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-check fs-20" })
+    ), /* @__PURE__ */ import_react26.default.createElement("div", null, /* @__PURE__ */ import_react26.default.createElement("div", { className: "fw-bold text-dark fs-14 mb-0.5" }, "Inspection Decision Finalized: ", /* @__PURE__ */ import_react26.default.createElement("span", { className: "text-success" }, qc.qcStatus || qc.adminDecision)), /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-secondary fs-12" }, "This Quality Check was already approved/finalized by Admin. Modifications and re-submissions are locked."))), /* @__PURE__ */ import_react26.default.createElement("div", null, /* @__PURE__ */ import_react26.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary px-4 py-2 fs-13 shadow-sm rounded-3 text-nowrap fw-semibold",
+        onClick: onBack
+      },
+      "Back"
+    )))) : !isInspectionDetailsComplete ? /* @__PURE__ */ import_react26.default.createElement(
       "div",
       {
         className: "card border-0 shadow-sm rounded-4 p-4",
@@ -37449,7 +37550,7 @@
         style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
         onClick: () => onViewResolveDamaged && onViewResolveDamaged(itemToResolve)
       },
-      "View / Resolve"
+      effectiveStatus === "Reversed (treated as good)" || effectiveStatus === "Write Off (scrap)" || effectiveStatus === "Return to Vendor" ? "View Resolution" : "View / Resolve"
     ))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Stock pool entries"), relevantStock.length > 0 ? relevantStock.map((entry, idx) => /* @__PURE__ */ import_react27.default.createElement("div", { key: entry.id || idx, className: "d-flex align-items-center justify-content-between py-2 border-bottom border-light fs-13" }, /* @__PURE__ */ import_react27.default.createElement("div", null, "Added ", /* @__PURE__ */ import_react27.default.createElement("strong", null, Number(entry.qty).toFixed(1), "m"), " to stock on ", entry.decidedAt || "2026-10-07", " (", entry.source || "QC approved", ")."), /* @__PURE__ */ import_react27.default.createElement(
       "button",
       {
@@ -37582,6 +37683,7 @@
     onResolveDecision
   }) {
     const [resolutionNote, setResolutionNote] = (0, import_react28.useState)("");
+    const [isModifyingDecision, setIsModifyingDecision] = (0, import_react28.useState)(false);
     if (!damagedItem) {
       return /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-alert-circle fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Damaged Item Details Not Found"), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The flagged item record could not be loaded."), /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to Quality Check")));
     }
@@ -37592,6 +37694,7 @@
     const grnRef = damagedItem.grnRef || "GRN-1002";
     const fabricName = damagedItem.fabricName || 'Tussar Silk (42") \u2014 Ivory';
     const dateStr = damagedItem.dateFlagged || damagedItem.reportedAt || "2026-10-07";
+    const isAlreadyDecided = currentStatus === "Reversed (treated as good)" || currentStatus === "Return to Vendor" || currentStatus === "Write Off (scrap)" || currentStatus === "Transferred to Stock" || currentStatus === "Approved" || currentStatus === "Sold";
     const resolutions = [
       { key: "Reversed (treated as good)", label: "Approve \u2014 Add to Stock Pool", btnClass: "btn-outline-success" },
       { key: "Return to Vendor", label: "Return to Vendor (RTV)", btnClass: "btn-outline-warning text-dark" },
@@ -37618,7 +37721,23 @@
         className: `p-3 rounded-3 mb-3 d-flex align-items-center gap-2 fs-13 fw-semibold ${isCurrentlyInStock ? "bg-success-subtle text-success border border-success border-opacity-50" : "bg-light text-secondary border"}`
       },
       isCurrentlyInStock ? /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-check fs-18" }), /* @__PURE__ */ import_react28.default.createElement("span", null, "Currently counted in the Stock Pool \u2014 ", qty, "m, added ", dateStr)) : /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-x fs-18" }), /* @__PURE__ */ import_react28.default.createElement("span", null, "Not currently in the Stock Pool"))
-    ), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-3" }, "Current resolution: ", /* @__PURE__ */ import_react28.default.createElement("strong", null, currentStatus), ". Pick a different one below to change it \u2014 the Stock Pool will always be kept in sync with whichever is selected."), /* @__PURE__ */ import_react28.default.createElement("div", { className: "mb-4", style: { maxWidth: "650px" } }, /* @__PURE__ */ import_react28.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Resolution note (optional)"), /* @__PURE__ */ import_react28.default.createElement(
+    ), isAlreadyDecided && !isModifyingDecision ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "p-3.5 rounded-3 bg-light border d-flex flex-wrap align-items-center justify-content-between gap-3 mb-2" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react28.default.createElement(
+      "div",
+      {
+        className: "d-flex align-items-center justify-content-center rounded-circle bg-success text-white shadow-xs",
+        style: { width: "32px", height: "32px", flexShrink: 0 }
+      },
+      /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-check fs-18" })
+    ), /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "Decision Finalized by Admin: ", /* @__PURE__ */ import_react28.default.createElement("span", { className: "text-success" }, currentStatus)), /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-secondary fs-12" }, isCurrentlyInStock ? `Admin approved this fabric quality. ${qty}m has been transferred to and is currently active in the Main Stock Pool.` : `Admin finalized this disposition as ${currentStatus}.`))), /* @__PURE__ */ import_react28.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-secondary btn-sm px-3 py-1.5 rounded-3 fs-12 fw-medium d-inline-flex align-items-center gap-1.5",
+        onClick: () => setIsModifyingDecision(true)
+      },
+      /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-edit" }),
+      /* @__PURE__ */ import_react28.default.createElement("span", null, "Change Resolution")
+    )) : /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-3" }, isModifyingDecision ? "Choose a new resolution below:" : /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, "Current resolution: ", /* @__PURE__ */ import_react28.default.createElement("strong", null, currentStatus), ". Pick a different one below to change it \u2014 the Stock Pool will always be kept in sync with whichever is selected.")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "mb-4", style: { maxWidth: "650px" } }, /* @__PURE__ */ import_react28.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Resolution note (optional)"), /* @__PURE__ */ import_react28.default.createElement(
       "input",
       {
         type: "text",
@@ -37637,14 +37756,25 @@
           className: `btn btn-sm px-3.5 py-2 rounded-3 fs-13 fw-semibold shadow-2xs ${isCurrent ? "btn-success text-white" : r.btnClass}`,
           style: isCurrent ? { backgroundColor: "#10b981", borderColor: "#10b981" } : {},
           disabled: isCurrent,
-          onClick: () => handleApplyResolution(r.key),
+          onClick: () => {
+            handleApplyResolution(r.key);
+            setIsModifyingDecision(false);
+          },
           title: isCurrent ? "This is the current resolution" : `Set resolution to ${r.label}`
         },
         r.label,
         " ",
         isCurrent ? "\u2713 current" : ""
       );
-    }))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react28.default.createElement(
+    }), isModifyingDecision && /* @__PURE__ */ import_react28.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-link text-secondary text-decoration-none ms-2 fs-12",
+        onClick: () => setIsModifyingDecision(false)
+      },
+      "Cancel"
+    )))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between mb-4 border-bottom pb-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react28.default.createElement(
       "div",
       {
         className: "d-flex align-items-center justify-content-center rounded-3",
@@ -37783,51 +37913,49 @@
       }
     }
     let resolvedColor = "";
-    if (item.colorName && item.colorName !== "Ivory" && item.colorName !== "Greige (undyed)") {
-      resolvedColor = item.colorName;
-    } else if (baleColor) {
-      resolvedColor = baleColor;
-    } else if (matchingPoItem?.colorName) {
-      resolvedColor = matchingPoItem.colorName;
-    } else if (linkedGrn?.colorName && linkedGrn.colorName !== "Ivory") {
-      resolvedColor = linkedGrn.colorName;
-    } else if (linkedQC?.colorName && linkedQC.colorName !== "Ivory") {
+    const poHasExplicitColor = matchingPoItem && (matchingPoItem.colorName || matchingPoItem.color);
+    const grnHasExplicitColor = linkedGrn?.colorName && linkedGrn.colorName !== "Ivory" || baleColor;
+    const qcHasExplicitColor = linkedQC?.colorName && linkedQC.colorName !== "Ivory" && linkedQC.colorName !== "White";
+    if (poHasExplicitColor) {
+      resolvedColor = matchingPoItem.colorName || matchingPoItem.color;
+    } else if (grnHasExplicitColor) {
+      resolvedColor = linkedGrn?.colorName || baleColor;
+    } else if (qcHasExplicitColor) {
       resolvedColor = linkedQC.colorName;
-    } else if (item.colorName && item.colorName !== "Ivory") {
-      resolvedColor = item.colorName;
-    } else {
-      const lowerFab = fabricName.toLowerCase();
-      if (lowerFab.includes("grey") || lowerFab.includes("greige")) {
-        resolvedColor = "Grey / Natural";
-      } else if (lowerFab.includes("rayon")) {
-        resolvedColor = "Navy Blue";
-      } else if (lowerFab.includes("modal") && widthClean === "58") {
-        resolvedColor = "Rust Light";
-      } else if (lowerFab.includes("modal") && widthClean === "42") {
-        resolvedColor = "Peach";
-      } else if (lowerFab.includes("modal") && widthClean === "44") {
-        resolvedColor = "White";
-      } else if (lowerFab.includes("silk") || lowerFab.includes("tussar")) {
-        resolvedColor = "Ivory";
-      } else if (lowerFab.includes("georgette")) {
-        resolvedColor = "Sea Green";
+    } else if (item.colorName && item.colorName !== "Ivory" && item.colorName !== "Greige (undyed)") {
+      if (item.colorName.toLowerCase() === "white" && !poHasExplicitColor && !grnHasExplicitColor) {
+        resolvedColor = "";
       } else {
-        resolvedColor = "White";
+        resolvedColor = item.colorName;
+      }
+    }
+    if (!resolvedColor) {
+      const lowerFab = fabricName.toLowerCase();
+      if (lowerFab.includes("grey") || lowerFab.includes("greige") || lowerFab.includes("raw") || lowerFab.includes("kora") || lowerFab.includes("undyed")) {
+        resolvedColor = "Raw / Greige";
+      } else {
+        resolvedColor = "";
       }
     }
     const lowerColor = (resolvedColor || "").toLowerCase().trim();
     const masterColorMatch = (colors || []).find(
       (c) => c.name?.toLowerCase() === lowerColor || c.hex?.toLowerCase() === lowerColor
     );
-    let resolvedHex = item.colorHex;
-    if (masterColorMatch?.hex) {
+    let resolvedHex = null;
+    if (!resolvedColor) {
+      resolvedHex = null;
+    } else if (resolvedColor === "Raw / Greige" || resolvedColor === "Grey / Natural") {
+      resolvedHex = "#DCD7CE";
+    } else if (masterColorMatch?.hex) {
       resolvedHex = masterColorMatch.hex;
     } else if (COLOR_HEX_MAP[lowerColor]) {
       resolvedHex = COLOR_HEX_MAP[lowerColor];
     } else if (resolvedColor.startsWith("#")) {
       resolvedHex = resolvedColor;
-    } else if (!resolvedHex || resolvedHex === "#FFFFF0") {
-      resolvedHex = COLOR_HEX_MAP[lowerColor] || (lowerColor === "ivory" ? "#FFFFF0" : "#E2E8F0");
+    } else if (item.colorHex && item.colorHex !== "#FFFFFF" && item.colorHex !== "#FFFFF0") {
+      resolvedHex = item.colorHex;
+    } else {
+      resolvedHex = lowerColor === "white" ? "#FFFFFF" : lowerColor === "ivory" ? "#FFFFF0" : "#E2E8F0";
     }
     return {
       ...item,
@@ -37895,7 +38023,7 @@
     const groupList = Object.values(groups).filter((g) => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
-      return g.fabricName.toLowerCase().includes(q) || g.width.toLowerCase().includes(q) || g.colorName.toLowerCase().includes(q) || g.fabricId && g.fabricId.toLowerCase().includes(q);
+      return g.fabricName.toLowerCase().includes(q) || g.width.toLowerCase().includes(q) || g.colorName && g.colorName.toLowerCase().includes(q) || g.fabricId && g.fabricId.toLowerCase().includes(q);
     });
     const totalAvailableMeters = Object.values(groups).reduce((sum, g) => sum + g.totalQty, 0);
     const totalLotsCount = stockPool.length;
@@ -37969,7 +38097,7 @@
         },
         /* @__PURE__ */ import_react29.default.createElement("i", { className: "ti ti-arrow-left" }),
         /* @__PURE__ */ import_react29.default.createElement("span", null, "Back to Stock Pool")
-      ), /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("h3", { className: "fw-bold text-dark mb-1 fs-22 d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.fabricName), /* @__PURE__ */ import_react29.default.createElement("span", { className: "text-muted" }, "\xB7"), /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.width), /* @__PURE__ */ import_react29.default.createElement("span", { className: "text-muted" }, "\xB7"), /* @__PURE__ */ import_react29.default.createElement("span", { className: "d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react29.default.createElement(
+      ), /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react29.default.createElement("div", null, /* @__PURE__ */ import_react29.default.createElement("h3", { className: "fw-bold text-dark mb-1 fs-22 d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.fabricName), /* @__PURE__ */ import_react29.default.createElement("span", { className: "text-muted" }, "\xB7"), /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.width), /* @__PURE__ */ import_react29.default.createElement("span", { className: "text-muted" }, "\xB7"), selectedGroup.colorName ? /* @__PURE__ */ import_react29.default.createElement("span", { className: "d-inline-flex align-items-center gap-1.5" }, selectedGroup.colorHex && /* @__PURE__ */ import_react29.default.createElement(
         "span",
         {
           className: "rounded-circle shadow-sm",
@@ -37981,7 +38109,7 @@
             display: "inline-block"
           }
         }
-      ), /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.colorName)), selectedGroup.fabricId && /* @__PURE__ */ import_react29.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-0.5 fs-12 fw-medium rounded-2 ms-1" }, selectedGroup.fabricId)), /* @__PURE__ */ import_react29.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, /* @__PURE__ */ import_react29.default.createElement("strong", null, selectedGroup.totalQty.toFixed(1), "m"), " currently available across ", selectedGroup.lots.length, " lot(s).")), /* @__PURE__ */ import_react29.default.createElement(
+      ), /* @__PURE__ */ import_react29.default.createElement("span", null, selectedGroup.colorName)) : /* @__PURE__ */ import_react29.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-0.5 fs-12 fw-medium rounded-2" }, "Raw / Greige (No color)"), selectedGroup.fabricId && /* @__PURE__ */ import_react29.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-0.5 fs-12 fw-medium rounded-2 ms-1" }, selectedGroup.fabricId)), /* @__PURE__ */ import_react29.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, /* @__PURE__ */ import_react29.default.createElement("strong", null, selectedGroup.totalQty.toFixed(1), "m"), " currently available across ", selectedGroup.lots.length, " lot(s).")), /* @__PURE__ */ import_react29.default.createElement(
         "button",
         {
           type: "button",
@@ -38078,7 +38206,7 @@
       },
       /* @__PURE__ */ import_react29.default.createElement("td", { className: "ps-4 py-3" }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "fw-bold text-dark fs-14" }, g.fabricName), g.fabricId && /* @__PURE__ */ import_react29.default.createElement("div", { className: "text-muted fs-11" }, g.fabricId)),
       /* @__PURE__ */ import_react29.default.createElement("td", { className: "py-3 text-secondary fw-semibold" }, g.width),
-      /* @__PURE__ */ import_react29.default.createElement("td", { className: "py-3" }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react29.default.createElement(
+      /* @__PURE__ */ import_react29.default.createElement("td", { className: "py-3" }, g.colorName && g.colorName !== "\u2014" && g.colorName.toLowerCase() !== "none" ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "d-flex align-items-center gap-2" }, g.colorHex ? /* @__PURE__ */ import_react29.default.createElement(
         "span",
         {
           className: "rounded-circle shadow-sm",
@@ -38091,7 +38219,7 @@
             flexShrink: 0
           }
         }
-      ), /* @__PURE__ */ import_react29.default.createElement("span", { className: "fw-medium text-dark" }, g.colorName))),
+      ) : null, /* @__PURE__ */ import_react29.default.createElement("span", { className: "fw-medium text-dark" }, g.colorName)) : /* @__PURE__ */ import_react29.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-11 rounded fw-medium" }, "Raw / Greige (No color)")),
       /* @__PURE__ */ import_react29.default.createElement("td", { className: "py-3 text-end" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "fw-bold text-dark fs-14" }, g.totalQty.toFixed(1), "m")),
       /* @__PURE__ */ import_react29.default.createElement("td", { className: "py-3 text-center" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, g.lots.length, " lot(s)")),
       /* @__PURE__ */ import_react29.default.createElement("td", { className: "pe-4 py-3 text-end text-muted" }, /* @__PURE__ */ import_react29.default.createElement("i", { className: "ti ti-chevron-right fs-16 text-secondary" }))
@@ -38116,6 +38244,8 @@
   }) {
     const [items, setItems] = (0, import_react30.useState)(rejectedItems);
     const [selectedIds, setSelectedIds] = (0, import_react30.useState)([]);
+    const [activeTabFilter, setActiveTabFilter] = (0, import_react30.useState)("all");
+    const [viewDetailsItem, setViewDetailsItem] = (0, import_react30.useState)(null);
     const [activeActionModal, setActiveActionModal] = (0, import_react30.useState)(null);
     const [toastNotification, setToastNotification] = (0, import_react30.useState)(null);
     const showToast = (message, type = "success") => {
@@ -38123,6 +38253,9 @@
       setTimeout(() => {
         setToastNotification(null);
       }, 3200);
+    };
+    const isItemResolved = (status) => {
+      return status === "Reversed (treated as good)" || status === "Transferred to Stock" || status === "RTV Initiated" || status === "Sold" || status === "Approved" || status === "Closed";
     };
     const [rtvFormData, setRtvFormData] = (0, import_react30.useState)({
       challanNo: `RTV-CH-${Math.floor(1e3 + Math.random() * 9e3)}`,
@@ -38142,14 +38275,26 @@
       targetGrade: "",
       remarks: ""
     });
-    const handleToggleSelect = (id) => {
+    const handleToggleSelect = (item) => {
+      if (isItemResolved(item.status)) {
+        setViewDetailsItem(item);
+        return;
+      }
       setSelectedIds(
-        (prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+        (prev) => prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
       );
     };
     import_react30.default.useEffect(() => {
       setItems(rejectedItems);
     }, [rejectedItems]);
+    const activeItemsCount = items.filter((it) => !isItemResolved(it.status)).length;
+    const resolvedItemsCount = items.filter((it) => isItemResolved(it.status)).length;
+    const filteredItems = items.filter((it) => {
+      if (activeTabFilter === "active") return !isItemResolved(it.status);
+      if (activeTabFilter === "resolved") return isItemResolved(it.status);
+      return true;
+    });
+    const actionableItems = filteredItems.filter((it) => !isItemResolved(it.status));
     const selectedItemsData = items.filter((it) => selectedIds.includes(it.id));
     const totalSelectedQty = selectedItemsData.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
     const handleProcessRTV = () => {
@@ -38250,7 +38395,45 @@
       },
       /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-replace fs-16" }),
       /* @__PURE__ */ import_react30.default.createElement("span", null, "Transfer to Stock")
-    ))), /* @__PURE__ */ import_react30.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 bg-white mb-4" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "badge bg-danger rounded-pill px-2.5 py-1.5 fs-11" }, "Pool Active"), /* @__PURE__ */ import_react30.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Defective Inward Pieces")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-13" }, "Selected: ", /* @__PURE__ */ import_react30.default.createElement("strong", { className: "text-primary" }, selectedIds.length, " Pieces"), " (", /* @__PURE__ */ import_react30.default.createElement("strong", null, totalSelectedQty.toFixed(2), " Mtrs"), ")"))), /* @__PURE__ */ import_react30.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react30.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13" }, /* @__PURE__ */ import_react30.default.createElement(
+    ))), /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-2 mb-3" }, /* @__PURE__ */ import_react30.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${activeTabFilter === "all" ? "btn-dark text-white" : "btn-light text-secondary border"}`,
+        onClick: () => {
+          setActiveTabFilter("all");
+          setSelectedIds([]);
+        }
+      },
+      /* @__PURE__ */ import_react30.default.createElement("span", null, "All Records"),
+      /* @__PURE__ */ import_react30.default.createElement("span", { className: "badge rounded-pill bg-secondary text-white ms-1 fs-10" }, items.length)
+    ), /* @__PURE__ */ import_react30.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${activeTabFilter === "active" ? "btn-danger text-white" : "btn-light text-secondary border"}`,
+        onClick: () => {
+          setActiveTabFilter("active");
+          setSelectedIds([]);
+        }
+      },
+      /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-alert-triangle fs-13" }),
+      /* @__PURE__ */ import_react30.default.createElement("span", null, "Action Required (Defective Pool)"),
+      /* @__PURE__ */ import_react30.default.createElement("span", { className: "badge rounded-pill bg-danger text-white ms-1 fs-10" }, activeItemsCount)
+    ), /* @__PURE__ */ import_react30.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: `btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${activeTabFilter === "resolved" ? "btn-success text-white" : "btn-light text-secondary border"}`,
+        onClick: () => {
+          setActiveTabFilter("resolved");
+          setSelectedIds([]);
+        }
+      },
+      /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-check fs-13" }),
+      /* @__PURE__ */ import_react30.default.createElement("span", null, "Resolved / Approved by Admin"),
+      /* @__PURE__ */ import_react30.default.createElement("span", { className: "badge rounded-pill bg-success text-white ms-1 fs-10" }, resolvedItemsCount)
+    )), /* @__PURE__ */ import_react30.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 bg-white mb-4" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: `badge rounded-pill px-2.5 py-1.5 fs-11 ${activeTabFilter === "resolved" ? "bg-success" : "bg-danger"}` }, activeTabFilter === "resolved" ? "Finalized" : "Pool Active"), /* @__PURE__ */ import_react30.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, activeTabFilter === "resolved" ? "Resolved & Approved Items" : "Defective Inward Pieces")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-13" }, "Selected: ", /* @__PURE__ */ import_react30.default.createElement("strong", { className: "text-primary" }, selectedIds.length, " Pieces"), " (", /* @__PURE__ */ import_react30.default.createElement("strong", null, totalSelectedQty.toFixed(2), " Mtrs"), ")"))), /* @__PURE__ */ import_react30.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react30.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13" }, /* @__PURE__ */ import_react30.default.createElement(
       "thead",
       {
         className: "text-secondary",
@@ -38263,38 +38446,52 @@
           style: {
             width: "20px",
             height: "20px",
-            cursor: "pointer",
+            cursor: actionableItems.length === 0 ? "not-allowed" : "pointer",
             accentColor: "#5b47fb",
             borderRadius: "4px",
             verticalAlign: "middle"
           },
-          checked: items.length > 0 && items.every((it) => selectedIds.includes(it.id)),
+          disabled: actionableItems.length === 0,
+          checked: actionableItems.length > 0 && actionableItems.every((it) => selectedIds.includes(it.id)),
           onChange: (e) => {
             if (e.target.checked) {
-              setSelectedIds(items.map((it) => it.id));
+              setSelectedIds(actionableItems.map((it) => it.id));
             } else {
               setSelectedIds([]);
             }
           },
           onClick: (e) => e.stopPropagation(),
-          title: "Select / Deselect All Available"
+          title: actionableItems.length === 0 ? "No pending items available to action" : "Select / Deselect All Actionable Items"
         }
       )), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "120px" } }, "REJECTED ID"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "110px" } }, "SOURCE QC"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "170px" } }, "PO / VENDOR"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "240px" } }, "CONTAINER"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "160px" } }, "FABRIC QUALITY"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "130px", textAlign: "right" } }, "DEFECTIVE QTY"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "240px" } }, "DEFECT REASON"), /* @__PURE__ */ import_react30.default.createElement("th", { style: { padding: "12px 14px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "160px" } }, "CURRENT STATUS"))
-    ), /* @__PURE__ */ import_react30.default.createElement("tbody", null, items.length === 0 ? /* @__PURE__ */ import_react30.default.createElement("tr", null, /* @__PURE__ */ import_react30.default.createElement("td", { colSpan: "9", className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-check-circle fs-32 d-block mb-2 text-success opacity-50" }), "No defective inward pieces in pool.")) : items.map((it) => {
+    ), /* @__PURE__ */ import_react30.default.createElement("tbody", null, filteredItems.length === 0 ? /* @__PURE__ */ import_react30.default.createElement("tr", null, /* @__PURE__ */ import_react30.default.createElement("td", { colSpan: "9", className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-check-circle fs-32 d-block mb-2 text-success opacity-50" }), activeTabFilter === "resolved" ? "No resolved or admin-approved records found." : activeTabFilter === "active" ? "All defective pieces have been resolved or actioned!" : "No defective inward pieces in pool.")) : filteredItems.map((it) => {
       const isSelected = selectedIds.includes(it.id);
+      const isResolved = isItemResolved(it.status);
       return /* @__PURE__ */ import_react30.default.createElement(
         "tr",
         {
           key: it.id,
           style: {
             cursor: "pointer",
-            backgroundColor: isSelected ? "rgba(91, 71, 251, 0.08)" : void 0,
+            backgroundColor: isSelected ? "rgba(91, 71, 251, 0.08)" : isResolved ? "#fcfdfd" : void 0,
             transition: "background-color 0.15s ease"
           },
           className: isSelected ? "table-active" : "",
-          onClick: () => handleToggleSelect(it.id)
+          onClick: () => handleToggleSelect(it)
         },
-        /* @__PURE__ */ import_react30.default.createElement("td", { style: { textAlign: "center", width: "52px" } }, /* @__PURE__ */ import_react30.default.createElement(
+        /* @__PURE__ */ import_react30.default.createElement("td", { style: { textAlign: "center", width: "52px" } }, isResolved ? /* @__PURE__ */ import_react30.default.createElement(
+          "span",
+          {
+            className: "d-inline-flex align-items-center justify-content-center text-success",
+            title: "Approved by Admin & transferred to Main Stock Pool. Click row to view details.",
+            style: { width: "20px", height: "20px", cursor: "pointer" },
+            onClick: (e) => {
+              e.stopPropagation();
+              setViewDetailsItem(it);
+            }
+          },
+          /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-circle-check-filled fs-18" })
+        ) : /* @__PURE__ */ import_react30.default.createElement(
           "input",
           {
             type: "checkbox",
@@ -38309,7 +38506,7 @@
             checked: isSelected,
             onChange: (e) => {
               e.stopPropagation();
-              handleToggleSelect(it.id);
+              handleToggleSelect(it);
             },
             onClick: (e) => {
               e.stopPropagation();
@@ -38331,10 +38528,22 @@
           },
           it.reason || "Quality inspection generated for inward shipment."
         )),
-        /* @__PURE__ */ import_react30.default.createElement("td", null, /* @__PURE__ */ import_react30.default.createElement(
+        /* @__PURE__ */ import_react30.default.createElement("td", null, it.status === "Reversed (treated as good)" ? /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-check fs-11" }), /* @__PURE__ */ import_react30.default.createElement("span", null, "Approved (in Stock)")), /* @__PURE__ */ import_react30.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-link p-0 fs-11 text-decoration-none fw-semibold",
+            style: { color: "#5b47fb" },
+            onClick: (e) => {
+              e.stopPropagation();
+              setViewDetailsItem(it);
+            }
+          },
+          "View"
+        )) : /* @__PURE__ */ import_react30.default.createElement(
           "span",
           {
-            className: `badge px-2.5 py-1 fs-11 rounded-pill ${it.status === "In Pool" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : it.status === "RTV Initiated" ? "bg-primary-subtle text-primary border border-primary border-opacity-25" : it.status === "To Be Sold" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : it.status === "Sold" ? "bg-secondary-subtle text-secondary border border-secondary border-opacity-25" : it.status === "Transferred to Stock" ? "bg-info-subtle text-info border border-info border-opacity-25" : it.status === "Pending Admin Review" ? "bg-success-subtle text-success border border-success border-opacity-25" : it.status === "Reversed (treated as good)" ? "bg-success-subtle text-success border border-success border-opacity-25" : "bg-light text-secondary border"}`
+            className: `badge px-2.5 py-1 fs-11 rounded-pill ${it.status === "In Pool" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : it.status === "RTV Initiated" ? "bg-primary-subtle text-primary border border-primary border-opacity-25" : it.status === "To Be Sold" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : it.status === "Sold" ? "bg-secondary-subtle text-secondary border border-secondary border-opacity-25" : it.status === "Transferred to Stock" ? "bg-info-subtle text-info border border-info border-opacity-25" : it.status === "Pending Admin Review" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : "bg-light text-secondary border"}`
           },
           it.status
         ))
@@ -38499,6 +38708,21 @@
         onClick: handleProcessTransfer
       },
       "Approve & Move into Stock"
+    ))))), viewDetailsItem && /* @__PURE__ */ import_react30.default.createElement("div", { className: "modal show d-block", style: { background: "rgba(0,0,0,0.5)", zIndex: 1060 } }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "modal-dialog modal-md modal-dialog-centered" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 p-4" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" }, /* @__PURE__ */ import_react30.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-18 d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-circle-check-filled text-success" }), /* @__PURE__ */ import_react30.default.createElement("span", null, "Resolution Record \u2014 ", viewDetailsItem.id)), /* @__PURE__ */ import_react30.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn-close",
+        onClick: () => setViewDetailsItem(null)
+      }
+    )), /* @__PURE__ */ import_react30.default.createElement("div", { className: "p-3 bg-success-subtle border border-success border-opacity-25 rounded-3 mb-3 text-success" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "fw-bold fs-13 mb-0.5 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react30.default.createElement("i", { className: "ti ti-shield-check fs-16" }), /* @__PURE__ */ import_react30.default.createElement("span", null, "Finalized Decision: ", viewDetailsItem.status)), /* @__PURE__ */ import_react30.default.createElement("div", { className: "fs-12 text-secondary" }, "This shipment was approved by Admin and moved into the ", /* @__PURE__ */ import_react30.default.createElement("strong", null, "Main Stock Pool"), " as good stock. It has been finalized in the system and cannot be actioned (RTV / Scrap / Transfer) again.")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "row g-3 fs-13 mb-3" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "FABRIC QUALITY"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "fw-bold text-dark" }, viewDetailsItem.fabricName || "Fabric Quality")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "QUANTITY"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "fw-bold text-dark" }, Number(viewDetailsItem.quantity).toFixed(2), " Mtrs")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "SOURCE QC"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "font-monospace fw-semibold text-secondary" }, viewDetailsItem.sourceQcRef || "\u2014")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "PO / VENDOR"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "fw-semibold text-dark" }, viewDetailsItem.vendorName || "Vendor", " (", viewDetailsItem.poRef, ")")), /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "INSPECTION REASON"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-secondary" }, viewDetailsItem.reason || "Flagged during QC inspection.")), viewDetailsItem.resolutionNote && /* @__PURE__ */ import_react30.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-0.5" }, "ADMIN RESOLUTION NOTE"), /* @__PURE__ */ import_react30.default.createElement("div", { className: "text-dark fw-medium p-2 bg-light rounded border" }, viewDetailsItem.resolutionNote))), /* @__PURE__ */ import_react30.default.createElement("div", { className: "d-flex justify-content-end pt-2 border-top" }, /* @__PURE__ */ import_react30.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary px-4 py-2 rounded-3 fs-13 fw-semibold",
+        onClick: () => setViewDetailsItem(null)
+      },
+      "Close"
     ))))), toastNotification && /* @__PURE__ */ import_react30.default.createElement(
       "div",
       {
@@ -39829,15 +40053,32 @@
             }
           }
         }
-        let colorVal = qcData.colorName || linkedGrn?.colorName || baleColor || poItem?.colorName || poItem?.color || "White";
+        let colorVal = qcData.colorName || linkedGrn?.colorName || baleColor || poItem?.colorName || poItem?.color || "";
+        if (colorVal.toLowerCase() === "white" && !poItem?.colorName && !poItem?.color && !linkedGrn?.colorName && !baleColor) {
+          colorVal = "";
+        }
         if (colorVal === "Ivory" && (baleColor || poItem?.colorName)) {
           colorVal = baleColor || poItem?.colorName;
         }
         const matchedFabric = fabrics.find((f) => (f.qualityName || f.name)?.toLowerCase() === fabricName.toLowerCase());
         const resolvedFabricId = linkedGrn?.fabricId || matchedFabric?.id || poItem?.fabricId || "FAB-0001";
+        if (!colorVal) {
+          const lowerFab = (fabricName || "").toLowerCase();
+          if (lowerFab.includes("grey") || lowerFab.includes("greige") || lowerFab.includes("raw") || lowerFab.includes("kora") || lowerFab.includes("undyed")) {
+            colorVal = "Raw / Greige";
+          } else {
+            colorVal = "";
+          }
+        }
         const lowerCol = (colorVal || "").toLowerCase();
         const matchedColor = colors.find((c) => c.name?.toLowerCase() === lowerCol || c.hex?.toLowerCase() === lowerCol);
-        const colorHexVal = matchedColor?.hex || linkedGrn?.colorHex || poItem?.colorHex || (lowerCol === "white" ? "#FFFFFF" : lowerCol === "ivory" ? "#FFFFF0" : "#C86D51");
+        let colorHexVal = matchedColor?.hex || linkedGrn?.colorHex || poItem?.colorHex || null;
+        if (!colorHexVal) {
+          if (lowerCol === "white") colorHexVal = "#FFFFFF";
+          else if (lowerCol === "ivory") colorHexVal = "#FFFFF0";
+          else if (lowerCol.includes("grey") || lowerCol.includes("greige") || lowerCol.includes("natural")) colorHexVal = "#DCD7CE";
+          else colorHexVal = colorVal ? "#C86D51" : null;
+        }
         const newStockLot = {
           id: `SP-${Date.now()}`,
           fabricId: resolvedFabricId,
@@ -40124,6 +40365,15 @@
           setActiveGrnView("detail");
         },
         onEditGRN: (g) => {
+          const isLocked = Boolean(
+            g.isQcActioned || g.isSubmittedToQC || g.status === "Completed" || g.status && (g.status.includes("QC") || g.status === "Under QC") || (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+          );
+          if (isLocked) {
+            alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+            setSelectedGRN(g);
+            setActiveGrnView("detail");
+            return;
+          }
           setSelectedGRN(g);
           setActiveGrnView("form");
         }
@@ -40141,8 +40391,11 @@
           setActiveGrnView("list");
         },
         onEditHeader: (updatedGrn) => {
-          if (!updatedGrn || updatedGrn.isQcActioned || updatedGrn.status === "QC Approved" || updatedGrn.status === "QC Passed") {
-            console.warn("Cannot edit header of QC Approved / Actioned GRN");
+          const isLocked = Boolean(
+            !updatedGrn || updatedGrn.isQcActioned || updatedGrn.isSubmittedToQC || updatedGrn.status === "Completed" || updatedGrn.status && (updatedGrn.status.includes("QC") || updatedGrn.status === "Under QC")
+          );
+          if (isLocked) {
+            alert("Receipt details cannot be edited because this GRN has already been submitted to Quality Check (QC).");
             return;
           }
           const normalized = {
@@ -40173,6 +40426,15 @@
           addAuditLog("Update", "GRN", normalized.id, "GRN Header Details", "Previous", `Updated Receipt Details (${normalized.vendorChallanNo || normalized.vendorInvoiceNo || normalized.id})`);
         },
         onEditBales: (g) => {
+          const isLocked = Boolean(
+            g.isQcActioned || g.isSubmittedToQC || g.status === "Completed" || g.status && (g.status.includes("QC") || g.status === "Under QC") || (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+          );
+          if (isLocked) {
+            alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+            setSelectedGRN(g);
+            setActiveGrnView("detail");
+            return;
+          }
           setSelectedGRN(g);
           setActiveGrnView("form");
         },

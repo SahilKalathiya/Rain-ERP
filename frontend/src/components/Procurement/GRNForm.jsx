@@ -278,31 +278,26 @@ export default function GRNForm({
     }
   }, [grn, purchaseOrders]);
 
-  // Link to Quality Check and verify if QC inspection has actually started or taken action
+  // Link to Quality Check and verify if QC inspection has started or if GRN is submitted to QC / completed
   const linkedQCs = (qualityChecks || []).filter((q) => q && (q.grnRef === formData.id || q.grnId === formData.id));
   const linkedQC = linkedQCs[0] || null;
 
-  const isInspectionStarted = Boolean(
+  const isQcActioned = Boolean(
     formData.isQcActioned ||
-    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(formData.status) ||
-    linkedQCs.some((q) => {
-      const isStatusActioned = Boolean(
-        q.qcStatus &&
-        q.qcStatus !== 'Pending' &&
-        q.qcStatus !== 'Awaiting QC' &&
-        q.qcStatus !== 'Draft'
-      );
-      const isStartedFlag = Boolean(q.startedAt || q.isStarted);
-      const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
-      const hasPieces = Boolean(
-        (Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0) ||
-        (q.pieceInspections && Object.keys(q.pieceInspections).length > 0)
-      );
-      return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
-    })
+    formData.isSubmittedToQC ||
+    formData.status === 'Completed' ||
+    (formData.status && (formData.status.includes('QC') || formData.status === 'Under QC')) ||
+    (grn && (grn.status === 'Completed' || grn.isSubmittedToQC || grn.isQcActioned)) ||
+    linkedQCs.length > 0 ||
+    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval', 'Completed'].includes(formData.status)
   );
 
-  const isQcActioned = isInspectionStarted;
+  useEffect(() => {
+    if (isQcActioned && isHeaderEditing) {
+      setIsHeaderEditing(false);
+    }
+  }, [isQcActioned, isHeaderEditing]);
+
   const isLinkedFromPO = Boolean(grn && ((grn.linkedPOs && grn.linkedPOs.length > 0) || grn.poId));
 
   // Visual save feedback for Section 1 (Receipt details)
@@ -430,6 +425,10 @@ export default function GRNForm({
 
   // Generate Bales action
   const handleGenerateBales = () => {
+    if (isQcActioned) {
+      showToast('Bales cannot be altered because this GRN is locked.', 'warning');
+      return;
+    }
     const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
     if (count <= 0) {
       showToast('Please enter a valid number of bales (greater than 0).', 'warning');
@@ -606,7 +605,7 @@ export default function GRNForm({
   // Save Progress (Finish Later) / Save This Section
   const handleSaveHeaderOnly = () => {
     if (isQcActioned) {
-      showToast('Receipt details are locked because Quality Check has already started or been completed.', 'warning');
+      showToast('Receipt details are locked because this GRN has been submitted to QC.', 'warning');
       return;
     }
 
@@ -672,6 +671,10 @@ export default function GRNForm({
 
   // Save all bales draft progress (including any individual bale saves)
   const handleSaveAllBales = (specificBaleIdx = null) => {
+    if (isQcActioned) {
+      showToast('Bale entries are locked because this GRN has been submitted to QC.', 'warning');
+      return;
+    }
     const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || (eligiblePOs[0]?.id) || 'PO-DIRECT';
 
     const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
@@ -771,6 +774,10 @@ export default function GRNForm({
 
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
+    if (isQcActioned) {
+      showToast('This GRN is already completed and submitted to Quality Check (QC).', 'warning');
+      return;
+    }
     if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
       showToast('Please select a Source document (Purchase Order).', 'warning');
       return;
@@ -818,6 +825,9 @@ export default function GRNForm({
     const payload = {
       ...formData,
       status: 'Completed',
+      isSubmittedToQC: true,
+      isQcActioned: true,
+      isHeaderSaved: true,
       date: formData.receivedDate,
       fabricName: fabricItem,
       fabricId: fabricIdVal,
@@ -830,6 +840,15 @@ export default function GRNForm({
       lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered
     };
+
+    setFormData((prev) => ({
+      ...prev,
+      status: 'Completed',
+      isSubmittedToQC: true,
+      isQcActioned: true,
+      isHeaderSaved: true
+    }));
+    setIsHeaderEditing(false);
 
     if (onSaveGRN) {
       onSaveGRN(payload, true);
@@ -882,30 +901,20 @@ export default function GRNForm({
         </div>
       </div>
 
-      {/* QC ACTIONED LOCK BANNER */}
+      {/* QC ACTIONED / SUBMITTED LOCK BANNER */}
       {isQcActioned ? (
         <div className="alert alert-warning border border-warning d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-warning-subtle text-dark">
           <i className="ti ti-lock fs-24 text-warning"></i>
           <div className="flex-grow-1">
             <div className="fw-bold fs-14">
-              GRN Locked — Quality Check Actioned ({linkedQC ? linkedQC.qcStatus : formData.status})
+              GRN Locked — Submitted to Quality Check ({linkedQC ? (linkedQC.qcStatus || 'Pending') : (formData.status || 'Completed')})
             </div>
             <div className="fs-12 text-secondary">
-              Quality Check has already been completed or actioned for this shipment. Bale entries, piece quantities, and inward receipt details cannot be edited.
+              This shipment has been submitted to Quality Check (QC). Bale entries, piece quantities, and inward receipt details are locked and cannot be edited.
             </div>
           </div>
           <span className="badge bg-warning text-dark px-3 py-1.5 rounded-pill fs-12 fw-semibold">
-            Locked (QC Processed)
-          </span>
-        </div>
-      ) : (formData.status === 'Completed' || formData.isHeaderSaved) ? (
-        <div className="alert alert-info border border-info border-opacity-25 d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-2.5 bg-info-subtle text-dark">
-          <i className="ti ti-info-circle fs-20 text-info"></i>
-          <div className="flex-grow-1 fs-13">
-            <span className="fw-semibold">Shipment Inwarded:</span> You can edit this GRN record and container bales anytime <strong>until the inspection starts</strong>.
-          </div>
-          <span className="badge bg-white text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold">
-            Editable (Awaiting QC)
+            Locked (Non-editable)
           </span>
         </div>
       ) : null}
@@ -929,8 +938,9 @@ export default function GRNForm({
                 <span>Edit</span>
               </button>
             ) : (
-              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-normal">
-                <i className="ti ti-lock me-1 text-warning"></i> Read Only (QC Actioned)
+              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-3 d-inline-flex align-items-center gap-1">
+                <i className="ti ti-lock text-warning"></i>
+                <span>Locked (Submitted to QC &mdash; Non-editable)</span>
               </span>
             )
           ) : (
@@ -1745,7 +1755,7 @@ export default function GRNForm({
           </button>
           <div className="d-flex align-items-center gap-2 text-muted fs-13">
             <i className="ti ti-lock text-warning fs-18"></i>
-            <span>This shipment is locked because Quality Check has been actioned ({linkedQC?.qcStatus || formData.status}).</span>
+            <span>This shipment is locked because it has been submitted to Quality Check (Non-editable).</span>
           </div>
         </div>
       ) : (

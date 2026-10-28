@@ -52,29 +52,19 @@ function parseDateForSort(d, id) {
   return isNaN(timestamp) ? 0 : timestamp;
 }
 
-  // Check if quality inspection has actually started or been completed for a GRN
+  // Check if quality inspection has started or if GRN has been submitted to QC / completed
   const isRowInspectionStarted = (item) => {
     if (!item) return false;
-    if (item.isQcActioned) return true;
-    if (['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(item.status)) {
+    if (item.isQcActioned || item.isSubmittedToQC) return true;
+    if (['Completed', 'QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(item.status)) {
+      return true;
+    }
+    if (item.status && (item.status.includes('QC') || item.status === 'Under QC')) {
       return true;
     }
     const itemQcs = (qualityChecks || []).filter((q) => q && (q.grnRef === item.id || q.grnId === item.id));
-    return itemQcs.some((q) => {
-      const isStatusActioned = Boolean(
-        q.qcStatus &&
-        q.qcStatus !== 'Pending' &&
-        q.qcStatus !== 'Awaiting QC' &&
-        q.qcStatus !== 'Draft'
-      );
-      const isStartedFlag = Boolean(q.startedAt || q.isStarted);
-      const hasMeasurements = Boolean(q.actualWidth || q.actualFold);
-      const hasPieces = Boolean(
-        (Array.isArray(q.inspectedPieces) && q.inspectedPieces.length > 0) ||
-        (q.pieceInspections && Object.keys(q.pieceInspections).length > 0)
-      );
-      return isStatusActioned || isStartedFlag || hasMeasurements || hasPieces;
-    });
+    if (itemQcs.length > 0) return true;
+    return false;
   };
 
   const filtered = (grns || []).filter((g) => {

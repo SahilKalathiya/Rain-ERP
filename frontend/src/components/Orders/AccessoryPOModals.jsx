@@ -115,7 +115,8 @@ export const ACCESSORY_PO_CATEGORIES = {
  */
 export function calcShrinkagePO(reqPerPc, garments, shrinkagePct, bufferQty, extraQty, rate) {
   const totalDyed = reqPerPc * garments;
-  const totalGreige = totalDyed * (1 + (shrinkagePct || 0) / 100) + (bufferQty || 0);
+  const greigeBase = totalDyed * (1 + (parseFloat(shrinkagePct) || 0) / 100);
+  const totalGreige = greigeBase * (1 + (parseFloat(bufferQty) || 0) / 100);
   const totalPOQty = totalGreige + (parseFloat(extraQty) || 0);
   return {
     totalDyed,
@@ -156,7 +157,8 @@ export function calcBeadsPO(consumptionPer100, garments, extraQty, rate) {
 }
 
 export function calcDoriPO(reqPerPc, extraPerPacking, bufferQty, fabricPerUnit, garments, extraQty, rate) {
-  const totalReq = (reqPerPc + (extraPerPacking || 0)) * garments + (bufferQty || 0);
+  const baseReq = (reqPerPc + (extraPerPacking || 0)) * garments;
+  const totalReq = baseReq * (1 + (parseFloat(bufferQty) || 0) / 100);
   const totalPOQty = totalReq + (parseFloat(extraQty) || 0);
   const totalFabric = totalPOQty * (fabricPerUnit || 0);
   return {
@@ -845,7 +847,7 @@ export function GenericAccessoryPOModal({
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Dyed/Pc</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Total Dyed</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Shrinkage%</th>
-                                  <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Buffer</th>
+                                  <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Buffer %</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Total Greige</th>
                                 </>
                               )}
@@ -864,7 +866,7 @@ export function GenericAccessoryPOModal({
                                 <>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Req/Pc (m)</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Extra/Pack</th>
-                                  <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Buffer</th>
+                                  <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Buffer %</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Total Dori</th>
                                   <th className="text-center px-3 py-2.5 font-semibold text-gray-600 text-xs" style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px', color: '#475569' }}>Fabric/m</th>
                                 </>
@@ -949,7 +951,7 @@ export function GenericAccessoryPOModal({
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.reqPerPc}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.totalDyed?.toFixed(1)}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.shrinkagePct}%</td>
-                                      <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.bufferQty}</td>
+                                      <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.bufferQty !== undefined && row.bufferQty !== '' ? row.bufferQty + '%' : '0%'}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-800 font-medium" style={{ padding: '10px 12px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>{row.totalGreige?.toFixed(1)}</td>
                                     </>
                                   )}
@@ -968,7 +970,7 @@ export function GenericAccessoryPOModal({
                                     <>
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.reqPerPc}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.extraPerPacking}</td>
-                                      <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.bufferQty}</td>
+                                      <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.bufferQty !== undefined && row.bufferQty !== '' ? row.bufferQty + '%' : '0%'}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-800 font-medium" style={{ padding: '10px 12px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>{row.totalRequired?.toFixed(1)}</td>
                                       <td className="px-3 py-2.5 text-center text-gray-600" style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{row.fabricPerUnit}</td>
                                     </>

@@ -133,7 +133,7 @@ export default function GRNDetailView({
     ? `Bale entries total (${baleMetersEntered}m) does not match total quantity (${declaredTotalQty}m)`
     : '';
 
-  // Requirement 21 & Header Lock: Only once QC inspection actually starts or is actioned are both bale entries and receipt details locked.
+  // Requirement: Once a GRN is submitted to QC (or Completed / Actioned), it is non-editable.
   const isQcPassedOrApproved = Boolean(
     grn.status === 'QC Approved' ||
     grn.status === 'QC Passed' ||
@@ -143,12 +143,13 @@ export default function GRNDetailView({
   const isQcStarted = Boolean(
     isQcPassedOrApproved ||
     grn.isQcActioned ||
-    (qcRecs.some((q) => q.qcStatus && q.qcStatus !== 'Pending' && q.qcStatus !== 'Awaiting QC' && q.qcStatus !== 'Draft')) ||
-    (qcRecs.some((q) => q.startedAt || q.isStarted || q.actualWidth || q.actualFold || (q.inspectedPieces && q.inspectedPieces.length > 0) || (q.pieceInspections && Object.keys(q.pieceInspections).length > 0))) ||
+    grn.isSubmittedToQC ||
+    grn.status === 'Completed' ||
+    (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC')) ||
     grn.status === 'QC Rejected' ||
     grn.status === 'QC In Progress' ||
     grn.status === 'Pending Admin Approval' ||
-    (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC'))
+    (qcRecs && qcRecs.length > 0)
   );
 
   const canEditHeader = !isQcStarted;
@@ -391,9 +392,13 @@ export default function GRNDetailView({
               >
                 {grn.status || 'Draft'}
               </span>
-              {!isQcStarted && (
+              {isQcStarted ? (
+                <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1">
+                  <i className="ti ti-lock text-warning"></i> Locked (Submitted to QC &mdash; Non-editable)
+                </span>
+              ) : (
                 <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-medium">
-                  <i className="ti ti-check me-1"></i> Editable (Awaiting Inspection)
+                  <i className="ti ti-check me-1"></i> Editable (Draft)
                 </span>
               )}
             </h2>
@@ -403,7 +408,7 @@ export default function GRNDetailView({
           </div>
 
           <div className="d-flex align-items-center gap-2">
-            {!isQcStarted && (
+            {!isQcStarted ? (
               <button
                 type="button"
                 className="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-1.5 fw-semibold fs-13 rounded-2 shadow-sm text-white"
@@ -414,6 +419,11 @@ export default function GRNDetailView({
                 <i className="ti ti-edit fs-15"></i>
                 <span>Edit GRN</span>
               </button>
+            ) : (
+              <span className="badge bg-light text-secondary border px-3 py-2 fs-12 rounded-2 d-inline-flex align-items-center gap-1.5">
+                <i className="ti ti-lock text-warning fs-14"></i>
+                <span>Locked (Non-editable)</span>
+              </span>
             )}
           </div>
         </div>
@@ -435,7 +445,7 @@ export default function GRNDetailView({
           ) : (
             <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
               <i className="ti ti-lock fs-13 text-muted"></i>
-              <span>Locked ({isQcPassedOrApproved ? 'QC Approved' : 'QC Actioned'} &mdash; Non-editable)</span>
+              <span>Locked (Submitted to QC &mdash; Non-editable)</span>
             </span>
           )}
         </div>
@@ -519,7 +529,7 @@ export default function GRNDetailView({
           ) : (
             <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
               <i className="ti ti-lock fs-13 text-muted"></i>
-              <span>Locked (QC Started &mdash; Non-editable)</span>
+              <span>Locked (Submitted to QC &mdash; Non-editable)</span>
             </span>
           )}
         </div>
@@ -581,7 +591,7 @@ export default function GRNDetailView({
                           }`}
                         >
                           <i className={`ti ${isQcLocked ? 'ti-lock' : 'ti-pencil'} me-1 fs-10`}></i>
-                          {isQcLocked ? 'Locked (QC started)' : 'Editable'}
+                          {isQcLocked ? 'Locked (Submitted to QC)' : 'Editable'}
                         </span>
                       </td>
                     </tr>

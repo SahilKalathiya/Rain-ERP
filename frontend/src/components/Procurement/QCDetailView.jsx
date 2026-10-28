@@ -208,7 +208,7 @@ export default function QCDetailView({
               style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
               onClick={() => onViewResolveDamaged && onViewResolveDamaged(itemToResolve)}
             >
-              View / Resolve
+              {effectiveStatus === 'Reversed (treated as good)' || effectiveStatus === 'Write Off (scrap)' || effectiveStatus === 'Return to Vendor' ? 'View Resolution' : 'View / Resolve'}
             </button>
           </div>
         </div>

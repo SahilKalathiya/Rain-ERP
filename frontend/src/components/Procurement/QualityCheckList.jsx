@@ -178,7 +178,7 @@ export default function QualityCheckList({
       poItem?.color ||
       poItem?.colorName ||
       poItem?.shade ||
-      (parsedFabric.toLowerCase().includes('grey') ? 'Grey / Natural' : 'White');
+      (parsedFabric.toLowerCase().includes('grey') || parsedFabric.toLowerCase().includes('greige') || parsedFabric.toLowerCase().includes('raw') ? 'Grey / Natural' : '');
 
     const width =
       qc.actualWidth ||
@@ -215,8 +215,8 @@ export default function QualityCheckList({
   ).length;
   const adminCount = expandedQcRecords.filter(
     (qc) =>
-      qc.qcStatus === 'Send for Admin Approval' ||
-      qc.qcStatus === 'Admin Approval'
+      (qc.qcStatus === 'Send for Admin Approval' ||
+      qc.qcStatus === 'Admin Approval') && !qc.adminDecision
   ).length;
   const completedCount = expandedQcRecords.filter(
     (qc) =>
@@ -224,7 +224,8 @@ export default function QualityCheckList({
       qc.qcStatus === 'Approved' ||
       qc.qcStatus === 'Reject' ||
       qc.qcStatus === 'Rejected' ||
-      qc.qcStatus === 'Partial OK'
+      qc.qcStatus === 'Partial OK' ||
+      Boolean(qc.adminDecision)
   ).length;
   const damagedCount =
     damagedItems.length ||
@@ -280,15 +281,16 @@ function parseDateForSort(d, id) {
       matchesTab = qc.qcStatus === 'Pending' || !qc.qcStatus;
     } else if (activeTabFilter === 'admin') {
       matchesTab =
-        qc.qcStatus === 'Send for Admin Approval' ||
-        qc.qcStatus === 'Admin Approval';
+        (qc.qcStatus === 'Send for Admin Approval' ||
+        qc.qcStatus === 'Admin Approval') && !qc.adminDecision;
     } else if (activeTabFilter === 'completed') {
       matchesTab =
         qc.qcStatus === 'OK' ||
         qc.qcStatus === 'Approved' ||
         qc.qcStatus === 'Reject' ||
         qc.qcStatus === 'Rejected' ||
-        qc.qcStatus === 'Partial OK';
+        qc.qcStatus === 'Partial OK' ||
+        Boolean(qc.adminDecision);
     } else if (activeTabFilter === 'damaged') {
       matchesTab =
         Number(qc.defectQty) > 0 ||
@@ -512,7 +514,7 @@ function parseDateForSort(d, id) {
                       {/* WIDTH / COLOUR */}
                       <td>
                         <span className="text-secondary">
-                          {d.width ? `${String(d.width).replace(/"/g, '')}"` : '42"'} &middot; {d.color}
+                          {d.width ? `${String(d.width).replace(/"/g, '')}"` : '42"'} &middot; {d.color || 'Raw / Greige'}
                         </span>
                       </td>
 
@@ -534,9 +536,15 @@ function parseDateForSort(d, id) {
                             Partial OK
                           </span>
                         ) : d.status === 'Send for Admin Approval' || d.status === 'Admin Approval' ? (
-                          <span className="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
-                            Admin Approval
-                          </span>
+                          qc.adminDecision ? (
+                            <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
+                              Approved by Admin
+                            </span>
+                          ) : (
+                            <span className="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
+                              Admin Approval
+                            </span>
+                          )
                         ) : d.status === 'Reject' || d.status === 'Rejected' ? (
                           <span className="badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
                             Rejected

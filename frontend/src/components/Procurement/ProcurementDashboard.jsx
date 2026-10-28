@@ -973,7 +973,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         }
       }
 
-      let colorVal = qcData.colorName || linkedGrn?.colorName || baleColor || poItem?.colorName || poItem?.color || 'White';
+      let colorVal = qcData.colorName || linkedGrn?.colorName || baleColor || poItem?.colorName || poItem?.color || '';
+      // If it was defaulted to 'White' upstream but PO/GRN had no color specified, do not force 'White'
+      if (colorVal.toLowerCase() === 'white' && !poItem?.colorName && !poItem?.color && !linkedGrn?.colorName && !baleColor) {
+        colorVal = '';
+      }
       if (colorVal === 'Ivory' && (baleColor || poItem?.colorName)) {
         colorVal = baleColor || poItem?.colorName;
       }
@@ -981,10 +985,25 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       const matchedFabric = fabrics.find((f) => (f.qualityName || f.name)?.toLowerCase() === fabricName.toLowerCase());
       const resolvedFabricId = linkedGrn?.fabricId || matchedFabric?.id || poItem?.fabricId || 'FAB-0001';
 
+      if (!colorVal) {
+        const lowerFab = (fabricName || '').toLowerCase();
+        if (lowerFab.includes('grey') || lowerFab.includes('greige') || lowerFab.includes('raw') || lowerFab.includes('kora') || lowerFab.includes('undyed')) {
+          colorVal = 'Raw / Greige';
+        } else {
+          colorVal = '';
+        }
+      }
+
       // Match hex
       const lowerCol = (colorVal || '').toLowerCase();
       const matchedColor = colors.find((c) => c.name?.toLowerCase() === lowerCol || c.hex?.toLowerCase() === lowerCol);
-      const colorHexVal = matchedColor?.hex || linkedGrn?.colorHex || poItem?.colorHex || (lowerCol === 'white' ? '#FFFFFF' : (lowerCol === 'ivory' ? '#FFFFF0' : '#C86D51'));
+      let colorHexVal = matchedColor?.hex || linkedGrn?.colorHex || poItem?.colorHex || null;
+      if (!colorHexVal) {
+        if (lowerCol === 'white') colorHexVal = '#FFFFFF';
+        else if (lowerCol === 'ivory') colorHexVal = '#FFFFF0';
+        else if (lowerCol.includes('grey') || lowerCol.includes('greige') || lowerCol.includes('natural')) colorHexVal = '#DCD7CE';
+        else colorHexVal = colorVal ? '#C86D51' : null;
+      }
 
       const newStockLot = {
         id: `SP-${Date.now()}`,
@@ -1331,6 +1350,19 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActiveGrnView('detail');
               }}
               onEditGRN={(g) => {
+                const isLocked = Boolean(
+                  g.isQcActioned ||
+                  g.isSubmittedToQC ||
+                  g.status === 'Completed' ||
+                  (g.status && (g.status.includes('QC') || g.status === 'Under QC')) ||
+                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+                );
+                if (isLocked) {
+                  alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+                  setSelectedGRN(g);
+                  setActiveGrnView('detail');
+                  return;
+                }
                 setSelectedGRN(g);
                 setActiveGrnView('form');
               }}
@@ -1349,8 +1381,15 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActiveGrnView('list');
               }}
               onEditHeader={(updatedGrn) => {
-                if (!updatedGrn || updatedGrn.isQcActioned || updatedGrn.status === 'QC Approved' || updatedGrn.status === 'QC Passed') {
-                  console.warn('Cannot edit header of QC Approved / Actioned GRN');
+                const isLocked = Boolean(
+                  !updatedGrn ||
+                  updatedGrn.isQcActioned ||
+                  updatedGrn.isSubmittedToQC ||
+                  updatedGrn.status === 'Completed' ||
+                  (updatedGrn.status && (updatedGrn.status.includes('QC') || updatedGrn.status === 'Under QC'))
+                );
+                if (isLocked) {
+                  alert('Receipt details cannot be edited because this GRN has already been submitted to Quality Check (QC).');
                   return;
                 }
                 const normalized = {
@@ -1384,6 +1423,19 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 addAuditLog('Update', 'GRN', normalized.id, 'GRN Header Details', 'Previous', `Updated Receipt Details (${normalized.vendorChallanNo || normalized.vendorInvoiceNo || normalized.id})`);
               }}
               onEditBales={(g) => {
+                const isLocked = Boolean(
+                  g.isQcActioned ||
+                  g.isSubmittedToQC ||
+                  g.status === 'Completed' ||
+                  (g.status && (g.status.includes('QC') || g.status === 'Under QC')) ||
+                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+                );
+                if (isLocked) {
+                  alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+                  setSelectedGRN(g);
+                  setActiveGrnView('detail');
+                  return;
+                }
                 setSelectedGRN(g);
                 setActiveGrnView('form');
               }}

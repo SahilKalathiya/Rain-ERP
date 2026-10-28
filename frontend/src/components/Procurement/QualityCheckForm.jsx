@@ -380,6 +380,7 @@ export default function QualityCheckForm({
 
   // Requirement 23: Exception mismatch detection
   const hasAnyMismatch = isWidthMismatch || isFoldMismatch;
+  const isQcFinalized = Boolean(qc && (qc.adminDecision || qc.qcStatus === 'Approved' || qc.qcStatus === 'OK' || qc.qcStatus === 'Reject' || qc.qcStatus === 'Partial OK'));
 
   const handleSubmit = (statusOverride) => {
     const effectiveStatus = (typeof statusOverride === 'string') ? statusOverride : formData.qcStatus;
@@ -1101,7 +1102,37 @@ export default function QualityCheckForm({
 
           {/* Bottom Action Section */}
           <div className="pt-3">
-            {!isInspectionDetailsComplete ? (
+            {isQcFinalized ? (
+              <div className="card border-0 shadow-sm rounded-4 p-4 bg-light border">
+                <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center bg-success text-white flex-shrink-0 shadow-xs"
+                      style={{ width: '40px', height: '40px' }}
+                    >
+                      <i className="ti ti-check fs-20"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark fs-14 mb-0.5">
+                        Inspection Decision Finalized: <span className="text-success">{qc.qcStatus || qc.adminDecision}</span>
+                      </div>
+                      <div className="text-secondary fs-12">
+                        This Quality Check was already approved/finalized by Admin. Modifications and re-submissions are locked.
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary px-4 py-2 fs-13 shadow-sm rounded-3 text-nowrap fw-semibold"
+                      onClick={onBack}
+                    >
+                      Back
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : !isInspectionDetailsComplete ? (
               <div
                 className="card border-0 shadow-sm rounded-4 p-4"
                 style={{

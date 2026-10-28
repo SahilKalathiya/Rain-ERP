@@ -216,23 +216,15 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
     <>
       {viewMode === 'create' && (
         <OrderCreationWizard
+          editingOrder={selectedOrder}
           onSaveOrder={(newOrder, action) => handleSaveOrder(newOrder, action, true)}
           onCancel={() => {
-            if (selectedOrder) {
-              setViewMode('detail');
-              if (onNavigate) {
-                onNavigate(`/orders/${selectedOrder.id}`);
-              } else if (typeof window !== 'undefined' && window.history?.pushState) {
-                window.history.pushState(null, '', `/react/orders/${selectedOrder.id}`);
-              }
-            } else {
-              setSelectedOrder(null);
-              setViewMode('list');
-              if (onNavigate) {
-                onNavigate('/orders');
-              } else if (typeof window !== 'undefined' && window.history?.pushState) {
-                window.history.pushState(null, '', '/react/orders');
-              }
+            setSelectedOrder(null);
+            setViewMode('list');
+            if (onNavigate) {
+              onNavigate('/orders');
+            } else if (typeof window !== 'undefined' && window.history?.pushState) {
+              window.history.pushState(null, '', '/react/orders');
             }
           }}
         />

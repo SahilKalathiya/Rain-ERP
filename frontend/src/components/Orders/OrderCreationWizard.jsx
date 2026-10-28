@@ -92,7 +92,7 @@ export const autoCapitalizeWords = (str) => {
 };
 export const capitalizeWords = autoCapitalizeWords;
 
-export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
+export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrder = null }) {
   // Master Data State
   const [masterSizeSeries, setMasterSizeSeries] = useState(() => {
     const stored = getStoredData('erp_size_series_v1', null);
@@ -252,8 +252,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
   // Copy Sizes Modal State
   const [copySizesModal, setCopySizesModal] = useState(null); // { custIdx, articleId, colorId, sourceConfig }
 
-  // 1. Order Information (All fields empty, with placeholders)
+  // 1. Order Information (Populated from editingOrder if provided, else blank default)
   const [orderInfo, setOrderInfo] = useState(() => {
+    if (editingOrder) {
+      return {
+        orderId: editingOrder.id || editingOrder.orderId || '',
+        styleName: editingOrder.styleName || '',
+        orderDate: editingOrder.orderDate || new Date().toISOString().split('T')[0],
+        expectedDelivery: editingOrder.expectedDelivery || '',
+        priority: editingOrder.priority || 'Normal'
+      };
+    }
     const today = new Date();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const yy = String(today.getFullYear()).slice(-2);
@@ -267,12 +276,101 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     };
   });
 
-  // 2. Added Articles State (empty initially)
-  const [addedArticles, setAddedArticles] = useState([]);
+  // 2. Added Articles State (Populated from editingOrder.articles if available)
+  const [addedArticles, setAddedArticles] = useState(() => {
+    if (editingOrder && Array.isArray(editingOrder.articles) && editingOrder.articles.length > 0) {
+      return editingOrder.articles.map(art => ({
+        id: art.id || `ART-${Date.now()}-${Math.floor(Math.random() * 100)}`,
+        articleTypeId: art.articleTypeId || art.id,
+        name: art.name || '',
+        avgLength: art.avgLength || art.avgGarmentLength || '',
+        fabrics: (Array.isArray(art.fabrics) && art.fabrics.length > 0)
+          ? art.fabrics.map(f => ({
+              role: f.role || '',
+              fabricId: f.fabricId || '',
+              fabricQuality: f.fabricQuality || '',
+              avgLength: f.avgLength || art.avgLength || ''
+            }))
+          : [
+              {
+                role: '',
+                fabricId: art.fabricId || '',
+                fabricQuality: art.fabricQuality || '',
+                avgLength: art.avgLength || ''
+              }
+            ]
+      }));
+    }
+    return [];
+  });
 
-  // 3. Customers & Orders State (empty initially until user clicks 1, 2, 3, 4, 5, 6)
-  const [orderCustomers, setOrderCustomers] = useState([]);
-  const [expandedCustomerIdx, setExpandedCustomerIdx] = useState(-1);
+  // 3. Customers & Orders State (Populated from editingOrder.customerOrders / customers if available)
+  const [orderCustomers, setOrderCustomers] = useState(() => {
+    const rawCusts = editingOrder?.customerOrders || editingOrder?.customers;
+    if (Array.isArray(rawCusts) && rawCusts.length > 0) {
+      return rawCusts.map(c => ({
+        id: c.id || `ORD-CUST-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        customerId: c.customerId || '',
+        customerName: c.customerName || '',
+        assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
+        selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
+        sizeConfigs: c.sizeConfigs || {}
+      }));
+    }
+    return [];
+  });
+  const [expandedCustomerIdx, setExpandedCustomerIdx] = useState(() => {
+    const rawCusts = editingOrder?.customerOrders || editingOrder?.customers;
+    return (Array.isArray(rawCusts) && rawCusts.length > 0) ? 0 : -1;
+  });
+
+  // Synchronize state if editingOrder prop changes
+  useEffect(() => {
+    if (editingOrder) {
+      setOrderInfo({
+        orderId: editingOrder.id || editingOrder.orderId || '',
+        styleName: editingOrder.styleName || '',
+        orderDate: editingOrder.orderDate || new Date().toISOString().split('T')[0],
+        expectedDelivery: editingOrder.expectedDelivery || '',
+        priority: editingOrder.priority || 'Normal'
+      });
+      if (Array.isArray(editingOrder.articles) && editingOrder.articles.length > 0) {
+        setAddedArticles(editingOrder.articles.map(art => ({
+          id: art.id || `ART-${Date.now()}-${Math.floor(Math.random() * 100)}`,
+          articleTypeId: art.articleTypeId || art.id,
+          name: art.name || '',
+          avgLength: art.avgLength || art.avgGarmentLength || '',
+          fabrics: (Array.isArray(art.fabrics) && art.fabrics.length > 0)
+            ? art.fabrics.map(f => ({
+                role: f.role || '',
+                fabricId: f.fabricId || '',
+                fabricQuality: f.fabricQuality || '',
+                avgLength: f.avgLength || art.avgLength || ''
+              }))
+            : [
+                {
+                  role: '',
+                  fabricId: art.fabricId || '',
+                  fabricQuality: art.fabricQuality || '',
+                  avgLength: art.avgLength || ''
+                }
+              ]
+        })));
+      }
+      const rawCusts = editingOrder.customerOrders || editingOrder.customers;
+      if (Array.isArray(rawCusts) && rawCusts.length > 0) {
+        setOrderCustomers(rawCusts.map(c => ({
+          id: c.id || `ORD-CUST-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          customerId: c.customerId || '',
+          customerName: c.customerName || '',
+          assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
+          selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
+          sizeConfigs: c.sizeConfigs || {}
+        })));
+        setExpandedCustomerIdx(0);
+      }
+    }
+  }, [editingOrder]);
 
   // Load latest data from Fabric & Color masters
   useEffect(() => {
@@ -1251,13 +1349,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
     });
 
     const payload = {
+      ...(editingOrder || {}),
       id: orderInfo.orderId,
       styleName: finalStyleName,
       orderDate: orderInfo.orderDate,
       expectedDelivery: orderInfo.expectedDelivery || '',
       priority: orderInfo.priority || 'Normal',
-      status: status || 'Saved', // 'Draft' | 'Saved'
-      stage: status === 'Draft' ? 'Draft' : 'Confirmed',
+      status: status || (editingOrder?.status === 'Draft' && status !== 'Saved' ? 'Draft' : 'Saved'),
+      stage: (status === 'Draft' || (editingOrder?.status === 'Draft' && status !== 'Saved')) ? 'Draft' : 'Confirmed',
       totalGarments: grandTotalOrderPieces || 0,
       totalFabricGreige: parseFloat(totalGreigeFabric) || 0,
       totalFabricDyed: parseFloat(totalDyedFabric) || 0,
@@ -1287,7 +1386,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
       customerOrders: mappedCustomerOrders,
       fabricConsumptions: fabricConsumptionRows,
       fabricQualityGroups: fabricGroups,
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
 
     const saved = getStoredData('erp_sales_orders_v1', []);
@@ -1339,11 +1438,16 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
           >
             <i className="ti ti-arrow-left"></i> Back to Orders
           </button>
-          <h4 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+          <h4 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2 flex-wrap">
             <span className="p-2 rounded-3 text-white d-inline-flex align-items-center justify-content-center" style={{ backgroundColor: '#2e37a4', width: '36px', height: '36px' }}>
-              <i className="ti ti-file-plus fs-5"></i>
+              <i className={editingOrder ? "ti ti-edit fs-5" : "ti ti-file-plus fs-5"}></i>
             </span>
-            New Sales Order
+            <span>{editingOrder ? (editingOrder.status === 'Draft' ? 'Edit Draft Sales Order' : 'Edit Sales Order') : 'New Sales Order'}</span>
+            {editingOrder && (
+              <span className="badge font-monospace px-2.5 py-1 rounded-2 ms-1 fs-12 fw-normal" style={{ backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+                {editingOrder.id} &bull; {editingOrder.status || 'Draft'}
+              </span>
+            )}
           </h4>
           <p className="text-muted small mb-0 mt-1">
             Order intake with article, fabric requirement (incl. dyeing shrinkage &amp; buffer), size series and per-customer colour/quantity breakdown.
@@ -2677,11 +2781,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel }) {
             </button>
             <button
               type="button"
-              className="btn text-white rounded-3 px-4 py-2 fw-semibold shadow-sm"
+              className="btn text-white rounded-3 px-4 py-2 fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5"
               style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
               onClick={() => handleFinalSave('Saved')}
             >
-              <i className="ti ti-check me-1"></i> Save Order
+              <i className="ti ti-check"></i>
+              <span>{editingOrder ? 'Save & Proceed to Next Step' : 'Save Order'}</span>
+              {editingOrder && <i className="ti ti-arrow-right"></i>}
             </button>
           </div>
         </div>

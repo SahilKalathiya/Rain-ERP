@@ -105,37 +105,33 @@ function resolveItemColorAndFabric(item, { grns = [], purchaseOrders = [], quali
 
   // 7. Determine accurate Color Name
   let resolvedColor = '';
-  if (item.colorName && item.colorName !== 'Ivory' && item.colorName !== 'Greige (undyed)') {
-    resolvedColor = item.colorName;
-  } else if (baleColor) {
-    resolvedColor = baleColor;
-  } else if (matchingPoItem?.colorName) {
-    resolvedColor = matchingPoItem.colorName;
-  } else if (linkedGrn?.colorName && linkedGrn.colorName !== 'Ivory') {
-    resolvedColor = linkedGrn.colorName;
-  } else if (linkedQC?.colorName && linkedQC.colorName !== 'Ivory') {
+  const poHasExplicitColor = matchingPoItem && (matchingPoItem.colorName || matchingPoItem.color);
+  const grnHasExplicitColor = (linkedGrn?.colorName && linkedGrn.colorName !== 'Ivory') || baleColor;
+  const qcHasExplicitColor = linkedQC?.colorName && linkedQC.colorName !== 'Ivory' && linkedQC.colorName !== 'White';
+
+  if (poHasExplicitColor) {
+    resolvedColor = matchingPoItem.colorName || matchingPoItem.color;
+  } else if (grnHasExplicitColor) {
+    resolvedColor = linkedGrn?.colorName || baleColor;
+  } else if (qcHasExplicitColor) {
     resolvedColor = linkedQC.colorName;
-  } else if (item.colorName && item.colorName !== 'Ivory') {
-    resolvedColor = item.colorName;
-  } else {
-    // Distinct realistic fallback mapping per fabric quality & width
-    const lowerFab = fabricName.toLowerCase();
-    if (lowerFab.includes('grey') || lowerFab.includes('greige')) {
-      resolvedColor = 'Grey / Natural';
-    } else if (lowerFab.includes('rayon')) {
-      resolvedColor = 'Navy Blue';
-    } else if (lowerFab.includes('modal') && widthClean === '58') {
-      resolvedColor = 'Rust Light';
-    } else if (lowerFab.includes('modal') && widthClean === '42') {
-      resolvedColor = 'Peach';
-    } else if (lowerFab.includes('modal') && widthClean === '44') {
-      resolvedColor = 'White';
-    } else if (lowerFab.includes('silk') || lowerFab.includes('tussar')) {
-      resolvedColor = 'Ivory';
-    } else if (lowerFab.includes('georgette')) {
-      resolvedColor = 'Sea Green';
+  } else if (item.colorName && item.colorName !== 'Ivory' && item.colorName !== 'Greige (undyed)') {
+    // If stock lot has 'White' but neither PO nor GRN entered any color, it was auto-assigned: clear it!
+    if (item.colorName.toLowerCase() === 'white' && !poHasExplicitColor && !grnHasExplicitColor) {
+      resolvedColor = '';
     } else {
-      resolvedColor = 'White';
+      resolvedColor = item.colorName;
+    }
+  }
+
+  // If still empty, check if fabric quality is raw/greige
+  if (!resolvedColor) {
+    const lowerFab = fabricName.toLowerCase();
+    if (lowerFab.includes('grey') || lowerFab.includes('greige') || lowerFab.includes('raw') || lowerFab.includes('kora') || lowerFab.includes('undyed')) {
+      resolvedColor = 'Raw / Greige';
+    } else {
+      // Do not force 'White' - keep empty so it reflects no color specified
+      resolvedColor = '';
     }
   }
 
@@ -145,15 +141,21 @@ function resolveItemColorAndFabric(item, { grns = [], purchaseOrders = [], quali
     (c) => c.name?.toLowerCase() === lowerColor || c.hex?.toLowerCase() === lowerColor
   );
 
-  let resolvedHex = item.colorHex;
-  if (masterColorMatch?.hex) {
+  let resolvedHex = null;
+  if (!resolvedColor) {
+    resolvedHex = null;
+  } else if (resolvedColor === 'Raw / Greige' || resolvedColor === 'Grey / Natural') {
+    resolvedHex = '#DCD7CE';
+  } else if (masterColorMatch?.hex) {
     resolvedHex = masterColorMatch.hex;
   } else if (COLOR_HEX_MAP[lowerColor]) {
     resolvedHex = COLOR_HEX_MAP[lowerColor];
   } else if (resolvedColor.startsWith('#')) {
     resolvedHex = resolvedColor;
-  } else if (!resolvedHex || resolvedHex === '#FFFFF0') {
-    resolvedHex = COLOR_HEX_MAP[lowerColor] || (lowerColor === 'ivory' ? '#FFFFF0' : '#E2E8F0');
+  } else if (item.colorHex && item.colorHex !== '#FFFFFF' && item.colorHex !== '#FFFFF0') {
+    resolvedHex = item.colorHex;
+  } else {
+    resolvedHex = lowerColor === 'white' ? '#FFFFFF' : (lowerColor === 'ivory' ? '#FFFFF0' : '#E2E8F0');
   }
 
   return {
@@ -240,7 +242,7 @@ export default function StockPoolView({
     return (
       g.fabricName.toLowerCase().includes(q) ||
       g.width.toLowerCase().includes(q) ||
-      g.colorName.toLowerCase().includes(q) ||
+      (g.colorName && g.colorName.toLowerCase().includes(q)) ||
       (g.fabricId && g.fabricId.toLowerCase().includes(q))
     );
   });
@@ -347,19 +349,27 @@ export default function StockPoolView({
                 <span className="text-muted">·</span>
                 <span>{selectedGroup.width}</span>
                 <span className="text-muted">·</span>
-                <span className="d-inline-flex align-items-center gap-1.5">
-                  <span
-                    className="rounded-circle shadow-sm"
-                    style={{
-                      width: '15px',
-                      height: '15px',
-                      backgroundColor: selectedGroup.colorHex,
-                      border: selectedGroup.colorHex?.toLowerCase() === '#ffffff' || selectedGroup.colorHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.1)',
-                      display: 'inline-block'
-                    }}
-                  />
-                  <span>{selectedGroup.colorName}</span>
-                </span>
+                {selectedGroup.colorName ? (
+                  <span className="d-inline-flex align-items-center gap-1.5">
+                    {selectedGroup.colorHex && (
+                      <span
+                        className="rounded-circle shadow-sm"
+                        style={{
+                          width: '15px',
+                          height: '15px',
+                          backgroundColor: selectedGroup.colorHex,
+                          border: selectedGroup.colorHex?.toLowerCase() === '#ffffff' || selectedGroup.colorHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.1)',
+                          display: 'inline-block'
+                        }}
+                      />
+                    )}
+                    <span>{selectedGroup.colorName}</span>
+                  </span>
+                ) : (
+                  <span className="badge bg-light text-secondary border px-2 py-0.5 fs-12 fw-medium rounded-2">
+                    Raw / Greige (No color)
+                  </span>
+                )}
                 {selectedGroup.fabricId && (
                   <span className="badge bg-light text-secondary border px-2 py-0.5 fs-12 fw-medium rounded-2 ms-1">
                     {selectedGroup.fabricId}
@@ -586,20 +596,28 @@ export default function StockPoolView({
 
                     {/* Colour */}
                     <td className="py-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <span
-                          className="rounded-circle shadow-sm"
-                          style={{
-                            width: '14px',
-                            height: '14px',
-                            backgroundColor: g.colorHex,
-                            border: g.colorHex?.toLowerCase() === '#ffffff' || g.colorHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.1)',
-                            display: 'inline-block',
-                            flexShrink: 0
-                          }}
-                        />
-                        <span className="fw-medium text-dark">{g.colorName}</span>
-                      </div>
+                      {g.colorName && g.colorName !== '—' && g.colorName.toLowerCase() !== 'none' ? (
+                        <div className="d-flex align-items-center gap-2">
+                          {g.colorHex ? (
+                            <span
+                              className="rounded-circle shadow-sm"
+                              style={{
+                                width: '14px',
+                                height: '14px',
+                                backgroundColor: g.colorHex,
+                                border: g.colorHex?.toLowerCase() === '#ffffff' || g.colorHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.1)',
+                                display: 'inline-block',
+                                flexShrink: 0
+                              }}
+                            />
+                          ) : null}
+                          <span className="fw-medium text-dark">{g.colorName}</span>
+                        </div>
+                      ) : (
+                        <span className="badge bg-light text-secondary border px-2 py-1 fs-11 rounded fw-medium">
+                          Raw / Greige (No color)
+                        </span>
+                      )}
                     </td>
 
                     {/* Available Quantity */}

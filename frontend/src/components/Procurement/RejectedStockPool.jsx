@@ -16,6 +16,8 @@ export default function RejectedStockPool({
 }) {
   const [items, setItems] = useState(rejectedItems);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [activeTabFilter, setActiveTabFilter] = useState('all'); // 'all', 'active', 'resolved'
+  const [viewDetailsItem, setViewDetailsItem] = useState(null); // Read-only modal for resolved/approved records
   const [activeActionModal, setActiveActionModal] = useState(null); // 'rtv', 'scrap', 'transfer'
   const [toastNotification, setToastNotification] = useState(null);
 
@@ -24,6 +26,18 @@ export default function RejectedStockPool({
     setTimeout(() => {
       setToastNotification(null);
     }, 3200);
+  };
+
+  // Helper to determine if an item has already been resolved / finalized
+  const isItemResolved = (status) => {
+    return (
+      status === 'Reversed (treated as good)' ||
+      status === 'Transferred to Stock' ||
+      status === 'RTV Initiated' ||
+      status === 'Sold' ||
+      status === 'Approved' ||
+      status === 'Closed'
+    );
   };
 
   // Modal form states
@@ -47,10 +61,14 @@ export default function RejectedStockPool({
     remarks: ''
   });
 
-  // Toggle selection
-  const handleToggleSelect = (id) => {
+  // Toggle selection (Disabled for already resolved items)
+  const handleToggleSelect = (item) => {
+    if (isItemResolved(item.status)) {
+      setViewDetailsItem(item);
+      return;
+    }
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
     );
   };
 
@@ -59,6 +77,16 @@ export default function RejectedStockPool({
     setItems(rejectedItems);
   }, [rejectedItems]);
 
+  const activeItemsCount = items.filter((it) => !isItemResolved(it.status)).length;
+  const resolvedItemsCount = items.filter((it) => isItemResolved(it.status)).length;
+
+  const filteredItems = items.filter((it) => {
+    if (activeTabFilter === 'active') return !isItemResolved(it.status);
+    if (activeTabFilter === 'resolved') return isItemResolved(it.status);
+    return true;
+  });
+
+  const actionableItems = filteredItems.filter((it) => !isItemResolved(it.status));
   const selectedItemsData = items.filter((it) => selectedIds.includes(it.id));
   const totalSelectedQty = selectedItemsData.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
 
@@ -204,12 +232,60 @@ export default function RejectedStockPool({
         </div>
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <button
+          type="button"
+          className={`btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${
+            activeTabFilter === 'all'
+              ? 'btn-dark text-white'
+              : 'btn-light text-secondary border'
+          }`}
+          onClick={() => { setActiveTabFilter('all'); setSelectedIds([]); }}
+        >
+          <span>All Records</span>
+          <span className="badge rounded-pill bg-secondary text-white ms-1 fs-10">{items.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${
+            activeTabFilter === 'active'
+              ? 'btn-danger text-white'
+              : 'btn-light text-secondary border'
+          }`}
+          onClick={() => { setActiveTabFilter('active'); setSelectedIds([]); }}
+        >
+          <i className="ti ti-alert-triangle fs-13"></i>
+          <span>Action Required (Defective Pool)</span>
+          <span className="badge rounded-pill bg-danger text-white ms-1 fs-10">{activeItemsCount}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn btn-sm px-3.5 py-1.5 rounded-pill fw-semibold fs-12 d-inline-flex align-items-center gap-1.5 shadow-2xs ${
+            activeTabFilter === 'resolved'
+              ? 'btn-success text-white'
+              : 'btn-light text-secondary border'
+          }`}
+          onClick={() => { setActiveTabFilter('resolved'); setSelectedIds([]); }}
+        >
+          <i className="ti ti-check fs-13"></i>
+          <span>Resolved / Approved by Admin</span>
+          <span className="badge rounded-pill bg-success text-white ms-1 fs-10">{resolvedItemsCount}</span>
+        </button>
+      </div>
+
       {/* Main Table */}
       <div className="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div className="d-flex align-items-center gap-2">
-            <span className="badge bg-danger rounded-pill px-2.5 py-1.5 fs-11">Pool Active</span>
-            <h5 className="fw-bold text-dark mb-0 fs-16">Defective Inward Pieces</h5>
+            <span className={`badge rounded-pill px-2.5 py-1.5 fs-11 ${activeTabFilter === 'resolved' ? 'bg-success' : 'bg-danger'}`}>
+              {activeTabFilter === 'resolved' ? 'Finalized' : 'Pool Active'}
+            </span>
+            <h5 className="fw-bold text-dark mb-0 fs-16">
+              {activeTabFilter === 'resolved' ? 'Resolved & Approved Items' : 'Defective Inward Pieces'}
+            </h5>
           </div>
 
           <div className="d-flex align-items-center gap-3">
@@ -233,21 +309,22 @@ export default function RejectedStockPool({
                     style={{
                       width: '20px',
                       height: '20px',
-                      cursor: 'pointer',
+                      cursor: actionableItems.length === 0 ? 'not-allowed' : 'pointer',
                       accentColor: '#5b47fb',
                       borderRadius: '4px',
                       verticalAlign: 'middle'
                     }}
-                    checked={items.length > 0 && items.every((it) => selectedIds.includes(it.id))}
+                    disabled={actionableItems.length === 0}
+                    checked={actionableItems.length > 0 && actionableItems.every((it) => selectedIds.includes(it.id))}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(items.map((it) => it.id));
+                        setSelectedIds(actionableItems.map((it) => it.id));
                       } else {
                         setSelectedIds([]);
                       }
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    title="Select / Deselect All Available"
+                    title={actionableItems.length === 0 ? "No pending items available to action" : "Select / Deselect All Actionable Items"}
                   />
                 </th>
                 <th style={{ padding: '12px 14px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '120px' }}>
@@ -277,48 +354,67 @@ export default function RejectedStockPool({
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="text-center py-5 text-muted">
                     <i className="ti ti-check-circle fs-32 d-block mb-2 text-success opacity-50"></i>
-                    No defective inward pieces in pool.
+                    {activeTabFilter === 'resolved'
+                      ? 'No resolved or admin-approved records found.'
+                      : activeTabFilter === 'active'
+                      ? 'All defective pieces have been resolved or actioned!'
+                      : 'No defective inward pieces in pool.'}
                   </td>
                 </tr>
               ) : (
-                items.map((it) => {
+                filteredItems.map((it) => {
                   const isSelected = selectedIds.includes(it.id);
+                  const isResolved = isItemResolved(it.status);
 
                   return (
                     <tr
                       key={it.id}
                       style={{
                         cursor: 'pointer',
-                        backgroundColor: isSelected ? 'rgba(91, 71, 251, 0.08)' : undefined,
+                        backgroundColor: isSelected ? 'rgba(91, 71, 251, 0.08)' : (isResolved ? '#fcfdfd' : undefined),
                         transition: 'background-color 0.15s ease'
                       }}
                       className={isSelected ? 'table-active' : ''}
-                      onClick={() => handleToggleSelect(it.id)}
+                      onClick={() => handleToggleSelect(it)}
                     >
                       <td style={{ textAlign: 'center', width: '52px' }}>
-                        <input
-                          type="checkbox"
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#5b47fb',
-                            borderRadius: '4px',
-                            verticalAlign: 'middle'
-                          }}
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleToggleSelect(it.id);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        />
+                        {isResolved ? (
+                          <span
+                            className="d-inline-flex align-items-center justify-content-center text-success"
+                            title="Approved by Admin & transferred to Main Stock Pool. Click row to view details."
+                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewDetailsItem(it);
+                            }}
+                          >
+                            <i className="ti ti-circle-check-filled fs-18"></i>
+                          </span>
+                        ) : (
+                          <input
+                            type="checkbox"
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              cursor: 'pointer',
+                              accentColor: '#5b47fb',
+                              borderRadius: '4px',
+                              verticalAlign: 'middle'
+                            }}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleSelect(it);
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                          />
+                        )}
                       </td>
                       <td className="fw-bold font-monospace fs-13" style={{ color: '#5b47fb' }}>
                         {it.id}
@@ -352,27 +448,45 @@ export default function RejectedStockPool({
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={`badge px-2.5 py-1 fs-11 rounded-pill ${
-                            it.status === 'In Pool'
-                              ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                              : it.status === 'RTV Initiated'
-                              ? 'bg-primary-subtle text-primary border border-primary border-opacity-25'
-                              : it.status === 'To Be Sold'
-                              ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
-                              : it.status === 'Sold'
-                              ? 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
-                              : it.status === 'Transferred to Stock'
-                              ? 'bg-info-subtle text-info border border-info border-opacity-25'
-                              : it.status === 'Pending Admin Review'
-                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                              : it.status === 'Reversed (treated as good)'
-                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                              : 'bg-light text-secondary border'
-                          }`}
-                        >
-                          {it.status}
-                        </span>
+                        {it.status === 'Reversed (treated as good)' ? (
+                          <div className="d-inline-flex align-items-center gap-1.5">
+                            <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1">
+                              <i className="ti ti-check fs-11"></i>
+                              <span>Approved (in Stock)</span>
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-link p-0 fs-11 text-decoration-none fw-semibold"
+                              style={{ color: '#5b47fb' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewDetailsItem(it);
+                              }}
+                            >
+                              View
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className={`badge px-2.5 py-1 fs-11 rounded-pill ${
+                              it.status === 'In Pool'
+                                ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                                : it.status === 'RTV Initiated'
+                                ? 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                                : it.status === 'To Be Sold'
+                                ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                                : it.status === 'Sold'
+                                ? 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
+                                : it.status === 'Transferred to Stock'
+                                ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                                : it.status === 'Pending Admin Review'
+                                ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                                : 'bg-light text-secondary border'
+                            }`}
+                          >
+                            {it.status}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -645,6 +759,76 @@ export default function RejectedStockPool({
                   onClick={handleProcessTransfer}
                 >
                   Approve &amp; Move into Stock
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Read-Only Resolution Details for Resolved / Admin-Approved Items */}
+      {viewDetailsItem && (
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-md modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 p-4">
+              <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                <h5 className="fw-bold text-dark mb-0 fs-18 d-flex align-items-center gap-2">
+                  <i className="ti ti-circle-check-filled text-success"></i>
+                  <span>Resolution Record &mdash; {viewDetailsItem.id}</span>
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setViewDetailsItem(null)}
+                ></button>
+              </div>
+
+              <div className="p-3 bg-success-subtle border border-success border-opacity-25 rounded-3 mb-3 text-success">
+                <div className="fw-bold fs-13 mb-0.5 d-flex align-items-center gap-1.5">
+                  <i className="ti ti-shield-check fs-16"></i>
+                  <span>Finalized Decision: {viewDetailsItem.status}</span>
+                </div>
+                <div className="fs-12 text-secondary">
+                  This shipment was approved by Admin and moved into the <strong>Main Stock Pool</strong> as good stock. It has been finalized in the system and cannot be actioned (RTV / Scrap / Transfer) again.
+                </div>
+              </div>
+
+              <div className="row g-3 fs-13 mb-3">
+                <div className="col-6">
+                  <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">FABRIC QUALITY</div>
+                  <div className="fw-bold text-dark">{viewDetailsItem.fabricName || 'Fabric Quality'}</div>
+                </div>
+                <div className="col-6">
+                  <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">QUANTITY</div>
+                  <div className="fw-bold text-dark">{Number(viewDetailsItem.quantity).toFixed(2)} Mtrs</div>
+                </div>
+                <div className="col-6">
+                  <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">SOURCE QC</div>
+                  <div className="font-monospace fw-semibold text-secondary">{viewDetailsItem.sourceQcRef || '—'}</div>
+                </div>
+                <div className="col-6">
+                  <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">PO / VENDOR</div>
+                  <div className="fw-semibold text-dark">{viewDetailsItem.vendorName || 'Vendor'} ({viewDetailsItem.poRef})</div>
+                </div>
+                <div className="col-12">
+                  <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">INSPECTION REASON</div>
+                  <div className="text-secondary">{viewDetailsItem.reason || 'Flagged during QC inspection.'}</div>
+                </div>
+                {viewDetailsItem.resolutionNote && (
+                  <div className="col-12">
+                    <div className="text-muted fs-11 text-uppercase fw-semibold mb-0.5">ADMIN RESOLUTION NOTE</div>
+                    <div className="text-dark fw-medium p-2 bg-light rounded border">{viewDetailsItem.resolutionNote}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="d-flex justify-content-end pt-2 border-top">
+                <button
+                  type="button"
+                  className="btn btn-secondary px-4 py-2 rounded-3 fs-13 fw-semibold"
+                  onClick={() => setViewDetailsItem(null)}
+                >
+                  Close
                 </button>
               </div>
             </div>

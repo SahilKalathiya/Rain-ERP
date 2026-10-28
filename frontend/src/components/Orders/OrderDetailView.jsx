@@ -369,7 +369,26 @@ export default function OrderDetailView({
           });
         }
       });
-      return flattened;
+      return flattened.map(item => {
+        if (item.articleRows && typeof item.articleRows === 'object') {
+          const cleanRows = {};
+          Object.entries(item.articleRows).forEach(([art, rList]) => {
+            if (Array.isArray(rList)) {
+              const seen = new Set();
+              cleanRows[art] = rList.filter(r => {
+                const raw = (r.articleColor || '').trim();
+                const base = raw.replace(/\s*\(\d+\s*pcs\)/i, '').trim().toLowerCase();
+                const key = base || raw.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            }
+          });
+          return { ...item, articleRows: cleanRows };
+        }
+        return item;
+      });
     }
     return [];
   });
@@ -379,19 +398,39 @@ export default function OrderDetailView({
     (addedAccessories || []).forEach((acc) => {
       const cat = (acc.category || '').toLowerCase();
       if (cat.includes('button')) {
-        const directTotal = parseFloat(acc.total || acc.totalQuantity || 0);
-        if (!isNaN(directTotal) && directTotal > 0) {
-          sum += directTotal;
+        if (acc.articleRows && typeof acc.articleRows === 'object') {
+          Object.values(acc.articleRows).forEach(rows => {
+            if (Array.isArray(rows)) {
+              rows.forEach(r => {
+                const reqVal = parseFloat(r.reqPerPc) || 0;
+                const packInput = r.extraPerPack !== undefined && r.extraPerPack !== null ? String(r.extraPerPack).trim() : '';
+                const packNum = parseFloat(packInput);
+                const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
+                const bufVal = parseFloat(r.bufferPct) || 0;
+                const artPcs = parseFloat(r.totalQty) || 0;
+                const reqQty = artPcs * reqVal;
+                const packQty = artPcs * packVal;
+                const baseCalc = reqQty + packQty;
+                const bufQty = (baseCalc * bufVal) / 100;
+                sum += (baseCalc + bufQty);
+              });
+            }
+          });
         } else {
-          const req = parseFloat(acc.reqPerPc || acc.reqPerPiece || 0);
-          const gQty = parseFloat(acc.totalQty || acc.totalGarments || 0);
-          if (!isNaN(req) && !isNaN(gQty)) {
-            sum += req * gQty;
+          const directTotal = parseFloat(acc.total || acc.totalQuantity || 0);
+          if (!isNaN(directTotal) && directTotal > 0) {
+            sum += directTotal;
+          } else {
+            const req = parseFloat(acc.reqPerPc || acc.reqPerPiece || 0);
+            const gQty = parseFloat(acc.totalQty || acc.totalGarments || 0);
+            if (!isNaN(req) && !isNaN(gQty)) {
+              sum += req * gQty;
+            }
           }
         }
       }
     });
-    return sum;
+    return Math.round(sum);
   }, [addedAccessories]);
 
   const [accessorySearchQuery, setAccessorySearchQuery] = useState('');
@@ -539,14 +578,30 @@ export default function OrderDetailView({
 
   const getArticleColorOptions = (articleName) => {
     const fcRows = (order?.fabricConsumptions || []).filter(fc =>
-      (fc.articleName || fc.article || '').toLowerCase() === (articleName || '').toLowerCase()
+      (fc.articleName || fc.article || '').toLowerCase().trim() === (articleName || '').toLowerCase().trim()
     );
     if (fcRows.length > 0) {
-      return fcRows.map(r => ({
-        color: r.colorName || 'Standard',
-        qty: r.pcs !== undefined ? r.pcs : (order?.totalGarments || 0),
-        display: `${r.colorName || 'Standard'} (${r.pcs !== undefined ? r.pcs : (order?.totalGarments || 0)} pcs)`
-      }));
+      // Group by colorName so entries are strictly according to article & colour, NOT per fabric!
+      const colorMap = new Map();
+      fcRows.forEach(r => {
+        const cName = (r.colorName || 'Standard').trim();
+        const key = cName.toLowerCase();
+        if (!colorMap.has(key)) {
+          const rawPcs = (r.pcs !== undefined && r.pcs !== null && r.pcs !== '')
+            ? parseInt(r.pcs, 10)
+            : (order?.totalGarments || 0);
+          const pcsVal = isNaN(rawPcs) ? 0 : rawPcs;
+          colorMap.set(key, {
+            color: cName,
+            qty: pcsVal,
+            display: `${cName} (${pcsVal} pcs)`
+          });
+        }
+      });
+      const uniqueColors = Array.from(colorMap.values());
+      if (uniqueColors.length > 0) {
+        return uniqueColors;
+      }
     }
 
     const colors = [];
@@ -569,14 +624,33 @@ export default function OrderDetailView({
   };
 
   const getCardArticleRows = (item, articleName) => {
-    if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
-      return item.articleRows[articleName];
-    }
     const colorOpts = getArticleColorOptions(articleName);
     const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
       (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
     const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
     const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
+
+    if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
+      // Deduplicate rows according to article color (eliminating duplicates caused by multiple fabrics)
+      const seen = new Set();
+      const deduped = [];
+      item.articleRows[articleName].forEach(r => {
+        const raw = (r.articleColor || '').trim();
+        const base = raw.replace(/\s*\(\d+\s*pcs\)/i, '').trim().toLowerCase();
+        const key = base || raw.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          const matchedOpt = colorOpts.find(co => co.color.toLowerCase() === key || co.display.toLowerCase() === raw.toLowerCase());
+          deduped.push({
+            ...r,
+            totalQty: matchedOpt ? matchedOpt.qty : (key === 'all colours' ? totalAllQty : r.totalQty)
+          });
+        }
+      });
+      if (deduped.length > 0) {
+        return deduped;
+      }
+    }
 
     const initialRows = colorOpts.map((co, idx) => ({
       id: `row_${articleName}_${idx}`,
@@ -943,15 +1017,11 @@ export default function OrderDetailView({
         if (onBack) onBack();
       }, 600);
     } else {
-      setToastMessage(`Order #${updatedOrder.id || ''} saved! The Basket below is ready for procurement handoff.`);
+      setToastMessage(`Order #${updatedOrder.id || ''} saved successfully!`);
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
-        const basketEl = document.getElementById('basket-procurement-handoff');
-        if (basketEl) {
-          basketEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 500);
+      }, 1500);
     }
   };
 
@@ -1274,7 +1344,7 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {row.bufferPct ? row.bufferPct + '%' : '0'}
+                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
                           </span>
                         )}
                       </td>
@@ -1308,7 +1378,7 @@ export default function OrderDetailView({
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Dyed mtr/pc</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Shrink%</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Greige/Pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
               </tr>
             </thead>
@@ -1413,7 +1483,9 @@ export default function OrderDetailView({
                             <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
                           </div>
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -1447,7 +1519,7 @@ export default function OrderDetailView({
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Size</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>Thread Req. (mts)</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
               </tr>
             </thead>
@@ -1467,7 +1539,7 @@ export default function OrderDetailView({
                   const bufferVal = parseFloat(row.bufferPct) || 0;
                   const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
-                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
+                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
                   const isJobWork = /job/i.test(row.source || '');
 
                   return (
@@ -1567,7 +1639,9 @@ export default function OrderDetailView({
                             <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
                           </div>
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -1599,7 +1673,7 @@ export default function OrderDetailView({
               <th style={{ padding: '8px 10px' }}>Source</th>
               <th style={{ padding: '8px 10px' }}>Fabric Colour</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
               <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
             </tr>
           </thead>
@@ -1740,7 +1814,9 @@ export default function OrderDetailView({
                           <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
                         </div>
                       ) : (
-                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.bufferPct ? row.bufferPct + '%' : '0'}</span>
+                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                          {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                        </span>
                       )}
                     </td>
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -2795,51 +2871,95 @@ export default function OrderDetailView({
           </div>
         </div>
 
-        {/* Header Right Action Menu (3 Dots) */}
-        <div className="dropdown">
-          <button
-            type="button"
-            className="btn btn-link text-secondary p-1 text-decoration-none d-flex align-items-center justify-content-center"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-            style={{ border: 'none', width: '36px', height: '36px' }}
-          >
-            <i className="ti ti-dots-vertical" style={{ fontSize: '20px', lineHeight: 1 }}></i>
-          </button>
-          <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
-            {onEditSection && (
+        {/* Header Right Action Buttons & Menu */}
+        <div className="d-flex align-items-center gap-2">
+          {onEditSection && (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fw-semibold shadow-xs"
+              onClick={() => onEditSection('all')}
+              title="Edit order details, styles, and customer quantities"
+            >
+              <i className="ti ti-edit fs-14"></i>
+              <span>{order?.status === 'Draft' ? 'Edit Draft Order' : 'Edit Order'}</span>
+            </button>
+          )}
+
+          {/* Header Right Action Menu (3 Dots) */}
+          <div className="dropdown">
+            <button
+              type="button"
+              className="btn btn-link text-secondary p-1 text-decoration-none d-flex align-items-center justify-content-center"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              style={{ border: 'none', width: '36px', height: '36px' }}
+            >
+              <i className="ti ti-dots-vertical" style={{ fontSize: '20px', lineHeight: 1 }}></i>
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
+              {onEditSection && (
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item py-2 d-flex align-items-center gap-2"
+                    onClick={() => onEditSection('all')}
+                  >
+                    <i className="ti ti-edit text-primary" style={{ fontSize: '16px', lineHeight: 1 }}></i> Edit Order
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"
                   className="dropdown-item py-2 d-flex align-items-center gap-2"
-                  onClick={() => onEditSection('all')}
+                  onClick={handleConfirmOrder}
                 >
-                  <i className="ti ti-edit text-primary" style={{ fontSize: '16px', lineHeight: 1 }}></i> Edit Order
+                  <i className="ti ti-circle-check text-success" style={{ fontSize: '16px', lineHeight: 1 }}></i> Confirm Order
                 </button>
               </li>
-            )}
-            <li>
-              <button
-                type="button"
-                className="dropdown-item py-2 d-flex align-items-center gap-2"
-                onClick={handleConfirmOrder}
-              >
-                <i className="ti ti-circle-check text-success" style={{ fontSize: '16px', lineHeight: 1 }}></i> Confirm Order
-              </button>
-            </li>
-            <li><hr className="dropdown-divider" /></li>
-            <li>
-              <button
-                type="button"
-                className="dropdown-item py-2 d-flex align-items-center gap-2 text-secondary"
-                onClick={() => window.print()}
-              >
-                <i className="ti ti-printer" style={{ fontSize: '16px', lineHeight: 1 }}></i> Print Order
-              </button>
-            </li>
-          </ul>
+              <li><hr className="dropdown-divider" /></li>
+              <li>
+                <button
+                  type="button"
+                  className="dropdown-item py-2 d-flex align-items-center gap-2 text-secondary"
+                  onClick={() => window.print()}
+                >
+                  <i className="ti ti-printer" style={{ fontSize: '16px', lineHeight: 1 }}></i> Print Order
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
+
+      {/* Draft Order Notice Banner */}
+      {order?.status === 'Draft' && (
+        <div className="alert border-0 shadow-xs rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
+          <div className="d-flex align-items-center gap-2.5">
+            <div className="p-2 rounded-3 text-warning bg-white shadow-xs d-flex align-items-center justify-content-center" style={{ width: '38px', height: '38px' }}>
+              <i className="ti ti-file-text fs-5"></i>
+            </div>
+            <div>
+              <div className="fw-bold text-dark fs-14">This Sales Order is currently saved as a Draft</div>
+              <div className="text-muted small" style={{ fontSize: '12px' }}>
+                You can edit style info, configure articles, size matrices, and customer breakdowns to proceed to the next step.
+              </div>
+            </div>
+          </div>
+          {onEditSection && (
+            <button
+              type="button"
+              className="btn text-white btn-sm px-3 py-2 rounded-3 fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5"
+              style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
+              onClick={() => onEditSection('all')}
+            >
+              <i className="ti ti-edit"></i>
+              <span>Continue Editing Draft</span>
+              <i className="ti ti-arrow-right"></i>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* =========================================================================
        * 2. FIVE KPI METRIC CARDS (Customers, Total Colors, Unique Colors, Articles, Total Qty)
@@ -4647,178 +4767,7 @@ export default function OrderDetailView({
         </div>
       </div>
 
-      {/* =========================================================================
-       * SECTION 9: THE BASKET & PROCUREMENT HANDOFF (PDF Route 1 Specification)
-       * "A saved order generates a bottom Basket Action Bar with three buttons:
-       * Create PO, Send to Process, and Order Material."
-       * ========================================================================= */}
-      {confirmed && (
-        <div
-          id="basket-procurement-handoff"
-          className="card border-0 shadow-sm rounded-4 p-4 my-4"
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1.5px solid #c7d2fe',
-            boxShadow: '0 4px 20px rgba(46, 55, 164, 0.08)'
-          }}
-        >
-          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 border-bottom">
-            <div className="d-flex align-items-center gap-3">
-              <div
-                className="rounded-3 d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                style={{
-                  width: '46px',
-                  height: '46px',
-                  backgroundColor: '#2e37a4',
-                  boxShadow: '0 4px 12px rgba(46, 55, 164, 0.25)'
-                }}
-              >
-                <i className="ti ti-basket fs-22"></i>
-              </div>
-              <div>
-                <div className="d-flex align-items-center gap-2 flex-wrap">
-                  <h5 className="fw-bold text-dark mb-0 fs-16">The Basket &bull; Procurement Handoff</h5>
-                  <span className="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 fs-11 fw-semibold">
-                    <i className="ti ti-check me-1"></i>Order Saved &bull; Auto-populated
-                  </span>
-                </div>
-                <p className="text-secondary fs-12 mb-0 mt-0.5">
-                  Route 1 &bull; Section 9: Triggering procurement from inside this order auto-populates all specifications (fabric, buttons, quantities) into the resulting PO or Process Challan.
-                </p>
-              </div>
-            </div>
 
-            {/* Quick summary pills */}
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              {totalButtonQty > 0 && (
-                <span className="badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium">
-                  <i className="ti ti-circle-dot text-primary me-1"></i>Buttons BOM: <strong>{totalButtonQty.toLocaleString()} pcs</strong>
-                </span>
-              )}
-              {order?.totalFabricGreige > 0 && (
-                <span className="badge bg-light text-dark border px-3 py-1.5 fs-12 rounded-pill fw-medium">
-                  <i className="ti ti-layers text-primary me-1"></i>Greige Fabric: <strong>{order.totalFabricGreige}m</strong>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Basket 3 Action Buttons per Section 9 */}
-          <div className="d-flex flex-wrap align-items-center gap-3 pt-3">
-            {/* Button 1: Create PO */}
-            <div className="btn-group shadow-sm">
-              <button
-                type="button"
-                className="btn text-white px-4 py-2.5 fw-semibold fs-13 rounded-start-3 d-inline-flex align-items-center gap-2"
-                style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
-                onClick={() => {
-                  if (totalButtonQty > 0) {
-                    setActivePOModalCategory('BUTTON');
-                  } else if (onNavigateToProcurement) {
-                    onNavigateToProcurement('/procurement-pos', order);
-                  } else if (onTriggerProcurement) {
-                    onTriggerProcurement('Create PO', order);
-                  }
-                }}
-                title="Create Purchase Order with auto-populated specifications from this order"
-              >
-                <i className="ti ti-shopping-cart fs-16"></i>
-                <span>Create PO</span>
-              </button>
-              <button
-                type="button"
-                className="btn text-white dropdown-toggle dropdown-toggle-split px-2.5 rounded-end-3"
-                style={{ backgroundColor: '#242b82', borderColor: '#242b82' }}
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                <span className="visually-hidden">Toggle Dropdown</span>
-              </button>
-              <ul className="dropdown-menu dropdown-menu-end shadow-lg border rounded-3 p-1 fs-13">
-                {totalButtonQty > 0 && (
-                  <li>
-                    <button
-                      type="button"
-                      className="dropdown-item py-2 px-3 rounded-2 d-flex align-items-center justify-content-between"
-                      onClick={() => setActivePOModalCategory('BUTTON')}
-                    >
-                      <span className="d-flex align-items-center gap-2">
-                        <i className="ti ti-circle-dot text-primary"></i>
-                        <span>Button PO (Auto-populate)</span>
-                      </span>
-                      <span className="badge bg-light text-primary border rounded-pill">{totalButtonQty.toLocaleString()} pcs</span>
-                    </button>
-                  </li>
-                )}
-                <li>
-                  <button
-                    type="button"
-                    className="dropdown-item py-2 px-3 rounded-2 d-flex align-items-center gap-2"
-                    onClick={() => {
-                      if (onNavigateToProcurement) {
-                        onNavigateToProcurement('/procurement-pos', order);
-                      } else if (onTriggerProcurement) {
-                        onTriggerProcurement('Create PO', order);
-                      }
-                    }}
-                  >
-                    <i className="ti ti-file-invoice text-primary"></i>
-                    <span>Fabric Purchase Order (PO)</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Button 2: Send to Process */}
-            <button
-              type="button"
-              className="btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border"
-              style={{
-                backgroundColor: '#ffffff',
-                borderColor: '#6366f1',
-                color: '#4338ca'
-              }}
-              onClick={() => {
-                if (onTriggerProcurement) {
-                  onTriggerProcurement('Send to Process', order);
-                } else {
-                  setToastMessage(`Job Work / Dyeing Challan created for Order #${order?.id}`);
-                  setShowToast(true);
-                  setTimeout(() => setShowToast(false), 3000);
-                }
-              }}
-              title="Send fabrics or job-work items to processing / dyeing"
-            >
-              <i className="ti ti-ticket fs-16" style={{ color: '#6366f1' }}></i>
-              <span>Send to Process</span>
-            </button>
-
-            {/* Button 3: Order Material */}
-            <button
-              type="button"
-              className="btn px-4 py-2.5 fw-semibold fs-13 rounded-3 shadow-sm d-inline-flex align-items-center gap-2 border"
-              style={{
-                backgroundColor: '#ffffff',
-                borderColor: '#cbd5e1',
-                color: '#334155'
-              }}
-              onClick={() => {
-                if (onTriggerProcurement) {
-                  onTriggerProcurement('Order Material', order);
-                } else {
-                  setToastMessage(`Material requisition queued for Order #${order?.id}`);
-                  setShowToast(true);
-                  setTimeout(() => setShowToast(false), 3000);
-                }
-              }}
-              title="Generate internal material requisition for stores"
-            >
-              <i className="ti ti-package fs-16 text-secondary"></i>
-              <span>Order Material</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* =========================================================================
        * BOTTOM ACTION BUTTONS ROW (No background card, clean direct buttons)

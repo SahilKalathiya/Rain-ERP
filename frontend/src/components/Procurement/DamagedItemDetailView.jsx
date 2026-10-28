@@ -15,6 +15,7 @@ export default function DamagedItemDetailView({
   onResolveDecision
 }) {
   const [resolutionNote, setResolutionNote] = useState('');
+  const [isModifyingDecision, setIsModifyingDecision] = useState(false);
 
   if (!damagedItem) {
     return (
@@ -45,6 +46,13 @@ export default function DamagedItemDetailView({
   const grnRef = damagedItem.grnRef || 'GRN-1002';
   const fabricName = damagedItem.fabricName || 'Tussar Silk (42") — Ivory';
   const dateStr = damagedItem.dateFlagged || damagedItem.reportedAt || '2026-10-07';
+  const isAlreadyDecided =
+    currentStatus === 'Reversed (treated as good)' ||
+    currentStatus === 'Return to Vendor' ||
+    currentStatus === 'Write Off (scrap)' ||
+    currentStatus === 'Transferred to Stock' ||
+    currentStatus === 'Approved' ||
+    currentStatus === 'Sold';
 
   const resolutions = [
     { key: 'Reversed (treated as good)', label: 'Approve — Add to Stock Pool', btnClass: 'btn-outline-success' },
@@ -133,47 +141,94 @@ export default function DamagedItemDetailView({
           )}
         </div>
 
-        <p className="text-secondary fs-13 mb-3">
-          Current resolution: <strong>{currentStatus}</strong>. Pick a different one below to change it — the Stock Pool will always be kept in sync with whichever is selected.
-        </p>
-
-        {/* Resolution Note */}
-        <div className="mb-4" style={{ maxWidth: '650px' }}>
-          <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-            Resolution note (optional)
-          </label>
-          <input
-            type="text"
-            className="form-control form-control-sm bg-white fs-13"
-            placeholder="e.g. vendor agreed to credit note"
-            value={resolutionNote}
-            onChange={(e) => setResolutionNote(e.target.value)}
-          />
-        </div>
-
-        {/* Action Buttons (Matches Screenshot 5) */}
-        <div className="d-flex flex-wrap align-items-center gap-2 pt-2 border-top border-light">
-          {resolutions.map((r) => {
-            const isCurrent = currentStatus === r.key;
-            return (
-              <button
-                key={r.key}
-                type="button"
-                className={`btn btn-sm px-3.5 py-2 rounded-3 fs-13 fw-semibold shadow-2xs ${
-                  isCurrent
-                    ? 'btn-success text-white'
-                    : r.btnClass
-                }`}
-                style={isCurrent ? { backgroundColor: '#10b981', borderColor: '#10b981' } : {}}
-                disabled={isCurrent}
-                onClick={() => handleApplyResolution(r.key)}
-                title={isCurrent ? 'This is the current resolution' : `Set resolution to ${r.label}`}
+        {isAlreadyDecided && !isModifyingDecision ? (
+          <div className="p-3.5 rounded-3 bg-light border d-flex flex-wrap align-items-center justify-content-between gap-3 mb-2">
+            <div className="d-flex align-items-center gap-2.5">
+              <div
+                className="d-flex align-items-center justify-content-center rounded-circle bg-success text-white shadow-xs"
+                style={{ width: '32px', height: '32px', flexShrink: 0 }}
               >
-                {r.label} {isCurrent ? '✓ current' : ''}
-              </button>
-            );
-          })}
-        </div>
+                <i className="ti ti-check fs-18"></i>
+              </div>
+              <div>
+                <div className="fw-bold text-dark fs-14">
+                  Decision Finalized by Admin: <span className="text-success">{currentStatus}</span>
+                </div>
+                <div className="text-secondary fs-12">
+                  {isCurrentlyInStock
+                    ? `Admin approved this fabric quality. ${qty}m has been transferred to and is currently active in the Main Stock Pool.`
+                    : `Admin finalized this disposition as ${currentStatus}.`}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm px-3 py-1.5 rounded-3 fs-12 fw-medium d-inline-flex align-items-center gap-1.5"
+              onClick={() => setIsModifyingDecision(true)}
+            >
+              <i className="ti ti-edit"></i>
+              <span>Change Resolution</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-secondary fs-13 mb-3">
+              {isModifyingDecision ? 'Choose a new resolution below:' : (
+                <>Current resolution: <strong>{currentStatus}</strong>. Pick a different one below to change it &mdash; the Stock Pool will always be kept in sync with whichever is selected.</>
+              )}
+            </p>
+
+            {/* Resolution Note */}
+            <div className="mb-4" style={{ maxWidth: '650px' }}>
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                Resolution note (optional)
+              </label>
+              <input
+                type="text"
+                className="form-control form-control-sm bg-white fs-13"
+                placeholder="e.g. vendor agreed to credit note"
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+              />
+            </div>
+
+            {/* Action Buttons (Matches Screenshot 5) */}
+            <div className="d-flex flex-wrap align-items-center gap-2 pt-2 border-top border-light">
+              {resolutions.map((r) => {
+                const isCurrent = currentStatus === r.key;
+                return (
+                  <button
+                    key={r.key}
+                    type="button"
+                    className={`btn btn-sm px-3.5 py-2 rounded-3 fs-13 fw-semibold shadow-2xs ${
+                      isCurrent
+                        ? 'btn-success text-white'
+                        : r.btnClass
+                    }`}
+                    style={isCurrent ? { backgroundColor: '#10b981', borderColor: '#10b981' } : {}}
+                    disabled={isCurrent}
+                    onClick={() => {
+                      handleApplyResolution(r.key);
+                      setIsModifyingDecision(false);
+                    }}
+                    title={isCurrent ? 'This is the current resolution' : `Set resolution to ${r.label}`}
+                  >
+                    {r.label} {isCurrent ? '✓ current' : ''}
+                  </button>
+                );
+              })}
+              {isModifyingDecision && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-secondary text-decoration-none ms-2 fs-12"
+                  onClick={() => setIsModifyingDecision(false)}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* History Card (Modern Audit Timeline) */}
