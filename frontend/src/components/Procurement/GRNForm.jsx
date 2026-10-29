@@ -67,21 +67,12 @@ export default function GRNForm({
     const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || (vendors[0]?.id || ''));
     const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : (vendors[0]?.name || ''));
 
-    // Check if PO has previous GRNs and remaining pending balance
-    let poPendingBalance = '';
-    if (defaultPO && !isExisting) {
-      const poTotalM = (defaultPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-      const prevM = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(defaultPO.id)) || g.poId === defaultPO.id)
-        .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
-      const pend = Math.max(0, poTotalM - prevM);
-      if (pend > 0) poPendingBalance = String(pend);
-    }
-
-    const defaultDeclared = (grn && grn.totalQty !== undefined && grn.totalQty !== '')
-      ? grn.totalQty
-      : (grn?.declaredTotalMeters
-          ? grn.declaredTotalMeters
-          : (grn?.pendingQtyToReceive ? String(grn.pendingQtyToReceive) : poPendingBalance));
+    // For existing saved GRN, retain its saved declared total qty. For a new GRN, keep it blank for user to enter actual delivery qty.
+    const defaultDeclared = (isExisting && !grn?.isNew)
+      ? (grn && grn.totalQty !== undefined && grn.totalQty !== ''
+          ? grn.totalQty
+          : (grn?.declaredTotalMeters ? grn.declaredTotalMeters : ''))
+      : '';
 
     const cleanDate = (d) => {
       if (!d) return new Date().toISOString().split('T')[0];
@@ -113,7 +104,7 @@ export default function GRNForm({
         const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
 
         return {
-          baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
+          baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
           itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
           fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
           piecesCount,
@@ -127,7 +118,7 @@ export default function GRNForm({
     if (targetBaleCount > initialBales.length) {
       for (let i = initialBales.length; i < targetBaleCount; i++) {
         initialBales.push({
-          baleNo: String(i + 1),
+          baleNo: '',
           itemIdx: 0,
           fabricItemLabel: '',
           piecesCount: '',
@@ -225,7 +216,7 @@ export default function GRNForm({
             const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
 
             return {
-              baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
+              baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
               itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
               fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
               piecesCount,
@@ -239,7 +230,7 @@ export default function GRNForm({
         if (targetBaleCount > initialBales.length) {
           for (let i = initialBales.length; i < targetBaleCount; i++) {
             initialBales.push({
-              baleNo: String(i + 1),
+              baleNo: '',
               itemIdx: 0,
               fabricItemLabel: '',
               piecesCount: '',
@@ -267,12 +258,14 @@ export default function GRNForm({
           lrNumber: grn.lrNumber || grn.lrNo || prev.lrNumber || '',
           lrDate: cleanDate(grn.lrDate) || prev.lrDate,
           weight: grn.weight !== undefined ? grn.weight : prev.weight,
-          totalQty: (grn && grn.totalQty !== undefined && grn.totalQty !== '')
-            ? String(grn.totalQty)
-            : (grn?.declaredTotalMeters
-                ? String(grn.declaredTotalMeters)
-                : (grn?.pendingQtyToReceive ? String(grn.pendingQtyToReceive) : (prev.totalQty || ''))),
-          declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || grn?.pendingQtyToReceive || prev.declaredTotalMeters || 0),
+          totalQty: (isExisting && !grn?.isNew)
+            ? ((grn && grn.totalQty !== undefined && grn.totalQty !== '')
+                ? String(grn.totalQty)
+                : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')))
+            : (grn?.isNew ? '' : (grn?.totalQty ? String(grn.totalQty) : '')),
+          declaredTotalMeters: (isExisting && !grn?.isNew)
+            ? Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0)
+            : 0,
           totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
           status: grn.status || prev.status,
           bales: initialBales.length > 0 ? initialBales : prev.bales
@@ -296,14 +289,20 @@ export default function GRNForm({
   const linkedQCs = (qualityChecks || []).filter((q) => q && (q.grnRef === formData.id || q.grnId === formData.id));
   const linkedQC = linkedQCs[0] || null;
 
+  // Requirement: Submitting a GRN does NOT lock it from editing.
+  // The GRN only becomes locked once QC inspection has actually started or been actioned.
+  const hasActiveQcInspection = linkedQCs.some(
+    (q) => q && ((q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status))
+  );
+
   const isQcActioned = Boolean(
     formData.isQcActioned ||
-    formData.isSubmittedToQC ||
-    formData.status === 'Completed' ||
-    (formData.status && (formData.status.includes('QC') || formData.status === 'Under QC')) ||
-    (grn && (grn.status === 'Completed' || grn.isSubmittedToQC || grn.isQcActioned)) ||
-    linkedQCs.length > 0 ||
-    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval', 'Completed'].includes(formData.status)
+    grn?.isQcActioned ||
+    (grn?.qcStatus && grn.qcStatus !== 'Pending') ||
+    (formData.qcStatus && formData.qcStatus !== 'Pending') ||
+    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(formData.status) ||
+    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(grn?.status) ||
+    hasActiveQcInspection
   );
 
   useEffect(() => {
@@ -352,6 +351,7 @@ export default function GRNForm({
     : (currentPO && currentPO.items && currentPO.items.length > 0
         ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
         : Number(grn?.poOrderedMeters || 0));
+  const totalLinkedOrderedMeters = poOrderedMeters;
 
   // Existing previous GRNs for these POs (excluding current GRN being edited)
   const previousGrnsForPo = (grns || []).filter(
@@ -508,6 +508,10 @@ export default function GRNForm({
     const pend = Math.max(0, poTotalM - prevM);
 
     setFormData((prev) => {
+      const firstPoItem = selectedPO.items && selectedPO.items[0];
+      const poWidth = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : '';
+      const poFold = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : '';
+
       // If bales exist, keep their assignments or update default
       const updatedBales = (prev.bales || []).map((b) => {
         const item = selectedPO.items && selectedPO.items[0];
@@ -525,8 +529,12 @@ export default function GRNForm({
         linkedPOs: [newPoId],
         vendorId: selectedPO.vendorId,
         vendorName: vName,
-        totalQty: pend > 0 ? String(pend) : '',
-        declaredTotalMeters: pend > 0 ? pend : 0,
+        width: poWidth || prev.width,
+        pannaWidth: poWidth || prev.pannaWidth,
+        fold: poFold || prev.fold,
+        fabricFolding: poFold || prev.fabricFolding,
+        totalQty: '',
+        declaredTotalMeters: 0,
         bales: updatedBales
       };
     });
@@ -565,7 +573,7 @@ export default function GRNForm({
       } else {
         const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
         newBales.push({
-          baleNo: String(i + 1),
+          baleNo: '',
           itemIdx: i % (poItemLabels.length || 1),
           fabricItemLabel: assignedLabel,
           isMixedFabric: false,
@@ -800,11 +808,36 @@ export default function GRNForm({
     const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || 'Natural';
     const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '#ffffff';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
-    const widthVal = firstPoItem?.width || formData.width || '44';
+    const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : (formData.width || '44');
+    const foldVal = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : (formData.fold || formData.fabricFolding || '100');
     const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
     const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
 
+    const count = Math.max(0, parseInt(formData.totalBales, 10) || 0);
     const currentBales = formData.bales || [];
+    let nextBales = [...currentBales];
+
+    if (count > 0 && nextBales.length !== count) {
+      const generated = [];
+      for (let i = 0; i < count; i++) {
+        if (nextBales[i]) {
+          generated.push(nextBales[i]);
+        } else {
+          const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
+          generated.push({
+            baleNo: '',
+            itemIdx: i % (poItemLabels.length || 1),
+            fabricItemLabel: assignedLabel,
+            isMixedFabric: false,
+            piecesCount: '',
+            pieces: [],
+            totalLength: 0,
+            isSaved: false
+          });
+        }
+      }
+      nextBales = generated;
+    }
 
     const payload = {
       ...formData,
@@ -821,12 +854,16 @@ export default function GRNForm({
       colorName: colorVal,
       colorHex: colorHexVal,
       width: widthVal,
+      pannaWidth: widthVal,
+      fold: foldVal,
+      fabricFolding: foldVal,
       declaredTotalMeters: declaredTotal,
       totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
+      totalBales: count > 0 ? String(count) : (formData.totalBales || ''),
       totalMetersEntered,
-      bales: currentBales
+      bales: nextBales
     };
 
     // Update local state immediately with complete saved details
@@ -869,7 +906,8 @@ export default function GRNForm({
     const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || 'Natural';
     const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '#ffffff';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
-    const widthVal = firstPoItem?.width || formData.width || '44';
+    const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : (formData.width || '44');
+    const foldVal = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : (formData.fold || formData.fabricFolding || '100');
     const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
     const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
 
@@ -896,7 +934,7 @@ export default function GRNForm({
       const isTarget = isSingle ? (idx === specificBaleIdx) : true;
       return {
         ...b,
-        baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
+        baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
         pieces: normPieces,
         totalLength: bTotal,
         piecesCount: b.piecesCount !== undefined && b.piecesCount !== '' ? String(b.piecesCount) : String(normPieces.length),
@@ -921,6 +959,9 @@ export default function GRNForm({
       colorName: colorVal,
       colorHex: colorHexVal,
       width: widthVal,
+      pannaWidth: widthVal,
+      fold: foldVal,
+      fabricFolding: foldVal,
       declaredTotalMeters: declaredTotal,
       totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
@@ -1020,13 +1061,14 @@ export default function GRNForm({
     const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || '';
     const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '';
     const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
-    const widthVal = firstPoItem?.width || formData.width || '';
+    const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : (formData.width || '');
+    const foldVal = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : (formData.fold || formData.fabricFolding || '');
 
     const payload = {
       ...formData,
       status: 'Completed',
       isSubmittedToQC: true,
-      isQcActioned: true,
+      isQcActioned: false, // Requirement 4: Remains editable until QC inspection actually begins/actions!
       isHeaderSaved: true,
       date: formData.receivedDate,
       fabricName: fabricItem,
@@ -1034,6 +1076,9 @@ export default function GRNForm({
       colorName: colorVal,
       colorHex: colorHexVal,
       width: widthVal,
+      pannaWidth: widthVal,
+      fold: foldVal,
+      fabricFolding: foldVal,
       declaredTotalMeters: declaredTotal,
       totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
@@ -1045,7 +1090,7 @@ export default function GRNForm({
       ...prev,
       status: 'Completed',
       isSubmittedToQC: true,
-      isQcActioned: true,
+      isQcActioned: false,
       isHeaderSaved: true
     }));
     setIsHeaderEditing(false);
@@ -1184,10 +1229,10 @@ export default function GRNForm({
         {!isHeaderEditing ? (
           /* READ-ONLY / SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
           <div className="row g-4 fs-13 pt-1">
-            {/* 1. SOURCE DOCUMENT */}
+            {/* 1. PO NO. */}
             <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '150px' }}>
               <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
-                SOURCE DOCUMENT
+                PO NO.
               </div>
               <div className="fw-bold text-dark fs-13 text-truncate" title={formData.linkedPOs && formData.linkedPOs.length > 1 ? formData.linkedPOs.join(', ') : formData.poId}>
                 {formData.linkedPOs && formData.linkedPOs.length > 1
@@ -1275,17 +1320,7 @@ export default function GRNForm({
               </div>
             </div>
 
-            {/* 8. FABRIC FOLDING */}
-            <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
-              <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
-                FABRIC FOLDING
-              </div>
-              <div className="fw-bold text-dark fs-13">
-                {currentPO?.items?.[0]?.fold ? `${currentPO.items[0].fold}%` : (formData.fabricFolding ? `${formData.fabricFolding} cms` : '—')}
-              </div>
-            </div>
-
-            {/* 9. TOTAL QTY / BALES */}
+            {/* 8. TOTAL QTY / BALES */}
             <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '140px' }}>
               <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
                 TOTAL QTY / BALES
@@ -1302,11 +1337,11 @@ export default function GRNForm({
           /* EDITING FORM INPUTS (Image 1) */
           <div>
             <div className="row g-3 mb-2">
-              {/* Row 1: Source document & Received date */}
+              {/* Row 1: PO No. & Received date */}
               <div className="col-12 col-md-8">
                 <div className="d-flex align-items-center justify-content-between mb-1">
                   <label className="form-label fs-13 fw-semibold text-secondary mb-0">
-                    Source document (Purchase Order) <span className="text-danger">*</span>
+                    PO No. (Purchase Order) <span className="text-danger">*</span>
                   </label>
                   {!isQcActioned && (formData.poId || (formData.linkedPOs && formData.linkedPOs.length > 0)) && (
                     <button
@@ -1380,7 +1415,7 @@ export default function GRNForm({
                         Multiple POs Consolidated in Shipment ({formData.linkedPOs.length} POs):
                       </span>
                       <span className="badge bg-primary text-white fs-11 rounded-pill">
-                        Total Ordered: {totalLinkedOrderedMeters.toLocaleString()}m
+                        Total Ordered: {(totalLinkedOrderedMeters || poOrderedMeters || 0).toLocaleString()}m
                       </span>
                     </div>
                     <div className="d-flex flex-wrap gap-2">
@@ -1439,6 +1474,12 @@ export default function GRNForm({
                         <span>Link PO</span>
                       </button>
                     </div>
+                    {availableVendorPOs.length === 0 && (
+                      <div className="text-muted fs-11 mt-1.5 d-flex align-items-center gap-1">
+                        <i className="ti ti-info-circle text-secondary"></i>
+                        <span>No other pending POs found for {formData.vendorName || 'this vendor'} to link.</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1717,54 +1758,37 @@ export default function GRNForm({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                             }
+                      handleSaveHeaderOnly();
+                    }
                   }}
                 />
               </div>
 
               <button
                 type="button"
-                className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 text-white shadow-sm"
-                style={{
-                  height: '40px',
-                  backgroundColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb',
-                  borderColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb',
-                  borderRadius: '8px',
-                  cursor: (isQcActioned || isPoAlreadyCompleted) ? 'not-allowed' : 'pointer'
-                }}
-                disabled={isQcActioned || isPoAlreadyCompleted}
-                onClick={handleGenerateBales}
-                title={isPoAlreadyCompleted ? 'PO is fully received (0m pending)' : (isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales')}
-              >
-                <i className={`ti ${(isQcActioned || isPoAlreadyCompleted) ? 'ti-lock' : 'ti-package'} fs-15`}></i>
-                <span>Generate Bales</span>
-              </button>
-
-              <button
-                type="button"
-                className={`btn d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-medium fs-13 shadow-sm ${
-                  isSectionSaved ? 'btn-success text-white' : 'btn-white border text-dark'
+                className={`btn d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 shadow-sm ${
+                  isSectionSaved ? 'btn-success text-white' : 'btn-primary text-white'
                 }`}
                 style={{
                   height: '40px',
-                  borderColor: isSectionSaved ? '#10b981' : '#cbd5e1',
+                  backgroundColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : (isSectionSaved ? '#10b981' : '#5b47fb'),
+                  borderColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : (isSectionSaved ? '#10b981' : '#5b47fb'),
                   borderRadius: '8px',
-                  backgroundColor: (isQcActioned || isPoAlreadyCompleted) ? '#f1f5f9' : (isSectionSaved ? '#10b981' : '#ffffff'),
                   cursor: (isQcActioned || isPoAlreadyCompleted) ? 'not-allowed' : 'pointer',
                   opacity: (isQcActioned || isPoAlreadyCompleted) ? 0.6 : 1,
                   transition: 'all 0.2s ease-in-out'
                 }}
                 disabled={isQcActioned || isPoAlreadyCompleted}
                 onClick={handleSaveHeaderOnly}
-                title={isPoAlreadyCompleted ? 'PO is fully received (0m pending)' : (isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header')}
+                title={isPoAlreadyCompleted ? 'PO is fully received (0m pending)' : (isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details and generate bale entries below')}
               >
-                <i className={`ti ${isSectionSaved ? 'ti-check' : 'ti-device-floppy'} fs-15`} style={{ color: isSectionSaved ? '#ffffff' : ((isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb') }}></i>
+                <i className={`ti ${isSectionSaved ? 'ti-check' : 'ti-device-floppy'} fs-15`}></i>
                 <span>{isSectionSaved ? 'Section Saved' : 'Save This Section'}</span>
               </button>
             </div>
 
             <p className="text-muted fs-12 mt-2 mb-0">
-              Enter the number of bales and click &quot;Generate Bales&quot; (or press Enter) to create bale entries below.
+              Enter the number of bales and click &quot;Save This Section&quot; to save details and generate bale entries below.
             </p>
           </div>
         )}
@@ -1922,6 +1946,7 @@ export default function GRNForm({
                         </label>
                         <input
                           type="text"
+                          placeholder="e.g. 1"
                           className="form-control bg-white text-center fs-13 fw-semibold"
                           style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
                           value={bale.baleNo || ''}
@@ -1942,25 +1967,24 @@ export default function GRNForm({
                           disabled={isQcActioned}
                           onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
                         >
-                          <option value="MIXED_FABRIC" className="fw-bold text-primary">
-                            🔀 Mixed Bale (Multiple Fabric Qualities)
-                          </option>
-                          {poItemLabels.length > 0 && (
-                            <optgroup label="From Linked Purchase Orders">
-                              {poItemLabels.map((lbl, oIdx) => (
-                                <option key={`po-${oIdx}`} value={lbl}>
-                                  {lbl}
-                                </option>
-                              ))}
-                            </optgroup>
+                          {poItemLabels.length > 1 && (
+                            <option value="MIXED_FABRIC" className="fw-bold text-primary">
+                              🔀 Mixed Bale (Multiple Fabric Qualities)
+                            </option>
                           )}
-                          <optgroup label="All Master Fabrics">
-                            {masterFabricLabels.map((lbl, fIdx) => (
+                          {poItemLabels.length > 0 ? (
+                            poItemLabels.map((lbl, oIdx) => (
+                              <option key={`po-${oIdx}`} value={lbl}>
+                                {lbl}
+                              </option>
+                            ))
+                          ) : (
+                            masterFabricLabels.map((lbl, fIdx) => (
                               <option key={`mf-${fIdx}`} value={lbl}>
                                 {lbl}
                               </option>
-                            ))}
-                          </optgroup>
+                            ))
+                          )}
                         </select>
                       </div>
 
@@ -2030,12 +2054,15 @@ export default function GRNForm({
                                     disabled={isQcActioned}
                                     onChange={(e) => handlePieceFabricChange(bIdx, pIdx, e.target.value)}
                                   >
-                                    {poItemLabels.map((lbl, oIdx) => (
-                                      <option key={`p-po-${oIdx}`} value={lbl}>{lbl}</option>
-                                    ))}
-                                    {masterFabricLabels.map((lbl, fIdx) => (
-                                      <option key={`p-mf-${fIdx}`} value={lbl}>{lbl}</option>
-                                    ))}
+                                    {poItemLabels.length > 0 ? (
+                                      poItemLabels.map((lbl, oIdx) => (
+                                        <option key={`p-po-${oIdx}`} value={lbl}>{lbl}</option>
+                                      ))
+                                    ) : (
+                                      masterFabricLabels.map((lbl, fIdx) => (
+                                        <option key={`p-mf-${fIdx}`} value={lbl}>{lbl}</option>
+                                      ))
+                                    )}
                                   </select>
                                 )}
                                 <input

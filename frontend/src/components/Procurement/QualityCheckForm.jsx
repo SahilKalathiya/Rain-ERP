@@ -23,50 +23,97 @@ export default function QualityCheckForm({
   // Helper to resolve expected Fold & Width from GRN's linked POs
   const getExpectedFromGRN = (grnId) => {
     const foundGRN = grns.find((g) => g.id === grnId);
-    if (!foundGRN) return { fold: '100', width: '44' };
 
     let foundFold = null;
     let foundWidth = null;
 
-    if (foundGRN.linkedPOs && foundGRN.linkedPOs.length > 0) {
-      const linkedPO = purchaseOrders.find((p) => foundGRN.linkedPOs.includes(p.id));
-      if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
-        // Resolve item matching this specific QC's fabric quality
-        const targetFabric = qc?.fabricName || foundGRN.fabricName;
-        const matchedItem = targetFabric
-          ? linkedPO.items.find((it) => {
-              const itName = it.fabricName || it.fabricQuality || '';
-              return itName.toLowerCase() === targetFabric.toLowerCase() ||
-                targetFabric.toLowerCase().includes(itName.toLowerCase()) ||
-                itName.toLowerCase().includes(targetFabric.toLowerCase());
-            }) || linkedPO.items[0]
-          : linkedPO.items[0];
+    const poIds = (foundGRN?.linkedPOs && foundGRN.linkedPOs.length > 0)
+      ? foundGRN.linkedPOs
+      : (foundGRN?.poId
+          ? [foundGRN.poId]
+          : (qc?.againstRef
+              ? qc.againstRef.split(',').map((s) => s.trim())
+              : (qc?.poId ? [qc.poId] : [])));
 
-        const item = matchedItem || linkedPO.items[0];
-        if (item.fold) foundFold = String(item.fold);
-        if (item.width) foundWidth = String(item.width);
+    let linkedPO = purchaseOrders.find((p) => poIds.includes(p.id));
+
+    // Fallback search across all POs if direct ID was not matched
+    const rawTarget = qc?.fabricName || foundGRN?.fabricName || '';
+    const targetFabric = rawTarget
+      .replace(/^\[[^\]]+\]\s*/, '')
+      .replace(/\s*\([^)]*\)/g, '')
+      .replace(/\s*—.*$/, '')
+      .trim()
+      .toLowerCase();
+
+    if (!linkedPO && purchaseOrders.length > 0) {
+      if (targetFabric) {
+        linkedPO = purchaseOrders.find((p) =>
+          (p.items || []).some((it) => {
+            const itName = (it.fabricName || it.fabricQuality || '')
+              .replace(/^\[[^\]]+\]\s*/, '')
+              .replace(/\s*\([^)]*\)/g, '')
+              .replace(/\s*—.*$/, '')
+              .trim()
+              .toLowerCase();
+            return itName === targetFabric || targetFabric.includes(itName) || itName.includes(targetFabric);
+          })
+        );
+      }
+      if (!linkedPO) {
+        linkedPO = purchaseOrders[0];
       }
     }
 
-    if (!foundWidth && (qc?.fabricName || foundGRN.fabricName)) {
-      const targetName = qc?.fabricName || foundGRN.fabricName;
-      const matchingFabric = fabrics.find((f) => f.qualityName === targetName);
+    if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
+      const matchedItem = targetFabric
+        ? linkedPO.items.find((it) => {
+            const itName = (it.fabricName || it.fabricQuality || '')
+              .replace(/^\[[^\]]+\]\s*/, '')
+              .replace(/\s*\([^)]*\)/g, '')
+              .replace(/\s*—.*$/, '')
+              .trim()
+              .toLowerCase();
+            return itName === targetFabric || targetFabric.includes(itName) || itName.includes(targetFabric);
+          }) || linkedPO.items[0]
+        : linkedPO.items[0];
+
+      const item = matchedItem || linkedPO.items[0];
+      if (item.fold !== undefined && item.fold !== null && String(item.fold).trim() !== '') {
+        foundFold = String(item.fold).replace(/%/g, '').trim();
+      }
+      if (item.width !== undefined && item.width !== null && String(item.width).trim() !== '') {
+        foundWidth = String(item.width).replace(/"/g, '').trim();
+      }
+    }
+
+    if (!foundWidth && foundGRN?.width) {
+      foundWidth = String(foundGRN.width).replace(/"/g, '').trim();
+    }
+    if (!foundWidth && foundGRN?.pannaWidth) {
+      foundWidth = String(foundGRN.pannaWidth).replace(/"/g, '').trim();
+    }
+
+    if (!foundFold && foundGRN?.fold) {
+      foundFold = String(foundGRN.fold).replace(/%/g, '').trim();
+    }
+    if (!foundFold && foundGRN?.fabricFolding) {
+      foundFold = String(foundGRN.fabricFolding).replace(/%/g, '').trim();
+    }
+
+    if (!foundWidth && targetFabric) {
+      const matchingFabric = fabrics.find((f) => {
+        const qName = (f.qualityName || '').toLowerCase();
+        return qName === targetFabric || targetFabric.includes(qName) || qName.includes(targetFabric);
+      });
       if (matchingFabric && matchingFabric.pannaWidth) {
-        foundWidth = String(matchingFabric.pannaWidth);
+        foundWidth = String(matchingFabric.pannaWidth).replace(/"/g, '').trim();
       }
-    }
-
-    if (!foundWidth && foundGRN.pannaWidth) {
-      foundWidth = String(foundGRN.pannaWidth);
-    }
-
-    if (!foundFold && foundGRN.fabricFolding) {
-      foundFold = String(foundGRN.fabricFolding);
     }
 
     return {
-      fold: foundFold || '100',
-      width: foundWidth || '44'
+      fold: foundFold || (qc?.expectedFold ? String(qc.expectedFold).replace(/%/g, '').trim() : '100'),
+      width: foundWidth || (qc?.expectedWidth ? String(qc.expectedWidth).replace(/"/g, '').trim() : '44')
     };
   };
 
@@ -80,9 +127,9 @@ export default function QualityCheckForm({
     baleRef: qc?.baleRef || 'Bale 01',
     pieceRef: qc?.pieceRef || 'Piece 01',
     inspectorName: (qc?.inspectorName && qc.inspectorName !== 'Saksham Garg') ? qc.inspectorName : (currentUser.name && currentUser.name !== 'Saksham Garg' ? currentUser.name : ''),
-    expectedWidth: qc?.expectedWidth || initialExpected.width,
+    expectedWidth: initialExpected.width,
     actualWidth: qc?.actualWidth !== undefined && qc?.actualWidth !== null ? String(qc.actualWidth) : '',
-    expectedFold: qc?.expectedFold || initialExpected.fold,
+    expectedFold: initialExpected.fold,
     actualFold: qc?.actualFold !== undefined && qc?.actualFold !== null ? String(qc.actualFold) : '',
     photos: qc?.photos || [],
     notes: (qc?.notes && !qc.notes.startsWith('Quality inspection generated')) ? qc.notes : '',
@@ -120,9 +167,9 @@ export default function QualityCheckForm({
         baleRef: qc.baleRef || 'Bale 01',
         pieceRef: qc.pieceRef || 'Piece 01',
         inspectorName: (qc.inspectorName && qc.inspectorName !== 'Saksham Garg') ? qc.inspectorName : '',
-        expectedWidth: qc.expectedWidth || exp.width,
+        expectedWidth: exp.width,
         actualWidth: qc.actualWidth !== undefined && qc.actualWidth !== null ? String(qc.actualWidth) : '',
-        expectedFold: qc.expectedFold || exp.fold,
+        expectedFold: exp.fold,
         actualFold: qc.actualFold !== undefined && qc.actualFold !== null ? String(qc.actualFold) : '',
         photos: qc.photos || [],
         notes: (qc.notes && !qc.notes.startsWith('Quality inspection generated')) ? qc.notes : '',
@@ -675,7 +722,7 @@ export default function QualityCheckForm({
                   type="text"
                   className="form-control fs-13 rounded-3 bg-white border"
                   style={{ width: '160px', borderColor: '#cbd5e1' }}
-                  placeholder="e.g. 42 (Required)"
+                  placeholder={`e.g. ${expWidthClean} (Required)`}
                   value={formData.actualWidth}
                   onChange={(e) => setFormData({ ...formData, actualWidth: e.target.value })}
                 />
@@ -692,7 +739,7 @@ export default function QualityCheckForm({
                   type="text"
                   className="form-control fs-13 rounded-3 bg-white border"
                   style={{ width: '160px', borderColor: '#cbd5e1' }}
-                  placeholder="e.g. 100 (Required)"
+                  placeholder={`e.g. ${expFoldClean} (Required)`}
                   value={formData.actualFold}
                   onChange={(e) => setFormData({ ...formData, actualFold: e.target.value })}
                 />

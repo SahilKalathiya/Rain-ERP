@@ -52,18 +52,23 @@ function parseDateForSort(d, id) {
   return isNaN(timestamp) ? 0 : timestamp;
 }
 
-  // Check if quality inspection has started or if GRN has been submitted to QC / completed
+  // Requirement: Submitting a GRN does NOT lock it from editing.
+  // It only locks once QC inspection has actually started or actioned.
   const isRowInspectionStarted = (item) => {
     if (!item) return false;
-    if (item.isQcActioned || item.isSubmittedToQC) return true;
-    if (['Completed', 'QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(item.status)) {
+    if (['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(item.status)) {
       return true;
     }
-    if (item.status && (item.status.includes('QC') || item.status === 'Under QC')) {
+    if (item.qcStatus && item.qcStatus !== 'Pending') {
+      return true;
+    }
+    if (item.isQcActioned && item.status !== 'Draft' && item.status !== 'Bale Entry in Progress' && item.status !== 'Completed' && item.status !== 'Submitted to QC') {
       return true;
     }
     const itemQcs = (qualityChecks || []).filter((q) => q && (q.grnRef === item.id || q.grnId === item.id));
-    if (itemQcs.length > 0) return true;
+    if (itemQcs.some((q) => (q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status))) {
+      return true;
+    }
     return false;
   };
 

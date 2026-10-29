@@ -2977,7 +2977,7 @@ function freshAccessoryDraft(){
     unit:'Piece', piecesPerUnit:1, variants:[], colors:[],
     laceSizeValue:'', laceSizeUnit:'mm', fabricPerMeterLace:'', defaultShrinkage:'',
     tasselType:'Ready Made', jobWorkRows:[],
-    sizeValue:'', sizeUnit:'mm', threadPattern:'Kantha', threadPerStitch:15, threadPerPiece:60, boxes:[], coneSizes:[], placements:[], processRemarks:'',
+    sizeValue:'', sizeUnit:'mm', threadPattern:'Kantha', metersPerMeterStitching:'', threadPerPiece:60, processRemarks:'',
     fabricRows:[],
   };
 }
@@ -2992,8 +2992,6 @@ function syncAccessoryTagsIntoDraft(){
   const d = window._accDraft;
   if(window['_tags_acc_variants']) d.variants = window['_tags_acc_variants'].slice();
   if(window['_tags_acc_colors']) d.colors = window['_tags_acc_colors'].slice();
-  if(window['_tags_acc_cones']) d.coneSizes = window['_tags_acc_cones'].slice();
-  if(window['_tags_acc_placements']) d.placements = window['_tags_acc_placements'].slice();
 }
 function commonAccessoryFieldsHTML(){
   const d = window._accDraft;
@@ -3056,8 +3054,6 @@ function paintAccessoryModal(){
       ` : ''}
     `;
   } else if(d.category==='Thread'){
-    const showBoxCone = ['Kantha','Couching','Stitching'].includes(d.threadPattern);
-    const showPlacements = ['Kantha','Couching'].includes(d.threadPattern);
     const showProcessOnly = ['Button Tacking','Handwork'].includes(d.threadPattern);
     categoryFields = `
       <div class="row">
@@ -3070,27 +3066,12 @@ function paintAccessoryModal(){
       </div>
       <p class="hint" style="margin:0 0 6px;">Thread is measured continuously, not counted per piece — there's no "pieces per unit" here.</p>
       <div class="row"><div class="field"><label>Thread pattern</label><select onchange="accField('threadPattern',this.value)">${THREAD_PATTERNS.map(p=>`<option ${d.threadPattern===p?'selected':''}>${p}</option>`).join('')}</select></div></div>
-      ${(d.threadPattern==='Kantha'||d.threadPattern==='Couching') ? `
-        <div class="row"><div class="field small"><label>Thread per stitch (m per 1m of stitching)</label><input type="number" value="${d.threadPerStitch}" onchange="accField('threadPerStitch',this.value)"></div></div>
-      ` : ''}
       ${d.threadPattern==='Stitching' ? `
+        <div class="row">
+          <div class="field"><label>Meters of thread required for 1m stitching (single‑time entry)</label><input type="text" value="${d.metersPerMeterStitching||''}" onchange="accField('metersPerMeterStitching',this.value)"></div>
+        </div>
         <div class="row"><div class="field small"><label>Thread per piece (m)</label><input type="number" value="${d.threadPerPiece}" onchange="accField('threadPerPiece',this.value)"></div></div>
         <div class="hint">Auto-fills the BOM quantity per piece; remains editable there.</div>
-      ` : ''}
-      ${showBoxCone ? `
-        <div class="hint" style="margin:12px 0 6px;">Available boxes (each box = 6000 m):</div>
-        ${d.boxes.map((b,i)=>`
-          <div class="row" style="align-items:flex-end;">
-            <div class="field small"><label>Reels per box</label><input type="number" value="${b.reelsPerBox}" onchange="accRowField('boxes',${i},'reelsPerBox',this.value)"></div>
-            <div class="field small"><label>Meters per reel</label><input type="number" value="${b.metersPerReel}" onchange="accRowField('boxes',${i},'metersPerReel',this.value)"></div>
-            <div class="field small"><button class="btn-link" onclick="accRemoveRow('boxes',${i})">Remove</button></div>
-          </div>`).join('')}
-        <button class="btn-link" onclick="accAddRow('boxes', {reelsPerBox:'',metersPerReel:''})">+ Add more</button>
-        <div class="row" style="margin-top:12px;"><div class="field"><label>Available cone sizes (m)</label>${tagInputHTML('acc_cones', d.coneSizes)}</div></div>
-      ` : ''}
-      ${showPlacements ? `
-        <div class="row" style="margin-top:12px;"><div class="field"><label>Available placements</label>${tagInputHTML('acc_placements', d.placements)}</div></div>
-        <div class="hint">e.g. Sleeves, Front, Back — some may be predefined via Manufacturing Defaults.</div>
       ` : ''}
       ${d.threadPattern==='Embroidery' ? `<div class="hint" style="margin-top:10px;">No additional measurements required for Embroidery.</div>` : ''}
       ${showProcessOnly ? `

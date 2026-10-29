@@ -140,16 +140,16 @@ export default function GRNDetailView({
     (qcRecs.length > 0 && qcRecs.every((q) => q.qcStatus === 'Passed' || q.qcStatus === 'QC Approved' || q.qcStatus === 'Approved'))
   );
 
+  const hasActiveQc = qcRecs && qcRecs.some(
+    (q) => (q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status)
+  );
+
   const isQcStarted = Boolean(
     isQcPassedOrApproved ||
-    grn.isQcActioned ||
-    grn.isSubmittedToQC ||
-    grn.status === 'Completed' ||
-    (grn.status && (grn.status.includes('QC') || grn.status === 'Under QC')) ||
-    grn.status === 'QC Rejected' ||
-    grn.status === 'QC In Progress' ||
-    grn.status === 'Pending Admin Approval' ||
-    (qcRecs && qcRecs.length > 0)
+    (grn.isQcActioned && grn.status !== 'Completed' && grn.status !== 'Submitted to QC') ||
+    (grn.qcStatus && grn.qcStatus !== 'Pending') ||
+    ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(grn.status) ||
+    hasActiveQc
   );
 
   const canEditHeader = !isQcStarted;
@@ -493,10 +493,6 @@ export default function GRNDetailView({
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">WEIGHT</div>
             <div className="fw-bold text-dark">{grn.weightKg || grn.weight || '—'} kg</div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">FABRIC FOLDING</div>
-            <div className="fw-bold text-dark">{grn.foldingCms || grn.fabricFolding || expectedFold || '—'} cms</div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL QUANTITY</div>

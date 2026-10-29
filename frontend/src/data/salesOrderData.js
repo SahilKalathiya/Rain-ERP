@@ -36,8 +36,8 @@ export const getStoredAccessoriesMaster = () => {
   const data = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
   if (Array.isArray(data)) {
     return data.map(item => {
-      if (item && item.tasselType) {
-        const { tasselType, ...rest } = item;
+      if (item && item.category && !['Thread'].includes(item.category) && item.threadPattern) {
+        const { threadPattern, ...rest } = item;
         return rest;
       }
       return item;

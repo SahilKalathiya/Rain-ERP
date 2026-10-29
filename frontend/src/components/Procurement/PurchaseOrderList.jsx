@@ -197,19 +197,19 @@ export default function PurchaseOrderList({
           </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0 fs-13">
+        <div className="table-responsive" style={{ overflowX: 'hidden' }}>
+          <table className="table table-hover align-middle mb-0" style={{ width: '100%', fontSize: '11px', tableLayout: 'auto' }}>
             <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '120px', whiteSpace: 'nowrap' }}>PO No.</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '100px', whiteSpace: 'nowrap' }}>Date</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '140px' }}>Vendor</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '200px' }}>Fabrics / Qualities</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '125px', whiteSpace: 'nowrap' }}>Expected Date</th>
-                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '90px', whiteSpace: 'nowrap' }}>Buffer %</th>
-                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '130px', whiteSpace: 'nowrap' }}>Total Amount</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '160px' }}>Status</th>
-                <th className="text-end" style={{ padding: '12px 16px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '250px', whiteSpace: 'nowrap' }}>Actions</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', width: '9%' }}>PO No.</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', width: '8%' }}>Date</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', width: '12%' }}>Vendor</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', width: '21%' }}>Fabrics / Qualities</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', width: '8%' }}>Expected Date</th>
+                <th className="text-center" style={{ padding: '7px 4px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', width: '6%' }}>Buffer %</th>
+                <th className="text-end" style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', width: '10%' }}>Total Amount</th>
+                <th style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', width: '13%' }}>Status</th>
+                <th className="text-end" style={{ padding: '7px 6px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.03em', width: '13%' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -235,40 +235,40 @@ export default function PurchaseOrderList({
                       className="hover-bg-light"
                       onClick={() => onSelectPO && onSelectPO(po)}
                     >
-                      <td className="fw-bold text-primary font-monospace">{po.id}</td>
-                      <td>{po.date ? (typeof po.date === 'string' && po.date.includes('T') ? po.date.split('T')[0] : String(po.date)) : '-'}</td>
-                      <td>
-                        <div className="fw-medium text-dark">{getVendorName(po)}</div>
-                        <div className="text-muted fs-11">{po.vendorId}</div>
+                      <td style={{ padding: '6px 6px', whiteSpace: 'nowrap', fontSize: '11px' }} className="fw-bold text-primary font-monospace">{po.id}</td>
+                      <td style={{ padding: '6px 6px', whiteSpace: 'nowrap', fontSize: '11px' }}>{po.date ? (typeof po.date === 'string' && po.date.includes('T') ? po.date.split('T')[0] : String(po.date)) : '-'}</td>
+                      <td style={{ padding: '6px 6px' }}>
+                        <div className="fw-semibold text-dark text-truncate" style={{ fontSize: '11px', maxWidth: '140px' }} title={getVendorName(po)}>{getVendorName(po)}</div>
+                        <div className="text-muted" style={{ fontSize: '10px' }}>{po.vendorId}</div>
                       </td>
-                      <td>
-                        <div className="d-flex flex-column gap-1">
+                      <td style={{ padding: '6px 6px', fontSize: '10.5px' }}>
+                        <div className="d-flex flex-column gap-0.5">
                           {(po.items || []).map((it, idx) => (
-                            <span key={idx} className="text-dark">
-                              {it.fabricName || it.fabricQuality || 'Fabric'} {it.colorName ? `(${it.colorName})` : ''} ({Number(it.quantity || 0).toLocaleString()}m @ ₹{it.rate || 0})
-                            </span>
+                            <div key={idx} className="text-dark text-truncate" style={{ maxWidth: '230px' }} title={`${it.fabricName || it.fabricQuality || 'Fabric'} ${it.colorName ? `(${it.colorName})` : ''} (${Number(it.quantity || 0).toLocaleString()}m @ ₹${it.rate || 0})`}>
+                              <span className="fw-medium">{it.fabricName || it.fabricQuality || 'Fabric'}</span> {it.colorName ? `(${it.colorName})` : ''} <span className="text-secondary">({Number(it.quantity || 0).toLocaleString()}m @ ₹{it.rate || 0})</span>
+                            </div>
                           ))}
                         </div>
                       </td>
-                      <td>{po.expectedDeliveryDate ? (typeof po.expectedDeliveryDate === 'string' && po.expectedDeliveryDate.includes('T') ? po.expectedDeliveryDate.split('T')[0] : String(po.expectedDeliveryDate)) : '-'}</td>
-                      <td>
+                      <td style={{ padding: '6px 6px', whiteSpace: 'nowrap', fontSize: '11px' }}>{po.expectedDeliveryDate ? (typeof po.expectedDeliveryDate === 'string' && po.expectedDeliveryDate.includes('T') ? po.expectedDeliveryDate.split('T')[0] : String(po.expectedDeliveryDate)) : '-'}</td>
+                      <td className="text-center" style={{ padding: '6px 4px', fontSize: '10px' }}>
                         {po.bufferAllowed ? (
-                          <span className="badge bg-info-subtle text-info">±{po.bufferPercent}%</span>
+                          <span className="badge bg-info-subtle text-info py-0.5 px-1.5 fs-10">±{po.bufferPercent}%</span>
                         ) : (
-                          <span className="text-muted fs-11">None</span>
+                          <span className="text-muted fs-10">None</span>
                         )}
                       </td>
-                      <td className="text-end fw-bold text-dark fs-14">
+                      <td className="text-end fw-bold text-dark" style={{ padding: '6px 6px', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
                         ₹
                         {(Number(po.totalAmount) || 0).toLocaleString('en-IN', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
                         })}
                       </td>
-                      <td>
-                        <div className="d-flex flex-column align-items-start gap-1">
+                      <td style={{ padding: '6px 6px' }}>
+                        <div className="d-flex flex-column align-items-start gap-0.5">
                           <span
-                            className={`badge px-2 py-1 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-12 ${po.status === 'Completed'
+                            className={`badge px-1.5 py-0.5 rounded-pill fw-semibold d-inline-flex align-items-center gap-1 fs-10 ${po.status === 'Completed'
                                 ? 'bg-success-subtle text-success border border-success border-opacity-25'
                                 : po.status === 'Partially Received'
                                   ? 'bg-info-subtle text-info border border-info border-opacity-25'
@@ -279,58 +279,59 @@ export default function PurchaseOrderList({
                                       : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
                               }`}
                           >
-                            {po.status === 'Sent' && <i className="ti ti-send fs-11"></i>}
-                            {po.status === 'Completed' && <i className="ti ti-check fs-11"></i>}
-                            {po.status === 'Draft' && <i className="ti ti-file fs-11"></i>}
-                            <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
+                            {po.status === 'Sent' && <i className="ti ti-send fs-10"></i>}
+                            {po.status === 'Completed' && <i className="ti ti-check fs-10"></i>}
+                            {po.status === 'Draft' && <i className="ti ti-file fs-10"></i>}
+                            <span>{po.status === 'Sent' ? 'Sent' : po.status}</span>
                           </span>
 
                           {isPoGrnLocked(po) && po.status !== 'Completed' && (
                             <span
-                              className="badge bg-light text-secondary border px-1.5 py-0.5 rounded-pill fs-11 d-inline-flex align-items-center gap-1 shadow-2xs"
-                              title="Requirement 15: Non-editable (GRN process started)"
+                              className="badge bg-light text-secondary border px-1 py-0.5 rounded-pill fs-9 d-inline-flex align-items-center gap-0.5 shadow-2xs"
+                              style={{ fontSize: '9px' }}
+                              title="Non-editable (GRN process started)"
                             >
-                              <i className="ti ti-lock text-warning fs-11"></i>
-                              <span>Locked (GRN Started)</span>
+                              <i className="ti ti-lock text-warning" style={{ fontSize: '8.5px' }}></i>
+                              <span>Locked</span>
                             </span>
                           )}
 
                           {po.status === 'Partially Received' && (
-                            <div className="mt-1 p-1.5 rounded-2 bg-light border border-info border-opacity-25 w-100" style={{ fontSize: '11px', lineHeight: 1.4 }}>
+                            <div className="mt-0.5 p-1 rounded-2 bg-light border border-info border-opacity-25 w-100" style={{ fontSize: '9.5px', lineHeight: 1.2 }}>
                               <div className="d-flex align-items-center justify-content-between text-muted">
-                                <span>Received:</span>
+                                <span>Rec:</span>
                                 <strong className="text-dark">{receivedMeters.toLocaleString()}m</strong>
                               </div>
                               <div className="d-flex align-items-center justify-content-between text-danger fw-semibold">
-                                <span>Pending:</span>
+                                <span>Pend:</span>
                                 <span>{pendingMeters.toLocaleString()}m</span>
                               </div>
                             </div>
                           )}
                           {po.status === 'Completed' && totalOrdered > 0 && (
-                            <div className="mt-0.5 text-success fw-medium d-flex align-items-center gap-1" style={{ fontSize: '11px' }}>
-                              <i className="ti ti-check fs-12"></i>
-                              <span>All {totalOrdered.toLocaleString()}m received</span>
+                            <div className="mt-0.5 text-success fw-medium d-flex align-items-center gap-0.5" style={{ fontSize: '9.5px' }}>
+                              <i className="ti ti-check fs-10"></i>
+                              <span>All {totalOrdered.toLocaleString()}m recd</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="text-end" style={{ whiteSpace: 'nowrap', verticalAlign: 'middle', padding: '10px 14px' }}>
-                        <div className="d-inline-flex align-items-center justify-content-end gap-2 flex-nowrap">
+                      <td className="text-end" style={{ verticalAlign: 'middle', padding: '6px 6px' }}>
+                        <div className="d-flex align-items-center justify-content-end gap-1 flex-wrap">
                           {/* GRN Inward Buttons / Badges */}
-                          <div className="d-inline-flex align-items-center gap-1.5 flex-nowrap">
+                          <div className="d-flex align-items-center justify-content-end gap-1 flex-wrap">
                             {/* 1. Show existing GRNs created for this PO */}
                             {poGrns.map((g, gIdx) => (
                               <button
                                 key={g.id || gIdx}
                                 type="button"
-                                className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                                className="btn btn-sm px-1.5 py-0.5 rounded-2 fw-semibold d-inline-flex align-items-center gap-0.5 text-nowrap"
                                 style={{
                                   background: '#f0fdf4',
                                   color: '#16a34a',
                                   border: '1px solid #bbf7d0',
-                                  height: '30px',
-                                  fontSize: '11.5px',
+                                  height: '22px',
+                                  fontSize: '10px',
                                   lineHeight: 1,
                                   whiteSpace: 'nowrap'
                                 }}
@@ -344,7 +345,7 @@ export default function PurchaseOrderList({
                                   }
                                 }}
                               >
-                                <i className="ti ti-check fs-12"></i>
+                                <i className="ti ti-check fs-10"></i>
                                 <span className="fw-bold">{g.id}</span>
                               </button>
                             ))}
@@ -353,13 +354,13 @@ export default function PurchaseOrderList({
                             {pendingMeters > 0 && po.status !== 'Draft' && po.status !== 'Cancelled' && po.status !== 'Completed' ? (
                               <button
                                 type="button"
-                                className="btn btn-sm px-2.5 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap shadow-xs"
+                                className="btn btn-sm px-1.5 py-0.5 rounded-2 fw-semibold d-inline-flex align-items-center gap-0.5 text-nowrap shadow-xs"
                                 style={{
                                   background: poGrns.length > 0 ? '#eff6ff' : '#ecfdf5',
                                   color: poGrns.length > 0 ? '#1d4ed8' : '#059669',
                                   border: poGrns.length > 0 ? '1px solid #bfdbfe' : '1px solid #a7f3d0',
-                                  height: '30px',
-                                  fontSize: '11.5px',
+                                  height: '22px',
+                                  fontSize: '10px',
                                   lineHeight: 1,
                                   whiteSpace: 'nowrap'
                                 }}
@@ -371,19 +372,19 @@ export default function PurchaseOrderList({
                                   if (onInwardGRN) onInwardGRN({ ...po, pendingQtyToReceive: pendingMeters });
                                 }}
                               >
-                                <i className={poGrns.length > 0 ? "ti ti-truck-delivery fs-13" : "ti ti-package fs-13"}></i>
+                                <i className={poGrns.length > 0 ? "ti ti-truck-delivery fs-11" : "ti ti-package fs-11"}></i>
                                 <span className="fw-bold">
                                   {poGrns.length > 0 ? `+ GRN (${pendingMeters.toLocaleString()}m)` : '+ GRN'}
                                 </span>
                               </button>
                             ) : ((pendingMeters <= 0 && totalOrdered > 0) || po.status === 'Completed') ? (
                               <span
-                                className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
-                                style={{ height: '30px' }}
+                                className="badge bg-success-subtle text-success border border-success border-opacity-25 px-1.5 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center gap-0.5 text-nowrap"
+                                style={{ height: '22px' }}
                                 title={`PO 100% Fulfilled: All ${totalOrdered.toLocaleString()}m received across ${poGrns.length} GRN(s). No further GRN allowed.`}
                               >
-                                <i className="ti ti-circle-check fs-12"></i>
-                                <span>Fully Received</span>
+                                <i className="ti ti-circle-check fs-10"></i>
+                                <span>Fulfilled</span>
                               </span>
                             ) : null}
                           </div>
@@ -392,27 +393,27 @@ export default function PurchaseOrderList({
                           <div className="btn-group btn-group-sm shadow-2xs" role="group" style={{ flexShrink: 0 }}>
                             <button
                               type="button"
-                              className="btn btn-white border px-2 d-inline-flex align-items-center justify-content-center text-primary"
-                              style={{ width: '31px', height: '30px', borderColor: '#cbd5e1' }}
+                              className="btn btn-white border px-1 d-inline-flex align-items-center justify-content-center text-primary"
+                              style={{ width: '22px', height: '22px', borderColor: '#cbd5e1' }}
                               title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (onSelectPO) onSelectPO(po);
                               }}
                             >
-                              <i className="ti ti-eye fs-14"></i>
+                              <i className="ti ti-eye fs-11"></i>
                             </button>
                             <button
                               type="button"
-                              className="btn btn-white border px-2 d-inline-flex align-items-center justify-content-center text-secondary"
-                              style={{ width: '31px', height: '30px', borderColor: '#cbd5e1' }}
+                              className="btn btn-white border px-1 d-inline-flex align-items-center justify-content-center text-secondary"
+                              style={{ width: '22px', height: '22px', borderColor: '#cbd5e1' }}
                               title="Print PO Invoice"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (onPrintPO) onPrintPO(po);
                               }}
                             >
-                              <i className="ti ti-printer fs-14"></i>
+                              <i className="ti ti-printer fs-11"></i>
                             </button>
                           </div>
                         </div>

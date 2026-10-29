@@ -45,12 +45,21 @@ export default function QCDetailView({
   }
 
   const fabricName = qc.fabricName || grn?.fabricName || 'Tussar Silk (42") — Ivory';
-  const poId = grn?.linkedPOs?.[0] || 'PO-1001';
+  const poId = purchaseOrder?.id || grn?.linkedPOs?.[0] || grn?.poId || 'PO-1001';
   const grnId = qc.grnRef || grn?.id || 'GRN-1002';
 
-  const expectedWidth = qc.expectedWidth ? `${String(qc.expectedWidth).replace(/"/g, '')}"` : '44"';
+  const cleanFab = fabricName.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*—.*$/, '').trim().toLowerCase();
+  const matchedPoItem = purchaseOrder?.items?.find((it) => {
+    const itName = (it.fabricName || it.fabricQuality || '').replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*—.*$/, '').trim().toLowerCase();
+    return itName === cleanFab || cleanFab.includes(itName) || itName.includes(cleanFab);
+  }) || purchaseOrder?.items?.[0];
+
+  const resolvedExpWidth = matchedPoItem?.width || qc.expectedWidth || grn?.width || grn?.pannaWidth || '44';
+  const resolvedExpFold = matchedPoItem?.fold !== undefined ? matchedPoItem.fold : (qc.expectedFold || grn?.fold || grn?.fabricFolding || '100');
+
+  const expectedWidth = `${String(resolvedExpWidth).replace(/"/g, '')}"`;
   const widthFound = qc.actualWidth ? `${String(qc.actualWidth).replace(/"/g, '')}"` : (qc.widthFound || '—');
-  const expectedFold = qc.expectedFold ? `${String(qc.expectedFold).replace(/%/g, '')}%` : '100%';
+  const expectedFold = `${String(resolvedExpFold).replace(/%/g, '')}%`;
   const foldFound = qc.actualFold ? `${String(qc.actualFold).replace(/%/g, '')}%` : (qc.foldFound ? `${qc.foldFound}%` : '—%');
 
   const receivedQty = Number(qc.totalReceivedMeters) || Number(qc.receivedQty) || Number(grn?.declaredTotalMeters) || 2000;

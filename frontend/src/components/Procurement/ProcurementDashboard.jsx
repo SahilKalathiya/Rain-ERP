@@ -421,14 +421,23 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               if (fMeters <= 0) {
                 fMeters = Math.round((Number(g.declaredTotalMeters || g.totalQty || 0)) / baleFabrics.length);
               }
+              const cleanBaleFabric = fLbl.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*—.*$/, '').trim().toLowerCase();
+              const matchedPoItem = poItems.find((it) => {
+                const itName = (it.fabricName || it.fabricQuality || '').replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*—.*$/, '').trim().toLowerCase();
+                return itName === cleanBaleFabric || cleanBaleFabric.includes(itName) || itName.includes(cleanBaleFabric);
+              }) || poItems[idx] || poItems[0];
+
+              const expWidth = matchedPoItem?.width || g.width || g.pannaWidth || '44';
+              const expFold = matchedPoItem?.fold !== undefined ? matchedPoItem.fold : (g.fold || g.fabricFolding || '100');
+
               partitions.push({
                 ...originalQC,
                 id: `QC-${g.id.replace('GRN-', '')}-F${idx + 1}`,
                 grnRef: g.id,
-                againstRef: g.poId || '',
+                againstRef: linkedPO?.id || g.poId || '',
                 fabricName: fLbl,
-                expectedWidth: String(g.pannaWidth || '44'),
-                expectedFold: String(g.fabricFolding || '100'),
+                expectedWidth: String(expWidth).replace(/"/g, ''),
+                expectedFold: String(expFold).replace(/%/g, ''),
                 totalReceivedMeters: fMeters,
                 receivedQty: fMeters,
                 qcStatus: originalQC.qcStatus || 'Pending'
@@ -614,8 +623,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       isHeaderSaved: false,
       totalBales: '',
       poOrderedMeters: orderedMeters,
-      totalQty: pendingMeters > 0 ? String(pendingMeters) : '',
-      declaredTotalMeters: pendingMeters > 0 ? pendingMeters : 0,
+      totalQty: '',
+      declaredTotalMeters: 0,
       pendingQtyToReceive: pendingMeters,
       bales: []
     };
@@ -732,18 +741,56 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         }
       });
 
+      const poIds = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
+        ? enrichedGRN.linkedPOs
+        : (enrichedGRN.poId ? [enrichedGRN.poId] : []);
+      const linkedPO = purchaseOrders.find((p) => poIds.includes(p.id));
+      const poItems = linkedPO?.items || [];
+
       const uniqueFabrics = Object.keys(fabricMap);
       if (uniqueFabrics.length > 0) {
         uniqueFabrics.forEach((fLbl, idx) => {
           const data = fabricMap[fLbl];
-          const cleanFabricName = fLbl.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
+          const cleanFabricName = fLbl.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*—.*$/, '').trim();
+          const cleanLower = cleanFabricName.toLowerCase();
           const matchingFabric = fabrics.find((f) => f.qualityName === fLbl || f.qualityName === cleanFabricName || fLbl.includes(f.qualityName));
+
+          const matchedPoItem = poItems.find((it) => {
+            const itName = (it.fabricName || it.fabricQuality || '')
+              .replace(/^\[[^\]]+\]\s*/, '')
+              .replace(/\s*\([^)]*\)/g, '')
+              .replace(/\s*—.*$/, '')
+              .trim()
+              .toLowerCase();
+            return itName === cleanLower || cleanLower.includes(itName) || itName.includes(cleanLower);
+          }) || poItems[idx] || poItems[0];
+
+          let expWidth = '44';
+          if (matchedPoItem?.width !== undefined && matchedPoItem?.width !== null && String(matchedPoItem.width).trim() !== '') {
+            expWidth = String(matchedPoItem.width).replace(/"/g, '').trim();
+          } else if (enrichedGRN.width) {
+            expWidth = String(enrichedGRN.width).replace(/"/g, '').trim();
+          } else if (enrichedGRN.pannaWidth) {
+            expWidth = String(enrichedGRN.pannaWidth).replace(/"/g, '').trim();
+          } else if (matchingFabric?.pannaWidth) {
+            expWidth = String(matchingFabric.pannaWidth).replace(/"/g, '').trim();
+          }
+
+          let expFold = '100';
+          if (matchedPoItem?.fold !== undefined && matchedPoItem?.fold !== null && String(matchedPoItem.fold).trim() !== '') {
+            expFold = String(matchedPoItem.fold).replace(/%/g, '').trim();
+          } else if (enrichedGRN.fold) {
+            expFold = String(enrichedGRN.fold).replace(/%/g, '').trim();
+          } else if (enrichedGRN.fabricFolding) {
+            expFold = String(enrichedGRN.fabricFolding).replace(/%/g, '').trim();
+          }
+
           fabricBatches.push({
             fabricName: fLbl,
-            fabricId: matchingFabric?.id || '',
-            colorName: enrichedGRN.colorName || 'Grey / Natural',
-            expectedWidth: matchingFabric?.pannaWidth ? String(matchingFabric.pannaWidth) : String(enrichedGRN.pannaWidth || '44'),
-            expectedFold: String(enrichedGRN.fabricFolding || '100'),
+            fabricId: matchingFabric?.id || matchedPoItem?.fabricId || '',
+            colorName: matchedPoItem?.colorName || matchedPoItem?.color || enrichedGRN.colorName || 'Grey / Natural',
+            expectedWidth: expWidth,
+            expectedFold: expFold,
             totalReceivedMeters: Math.round(data.meters * 100) / 100,
             pieces: data.pieces,
             baleRefs: Array.from(data.bales).join(', '),
@@ -754,27 +801,29 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
       // Fallback if no bales entered
       if (fabricBatches.length === 0) {
-        const linkedPO = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
-          ? purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id))
-          : purchaseOrders.find((p) => p.id === enrichedGRN.poId);
-
         let expFold = '100';
         let expWidth = '44';
         let singleFabricName = enrichedGRN.fabricName || '';
         let singleColorName = enrichedGRN.colorName || '';
 
-        if (linkedPO && linkedPO.items && linkedPO.items.length > 0) {
-          const item = linkedPO.items[0];
-          if (item.fold) expFold = String(item.fold);
-          if (item.width) expWidth = String(item.width);
+        if (poItems.length > 0) {
+          const item = poItems[0];
+          if (item.fold !== undefined && item.fold !== null && String(item.fold).trim() !== '') {
+            expFold = String(item.fold).replace(/%/g, '').trim();
+          }
+          if (item.width !== undefined && item.width !== null && String(item.width).trim() !== '') {
+            expWidth = String(item.width).replace(/"/g, '').trim();
+          }
           if (item.fabricName || item.fabricQuality) singleFabricName = item.fabricName || item.fabricQuality;
           if (item.color || item.colorName) singleColorName = item.color || item.colorName;
+        } else if (enrichedGRN.width || enrichedGRN.pannaWidth) {
+          expWidth = String(enrichedGRN.width || enrichedGRN.pannaWidth).replace(/"/g, '').trim();
         }
 
-        if (!expWidth && singleFabricName) {
+        if (expWidth === '44' && singleFabricName) {
           const matchingFabric = fabrics.find((f) => f.qualityName === singleFabricName);
           if (matchingFabric && matchingFabric.pannaWidth) {
-            expWidth = String(matchingFabric.pannaWidth);
+            expWidth = String(matchingFabric.pannaWidth).replace(/"/g, '').trim();
           }
         }
 
@@ -1385,13 +1434,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               onEditGRN={(g) => {
                 const isLocked = Boolean(
                   g.isQcActioned ||
-                  g.isSubmittedToQC ||
-                  g.status === 'Completed' ||
-                  (g.status && (g.status.includes('QC') || g.status === 'Under QC')) ||
-                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+                  (g.qcStatus && g.qcStatus !== 'Pending') ||
+                  ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(g.status) ||
+                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id) && ((q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status)))
                 );
                 if (isLocked) {
-                  alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+                  alert(`GRN ${g.id} is locked because Quality Check (QC) inspection has already started or been actioned. It cannot be edited.`);
                   setSelectedGRN(g);
                   setActiveGrnView('detail');
                   return;
@@ -1417,12 +1465,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 const isLocked = Boolean(
                   !updatedGrn ||
                   updatedGrn.isQcActioned ||
-                  updatedGrn.isSubmittedToQC ||
-                  updatedGrn.status === 'Completed' ||
-                  (updatedGrn.status && (updatedGrn.status.includes('QC') || updatedGrn.status === 'Under QC'))
+                  (updatedGrn.qcStatus && updatedGrn.qcStatus !== 'Pending') ||
+                  ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(updatedGrn.status) ||
+                  (qualityChecks || []).some((q) => q && (q.grnRef === updatedGrn.id || q.grnId === updatedGrn.id) && ((q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status)))
                 );
                 if (isLocked) {
-                  alert('Receipt details cannot be edited because this GRN has already been submitted to Quality Check (QC).');
+                  alert('Receipt details cannot be edited because Quality Check (QC) inspection has already started or been actioned.');
                   return;
                 }
                 const normalized = {
@@ -1458,13 +1506,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               onEditBales={(g) => {
                 const isLocked = Boolean(
                   g.isQcActioned ||
-                  g.isSubmittedToQC ||
-                  g.status === 'Completed' ||
-                  (g.status && (g.status.includes('QC') || g.status === 'Under QC')) ||
-                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id))
+                  (g.qcStatus && g.qcStatus !== 'Pending') ||
+                  ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(g.status) ||
+                  (qualityChecks || []).some((q) => q && (q.grnRef === g.id || q.grnId === g.id) && ((q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status)))
                 );
                 if (isLocked) {
-                  alert(`GRN ${g.id} is locked because it has already been submitted to Quality Check (QC). It cannot be edited.`);
+                  alert(`GRN ${g.id} is locked because Quality Check (QC) inspection has already started or been actioned. It cannot be edited.`);
                   setSelectedGRN(g);
                   setActiveGrnView('detail');
                   return;
@@ -1546,7 +1593,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             <QCDetailView
               qc={selectedQC || qualityChecks[0]}
               grn={grns.find((g) => g && (g.id === selectedQC?.grnRef || (selectedQC?.grnRef && g.id.includes(selectedQC.grnRef.replace('GRN-', ''))))) || selectedGRN || grns[0]}
-              purchaseOrder={purchaseOrders.find((p) => p.id === (grns.find((g) => g && g.id === selectedQC?.grnRef)?.linkedPOs?.[0]))}
+              purchaseOrder={(() => {
+                const matchedGrn = grns.find((g) => g && (g.id === selectedQC?.grnRef || (selectedQC?.grnRef && g.id.includes(selectedQC.grnRef.replace('GRN-', ''))))) || selectedGRN;
+                const poId = matchedGrn?.linkedPOs?.[0] || matchedGrn?.poId || selectedQC?.againstRef || selectedQC?.poId;
+                return purchaseOrders.find((p) => p.id === poId) || purchaseOrders[0];
+              })()}
               stockEntries={stockPool}
               damagedItem={rejectedStock.find((r) => r && (r.sourceQcRef === selectedQC?.id || r.grnRef === selectedQC?.grnRef))}
               onBackToGRN={() => {

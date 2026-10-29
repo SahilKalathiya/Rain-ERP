@@ -183,6 +183,7 @@ export default function FabricMasterView({
         id: `FAB-${String(fabrics.length + 1).padStart(4, '0')}`,
         qualityName: '',
         fabricType: '',
+        isCustomType: false,
         gsm: '',
         widths: [],
         defaultShrinkage: '',
@@ -195,6 +196,7 @@ export default function FabricMasterView({
       id: '',
       qualityName: '',
       fabricType: '',
+      isCustomType: false,
       gsm: '',
       widths: [],
       defaultShrinkage: '',
@@ -220,6 +222,7 @@ export default function FabricMasterView({
       id: `FAB-${nextNum}`,
       qualityName: '',
       fabricType: '',
+      isCustomType: false,
       gsm: '',
       widths: [],
       defaultShrinkage: '',
@@ -239,6 +242,7 @@ export default function FabricMasterView({
     setSelectedFabric(null);
     setIsCreatingNew(false);
     setIsEditing(false);
+    setIsCustomFabricType(false);
     setWidthInput('');
     setFormErrors({});
     if (isInline && onCloseInline) onCloseInline(null);
@@ -277,12 +281,16 @@ export default function FabricMasterView({
       : ['44', '58'];
 
     const fType = f.fabricType || f.fabric_type || '';
-    setIsCustomFabricType(Boolean(fType && !STANDARD_FABRIC_TYPES.includes(fType)));
+    const isCustom = f.isCustomType !== undefined
+      ? Boolean(f.isCustomType)
+      : Boolean(fType && !STANDARD_FABRIC_TYPES.includes(fType));
+    setIsCustomFabricType(isCustom);
 
     setFormData({
       ...f,
       qualityName: f.qualityName || f.quality_name || '',
       fabricType: fType,
+      isCustomType: isCustom,
       widths: parsedWidths,
       hsnCode: f.hsnCode || f.hsn_code || '520811'
     });
@@ -374,12 +382,15 @@ export default function FabricMasterView({
     }
 
     const capitalizedQName = capitalizeWords((formData.qualityName || '').trim());
+    const finalFabricType = (formData.fabricType || '').trim();
     const updatedFabric = {
       ...formData,
       id: formData.id || `FAB-${Date.now()}`,
       quality: capitalizedQName,
       qualityName: capitalizedQName,
       name: capitalizedQName,
+      fabricType: finalFabricType,
+      isCustomType: Boolean(isCustomFabricType),
       widths: currentWidths,
       gsm: Number(formData.gsm) || null,
       defaultShrinkage: (formData.defaultShrinkage !== '' && formData.defaultShrinkage !== null && formData.defaultShrinkage !== undefined) ? Number(formData.defaultShrinkage) : 0,
@@ -492,7 +503,8 @@ export default function FabricMasterView({
                             const newType = e.target.value;
                             setFormData({
                               ...formData,
-                              fabricType: newType
+                              fabricType: newType,
+                              isCustomType: true
                             });
                             if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
                           }}
@@ -502,7 +514,7 @@ export default function FabricMasterView({
                           className="btn btn-outline-secondary"
                           onClick={() => {
                             setIsCustomFabricType(false);
-                            setFormData({ ...formData, fabricType: '' });
+                            setFormData({ ...formData, fabricType: '', isCustomType: false });
                           }}
                           title="Switch back to dropdown list"
                         >
@@ -519,20 +531,26 @@ export default function FabricMasterView({
                             setIsCustomFabricType(true);
                             setFormData({
                               ...formData,
-                              fabricType: ''
+                              fabricType: '',
+                              isCustomType: true
                             });
                             return;
                           }
+                          setIsCustomFabricType(false);
                           setFormData({
                             ...formData,
-                            fabricType: newType
+                            fabricType: newType,
+                            isCustomType: false
                           });
                           if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
                         }}
                       >
                         <option value="">Select fabric type...</option>
                         <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
-                        <option value="Cotton">Cotton (Processed)</option>
+                        <option value="Cotton">Cotton</option>
+                        {formData.fabricType === 'Cotton (Processed)' && (
+                          <option value="Cotton (Processed)">Cotton (Processed)</option>
+                        )}
                         <option value="Rayon">Rayon</option>
                         <option value="Modal">Modal</option>
                         <option value="Silk">Silk</option>
@@ -732,7 +750,7 @@ export default function FabricMasterView({
               >
                 <option value="">All Fabric Types</option>
                 <option value="Greige / Undyed">Greige / Undyed</option>
-                <option value="Cotton">Cotton (Processed)</option>
+                <option value="Cotton">Cotton</option>
                 <option value="Rayon">Rayon</option>
                 <option value="Modal">Modal</option>
                 <option value="Silk">Silk</option>
@@ -794,7 +812,7 @@ export default function FabricMasterView({
                         </td>
                         <td>
                           <span className={`badge border ${isSelected ? 'bg-white text-primary' : 'bg-light text-secondary'}`}>
-                            {f.fabricType || f.fabric_type || 'Cotton'}
+                            {f.fabricType || f.fabric_type || '-'}
                           </span>
                         </td>
                         <td className={isSelected ? 'text-white' : ''}>{f.gsm ? `${f.gsm} gsm` : '-'}</td>
@@ -945,7 +963,8 @@ export default function FabricMasterView({
                                   const newType = e.target.value;
                                   setFormData({
                                     ...formData,
-                                    fabricType: newType
+                                    fabricType: newType,
+                                    isCustomType: true
                                   });
                                   if (formErrors.fabricType) setFormErrors((prev) => ({ ...prev, fabricType: null }));
                                 }}
@@ -956,7 +975,7 @@ export default function FabricMasterView({
                                   className="btn btn-outline-secondary"
                                   onClick={() => {
                                     setIsCustomFabricType(false);
-                                    setFormData({ ...formData, fabricType: '' });
+                                    setFormData({ ...formData, fabricType: '', isCustomType: false });
                                   }}
                                   title="Switch back to dropdown list"
                                 >
@@ -978,13 +997,16 @@ export default function FabricMasterView({
                                   setIsCustomFabricType(true);
                                   setFormData({
                                     ...formData,
-                                    fabricType: ''
+                                    fabricType: '',
+                                    isCustomType: true
                                   });
                                   return;
                                 }
+                                setIsCustomFabricType(false);
                                 setFormData({
                                   ...formData,
-                                  fabricType: newType
+                                  fabricType: newType,
+                                  isCustomType: false
                                 });
                                 if (formErrors.fabricType) {
                                   setFormErrors((prev) => ({ ...prev, fabricType: null }));
@@ -993,7 +1015,10 @@ export default function FabricMasterView({
                             >
                               <option value="">Select fabric type...</option>
                               <option value="Greige / Undyed">Greige / Undyed (Grey Fabric)</option>
-                              <option value="Cotton">Cotton (Processed)</option>
+                              <option value="Cotton">Cotton</option>
+                              {formData.fabricType === 'Cotton (Processed)' && (
+                                <option value="Cotton (Processed)">Cotton (Processed)</option>
+                              )}
                               <option value="Rayon">Rayon</option>
                               <option value="Modal">Modal</option>
                               <option value="Silk">Silk</option>

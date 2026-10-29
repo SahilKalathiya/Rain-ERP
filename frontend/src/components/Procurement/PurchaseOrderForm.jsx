@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import VendorMasterView from './VendorMasterView';
 import FabricMasterView from './FabricMasterView';
@@ -94,7 +94,7 @@ function SearchableColorInput({
     <div
       ref={wrapperRef}
       className="position-relative"
-      style={{ width: '100%', minWidth: '130px' }}
+      style={{ width: '100%', minWidth: '100px' }}
     >
       {/* Unified Seamless Container */}
       <div
@@ -102,8 +102,8 @@ function SearchableColorInput({
         style={{
           border: (isOpen || isFocused) ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
           boxShadow: (isOpen || isFocused) ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
-          padding: '2px 8px 2px 8px',
-          height: '31px',
+          padding: '2px 6px',
+          height: '32px',
           transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
           cursor: 'text'
         }}
@@ -116,14 +116,14 @@ function SearchableColorInput({
         {/* Color Swatch */}
         <span
           style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '4px',
+            width: '14px',
+            height: '14px',
+            borderRadius: '3px',
             backgroundColor: swatchHex,
             border: swatchHex?.toLowerCase() === '#ffffff' || swatchHex?.toLowerCase() === '#fffff0' ? '1px solid #cbd5e1' : '1px solid rgba(0,0,0,0.15)',
             display: 'inline-block',
             flexShrink: 0,
-            marginRight: '6px',
+            marginRight: '5px',
             cursor: 'pointer'
           }}
           title="Pick or edit color"
@@ -141,7 +141,7 @@ function SearchableColorInput({
             outline: 'none',
             boxShadow: 'none',
             backgroundColor: 'transparent',
-            fontSize: '13px',
+            fontSize: '12px',
             color: '#1e293b',
             width: '100%',
             minWidth: 0,
@@ -386,7 +386,7 @@ function SearchableFabricInput({
     <div
       ref={wrapperRef}
       className="position-relative"
-      style={{ width: '100%', minWidth: '150px' }}
+      style={{ width: '100%', minWidth: '115px' }}
     >
       {/* Unified Seamless Container */}
       <div
@@ -394,8 +394,8 @@ function SearchableFabricInput({
         style={{
           border: (isOpen || isFocused) ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
           boxShadow: (isOpen || isFocused) ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
-          padding: '2px 8px 2px 8px',
-          height: '31px',
+          padding: '2px 6px',
+          height: '32px',
           transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
           cursor: 'text'
         }}
@@ -413,7 +413,7 @@ function SearchableFabricInput({
             outline: 'none',
             boxShadow: 'none',
             backgroundColor: 'transparent',
-            fontSize: '13px',
+            fontSize: '12px',
             color: '#1e293b',
             width: '100%',
             minWidth: 0,
@@ -683,6 +683,7 @@ export default function PurchaseOrderForm({
         id: it.id || `item-${idx + 1}`,
         fabricId: it.fabricId || '',
         fabricName: it.fabricName || it.fabricQuality || '',
+        fabricType: it.fabricType || (isRawFabricQuality(it.fabricName || it.fabricQuality) ? 'Greige Fabric' : 'Process'),
         colorName: it.colorName || it.color || '',
         width: it.width || '',
         quantity: it.quantity || '',
@@ -695,6 +696,7 @@ export default function PurchaseOrderForm({
           id: `item-${Date.now()}`,
           fabricId: '',
           fabricName: '',
+          fabricType: 'Process',
           colorName: '',
           width: '',
           quantity: '',
@@ -818,7 +820,13 @@ export default function PurchaseOrderForm({
   // View Mode by default for existing POs, Edit Mode for new POs. If PO is locked, strictly view mode.
   const [isEditing, setIsEditing] = useState(!isExisting && !isPoLocked);
   const userToggledColorRef = useRef(false);
-  const [showColorColumn, setShowColorColumn] = useState(true);
+
+  // Live computed check: show color column if at least one item is "Process"
+  const showColorColumn = useMemo(() => {
+    return (formData.items || []).some(
+      (it) => (it.fabricType || 'Process') === 'Process'
+    );
+  }, [formData.items]);
 
   // Sync state whenever selected `po` changes
   useEffect(() => {
@@ -841,6 +849,7 @@ export default function PurchaseOrderForm({
             id: it.id || `item-${idx + 1}`,
             fabricId: it.fabricId || '',
             fabricName: it.fabricName || it.fabricQuality || '',
+            fabricType: it.fabricType || (isRawFabricQuality(it.fabricName || it.fabricQuality) ? 'Greige Fabric' : 'Process'),
             colorName: it.colorName || it.color || '',
             width: it.width || '',
             quantity: it.quantity || '',
@@ -853,6 +862,7 @@ export default function PurchaseOrderForm({
               id: `item-${Date.now()}`,
               fabricId: '',
               fabricName: '',
+              fabricType: 'Process',
               colorName: '',
               width: '',
               quantity: '',
@@ -863,10 +873,7 @@ export default function PurchaseOrderForm({
           ]
       });
       setIsEditing(isPoLocked ? false : Boolean(po.isAutoGenerated || po.isNew)); // auto-generated or new PO starts in edit mode, existing starts in read-only
-      const hasColors = checkHasColors(po?.items);
-      const allRaw = checkAllRawFabrics(po?.items, fabrics);
       userToggledColorRef.current = false;
-      setShowColorColumn(hasColors ? true : (allRaw ? false : true));
     } else {
       setIsEditing(!isPoLocked);
     }
@@ -911,10 +918,13 @@ export default function PurchaseOrderForm({
         if (it.id === targetRowId) {
           const wList = newFabric.widths || (newFabric.pannaWidth ? [String(newFabric.pannaWidth)] : []);
           const defaultWidth = (wList && wList.length === 1) ? String(wList[0]).replace(/"/g, '') : '';
+          const isRaw = isRawFabricQuality(newFabric.qualityName, newFabric);
           return {
             ...it,
             fabricId: newFabric.id,
             fabricName: newFabric.qualityName,
+            fabricType: isRaw ? 'Greige Fabric' : (it.fabricType || 'Process'),
+            colorName: isRaw ? '' : (it.colorName || ''),
             width: defaultWidth,
             rate: it.rate || '',
             fold: it.fold || ''
@@ -998,6 +1008,7 @@ export default function PurchaseOrderForm({
           id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           fabricId: '',
           fabricName: '',
+          fabricType: prev.items?.[prev.items.length - 1]?.fabricType || 'Process',
           colorName: '',
           width: '',
           quantity: '',
@@ -1019,6 +1030,7 @@ export default function PurchaseOrderForm({
             id: `item-${Date.now()}`,
             fabricId: '',
             fabricName: '',
+            fabricType: 'Process',
             colorName: '',
             width: '',
             quantity: '',
@@ -1044,6 +1056,13 @@ export default function PurchaseOrderForm({
 
         const updated = { ...it, [field]: value };
 
+        // If fabricType changed to Greige Fabric, clear colorName
+        if (field === 'fabricType') {
+          if (value === 'Greige Fabric') {
+            updated.colorName = '';
+          }
+        }
+
         // Auto-fill fabric name when fabric is selected, auto-select width if only 1 width configured
         if (field === 'fabricId') {
           const matchedFabric = fabrics.find(
@@ -1051,6 +1070,14 @@ export default function PurchaseOrderForm({
           );
           if (matchedFabric) {
             updated.fabricName = matchedFabric.qualityName;
+            const isRaw = isRawFabricQuality(matchedFabric.qualityName, matchedFabric);
+            if (isRaw) {
+              updated.fabricType = 'Greige Fabric';
+              updated.colorName = '';
+            } else if (!updated.fabricType) {
+              updated.fabricType = 'Process';
+            }
+
             const wList = matchedFabric.widths || (matchedFabric.pannaWidth ? [String(matchedFabric.pannaWidth)] : []);
             if (wList && wList.length === 1) {
               updated.width = String(wList[0]).replace(/"/g, '');
@@ -1070,15 +1097,6 @@ export default function PurchaseOrderForm({
                     bufferPercent: parsedBuf
                   }));
                 }, 0);
-              }
-            }
-
-            // Requirement 14: If user has not manually toggled color column,
-            // auto-hide color column if raw/greige fabric is selected
-            if (!userToggledColorRef.current) {
-              const isRaw = isRawFabricQuality(matchedFabric.qualityName, matchedFabric);
-              if (isRaw) {
-                setShowColorColumn(false);
               }
             }
           } else {
@@ -1153,7 +1171,8 @@ export default function PurchaseOrderForm({
         return {
           ...it,
           fabricName: it.fabricName || (curFab?.qualityName || 'Fabric'),
-          colorName: it.colorName ? it.colorName.trim() : '',
+          fabricType: it.fabricType || (isRaw ? 'Greige Fabric' : 'Process'),
+          colorName: it.fabricType === 'Greige Fabric' ? '' : (it.colorName ? it.colorName.trim() : ''),
           quantity: Number(it.quantity) || 0,
           rate: Number(it.rate) || 0,
           fold: Number(it.fold) || 100,
@@ -1377,311 +1396,7 @@ export default function PurchaseOrderForm({
         </div>
       )}
 
-      {/* Requirement 15: Locked Notice Banner */}
-      {isPoLocked && (
-        <div className="alert alert-warning border border-warning border-opacity-50 rounded-3 py-2.5 px-3 mb-3 fs-13 d-flex align-items-center gap-2.5 shadow-xs bg-warning-subtle text-dark">
-          <i className="ti ti-lock fs-18 text-warning flex-shrink-0"></i>
-          <div>
-            <strong className="text-dark">Purchase Order Locked (Non-Editable):</strong>{' '}
-            <span className="text-secondary">
-              This Purchase Order is sent to vendor and its GRN process has started (GRN: <strong>{linkedGrn?.id || allPoGrns[0]?.id || 'In progress'}</strong>). In accordance with system Requirement 15, this record is locked in read-only View Mode and can no longer be edited.
-            </span>
-          </div>
-        </div>
-      )}
 
-      {/* Requirement 7: Complete History after GRN starts */}
-      {hasGrnStarted && (
-        <div
-          className="card mb-4 shadow-sm border-0"
-          style={{
-            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Section Header */}
-          <div
-            className="d-flex align-items-center justify-content-between px-4 py-3 border-bottom"
-            style={{ background: '#f8fafc' }}
-          >
-            <div className="d-flex align-items-center gap-2">
-              <span
-                className="d-inline-flex align-items-center justify-content-center rounded-circle"
-                style={{ width: '28px', height: '28px', background: '#ecfdf5', color: '#059669' }}
-              >
-                <i className="ti ti-history fs-16"></i>
-              </span>
-              <div>
-                <h6 className="fw-bold text-dark mb-0 fs-14">GRN Inward &amp; Quality Check (QC) History</h6>
-                <span className="text-muted fs-11">
-                  Complete tracking: Quantity received, Number of GRNs, Quantity pending in QC, and QC completion status
-                </span>
-              </div>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              <span className="badge bg-light text-secondary border px-2.5 py-1 fs-12 fw-medium d-inline-flex align-items-center gap-1">
-                <i className="ti ti-lock text-warning fs-12"></i>
-                PO Locked (GRN Started)
-              </span>
-              {allPoGrns.length > 0 && onViewGRN && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 py-1 px-2.5 rounded-2 fs-12"
-                  onClick={() => onViewGRN(allPoGrns[0])}
-                >
-                  <i className="ti ti-eye fs-13"></i>
-                  View Latest GRN ({allPoGrns[0].id})
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 4 Key Metrics Grid */}
-          <div className="p-4">
-            <div className="row g-3">
-              {/* 1. Quantity received */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border shadow-2xs"
-                  style={{ background: '#ffffff', borderColor: '#e2e8f0' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="text-muted fs-11 fw-bold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      1. Quantity Received
-                    </span>
-                    <span
-                      className="badge rounded-pill fs-11"
-                      style={{
-                        background: fulfillmentPercent === 100 ? '#dcfce7' : '#e0f2fe',
-                        color: fulfillmentPercent === 100 ? '#15803d' : '#0369a1'
-                      }}
-                    >
-                      {fulfillmentPercent}%
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-baseline gap-1 mb-1">
-                    <span className="fs-20 fw-bold text-dark">
-                      {totalQuantityReceived.toLocaleString()}
-                    </span>
-                    <span className="text-muted fs-12">/ {totalOrderedMtrs.toLocaleString()} m</span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="progress mt-2" style={{ height: '5px' }}>
-                    <div
-                      className="progress-bar bg-success"
-                      role="progressbar"
-                      style={{ width: `${fulfillmentPercent}%` }}
-                    ></div>
-                  </div>
-                  <div className="d-flex justify-content-between align-items-center mt-2 fs-11 text-muted">
-                    <span>Ordered: {totalOrderedMtrs.toLocaleString()}m</span>
-                    <span className={pendingQuantityToReceive > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}>
-                      {pendingQuantityToReceive > 0 ? `${pendingQuantityToReceive.toLocaleString()}m pending` : 'All Received'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Number of GRNs created */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border shadow-2xs"
-                  style={{ background: '#ffffff', borderColor: '#e2e8f0' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="text-muted fs-11 fw-bold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      2. GRNs Created
-                    </span>
-                    <span className="badge bg-purple-subtle text-purple rounded-pill fs-11">
-                      {numGrnsCreated || (hasGrnStarted ? 1 : 0)} Total
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-baseline gap-1 mb-1">
-                    <span className="fs-20 fw-bold text-dark">
-                      {numGrnsCreated || (hasGrnStarted ? 1 : 0)}
-                    </span>
-                    <span className="text-muted fs-12">
-                      {(numGrnsCreated || 1) === 1 ? 'GRN Created' : 'GRNs Created'}
-                    </span>
-                  </div>
-                  <div className="d-flex flex-wrap gap-1 mt-2">
-                    {allPoGrns.length > 0 ? (
-                      allPoGrns.map((g) => (
-                        <button
-                          key={g.id}
-                          type="button"
-                          className="badge border text-primary fw-medium font-monospace d-inline-flex align-items-center gap-1 p-1 px-1.5"
-                          style={{ background: '#f8fafc', cursor: onViewGRN ? 'pointer' : 'default' }}
-                          onClick={() => onViewGRN && onViewGRN(g)}
-                          title="Click to view GRN details"
-                        >
-                          <i className="ti ti-file-text fs-10"></i>
-                          {g.id}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-muted fs-11">Inward processing started</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Quantity pending in QC */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border shadow-2xs"
-                  style={{ background: '#ffffff', borderColor: '#e2e8f0' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="text-muted fs-11 fw-bold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      3. Pending in QC
-                    </span>
-                    <span
-                      className={`badge rounded-pill fs-11 ${
-                        quantityPendingInQC > 0 ? 'bg-warning-subtle text-warning-emphasis' : 'bg-success-subtle text-success'
-                      }`}
-                    >
-                      {quantityPendingInQC > 0 ? 'Inspection Due' : 'All Clear'}
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-baseline gap-1 mb-1">
-                    <span className={`fs-20 fw-bold ${quantityPendingInQC > 0 ? 'text-warning-emphasis' : 'text-dark'}`}>
-                      {quantityPendingInQC.toLocaleString()}
-                    </span>
-                    <span className="text-muted fs-12">m pending</span>
-                  </div>
-                  <div className="d-flex justify-content-between align-items-center mt-2 fs-11 text-muted">
-                    <span>Passed / OK: <strong className="text-success">{quantityPassedQC.toLocaleString()}m</strong></span>
-                    <span>Total Inward: {totalQuantityReceived.toLocaleString()}m</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. QC completion status */}
-              <div className="col-12 col-sm-6 col-lg-3">
-                <div
-                  className="p-3 rounded-3 h-100 border shadow-2xs"
-                  style={{ background: '#ffffff', borderColor: '#e2e8f0' }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="text-muted fs-11 fw-bold text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                      4. QC Completion Status
-                    </span>
-                    <span className={`badge px-2 py-0.5 rounded-pill fs-11 ${qcCompletionBadgeClass}`}>
-                      {qcCompletionStatus.includes('100%') ? '✓ Passed' : qcCompletionStatus.includes('Partially') ? 'In Progress' : 'Pending'}
-                    </span>
-                  </div>
-                  <div className="fw-bold text-dark fs-13 mb-1 text-truncate" title={qcCompletionStatus}>
-                    {qcCompletionStatus}
-                  </div>
-                  <div className="mt-2 pt-1 border-top d-flex align-items-center justify-content-between fs-11 text-muted">
-                    <span>Inspected Deliveries:</span>
-                    <span className="fw-semibold text-dark">
-                      {allPoGrns.filter((g) => findQcForGrn(g)).length} / {numGrnsCreated || (hasGrnStarted ? 1 : 0)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Detailed GRN & QC Table Breakdown if GRNs exist */}
-            {allPoGrns.length > 0 && (
-              <div className="rounded-3 border overflow-hidden mt-3" style={{ background: '#ffffff' }}>
-                <div className="d-flex align-items-center justify-content-between px-3 py-2 bg-light border-bottom">
-                  <span className="fw-semibold text-secondary fs-12 text-uppercase" style={{ letterSpacing: '0.04em' }}>
-                    Linked Inward Deliveries &amp; Quality Checks Breakdown
-                  </span>
-                  <span className="text-muted fs-11">
-                    Showing {allPoGrns.length} {allPoGrns.length === 1 ? 'delivery' : 'deliveries'}
-                  </span>
-                </div>
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0 fs-12">
-                    <thead className="text-muted bg-white border-bottom" style={{ fontSize: '11px', textTransform: 'uppercase' }}>
-                      <tr>
-                        <th style={{ padding: '8px 12px' }}>GRN No.</th>
-                        <th style={{ padding: '8px 12px' }}>Inward Date</th>
-                        <th style={{ padding: '8px 12px' }}>Challan / Invoice</th>
-                        <th style={{ padding: '8px 12px' }}>Bales / Pcs</th>
-                        <th style={{ padding: '8px 12px' }}>Received (Mtrs)</th>
-                        <th style={{ padding: '8px 12px' }}>QC Inspection Status</th>
-                        <th className="text-end" style={{ padding: '8px 12px' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allPoGrns.map((g) => {
-                        const qc = findQcForGrn(g);
-                        const gMtrs = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
-                        const gBales = g.bales?.length || Number(g.totalBales) || Number(g.numBales) || 0;
-                        const gPieces = (g.bales || []).reduce((s, b) => s + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || Number(g.totalPieces) || 0;
-
-                        return (
-                          <tr key={g.id}>
-                            <td className="fw-bold font-monospace text-primary">
-                              {g.id}
-                            </td>
-                            <td>{g.date || g.challanDate || '—'}</td>
-                            <td>
-                              <div className="text-dark fw-medium">{g.vendorChallanNo || g.challanNo || '—'}</div>
-                              <div className="text-muted fs-10">{g.vendorInvoiceNo || g.invoiceNo ? `Inv: ${g.vendorInvoiceNo || g.invoiceNo}` : ''}</div>
-                            </td>
-                            <td>{gBales} Bales {gPieces > 0 ? `(${gPieces} pcs)` : ''}</td>
-                            <td className="fw-bold text-dark">{gMtrs.toLocaleString()}m</td>
-                            <td>
-                              {qc ? (
-                                <div className="d-flex align-items-center gap-1.5">
-                                  <span
-                                    className={`badge px-2 py-0.5 rounded-pill fs-11 ${
-                                      qc.qcStatus === 'Passed' || qc.status === 'Passed' || qc.qcStatus === 'Approved'
-                                        ? 'bg-success-subtle text-success border border-success border-opacity-25'
-                                        : qc.qcStatus === 'Rejected' || qc.status === 'Rejected'
-                                        ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
-                                        : 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-50'
-                                    }`}
-                                  >
-                                    {qc.qcStatus || qc.status || 'Under QC'}
-                                  </span>
-                                  {onViewQC && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-link btn-sm p-0 fs-11 text-decoration-none"
-                                      onClick={() => onViewQC(qc)}
-                                      title="Open QC Inspection Report"
-                                    >
-                                      View {qc.id}
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="badge bg-light text-muted border px-2 py-0.5 rounded-pill fs-11">
-                                  Pending QC
-                                </span>
-                              )}
-                            </td>
-                            <td className="text-end">
-                              {onViewGRN && (
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-primary py-0.5 px-2 rounded-2 fs-11"
-                                  onClick={() => onViewGRN(g)}
-                                >
-                                  View GRN
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* SECTION 1: HEADER & VENDOR INFORMATION (Image 3 Style with Divider Lines) */}
       <div
@@ -1717,13 +1432,13 @@ export default function PurchaseOrderForm({
 
         <div className="row g-3">
           {/* PO No. */}
-          <div className="col-12 col-md-3">
+          <div className="col-12 col-md-4">
             <label className="form-label fs-12 fw-semibold text-secondary mb-1">PO No.</label>
             <div className="fw-bold text-primary font-monospace fs-14">{formData.id}</div>
           </div>
 
           {/* PO Date * */}
-          <div className="col-12 col-md-3">
+          <div className="col-12 col-md-4">
             <label className="form-label fs-12 fw-semibold text-secondary mb-1">
               PO Date <span className="text-danger">*</span>
             </label>
@@ -1741,7 +1456,7 @@ export default function PurchaseOrderForm({
           </div>
 
           {/* Vendor * */}
-          <div className="col-12 col-md-3">
+          <div className="col-12 col-md-4">
             <div className="d-flex align-items-center justify-content-between mb-1">
               <label className="form-label fs-12 fw-semibold text-secondary mb-0">
                 Vendor <span className="text-danger">*</span>
@@ -1783,9 +1498,409 @@ export default function PurchaseOrderForm({
               </div>
             )}
           </div>
+        </div>
+      </div>
 
+
+      {/* SECTION 2: Fabric Line Items (FULL BORDERED GRID - Image 3 Style) */}
+      <div className="mb-4">
+        <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+          <div className="d-flex align-items-center gap-2">
+            <h6 className="fw-bold text-dark mb-0 fs-15">Fabric Line Items</h6>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            {isEditing && (
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12"
+                onClick={handleAddItem}
+              >
+                <i className="ti ti-plus fs-13"></i>
+                <span>Add Line</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* FULL BORDERED TABLE WITH LINES (table-bordered) */}
+        <div className="table-responsive" style={{ overflowX: 'auto', minHeight: '260px' }}>
+          <table
+            className="table table-bordered align-middle mb-0 fs-12"
+            style={{
+              width: '100%',
+              border: '1px solid #dee2e6',
+              borderCollapse: 'collapse',
+              background: '#ffffff'
+            }}
+          >
+            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
+              <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                {/* 1st Column: FABRIC TYPE * */}
+                <th style={{ width: showColorColumn ? '13%' : '16%', minWidth: '115px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                  <span>FABRIC TYPE *</span>
+                </th>
+
+                {/* 2nd Column: FABRIC QUALITY * */}
+                <th style={{ width: showColorColumn ? '18%' : '24%', minWidth: showColorColumn ? '130px' : '145px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                  <div className="d-flex align-items-center justify-content-between gap-1">
+                    <span>FABRIC QUALITY *</span>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-medium"
+                        onClick={() => handleOpenNewFabricModal()}
+                        title="Add new fabric to master"
+                      >
+                        + New
+                      </button>
+                    )}
+                  </div>
+                </th>
+                {showColorColumn && (
+                  <th style={{ width: '14%', minWidth: '110px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                    <div className="d-flex align-items-center gap-1">
+                      <span>COLOR NAME</span>
+                      <span className="badge bg-light text-muted border fs-10 px-1 py-0 fw-normal">Opt</span>
+                    </div>
+                  </th>
+                )}
+                <th style={{ width: showColorColumn ? '11%' : '13%', minWidth: '80px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-start">
+                  WIDTH *
+                </th>
+                <th style={{ width: showColorColumn ? '12%' : '13%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                  QTY (MTRS) *
+                </th>
+                <th style={{ width: showColorColumn ? '11%' : '12%', minWidth: '80px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                  RATE (₹) *
+                </th>
+                <th style={{ width: showColorColumn ? '8%' : '9%', minWidth: '65px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                  FOLD %
+                </th>
+                <th style={{ width: showColorColumn ? '13%' : '13%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-end">
+                  AMOUNT (₹)
+                </th>
+                {isEditing && (
+                  <th style={{ width: '32px', minWidth: '32px', padding: '8px 2px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center"></th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {formData.items.map((row) => {
+                const currentFabric = fabrics.find(
+                  (f) => f.id === row.fabricId || (f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || '').toLowerCase())
+                );
+                const hasFabricSelected = Boolean(row.fabricId || (row.fabricName && row.fabricName.trim()));
+                const isRaw = hasFabricSelected ? isRawFabricQuality(row.fabricName, currentFabric) : false;
+
+                let allowedWidths = [];
+                if (hasFabricSelected) {
+                  let rawWidths = currentFabric?.widths;
+                  if (!rawWidths && currentFabric?.pannaWidth) rawWidths = [String(currentFabric.pannaWidth)];
+                  if (!rawWidths || rawWidths.length === 0) rawWidths = ['44', '48', '58'];
+                  allowedWidths = Array.from(new Set(rawWidths.map((w) => String(w).trim().replace(/"/g, '')).filter(Boolean)));
+                }
+
+                return (
+                  <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                    {/* 1st Column: Fabric Type (Process / Greige Fabric) */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '115px' }}>
+                      {isEditing && !isPoLocked ? (
+                        <select
+                          className="form-select form-select-sm bg-white text-start fw-medium"
+                          style={{
+                            borderColor: '#cbd5e1',
+                            height: '32px',
+                            minHeight: '32px',
+                            fontSize: '12px',
+                            lineHeight: '1.2',
+                            paddingTop: '2px',
+                            paddingBottom: '2px',
+                            paddingLeft: '8px',
+                            paddingRight: '22px',
+                            minWidth: '105px',
+                            width: '100%',
+                            cursor: 'pointer'
+                          }}
+                          value={row.fabricType || 'Process'}
+                          onChange={(e) => handleItemChange(row.id, 'fabricType', e.target.value)}
+                        >
+                          <option value="Process">Process</option>
+                          <option value="Greige Fabric">Greige Fabric</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`badge ${
+                            (row.fabricType || 'Process') === 'Greige Fabric'
+                              ? 'bg-secondary-subtle text-secondary border'
+                              : 'bg-primary-subtle text-primary border'
+                          } fs-11 fw-medium px-2 py-0.5`}
+                        >
+                          {row.fabricType || 'Process'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 2nd Column: Fabric Quality */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: showColorColumn ? '130px' : '145px' }}>
+                      {isEditing ? (
+                        <SearchableFabricInput
+                          value={row.fabricId || ''}
+                          fabrics={fabrics}
+                          onChange={(newFabricId) => handleItemChange(row.id, 'fabricId', newFabricId)}
+                          onAddNew={() => handleOpenNewFabricModal(row.id)}
+                        />
+                      ) : (
+                        <div className="fw-medium text-dark fs-12">{row.fabricName || 'Fabric'}</div>
+                      )}
+                    </td>
+
+                    {/* Color Name (Shown only when showColorColumn is true) */}
+                    {showColorColumn && (
+                      <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '110px' }}>
+                        {(row.fabricType || 'Process') === 'Greige Fabric' ? (
+                          <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-0.5">
+                            Greige (No color)
+                          </span>
+                        ) : isEditing && !isPoLocked ? (
+                          <div>
+                            <SearchableColorInput
+                              value={row.colorName || ''}
+                              placeholder={!hasFabricSelected ? "Color name (optional)..." : "Color name (optional)..."}
+                              colors={masterColorList}
+                              onChange={(newColorName) => handleItemChange(row.id, 'colorName', newColorName)}
+                              onAddNew={() => handleOpenNewColorModal(row.id)}
+                            />
+                          </div>
+                        ) : (
+                          <div className="d-flex align-items-center gap-2">
+                            {row.colorName ? (() => {
+                              const matchedColor = masterColorList.find(
+                                (c) =>
+                                  c.name.toLowerCase() === (row.colorName || '').toLowerCase() ||
+                                  c.hex.toLowerCase() === (row.colorName || '').toLowerCase()
+                              );
+                              const swatchHex = matchedColor
+                                ? matchedColor.hex
+                                : row.colorName?.startsWith('#')
+                                  ? row.colorName
+                                  : '#cbd5e1';
+                              return (
+                                <>
+                                  <span
+                                    className="d-inline-block rounded-circle"
+                                    style={{
+                                      width: '12px',
+                                      height: '12px',
+                                      backgroundColor: swatchHex,
+                                      border: '1px solid #cbd5e1',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                  <span className="text-dark fw-medium">{row.colorName}</span>
+                                </>
+                              );
+                            })() : (
+                              <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-0.5">
+                                —
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
+
+                    {/* Width (Panna) - Left-aligned text & variables */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '80px' }} className="text-start">
+                      {isEditing ? (
+                        !hasFabricSelected ? (
+                          <select
+                            className="form-select form-select-sm bg-light fs-12 text-start text-muted"
+                            style={{ borderColor: '#cbd5e1', paddingRight: '18px', height: '32px', cursor: 'not-allowed', opacity: 0.8 }}
+                            disabled
+                            value=""
+                            title="Please select a fabric quality first"
+                          >
+                            <option value="">Select fabric first...</option>
+                          </select>
+                        ) : allowedWidths && allowedWidths.length > 0 ? (
+                          <select
+                            className="form-select form-select-sm bg-white fs-12 text-start"
+                            style={{ borderColor: '#cbd5e1', paddingRight: '18px', height: '32px' }}
+                            value={String(row.width || '').replace(/"/g, '')}
+                            onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
+                          >
+                            <option value="">Select...</option>
+                            {allowedWidths.map((w) => (
+                              <option key={w} value={w}>
+                                {w}"
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            className="form-control form-control-sm bg-white fs-12 text-start"
+                            style={{ borderColor: '#cbd5e1', height: '32px' }}
+                            placeholder="44"
+                            value={row.width || ''}
+                            onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
+                          />
+                        )
+                      ) : (
+                        <div className="text-start text-dark fs-12">{row.width ? `${String(row.width).replace(/"/g, '')}"` : '—'}</div>
+                      )}
+                    </td>
+
+                    {/* Quantity (Mtrs) */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '85px' }} className="text-center">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="form-control form-control-sm bg-light fs-12 text-center no-spinner"
+                          style={{ borderColor: '#cbd5e1', height: '32px' }}
+                          placeholder="1000"
+                          value={row.quantity}
+                          onChange={(e) => handleItemChange(row.id, 'quantity', e.target.value)}
+                        />
+                      ) : (
+                        <div className="text-center fw-medium text-dark fs-12">
+                          {Number(row.quantity || 0).toLocaleString()} Mtrs
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Rate / Mtr (₹) */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '80px' }} className="text-center">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="form-control form-control-sm bg-light fs-12 text-center no-spinner"
+                          style={{ borderColor: '#cbd5e1', height: '32px' }}
+                          placeholder="45.00"
+                          value={row.rate}
+                          onChange={(e) => handleItemChange(row.id, 'rate', e.target.value)}
+                        />
+                      ) : (
+                        <div className="text-center text-dark fs-12">
+                          ₹{Number(row.rate || 0).toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Fold % */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 4px', minWidth: '65px' }} className="text-center">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="any"
+                          className="form-control form-control-sm bg-light fs-12 text-center no-spinner"
+                          style={{ borderColor: '#cbd5e1', height: '32px' }}
+                          placeholder="100%"
+                          value={row.fold ?? ''}
+                          onChange={(e) => handleItemChange(row.id, 'fold', e.target.value)}
+                        />
+                      ) : (
+                        <div className="text-center text-dark fs-12">
+                          {row.fold ? `${row.fold}%` : '—'}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Amount (₹) */}
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '85px' }} className="text-end">
+                      <div className="fw-bold text-dark fs-13">
+                        ₹
+                        {(Number(row.amount) || 0).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </div>
+                    </td>
+
+                    {/* Action: Trash Icon */}
+                    {isEditing && (
+                      <td style={{ border: '1px solid #dee2e6', padding: '4px 2px', width: '32px', minWidth: '32px' }} className="text-center">
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 text-danger border-0 d-inline-flex align-items-center justify-content-center"
+                          style={{ width: '26px', height: '26px', opacity: 0.8 }}
+                          onClick={() => handleRemoveItem(row.id)}
+                          title="Remove row"
+                        >
+                          <i className="ti ti-trash fs-15"></i>
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+
+            {/* PO Total Amount Footer Row (Image 3 Style) */}
+            <tfoot style={{ background: '#f8fafc', borderTop: '2px solid #dee2e6' }}>
+              <tr>
+                <td
+                  colSpan={showColorColumn ? 7 : 6}
+                  className="text-end fw-bold text-dark fs-14"
+                  style={{ border: '1px solid #dee2e6', padding: '10px 14px' }}
+                >
+                  PO Total Amount:
+                </td>
+                <td
+                  className="text-end fw-bold text-primary fs-15 font-monospace"
+                  style={{ border: '1px solid #dee2e6', padding: '10px 14px' }}
+                >
+                  ₹
+                  {poTotalAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </td>
+                {isEditing && <td style={{ border: '1px solid #dee2e6' }}></td>}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* GST Notice note */}
+        {!showColorColumn ? (
+          <div className="d-flex align-items-center justify-content-between mt-1.5 text-muted fs-11 px-1">
+            <span className="d-flex align-items-center gap-1">
+              <i className="ti ti-info-circle text-primary"></i>
+              <span>Color column is hidden for Greige fabric. Select &quot;Process&quot; in Fabric Type to add colors.</span>
+            </span>
+            <span style={{ color: '#94a3b8' }}>
+              GST will be added per-line based on vendor state
+            </span>
+          </div>
+        ) : (
+          <div className="text-end text-muted fs-11 mt-1.5" style={{ color: '#94a3b8' }}>
+            GST will be added per-line based on vendor state
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: Delivery, Terms & Buffer Settings */}
+      <div
+        className="card mb-4 shadow-none"
+        style={{
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          padding: '20px 24px'
+        }}
+      >
+        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <span className="fs-12 fw-bold text-uppercase text-secondary" style={{ letterSpacing: '0.5px' }}>
+            3. DELIVERY, ORDER &amp; BUFFER TERMS
+          </span>
+        </div>
+
+        <div className="row g-3">
           {/* Expected Delivery Date */}
-          <div className="col-12 col-md-3">
+          <div className="col-12 col-md-4">
             <label className="form-label fs-12 fw-semibold text-secondary mb-1">
               Expected Delivery Date
             </label>
@@ -1802,8 +1917,8 @@ export default function PurchaseOrderForm({
             )}
           </div>
 
-          {/* Optional: Link to Order & Discount Terms */}
-          <div className="col-12 col-md-6">
+          {/* Link to Order (optional) */}
+          <div className="col-12 col-md-4">
             <label className="form-label fs-12 fw-semibold text-secondary mb-1">
               Link to Order (optional)
             </label>
@@ -1833,7 +1948,8 @@ export default function PurchaseOrderForm({
             )}
           </div>
 
-          <div className="col-12 col-md-6">
+          {/* Discount Terms */}
+          <div className="col-12 col-md-4">
             <label className="form-label fs-12 fw-semibold text-secondary mb-1">
               Discount Terms
             </label>
@@ -1852,7 +1968,7 @@ export default function PurchaseOrderForm({
           </div>
 
           {/* Buffer Configuration Divider */}
-          <div className="col-12 border-top pt-2 mt-2">
+          <div className="col-12 border-top pt-3 mt-1">
             <div className="d-flex flex-wrap align-items-center gap-4">
               <div className="form-check">
                 <input
@@ -1900,352 +2016,7 @@ export default function PurchaseOrderForm({
         </div>
       </div>
 
-
-      {/* SECTION 2: Fabric Line Items (FULL BORDERED GRID - Image 3 Style) */}
-      <div className="mb-4">
-        <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-          <div className="d-flex align-items-center gap-2">
-            <h6 className="fw-bold text-dark mb-0 fs-15">Fabric Line Items</h6>
-          </div>
-          <div className="d-flex align-items-center gap-2">
-            {isEditing && (
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm px-3 py-1 d-flex align-items-center gap-1 fs-12"
-                onClick={handleAddItem}
-              >
-                <i className="ti ti-plus fs-13"></i>
-                <span>Add Line</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* FULL BORDERED TABLE WITH LINES (table-bordered) */}
-        <div className="table-responsive" style={{ overflow: 'visible', minHeight: '300px', paddingBottom: '100px', marginBottom: '-100px' }}>
-          <table
-            className="table table-bordered align-middle mb-0 fs-13"
-            style={{
-              width: '100%',
-              border: '1px solid #dee2e6',
-              borderCollapse: 'collapse',
-              background: '#ffffff'
-            }}
-          >
-            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
-              <tr style={{ color: '#475569', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                <th style={{ width: '22%', minWidth: '170px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span>FABRIC QUALITY *</span>
-                    {isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-medium"
-                        onClick={() => handleOpenNewFabricModal()}
-                        title="Add new fabric to master"
-                      >
-                        + New Fabric
-                      </button>
-                    )}
-                  </div>
-                </th>
-                <th style={{ width: '18%', minWidth: '160px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                  <div className="d-flex align-items-center gap-1">
-                    <span>COLOR NAME</span>
-                    <span className="badge bg-light text-muted border fs-10 px-1 py-0 fw-normal">Optional</span>
-                  </div>
-                </th>
-                <th style={{ width: '13%', minWidth: '115px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-start">
-                  WIDTH (PANNA) *
-                </th>
-                <th style={{ width: '12%', minWidth: '95px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
-                  QUANTITY (MTRS) *
-                </th>
-                <th style={{ width: '11%', minWidth: '90px', padding: '10px 8px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
-                  RATE / MTR (₹) *
-                </th>
-                <th style={{ width: '10%', minWidth: '90px', padding: '10px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
-                  FOLD %
-                </th>
-                <th style={{ width: '14%', minWidth: '100px', padding: '10px 10px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-end">
-                  AMOUNT (₹)
-                </th>
-                {isEditing && (
-                  <th style={{ width: '36px', padding: '10px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center"></th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {formData.items.map((row) => {
-                const currentFabric = fabrics.find(
-                  (f) => f.id === row.fabricId || (f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || '').toLowerCase())
-                );
-                const hasFabricSelected = Boolean(row.fabricId || (row.fabricName && row.fabricName.trim()));
-                const isRaw = hasFabricSelected ? isRawFabricQuality(row.fabricName, currentFabric) : false;
-
-                let allowedWidths = [];
-                if (hasFabricSelected) {
-                  let rawWidths = currentFabric?.widths;
-                  if (!rawWidths && currentFabric?.pannaWidth) rawWidths = [String(currentFabric.pannaWidth)];
-                  if (!rawWidths || rawWidths.length === 0) rawWidths = ['44', '48', '58'];
-                  allowedWidths = Array.from(new Set(rawWidths.map((w) => String(w).trim().replace(/"/g, '')).filter(Boolean)));
-                }
-
-                return (
-                  <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                    {/* Fabric Quality */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 8px' }}>
-                      {isEditing ? (
-                        <SearchableFabricInput
-                          value={row.fabricId || ''}
-                          fabrics={fabrics}
-                          onChange={(newFabricId) => handleItemChange(row.id, 'fabricId', newFabricId)}
-                          onAddNew={() => handleOpenNewFabricModal(row.id)}
-                        />
-                      ) : (
-                        <div className="fw-medium text-dark">{row.fabricName || 'Fabric'}</div>
-                      )}
-                    </td>
-
-                    {/* Color Name (Custom Searchable Combobox with Theme Styling - Optional across the board) */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 8px' }}>
-                      {isEditing && !isPoLocked ? (
-                        <div>
-                          <SearchableColorInput
-                            value={row.colorName || ''}
-                            placeholder={!hasFabricSelected ? "Color name (optional)..." : (isRaw ? "Optional (Raw fabric)..." : "Color name (optional)...")}
-                            colors={masterColorList}
-                            onChange={(newColorName) => handleItemChange(row.id, 'colorName', newColorName)}
-                            onAddNew={() => handleOpenNewColorModal(row.id)}
-                          />
-                          {hasFabricSelected && isRaw && (
-                            <div className="fs-10 text-muted mt-0.5 ps-1 d-flex align-items-center gap-1">
-                              <i className="ti ti-info-circle text-primary"></i>
-                              <span>Raw/Greige fabric (No color needed)</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="d-flex align-items-center gap-2">
-                          {row.colorName ? (() => {
-                            const matchedColor = masterColorList.find(
-                              (c) =>
-                                c.name.toLowerCase() === (row.colorName || '').toLowerCase() ||
-                                c.hex.toLowerCase() === (row.colorName || '').toLowerCase()
-                            );
-                            const swatchHex = matchedColor
-                              ? matchedColor.hex
-                              : row.colorName?.startsWith('#')
-                                ? row.colorName
-                                : '#cbd5e1';
-                            return (
-                              <>
-                                <span
-                                  className="d-inline-block rounded-circle"
-                                  style={{
-                                    width: '12px',
-                                    height: '12px',
-                                    backgroundColor: swatchHex,
-                                    border: '1px solid #cbd5e1',
-                                    flexShrink: 0
-                                  }}
-                                />
-                                <span className="text-dark fw-medium">{row.colorName}</span>
-                              </>
-                            );
-                          })() : (
-                            <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-0.5">
-                              {isRaw ? 'Raw / Greige (No color)' : '—'}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Width (Panna) - Left-aligned text & variables */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 6px' }} className="text-start">
-                      {isEditing ? (
-                        !hasFabricSelected ? (
-                          <select
-                            className="form-select form-select-sm bg-light fs-13 text-start text-muted"
-                            style={{ borderColor: '#cbd5e1', paddingRight: '22px', cursor: 'not-allowed', opacity: 0.8 }}
-                            disabled
-                            value=""
-                            title="Please select a fabric quality first"
-                          >
-                            <option value="">Select fabric first...</option>
-                          </select>
-                        ) : allowedWidths && allowedWidths.length > 0 ? (
-                          <select
-                            className="form-select form-select-sm bg-white fs-13 text-start"
-                            style={{ borderColor: '#cbd5e1', paddingRight: '22px' }}
-                            value={String(row.width || '').replace(/"/g, '')}
-                            onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
-                          >
-                            <option value="">Select...</option>
-                            {allowedWidths.map((w) => (
-                              <option key={w} value={w}>
-                                {w}"
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            className="form-control form-control-sm bg-white fs-13 text-start"
-                            style={{ borderColor: '#cbd5e1' }}
-                            placeholder="44"
-                            value={row.width || ''}
-                            onChange={(e) => handleItemChange(row.id, 'width', e.target.value)}
-                          />
-                        )
-                      ) : (
-                        <div className="text-start text-dark">{row.width ? `${String(row.width).replace(/"/g, '')}"` : '—'}</div>
-                      )}
-                    </td>
-
-                    {/* Quantity (Mtrs) */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 6px' }} className="text-center">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="form-control form-control-sm bg-light fs-13 text-center no-spinner"
-                          style={{ borderColor: '#cbd5e1' }}
-                          placeholder="1000"
-                          value={row.quantity}
-                          onChange={(e) => handleItemChange(row.id, 'quantity', e.target.value)}
-                        />
-                      ) : (
-                        <div className="text-center fw-medium text-dark">
-                          {Number(row.quantity || 0).toLocaleString()} Mtrs
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Rate / Mtr (₹) */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 6px' }} className="text-center">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="form-control form-control-sm bg-light fs-13 text-center no-spinner"
-                          style={{ borderColor: '#cbd5e1' }}
-                          placeholder="45.00"
-                          value={row.rate}
-                          onChange={(e) => handleItemChange(row.id, 'rate', e.target.value)}
-                        />
-                      ) : (
-                        <div className="text-center text-dark">
-                          ₹{Number(row.rate || 0).toFixed(2)}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Fold % */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 6px' }} className="text-center">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="any"
-                          className="form-control form-control-sm bg-light fs-13 text-center no-spinner"
-                          style={{ borderColor: '#cbd5e1' }}
-                          placeholder="100%"
-                          value={row.fold ?? ''}
-                          onChange={(e) => handleItemChange(row.id, 'fold', e.target.value)}
-                        />
-                      ) : (
-                        <div className="text-center text-dark">
-                          {row.fold ? `${row.fold}%` : '—'}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Amount (₹) */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '6px 8px' }} className="text-end">
-                      <div className="fw-bold text-dark fs-14">
-                        ₹
-                        {(Number(row.amount) || 0).toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </div>
-                    </td>
-
-                    {/* Action: Trash Icon */}
-                    {isEditing && (
-                      <td style={{ border: '1px solid #dee2e6', padding: '6px 4px', width: '36px' }} className="text-center">
-                        <button
-                          type="button"
-                          className="btn btn-link p-0 text-danger border-0 d-inline-flex align-items-center justify-content-center"
-                          style={{ width: '28px', height: '28px', opacity: 0.8 }}
-                          onClick={() => handleRemoveItem(row.id)}
-                          title="Remove row"
-                        >
-                          <i className="ti ti-trash fs-16"></i>
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-
-            {/* PO Total Amount Footer Row (Image 3 Style) */}
-            <tfoot style={{ background: '#f8fafc', borderTop: '2px solid #dee2e6' }}>
-              <tr>
-                <td
-                  colSpan={showColorColumn ? 6 : 5}
-                  className="text-end fw-bold text-dark fs-14"
-                  style={{ border: '1px solid #dee2e6', padding: '10px 14px' }}
-                >
-                  PO Total Amount:
-                </td>
-                <td
-                  className="text-end fw-bold text-primary fs-15 font-monospace"
-                  style={{ border: '1px solid #dee2e6', padding: '10px 14px' }}
-                >
-                  ₹
-                  {poTotalAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </td>
-                {isEditing && <td style={{ border: '1px solid #dee2e6' }}></td>}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        {/* GST Notice note */}
-        {!showColorColumn ? (
-          <div className="d-flex align-items-center justify-content-between mt-1.5 text-muted fs-11 px-1">
-            <span className="d-flex align-items-center gap-1">
-              <i className="ti ti-info-circle text-primary"></i>
-              <span>Color column is hidden for raw / greige fabric.</span>
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 text-primary text-decoration-underline fs-11 fw-medium"
-                onClick={() => {
-                  userToggledColorRef.current = true;
-                  setShowColorColumn(true);
-                }}
-              >
-                Show Color Column
-              </button>
-            </span>
-            <span style={{ color: '#94a3b8' }}>
-              GST will be added per-line based on vendor state
-            </span>
-          </div>
-        ) : (
-          <div className="text-end text-muted fs-11 mt-1.5" style={{ color: '#94a3b8' }}>
-            GST will be added per-line based on vendor state
-          </div>
-        )}
-      </div>
-
-      {/* SECTION 3: Notes (Image 1 Style) */}
+      {/* SECTION 4: Notes (Image 1 Style) */}
       <div
         className="card mb-4 shadow-none"
         style={{

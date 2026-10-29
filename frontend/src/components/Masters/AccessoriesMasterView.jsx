@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   initialAccessoryMasters,
   getStoredData,
@@ -80,10 +80,21 @@ const ALL_TABS = [
   'Thread Brand & Colors'
 ];
 
+const matchesCategory = (itemCat, tabCat) => {
+  if (!tabCat || tabCat === 'All') return true;
+  if (!itemCat) return false;
+  if (itemCat === tabCat) return true;
+  const normItem = itemCat.toLowerCase().replace(/s$/, '');
+  const normTab = tabCat.toLowerCase().replace(/s$/, '');
+  return normItem === normTab;
+};
+
 const getCategoryIcon = (cat) => {
   switch (cat) {
+    case 'Button':
     case 'Buttons': return 'ti ti-circle-dot';
     case 'Lace': return 'ti ti-cut';
+    case 'Tassel':
     case 'Tassels': return 'ti ti-archive';
     case 'Thread': return 'ti ti-needle-thread';
     case 'Dori': return 'ti ti-wave-sine';
@@ -100,8 +111,10 @@ const getCategoryIcon = (cat) => {
 
 const getCategoryColor = (cat) => {
   switch (cat) {
+    case 'Button':
     case 'Buttons': return '#2e37a4';
     case 'Lace': return '#2563eb';
+    case 'Tassel':
     case 'Tassels': return '#ea580c';
     case 'Thread': return '#0284c7';
     case 'Dori': return '#9333ea';
@@ -260,6 +273,204 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
           />
         )}
       </div>
+    </div>
+  );
+}
+
+export const parseTasselTypes = (val) => {
+  if (Array.isArray(val)) {
+    const cleaned = val.map((v) => (typeof v === 'string' ? v.trim() : v)).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : ['Ready Made'];
+  }
+  if (typeof val === 'string' && val.trim()) {
+    const list = val.split(',').map((s) => s.trim()).filter(Boolean);
+    return list.length > 0 ? list : ['Ready Made'];
+  }
+  return ['Ready Made'];
+};
+
+export const hasTasselType = (val, type) => {
+  const list = parseTasselTypes(val);
+  return list.some((t) => t.toLowerCase() === (type || '').toLowerCase());
+};
+
+export function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedList = parseTasselTypes(value);
+  const options = ['Ready Made', 'Job Work'];
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const toggleOption = (opt) => {
+    let next;
+    const isSelected = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
+    if (isSelected) {
+      if (selectedList.length === 1) {
+        // Keep at least one selected
+        return;
+      }
+      next = selectedList.filter((x) => x.toLowerCase() !== opt.toLowerCase());
+    } else {
+      next = [...selectedList, opt];
+    }
+    onChange?.(next);
+  };
+
+  const selectAll = () => {
+    onChange?.([...options]);
+  };
+
+  return (
+    <div ref={containerRef} className="position-relative w-100">
+      <div
+        className="form-control d-flex align-items-center justify-content-between"
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        style={{
+          minHeight: '42px',
+          height: 'auto',
+          borderRadius: '8px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          padding: '4px 10px',
+          borderColor: isOpen ? '#6366f1' : '#dee2e6',
+          boxShadow: isOpen ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
+          backgroundColor: disabled ? '#f8fafc' : '#fff',
+          userSelect: 'none'
+        }}
+      >
+        <div className="d-flex align-items-center flex-wrap gap-1" style={{ flex: 1, minHeight: '30px' }}>
+          {selectedList.map((item) => {
+            const isJW = item.toLowerCase() === 'job work';
+            return (
+              <span
+                key={item}
+                className="badge d-inline-flex align-items-center gap-1"
+                style={{
+                  backgroundColor: isJW ? '#fef3c7' : '#e0e7ff',
+                  color: isJW ? '#92400e' : '#3730a3',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: isJW ? '1px solid #fde68a' : '1px solid #c7d2fe'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleOption(item);
+                }}
+                title={selectedList.length > 1 ? 'Click to remove' : ''}
+              >
+                {item}
+                {selectedList.length > 1 && (
+                  <i className="ti ti-x" style={{ fontSize: '11px', cursor: 'pointer' }}></i>
+                )}
+              </span>
+            );
+          })}
+        </div>
+        <div className="text-muted ms-2 d-flex align-items-center">
+          <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'}`} style={{ fontSize: '13px' }}></i>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div
+          className="position-absolute bg-white border rounded-3 shadow-lg p-2"
+          style={{
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 1050,
+            minWidth: '220px'
+          }}
+        >
+          <div className="d-flex justify-content-between align-items-center px-2 py-1 mb-1 border-bottom">
+            <span className="small text-muted fw-semibold" style={{ fontSize: '11.5px' }}>
+              Select Multiple Types:
+            </span>
+            <button
+              type="button"
+              className="btn btn-xs btn-link text-decoration-none p-0 fw-semibold"
+              style={{ fontSize: '11px', color: '#6366f1' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                selectAll();
+              }}
+            >
+              Select Both
+            </button>
+          </div>
+          {options.map((opt) => {
+            const isChecked = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
+            const isJW = opt.toLowerCase() === 'job work';
+            return (
+              <div
+                key={opt}
+                className="d-flex align-items-center justify-content-between px-2 py-2 rounded-2"
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: isChecked ? '#f8fafc' : 'transparent',
+                  transition: 'background 0.15s'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleOption(opt);
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isChecked ? '#f8fafc' : 'transparent')}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="form-check-input mt-0"
+                    checked={isChecked}
+                    readOnly
+                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                  <span className="small fw-semibold text-dark" style={{ fontSize: '12.5px' }}>
+                    {opt}
+                  </span>
+                </div>
+                {isChecked && (
+                  <span
+                    className="badge rounded-pill"
+                    style={{
+                      fontSize: '10px',
+                      backgroundColor: isJW ? '#fef3c7' : '#e0e7ff',
+                      color: isJW ? '#92400e' : '#3730a3',
+                      border: isJW ? '1px solid #fde68a' : '1px solid #c7d2fe'
+                    }}
+                  >
+                    Selected
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          <div className="mt-2 pt-1 border-top text-end">
+            <button
+              type="button"
+              className="btn btn-xs btn-primary rounded-2 px-3 py-1 fw-semibold"
+              style={{ fontSize: '11.5px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -432,7 +643,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     fabricPerMeterLace: '',
 
     // Tassels
-    tasselType: '',
+    tasselType: ['Ready Made'],
     jobWorkRows: [{ size: '', threadConsumption: '' }],
 
     // Dori (Section 6.4)
@@ -448,14 +659,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     threadSize: '',
     threadSizeCustom: '',
     threadPattern: '',
-    threadPerStitch: '',
     metersPerMeterStitching: '',
     threadPerPiece: '',
-    boxes: [{ reelsPerBox: '', metersPerReel: '' }],
-    coneSizes: [],
-    placements: [],
     articlePlacements: [],
-    globalThreadMetric: '',
     stitchingArticles: [],
     consumptionPer100Pcs: {},
     processRemarks: ''
@@ -489,9 +695,14 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
   const availableTargetArticles = useMemo(() => {
     const list = [...articlesList];
-    const selectedNames = formData?.stitchingArticles || [];
+    const rawSelected = formData?.stitchingArticles;
+    const selectedNames = Array.isArray(rawSelected)
+      ? rawSelected
+      : (typeof rawSelected === 'string' && rawSelected.trim()
+          ? rawSelected.split(',').map(s => s.trim()).filter(Boolean)
+          : []);
     selectedNames.forEach(name => {
-      if (name && !list.some(a => a.name.toLowerCase() === name.toLowerCase())) {
+      if (name && typeof name === 'string' && !list.some(a => (a.name || '').toLowerCase() === name.toLowerCase())) {
         list.push({ id: `art-${name}`, name, icon: '👕' });
       }
     });
@@ -502,20 +713,34 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     const trimmed = (customArticleInput || '').trim();
     if (!trimmed) return;
     const formatted = autoCapitalizeWords(trimmed);
-    if (!articlesList.some(a => a.name.toLowerCase() === formatted.toLowerCase())) {
-      setArticlesList(prev => [...prev, { id: `ART-custom-${Date.now()}`, name: formatted, icon: '👕' }]);
-    }
-    const current = formData.stitchingArticles || [];
-    if (!current.includes(formatted)) {
-      setFormData({
-        ...formData,
-        stitchingArticles: [...current, formatted],
-        consumptionPer100Pcs: {
-          ...(formData.consumptionPer100Pcs || {}),
-          [formatted]: ''
+    const exists = articlesList.some(a => (a.name || '').toLowerCase() === formatted.toLowerCase());
+    if (!exists) {
+      const newArt = { id: `ART-custom-${Date.now()}`, name: formatted, icon: '👕' };
+      setArticlesList(prev => [...prev, newArt]);
+      try {
+        const stored = getStoredData('erp_articles_v1', []) || [];
+        if (!stored.some(a => (a.name || '').toLowerCase() === formatted.toLowerCase())) {
+          const updated = [...stored, newArt];
+          setStoredData('erp_articles_v1', updated);
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new CustomEvent('erp_articles_updated', { detail: updated }));
         }
-      });
+      } catch (e) {}
     }
+
+    setFormData(prev => {
+      const current = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+      const currentCons = { ...(prev.consumptionPer100Pcs || {}) };
+      const defaultCons = prev.threadPerPiece ? Number((parseFloat(prev.threadPerPiece) * 100).toFixed(2)) : '';
+      return {
+        ...prev,
+        stitchingArticles: current.includes(formatted) ? current : [...current, formatted],
+        consumptionPer100Pcs: {
+          ...currentCons,
+          [formatted]: currentCons[formatted] !== undefined && currentCons[formatted] !== '' ? currentCons[formatted] : defaultCons
+        }
+      };
+    });
     setCustomArticleInput('');
   };
 
@@ -576,8 +801,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
   const handleAddNew = () => {
     const targetCat = ALL_TABS.includes(selectedCategory) && selectedCategory !== 'Thread Sizes' && selectedCategory !== 'Thread Brand & Colors' && selectedCategory !== 'All'
-      ? selectedCategory
-      : 'Buttons';
+      ? (selectedCategory === 'Tassels' ? 'Tassel' : (selectedCategory === 'Buttons' ? 'Button' : selectedCategory))
+      : 'Button';
 
     setFormData(getEmptyAccessoryForm(targetCat));
     setLaceSizeInput('');
@@ -626,17 +851,21 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       threadPattern: acc.threadPattern || '',
       threadSize: acc.threadSize || acc.size || '',
       threadSizeCustom: acc.threadSizeCustom || '',
-      globalThreadMetric: acc.globalThreadMetric !== undefined ? acc.globalThreadMetric : '',
       articlePlacements: acc.articlePlacements || [],
-      stitchingArticles: acc.stitchingArticles || (acc.consumptionPer100Pcs ? Object.keys(acc.consumptionPer100Pcs) : []),
-      consumptionPer100Pcs: acc.consumptionPer100Pcs || {},
-      metersPerMeterStitching: acc.metersPerMeterStitching !== undefined ? acc.metersPerMeterStitching : (acc.threadPerStitch !== undefined ? acc.threadPerStitch : ''),
-      threadPerStitch: acc.threadPerStitch !== undefined ? acc.threadPerStitch : '',
+      metersPerMeterStitching: acc.metersPerMeterStitching !== undefined ? acc.metersPerMeterStitching : '',
+      stitchingArticles: Array.isArray(acc.stitchingArticles) && acc.stitchingArticles.length > 0
+        ? acc.stitchingArticles
+        : (typeof acc.stitchingArticles === 'string' && acc.stitchingArticles.trim()
+            ? acc.stitchingArticles.split(',').map(s => s.trim()).filter(Boolean)
+            : (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object'
+                ? Object.keys(acc.consumptionPer100Pcs)
+                : [])),
+      consumptionPer100Pcs: (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object' && !Array.isArray(acc.consumptionPer100Pcs))
+        ? acc.consumptionPer100Pcs
+        : {},
       threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : '',
-      boxes: (acc.boxes && acc.boxes.length > 0) ? acc.boxes : (acc.boxesConfig && acc.boxesConfig.length > 0 ? acc.boxesConfig : [{ reelsPerBox: '', metersPerReel: '' }]),
-      coneSizes: acc.coneSizes || [],
-      placements: acc.placements || acc.availablePlacements || [],
       processRemarks: acc.processRemarks || '',
+      tasselType: parseTasselTypes(acc.tasselType),
       jobWorkRows: (acc.jobWorkRows && acc.jobWorkRows.length > 0)
         ? acc.jobWorkRows
         : [{ size: '', threadConsumption: '' }],
@@ -708,18 +937,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
       threadSizeCustom: formData.threadSizeCustom || '',
       unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' || formData.category === 'Thread' ? 'Meter' : 'Piece'))),
-      unitCustom: formData.unitCustom || '',
       piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
-      threadPattern: formData.threadPattern || 'Stitching',
-      metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? (parseFloat(formData.metersPerMeterStitching) || 0) : ((formData.threadPerStitch !== undefined && formData.threadPerStitch !== '') ? (parseFloat(formData.threadPerStitch) || 0) : ''),
-      threadPerStitch: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? (parseFloat(formData.metersPerMeterStitching) || 0) : ((formData.threadPerStitch !== undefined && formData.threadPerStitch !== '') ? (parseFloat(formData.threadPerStitch) || 0) : ''),
+      threadPattern: (formData.category === 'Thread') ? (formData.threadPattern || 'Stitching') : '',
+      tasselType: (formData.category === 'Tassel' || formData.category === 'Tassels')
+        ? (Array.isArray(formData.tasselType) ? formData.tasselType.join(', ') : (formData.tasselType || 'Ready Made'))
+        : '',
+      jobWorkRows: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.jobWorkRows || []) : [],
+      metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? formData.metersPerMeterStitching : '',
       threadPerPiece: (formData.threadPerPiece !== undefined && formData.threadPerPiece !== '') ? (parseFloat(formData.threadPerPiece) || 0) : '',
-      globalThreadMetric: (formData.globalThreadMetric !== undefined && formData.globalThreadMetric !== '') ? (parseFloat(formData.globalThreadMetric) || 0) : '',
       articlePlacements: formData.articlePlacements || [],
-      stitchingArticles: formData.stitchingArticles || [],
-      consumptionPer100Pcs: formData.consumptionPer100Pcs || {},
-      boxesConfig: (formData.boxes || []).filter(b => b && (b.reelsPerBox || b.metersPerReel)),
-      boxes: (formData.boxes || []).filter(b => b && (b.reelsPerBox || b.metersPerReel)),
+      stitchingArticles: Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [],
+      consumptionPer100Pcs: (formData.consumptionPer100Pcs && typeof formData.consumptionPer100Pcs === 'object') ? formData.consumptionPer100Pcs : {},
       doriRequiredSize: formData.doriRequiredSize || formData.size || '',
       doriUnit: formData.doriUnit || formData.unit || 'Meter',
       doriFabricEntries: formData.doriFabricEntries || [],
@@ -767,6 +995,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     const updated = {
       ...selectedAccessory,
       ...sectionFormData,
+      tasselType: (selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels')
+        ? (Array.isArray(sectionFormData.tasselType)
+            ? sectionFormData.tasselType.join(', ')
+            : (sectionFormData.tasselType || selectedAccessory.tasselType || 'Ready Made'))
+        : (selectedAccessory.tasselType || ''),
       buttonSizes: sectionFormData.buttonSizesList ? sectionFormData.buttonSizesList.join(', ') : selectedAccessory.buttonSizes,
       buttonColors: sectionFormData.buttonColorsList ? sectionFormData.buttonColorsList.join(', ') : selectedAccessory.buttonColors,
       buttonSizesList: sectionFormData.buttonSizesList || selectedAccessory.buttonSizesList || [],
@@ -851,7 +1084,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         selectedCategory === 'All' ||
         selectedCategory === 'Thread Sizes' ||
         selectedCategory === 'Thread Brand & Colors' ||
-        acc.category === selectedCategory;
+        matchesCategory(acc.category, selectedCategory);
 
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
@@ -1010,7 +1243,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
           const count = cat === 'All'
             ? accessories.length
             : !isThreadTab
-            ? accessories.filter(a => a.category === cat).length
+            ? accessories.filter(a => matchesCategory(a.category, cat)).length
             : null;
           return (
             <button
@@ -1131,10 +1364,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               : formData.fabricRows,
                             doriFabricEntries: (!formData.doriFabricEntries || formData.doriFabricEntries.length === 0)
                               ? [{ fabricQuality: '', widthSizes: [], consumptions: {} }]
-                              : formData.doriFabricEntries,
-                            boxes: (!formData.boxes || formData.boxes.length === 0)
-                              ? [{ reelsPerBox: '', metersPerReel: '' }]
-                              : formData.boxes
+                              : formData.doriFabricEntries
                           });
                         }}
                         style={{ height: '42px', borderRadius: '8px' }}
@@ -1233,23 +1463,131 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   )}
 
                   {/* ============================================================== */}
-                  {/* CATEGORY 3: TASSEL (SCREENSHOT 2)                              */}
+                  {/* CATEGORY 3: TASSEL (SCREENSHOT 2 & DEMO)                       */}
                   {/* ============================================================== */}
                   {(formData.category === 'Tassel' || formData.category === 'Tassels') && (
                     <>
-                      <div className="mb-3">
-                        <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
-                        <select
-                          className="form-select"
-                          value={formData.unit || 'Piece'}
-                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                          style={{ height: '42px', borderRadius: '8px' }}
-                        >
-                          {ACCESSORY_UNITS.map((u) => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
+                      <div className="row g-2 mb-3">
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
+                          <select
+                            className="form-select"
+                            value={formData.unit || 'Piece'}
+                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                            style={{ height: '42px', borderRadius: '8px' }}
+                          >
+                            {ACCESSORY_UNITS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold text-dark small mb-1.5">Pieces per unit</label>
+                          <input
+                            type="number"
+                            min="1"
+                            className="form-control"
+                            value={formData.piecesPerUnit !== undefined ? formData.piecesPerUnit : 1}
+                            onChange={(e) => setFormData({ ...formData, piecesPerUnit: e.target.value })}
+                            style={{ height: '42px', borderRadius: '8px' }}
+                          />
+                        </div>
                       </div>
+
+                      <div className="row g-2 mb-3">
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold text-dark small mb-1.5">
+                            Tassel Type <span className="text-danger">*</span>
+                          </label>
+                          <TasselTypeMultiSelect
+                            value={formData.tasselType || ['Ready Made']}
+                            onChange={(val) => setFormData({ ...formData, tasselType: val })}
+                          />
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold text-dark small mb-1.5">Size / Length</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. 2 inch, Medium, 5cm"
+                            value={formData.size || ''}
+                            onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                            style={{ height: '42px', borderRadius: '8px' }}
+                          />
+                        </div>
+                      </div>
+
+                      {hasTasselType(formData.tasselType, 'Job Work') && (
+                        <div className="p-3 bg-light rounded-3 border mb-3">
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <span className="fw-semibold text-dark small">
+                              Size &amp; Thread Consumption:
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline-primary rounded-2 px-2 py-1 small fw-semibold"
+                              onClick={() => {
+                                const cur = formData.jobWorkRows || [];
+                                setFormData({
+                                  ...formData,
+                                  jobWorkRows: [...cur, { size: '', threadConsumption: '' }]
+                                });
+                              }}
+                            >
+                              <i className="ti ti-plus me-1"></i> Add Size Row
+                            </button>
+                          </div>
+                          {(formData.jobWorkRows && formData.jobWorkRows.length > 0 ? formData.jobWorkRows : [{ size: '', threadConsumption: '' }]).map((r, i) => (
+                            <div key={i} className="row g-2 align-items-center mb-2">
+                              <div className="col-5">
+                                <label className="form-label text-muted fs-11 mb-1">Size / Length</label>
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm bg-white"
+                                  placeholder="e.g. 2 inch / Medium"
+                                  value={r.size || ''}
+                                  onChange={(e) => {
+                                    const next = [...(formData.jobWorkRows || [])];
+                                    if (!next[i]) next[i] = { size: '', threadConsumption: '' };
+                                    next[i].size = e.target.value;
+                                    setFormData({ ...formData, jobWorkRows: next });
+                                  }}
+                                />
+                              </div>
+                              <div className="col-5">
+                                <label className="form-label text-muted fs-11 mb-1">Thread Consumption</label>
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm bg-white"
+                                  placeholder="e.g. 15m / pc"
+                                  value={r.threadConsumption || ''}
+                                  onChange={(e) => {
+                                    const next = [...(formData.jobWorkRows || [])];
+                                    if (!next[i]) next[i] = { size: '', threadConsumption: '' };
+                                    next[i].threadConsumption = e.target.value;
+                                    setFormData({ ...formData, jobWorkRows: next });
+                                  }}
+                                />
+                              </div>
+                              <div className="col-2 text-end pt-3">
+                                {(formData.jobWorkRows || []).length > 1 && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-light text-danger p-1"
+                                    onClick={() => {
+                                      const next = (formData.jobWorkRows || []).filter((_, idx) => idx !== i);
+                                      setFormData({ ...formData, jobWorkRows: next });
+                                    }}
+                                    title="Remove row"
+                                  >
+                                    <i className="ti ti-trash fs-6"></i>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -1546,19 +1884,46 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
                             </div>
 
+                            {/* Meters of thread required for 1m stitching (single-time entry) */}
+                            <div className="mb-3">
+                              <label className="form-label fw-semibold text-dark small mb-1">
+                                Meters of thread required for 1m stitching <span className="text-muted fw-normal">(single-time entry)</span> <span className="text-danger">*</span>
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
+                                <input
+                                  type="text"
+                                  className="form-control fw-bold"
+                                  placeholder="e.g. 15"
+                                  value={formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== null ? formData.metersPerMeterStitching : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ ...prev, metersPerMeterStitching: val }));
+                                  }}
+                                  style={{ height: '36px' }}
+                                />
+                                <span className="input-group-text bg-white text-muted">m / 1m stitch</span>
+                              </div>
+                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
+                                Single-time entry for thread required per 1 metre of stitching.
+                              </div>
+                            </div>
+
                             {/* Thread Per Piece - Default 60m, editable */}
                             <div className="mb-3">
                               <label className="form-label fw-semibold text-dark small mb-1">
                                 Thread Per Piece (metres) <span className="text-danger">*</span>
                               </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '220px' }}>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
                                 <input
                                   type="number"
-                                  step="1"
+                                  step="0.1"
                                   className="form-control fw-bold"
                                   placeholder="e.g. 60"
                                   value={formData.threadPerPiece !== undefined && formData.threadPerPiece !== null ? formData.threadPerPiece : ''}
-                                  onChange={(e) => setFormData({ ...formData, threadPerPiece: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ ...prev, threadPerPiece: val }));
+                                  }}
                                   style={{ height: '36px' }}
                                 />
                                 <span className="input-group-text bg-white text-muted">m / piece</span>
@@ -1574,7 +1939,27 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 <label className="form-label fw-bold text-dark small mb-0">
                                   Targeted Articles &amp; Consumption per 100 Pieces <span className="text-danger">*</span>
                                 </label>
-                                <div className="d-flex align-items-center gap-1.5">
+                                <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                  {formData.threadPerPiece && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-outline-primary py-0.5 px-2"
+                                      style={{ fontSize: '11px' }}
+                                      title="Auto-calculate consumption as Thread Per Piece x 100"
+                                      onClick={() => {
+                                        const calc = Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2));
+                                        if (!isNaN(calc)) {
+                                          const nextCons = { ...(formData.consumptionPer100Pcs || {}) };
+                                          (formData.stitchingArticles || []).forEach(art => {
+                                            nextCons[art] = calc;
+                                          });
+                                          setFormData(prev => ({ ...prev, consumptionPer100Pcs: nextCons }));
+                                        }
+                                      }}
+                                    >
+                                      ⚡ Auto-fill 100 pcs (x 100)
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-outline-secondary py-0.5 px-2"
@@ -1582,14 +1967,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     onClick={() => {
                                       const allNames = availableTargetArticles.map(a => a.name);
                                       const newConsumption = { ...(formData.consumptionPer100Pcs || {}) };
+                                      const defaultVal = formData.threadPerPiece ? Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2)) : '';
                                       allNames.forEach(name => {
-                                        if (newConsumption[name] === undefined) newConsumption[name] = '';
+                                        if (newConsumption[name] === undefined || newConsumption[name] === '') {
+                                          newConsumption[name] = defaultVal;
+                                        }
                                       });
-                                      setFormData({
-                                        ...formData,
+                                      setFormData(prev => ({
+                                        ...prev,
                                         stitchingArticles: allNames,
                                         consumptionPer100Pcs: newConsumption
-                                      });
+                                      }));
                                     }}
                                   >
                                     Select All
@@ -1599,11 +1987,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     className="btn btn-xs btn-outline-secondary py-0.5 px-2"
                                     style={{ fontSize: '11px' }}
                                     onClick={() => {
-                                      setFormData({
-                                        ...formData,
+                                      setFormData(prev => ({
+                                        ...prev,
                                         stitchingArticles: [],
                                         consumptionPer100Pcs: {}
-                                      });
+                                      }));
                                     }}
                                   >
                                     Deselect All
@@ -1617,7 +2005,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               {/* Multi-select chips for articles */}
                               <div className="d-flex flex-wrap gap-1.5 mb-2.5">
                                 {availableTargetArticles.map((art) => {
-                                  const isSelected = (formData.stitchingArticles || []).includes(art.name);
+                                  const currentArticles = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
+                                  const isSelected = currentArticles.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
                                     <button
                                       key={art.id || art.name}
@@ -1627,24 +2016,25 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       }`}
                                       style={{ fontSize: '12px' }}
                                       onClick={() => {
-                                        const current = formData.stitchingArticles || [];
+                                        const current = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
                                         const next = isSelected
-                                          ? current.filter(a => a !== art.name)
+                                          ? current.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim())
                                           : [...current, art.name];
                                         
                                         const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
                                         if (isSelected) {
                                           delete nextConsumption[art.name];
                                         } else {
-                                          if (nextConsumption[art.name] === undefined) {
-                                            nextConsumption[art.name] = '';
+                                          if (nextConsumption[art.name] === undefined || nextConsumption[art.name] === '') {
+                                            const defaultVal = formData.threadPerPiece ? Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2)) : '';
+                                            nextConsumption[art.name] = defaultVal;
                                           }
                                         }
-                                        setFormData({
-                                          ...formData,
+                                        setFormData(prev => ({
+                                          ...prev,
                                           stitchingArticles: next,
                                           consumptionPer100Pcs: nextConsumption
-                                        });
+                                        }));
                                       }}
                                     >
                                       <span>{art.icon || '👕'}</span>
@@ -1685,18 +2075,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               </div>
 
                               {/* Dynamic input boxes per selected article */}
-                              {(formData.stitchingArticles || []).length > 0 ? (
+                              {(Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0) ? (
                                 <div className="p-2.5 bg-light rounded-3 border">
                                   <div className="d-flex align-items-center justify-content-between mb-2">
                                     <div className="small fw-semibold text-dark">
                                       Thread Consumption per 100 Pieces (strictly in metres):
                                     </div>
                                     <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '11px' }}>
-                                      {(formData.stitchingArticles || []).length} Selected
+                                      {formData.stitchingArticles.length} Selected
                                     </span>
                                   </div>
                                   <div className="row g-2">
-                                    {(formData.stitchingArticles || []).map((artName) => (
+                                    {formData.stitchingArticles.map((artName) => (
                                       <div key={artName} className="col-md-6">
                                         <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-2 shadow-2xs">
                                           <div className="d-flex align-items-center gap-1.5 text-truncate" style={{ maxWidth: '140px' }}>
@@ -1708,18 +2098,19 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                             <div className="input-group input-group-sm" style={{ width: '150px' }}>
                                               <input
                                                 type="number"
+                                                step="any"
                                                 className="form-control fw-bold"
                                                 placeholder="e.g. 6000"
                                                 value={formData.consumptionPer100Pcs?.[artName] ?? ''}
                                                 onChange={(e) => {
                                                   const val = e.target.value;
-                                                  setFormData({
-                                                    ...formData,
+                                                  setFormData(prev => ({
+                                                    ...prev,
                                                     consumptionPer100Pcs: {
-                                                      ...(formData.consumptionPer100Pcs || {}),
+                                                      ...(prev.consumptionPer100Pcs || {}),
                                                       [artName]: val
                                                     }
-                                                  });
+                                                  }));
                                                 }}
                                               />
                                               <span className="input-group-text bg-light text-muted" style={{ fontSize: '11px' }}>m / 100pcs</span>
@@ -1729,15 +2120,15 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                               className="btn btn-sm btn-link text-danger p-0 ms-1 text-decoration-none"
                                               title={`Remove ${artName}`}
                                               onClick={() => {
-                                                const current = formData.stitchingArticles || [];
+                                                const current = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
                                                 const next = current.filter(a => a !== artName);
                                                 const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
                                                 delete nextConsumption[artName];
-                                                setFormData({
-                                                  ...formData,
+                                                setFormData(prev => ({
+                                                  ...prev,
                                                   stitchingArticles: next,
                                                   consumptionPer100Pcs: nextConsumption
-                                                });
+                                                }));
                                               }}
                                             >
                                               <i className="ti ti-x"></i>
@@ -2935,7 +3326,10 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       className="btn btn-xs btn-light text-primary rounded-2 px-2.5 py-1 small fw-semibold border"
                       onClick={() => {
                         setEditingSection('category');
-                        setSectionFormData({ ...selectedAccessory });
+                        setSectionFormData({
+                          ...selectedAccessory,
+                          tasselType: parseTasselTypes(selectedAccessory.tasselType)
+                        });
                       }}
                     >
                       <i className="ti ti-edit me-1"></i> Edit Section
@@ -3088,7 +3482,150 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     )
                   )}
 
-
+                  {(selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels') && (
+                    editingSection === 'category' ? (
+                      <div className="d-flex flex-column gap-3">
+                        <div className="row g-2">
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold text-muted">Tassel Type <span className="text-danger">*</span></label>
+                            <TasselTypeMultiSelect
+                              value={sectionFormData.tasselType || ['Ready Made']}
+                              onChange={(val) => setSectionFormData({ ...sectionFormData, tasselType: val })}
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold text-muted">Size / Length</label>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="e.g. 2 inch / Medium"
+                              value={sectionFormData.size || ''}
+                              onChange={(e) => setSectionFormData({ ...sectionFormData, size: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        {hasTasselType(sectionFormData.tasselType, 'Job Work') && (
+                          <div className="p-2.5 bg-light rounded-3 border">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <span className="small fw-semibold text-dark">Size &amp; Thread Consumption</span>
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-primary rounded-2 px-2 py-0.5 small fw-semibold"
+                                onClick={() => {
+                                  const cur = sectionFormData.jobWorkRows || [];
+                                  setSectionFormData({ ...sectionFormData, jobWorkRows: [...cur, { size: '', threadConsumption: '' }] });
+                                }}
+                              >
+                                + Add Size Row
+                              </button>
+                            </div>
+                            {(sectionFormData.jobWorkRows || []).map((r, i) => (
+                              <div key={i} className="row g-1 mb-1.5 align-items-center">
+                                <div className="col-5">
+                                  <input
+                                    type="text"
+                                    placeholder="Size (e.g. 2 inch)"
+                                    className="form-control form-control-sm bg-white"
+                                    value={r.size || ''}
+                                    onChange={(e) => {
+                                      const next = [...(sectionFormData.jobWorkRows || [])];
+                                      if (!next[i]) next[i] = { size: '', threadConsumption: '' };
+                                      next[i].size = e.target.value;
+                                      setSectionFormData({ ...sectionFormData, jobWorkRows: next });
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-5">
+                                  <input
+                                    type="text"
+                                    placeholder="Thread consumption"
+                                    className="form-control form-control-sm bg-white"
+                                    value={r.threadConsumption || ''}
+                                    onChange={(e) => {
+                                      const next = [...(sectionFormData.jobWorkRows || [])];
+                                      if (!next[i]) next[i] = { size: '', threadConsumption: '' };
+                                      next[i].threadConsumption = e.target.value;
+                                      setSectionFormData({ ...sectionFormData, jobWorkRows: next });
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-2 text-end">
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-light text-danger p-1"
+                                    onClick={() => {
+                                      const next = (sectionFormData.jobWorkRows || []).filter((_, idx) => idx !== i);
+                                      setSectionFormData({ ...sectionFormData, jobWorkRows: next });
+                                    }}
+                                  >
+                                    <i className="ti ti-trash"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-2.5">
+                        <div className="row g-2">
+                          <div className="col-md-6">
+                            <div className="text-muted small">Tassel Type</div>
+                            <div className="d-flex flex-wrap gap-1 mt-1">
+                              {parseTasselTypes(selectedAccessory.tasselType).map((t) => (
+                                <span
+                                  key={t}
+                                  className="badge rounded-2"
+                                  style={{
+                                    backgroundColor: t.toLowerCase() === 'job work' ? '#fef3c7' : '#e0e7ff',
+                                    color: t.toLowerCase() === 'job work' ? '#92400e' : '#3730a3',
+                                    border: t.toLowerCase() === 'job work' ? '1px solid #fde68a' : '1px solid #c7d2fe',
+                                    fontSize: '11.5px',
+                                    padding: '4px 8px'
+                                  }}
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {selectedAccessory.size && (
+                            <div className="col-md-6">
+                              <div className="text-muted small">Size / Length</div>
+                              <div className="fw-bold text-dark">{selectedAccessory.size}</div>
+                            </div>
+                          )}
+                        </div>
+                        {hasTasselType(selectedAccessory.tasselType, 'Job Work') && (
+                          <div>
+                            <div className="text-muted small mb-1">Size &amp; Thread Consumption:</div>
+                            {(selectedAccessory.jobWorkRows && selectedAccessory.jobWorkRows.length > 0) ? (
+                              <div className="table-responsive">
+                                <table className="table table-sm table-bordered mb-0 fs-12">
+                                  <thead className="table-light">
+                                    <tr>
+                                      <th>Size</th>
+                                      <th>Thread Consumption</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {selectedAccessory.jobWorkRows.map((r, i) => (
+                                      <tr key={i}>
+                                        <td>{r.size || '—'}</td>
+                                        <td>{r.threadConsumption || '—'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-muted small fst-italic">No size specifications added</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
 
                   {selectedAccessory.category === 'Dori' && (
                     <div className="d-flex flex-column gap-2.5">
@@ -3161,88 +3698,222 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   )}
 
                   {selectedAccessory.category === 'Thread' && (
-                    <div className="d-flex flex-column gap-3">
-                      <div className="row g-2">
-                        <div className="col-12">
-                          <div className="text-muted small">Ordering Unit</div>
-                          <div className="fw-semibold text-dark small">{selectedAccessory.unit || 'Meter'}</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-muted small mb-1">Thread Pattern</div>
-                        <span className="badge rounded-pill px-3 py-1 text-white fw-semibold" style={{ backgroundColor: '#2e37a4' }}>
-                          {selectedAccessory.threadPattern || 'Stitching'}
-                        </span>
-                      </div>
-
-                      {['Kantha', 'Couching'].includes(selectedAccessory.threadPattern) && (
-                        <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                          {selectedAccessory.articlePlacements && selectedAccessory.articlePlacements.length > 0 && (
-                            <div>
-                              <div className="text-muted small mb-1.5 fw-semibold">Article &rarr; Placement &rarr; Thread Line Chain:</div>
-                              {selectedAccessory.articlePlacements.map((ap, apIdx) => (
-                                <div key={apIdx} className="p-2.5 bg-light rounded-2 border mb-2 shadow-2xs">
-                                  <div className="fw-bold text-dark small mb-1">👘 {ap.article}</div>
-                                  <div className="d-flex flex-wrap gap-1.5">
-                                    {(ap.placements || []).map((p, pIdx) => (
-                                      <span key={pIdx} className="badge bg-white text-dark border px-2 py-1 shadow-2xs" style={{ fontSize: '11.5px' }}>
-                                        <span className="text-muted">{p.placement}:</span> <strong className="text-primary">{p.threadRequired}m</strong>
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {selectedAccessory.threadPattern === 'Stitching' && (
-                        <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                          <div>
-                            <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                            <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
+                    editingSection === 'category' ? (
+                      <div className="d-flex flex-column gap-3">
+                        <div className="row g-2">
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold text-dark mb-1">Ordering Unit</label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={sectionFormData.unit || 'Meter'}
+                              onChange={(e) => setSectionFormData({ ...sectionFormData, unit: e.target.value })}
+                            >
+                              {CONTINUOUS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
                           </div>
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold text-dark mb-1">Thread Pattern</label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={sectionFormData.threadPattern || 'Stitching'}
+                              onChange={(e) => setSectionFormData({ ...sectionFormData, threadPattern: e.target.value })}
+                            >
+                              {THREAD_PATTERNS.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                        </div>
 
-                          {((selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0) || (selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0)) && (
-                            <div>
-                              <div className="text-muted small mb-1.5 fw-semibold">Targeted Articles &amp; Consumption per 100 pcs:</div>
-                              <div className="d-flex flex-wrap gap-2">
-                                {(selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0
-                                  ? selectedAccessory.stitchingArticles
-                                  : Object.keys(selectedAccessory.consumptionPer100Pcs || {})
-                                ).map((art) => {
-                                  const m = selectedAccessory.consumptionPer100Pcs?.[art];
+                        {sectionFormData.threadPattern === 'Stitching' && (
+                          <div className="p-3 bg-light rounded-3 border">
+                            <div className="row g-2 mb-2">
+                              <div className="col-md-6">
+                                <label className="form-label small fw-semibold text-dark mb-1">
+                                  Meters of thread required for 1m stitching <span className="text-danger">*</span>
+                                </label>
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    type="text"
+                                    className="form-control fw-bold"
+                                    placeholder="e.g. 15"
+                                    value={sectionFormData.metersPerMeterStitching !== undefined ? sectionFormData.metersPerMeterStitching : ''}
+                                    onChange={(e) => setSectionFormData({ ...sectionFormData, metersPerMeterStitching: e.target.value })}
+                                  />
+                                  <span className="input-group-text bg-white text-muted">m / 1m</span>
+                                </div>
+                              </div>
+                              <div className="col-md-6">
+                                <label className="form-label small fw-semibold text-dark mb-1">
+                                  Thread Per Piece (metres) <span className="text-danger">*</span>
+                                </label>
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    className="form-control fw-bold"
+                                    placeholder="e.g. 60"
+                                    value={sectionFormData.threadPerPiece !== undefined ? sectionFormData.threadPerPiece : ''}
+                                    onChange={(e) => setSectionFormData({ ...sectionFormData, threadPerPiece: e.target.value })}
+                                  />
+                                  <span className="input-group-text bg-white text-muted">m / pc</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <label className="form-label small fw-bold text-dark mb-1">Targeted Articles &amp; Consumption per 100 Pieces</label>
+                              <div className="d-flex flex-wrap gap-1.5 mb-2">
+                                {availableTargetArticles.map((art) => {
+                                  const selList = Array.isArray(sectionFormData.stitchingArticles) ? sectionFormData.stitchingArticles : [];
+                                  const isSel = selList.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
-                                    <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-                                      <span className="fw-bold">{art}:</span>
-                                      <span className="text-primary font-monospace fw-bold">{m !== undefined && m !== '' ? `${m} m` : '—'}</span>
-                                      <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
-                                    </span>
+                                    <button
+                                      key={art.name}
+                                      type="button"
+                                      className={`btn btn-xs rounded-pill border ${isSel ? 'btn-primary text-white fw-semibold' : 'btn-light text-dark'}`}
+                                      onClick={() => {
+                                        const nextList = isSel ? selList.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim()) : [...selList, art.name];
+                                        const nextCons = { ...(sectionFormData.consumptionPer100Pcs || {}) };
+                                        if (isSel) {
+                                          delete nextCons[art.name];
+                                        } else {
+                                          const def = sectionFormData.threadPerPiece ? Number((parseFloat(sectionFormData.threadPerPiece) * 100).toFixed(2)) : '';
+                                          if (nextCons[art.name] === undefined || nextCons[art.name] === '') nextCons[art.name] = def;
+                                        }
+                                        setSectionFormData({ ...sectionFormData, stitchingArticles: nextList, consumptionPer100Pcs: nextCons });
+                                      }}
+                                    >
+                                      {art.name} {isSel ? '✓' : '+'}
+                                    </button>
                                   );
                                 })}
                               </div>
+                              {Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0 && (
+                                <div className="row g-2">
+                                  {sectionFormData.stitchingArticles.map(artName => (
+                                    <div key={artName} className="col-md-6">
+                                      <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-1 shadow-2xs">
+                                        <span className="small fw-semibold text-truncate" style={{ maxWidth: '120px' }}>{artName}:</span>
+                                        <div className="input-group input-group-sm" style={{ width: '130px' }}>
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            className="form-control fw-bold"
+                                            value={sectionFormData.consumptionPer100Pcs?.[artName] ?? ''}
+                                            onChange={(e) => {
+                                              const v = e.target.value;
+                                              setSectionFormData({
+                                                ...sectionFormData,
+                                                consumptionPer100Pcs: {
+                                                  ...(sectionFormData.consumptionPer100Pcs || {}),
+                                                  [artName]: v
+                                                }
+                                              });
+                                            }}
+                                          />
+                                          <span className="input-group-text p-1 small text-muted">m/100</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )}
-
-                      {selectedAccessory.threadPattern === 'Embroidery' && (
-                        <div className="alert alert-info py-2 px-3 rounded-2 small mb-0">
-                          Process required — no additional measurements needed for Embroidery.
-                        </div>
-                      )}
-
-                      {['Button Tacking', 'Handwork'].includes(selectedAccessory.threadPattern) && (
-                        <div className="p-2.5 bg-light rounded-2 border">
-                          <div className="small fw-semibold text-dark mb-1">{selectedAccessory.threadPattern} (Process Requirement)</div>
-                          <div className="text-muted small">
-                            Remarks: {selectedAccessory.processRemarks || 'Standard process specification'}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-3">
+                        <div className="row g-2">
+                          <div className="col-12">
+                            <div className="text-muted small">Ordering Unit</div>
+                            <div className="fw-semibold text-dark small">{selectedAccessory.unit || 'Meter'}</div>
                           </div>
                         </div>
-                      )}
-                    </div>
+
+                        <div>
+                          <div className="text-muted small mb-1">Thread Pattern</div>
+                          <span className="badge rounded-pill px-3 py-1 text-white fw-semibold" style={{ backgroundColor: '#2e37a4' }}>
+                            {selectedAccessory.threadPattern || 'Stitching'}
+                          </span>
+                        </div>
+
+                        {['Kantha', 'Couching'].includes(selectedAccessory.threadPattern) && (
+                          <div className="d-flex flex-column gap-2.5 pt-2 border-top">
+                            {selectedAccessory.articlePlacements && selectedAccessory.articlePlacements.length > 0 && (
+                              <div>
+                                <div className="text-muted small mb-1.5 fw-semibold">Article &rarr; Placement &rarr; Thread Line Chain:</div>
+                                {selectedAccessory.articlePlacements.map((ap, apIdx) => (
+                                  <div key={apIdx} className="p-2.5 bg-light rounded-2 border mb-2 shadow-2xs">
+                                    <div className="fw-bold text-dark small mb-1">👘 {ap.article}</div>
+                                    <div className="d-flex flex-wrap gap-1.5">
+                                      {(ap.placements || []).map((p, pIdx) => (
+                                        <span key={pIdx} className="badge bg-white text-dark border px-2 py-1 shadow-2xs" style={{ fontSize: '11.5px' }}>
+                                          <span className="text-muted">{p.placement}:</span> <strong className="text-primary">{p.threadRequired}m</strong>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {selectedAccessory.threadPattern === 'Stitching' && (
+                          <div className="d-flex flex-column gap-2.5 pt-2 border-top">
+                            <div className="row g-2 mb-2">
+                              <div className="col-md-6">
+                                <div className="text-muted small">Meters of thread required for 1m stitching (single‑time entry)</div>
+                                <div className="fw-bold text-dark fs-14">
+                                  {selectedAccessory.metersPerMeterStitching !== undefined && selectedAccessory.metersPerMeterStitching !== ''
+                                    ? `${selectedAccessory.metersPerMeterStitching} m / 1m stitch`
+                                    : '—'}
+                                </div>
+                              </div>
+                              <div className="col-md-6">
+                                <div className="text-muted small">Thread Per Piece (BOM Default)</div>
+                                <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
+                              </div>
+                            </div>
+
+                            {((selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0) || (selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0)) && (
+                              <div>
+                                <div className="text-muted small mb-1.5 fw-semibold">Targeted Articles &amp; Consumption per 100 pcs:</div>
+                                <div className="d-flex flex-wrap gap-2">
+                                  {(selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0
+                                    ? selectedAccessory.stitchingArticles
+                                    : Object.keys(selectedAccessory.consumptionPer100Pcs || {})
+                                  ).map((art) => {
+                                    const m = selectedAccessory.consumptionPer100Pcs?.[art];
+                                    return (
+                                      <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
+                                        <span className="fw-bold">{art}:</span>
+                                        <span className="text-primary font-monospace fw-bold">{m !== undefined && m !== '' ? `${m} m` : '—'}</span>
+                                        <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {selectedAccessory.threadPattern === 'Embroidery' && (
+                          <div className="alert alert-info py-2 px-3 rounded-2 small mb-0">
+                            Process required — no additional measurements needed for Embroidery.
+                          </div>
+                        )}
+
+                        {['Button Tacking', 'Handwork'].includes(selectedAccessory.threadPattern) && (
+                          <div className="p-2.5 bg-light rounded-2 border">
+                            <div className="small fw-semibold text-dark mb-1">{selectedAccessory.threadPattern} (Process Requirement)</div>
+                            <div className="text-muted small">
+                              Remarks: {selectedAccessory.processRemarks || 'Standard process specification'}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -3467,7 +4138,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         Color: {acc.color}
                       </div>
                     )}
-                    {acc.threadPattern && (
+                    {matchesCategory(acc.category, 'Thread') && acc.threadPattern && (
                       <div
                         style={{
                           backgroundColor: '#f5f3ff',
@@ -3480,6 +4151,36 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         }}
                       >
                         Pattern: {acc.threadPattern}
+                      </div>
+                    )}
+                    {matchesCategory(acc.category, 'Tassel') && (
+                      <div
+                        style={{
+                          backgroundColor: '#f5f3ff',
+                          border: '1px solid #ddd6fe',
+                          borderRadius: '8px',
+                          padding: '3px 8px',
+                          fontSize: '11.5px',
+                          color: '#6d28d9',
+                          fontWeight: 600
+                        }}
+                      >
+                        Type: {parseTasselTypes(acc.tasselType).join(', ')}
+                      </div>
+                    )}
+                    {matchesCategory(acc.category, 'Tassel') && hasTasselType(acc.tasselType, 'Job Work') && acc.jobWorkRows && acc.jobWorkRows.length > 0 && (
+                      <div
+                        style={{
+                          backgroundColor: '#fefce8',
+                          border: '1px solid #fef08a',
+                          borderRadius: '8px',
+                          padding: '3px 8px',
+                          fontSize: '11.5px',
+                          color: '#854d0e',
+                          fontWeight: 600
+                        }}
+                      >
+                        Sizes: {acc.jobWorkRows.map(r => r.size).filter(Boolean).join(', ') || `${acc.jobWorkRows.length} Size(s)`}
                       </div>
                     )}
                   </div>

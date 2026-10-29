@@ -1236,6 +1236,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       name: newFabric.qualityName || newFabric.quality || '',
       type: newFabric.fabricType || newFabric.type || 'Cotton',
       fabricType: newFabric.fabricType || newFabric.type || 'Cotton',
+      isCustomType: newFabric.isCustomType,
       widths: Array.isArray(newFabric.widths)
         ? newFabric.widths
         : (typeof newFabric.widths === 'string'
