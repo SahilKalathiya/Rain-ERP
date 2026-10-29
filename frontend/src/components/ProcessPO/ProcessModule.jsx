@@ -172,22 +172,26 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
   // 2. Process Challan Handlers
   const handleSaveChallan = (challanData, andRecordReturn = false) => {
+    const toSave = andRecordReturn
+      ? { ...challanData, is_locked: true, status: 'Inwarded' }
+      : challanData;
+
     let updated;
-    const existingIndex = challans.findIndex(c => c.id === challanData.id);
+    const existingIndex = challans.findIndex(c => c.id === toSave.id);
     if (existingIndex >= 0) {
       updated = [...challans];
-      updated[existingIndex] = challanData;
+      updated[existingIndex] = toSave;
     } else {
-      updated = [challanData, ...challans];
+      updated = [toSave, ...challans];
     }
     setChallans(updated);
     saveStoredProcessChallans(updated);
 
     // Update status of linked PO(s) to 'Sent to Vendor' (Section 4.2)
-    if (challanData.linked_pos && challanData.linked_pos.length > 0) {
+    if (toSave.linked_pos && toSave.linked_pos.length > 0) {
       const updatedPOs = pos.map(p => {
-        if (challanData.linked_pos.includes(p.id) || challanData.linked_pos.includes(p.po_number) || challanData.linked_pos.includes(`PPO-${p.po_number}`)) {
-          return { ...p, status: 'Sent to Vendor' };
+        if (toSave.linked_pos.includes(p.id) || toSave.linked_pos.includes(p.po_number) || toSave.linked_pos.includes(`PPO-${p.po_number}`)) {
+          return { ...p, is_locked: true, status: 'Sent to Vendor' };
         }
         return p;
       });
@@ -200,7 +204,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     // If requested, immediately transition to Record Inward Return
     if (andRecordReturn) {
-      handleRecordReturnFromChallan(challanData);
+      handleRecordReturnFromChallan(toSave);
     }
   };
 
@@ -209,6 +213,15 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   const handleRecordReturnFromChallan = (challan) => {
+    // 1. Lock this Challan as workflow has advanced to Inbound GRN
+    const updatedChallans = challans.map(c =>
+      (c.id === challan.id || c.challan_number === challan.challan_number)
+        ? { ...c, is_locked: true, status: 'Inwarded' }
+        : c
+    );
+    setChallans(updatedChallans);
+    saveStoredProcessChallans(updatedChallans);
+
     const defaultPieces = challan.items && challan.items.length > 0
       ? challan.items.map((it, idx) => ({
           id: idx + 1,
@@ -250,6 +263,19 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setReturns(updated);
     saveStoredProcessReturns(updated);
 
+    // Also lock linked Challan
+    if (returnData.linked_challan_id) {
+      setChallans(prevChallans => {
+        const updatedChallans = prevChallans.map(c =>
+          (c.challan_number === returnData.linked_challan_id || c.id === returnData.linked_challan_id)
+            ? { ...c, is_locked: true, status: 'Inwarded' }
+            : c
+        );
+        saveStoredProcessChallans(updatedChallans);
+        return updatedChallans;
+      });
+    }
+
     // If grey fabric returned, create an Open Bale (Section 5.3)
     if (returnData.grey_fabric_returned_meters > 0) {
       const newOpenBale = {
@@ -282,7 +308,51 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     const updated = [qcData, ...qcRecords];
     setQcRecords(updated);
     saveStoredProcessQCRecords(updated);
-    alert('QC Record saved successfully! Cutting-Room planning & Stock ledger updated.');
+
+    // Section 6.2 A: If Reprocess chosen, automatically generate a Reprocess Job Work Challan with No New Payment
+    if (qcData.rejection_action === 'Reprocess') {
+      const repChNo = `${Math.floor(4900 + Math.random() * 99)}-REPROC`;
+      const reprocessChallan = {
+        id: `PCH-${repChNo}`,
+        challan_number: `CH-${repChNo}`,
+        date: new Date().toISOString().split('T')[0],
+        vendor_id: 'VEND-0003',
+        vendor_name: 'Raju Dyeing (Krishna Dyeing)',
+        linked_pos: ['PPO-7611'],
+        styles_info: ['Graphic Boota Kurta'],
+        po_link_status: 'Reprocess In Loop',
+        admin_alert_triggered: false,
+        folding_notation: 'L100',
+        total_bales: 1,
+        total_pieces: 1,
+        grand_total_meters: qcData.original_length || 119.60,
+        remarks: `Reprocessing Rectification Challan for Than #${qcData.piece_no}. No new payment obligation.`,
+        receiver_signature: 'Raju Dyeing Rep',
+        company_representative: 'Anurag',
+        status: 'In Reprocess Loop',
+        created_by: 'Saksham Garg',
+        created_at: new Date().toISOString(),
+        items: [
+          {
+            id: Date.now(),
+            bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
+            fabric_name: '100x100 Voile (Grey)',
+            color_name: 'Beige',
+            invoice_no: 'INV-MS-0091',
+            original_piece_meters: qcData.original_length || 119.60,
+            dispatched_meters: qcData.original_length || 119.60,
+            is_partial_cut: false,
+            folding: 'L100'
+          }
+        ]
+      };
+      const updatedChallans = [reprocessChallan, ...challans];
+      setChallans(updatedChallans);
+      saveStoredProcessChallans(updatedChallans);
+      alert(`QC Rejection saved! Reprocess Challan #${reprocessChallan.challan_number} generated with zero new payment obligation. Item is flagged In Loop.`);
+    } else {
+      alert('QC Record saved successfully! Cutting-Room planning & Stock ledger updated.');
+    }
   };
 
   return (
@@ -319,7 +389,9 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setEditingPO(null);
             }}
             onCreateChallan={handleCreateChallanFromPO}
+            onPrintPO={handlePrintPO}
             readOnlyDefault={Boolean(editingPO)}
+            challans={challans}
           />
         ) : (
           <ProcessPOList
@@ -331,6 +403,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             onViewPO={handleViewPO}
             onPrintPO={handlePrintPO}
             onCreateChallanFromPO={handleCreateChallanFromPO}
+            challans={challans}
           />
         )
       )}
@@ -342,10 +415,12 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             initialChallan={editingChallan}
             onSave={handleSaveChallan}
             onRecordReturn={handleRecordReturnFromChallan}
+            onPrintChallan={handlePrintChallan}
             onCancel={() => {
               setShowChallanForm(false);
               setEditingChallan(null);
             }}
+            returns={returns}
           />
         ) : (
           <ProcessChallanList
@@ -360,6 +435,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             }}
             onPrintChallan={handlePrintChallan}
             onRecordReturnFromChallan={handleRecordReturnFromChallan}
+            returns={returns}
           />
         )
       )}
@@ -375,6 +451,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setShowReturnForm(false);
               setEditingReturn(null);
             }}
+            qcRecords={qcRecords}
           />
         ) : (
           <ProcessReturnList
@@ -390,6 +467,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             onInspectInQC={(record) => {
               setActiveTab('qc');
             }}
+            qcRecords={qcRecords}
           />
         )
       )}

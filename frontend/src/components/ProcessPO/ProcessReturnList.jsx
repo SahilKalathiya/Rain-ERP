@@ -13,11 +13,19 @@ export default function ProcessReturnList({
   returns = [],
   onNewReturn,
   onEditReturn,
-  onInspectInQC
+  onInspectInQC,
+  qcRecords = []
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [vendorFilter, setVendorFilter] = useState('ALL');
+
+  const isReturnLocked = (r) => {
+    if (r.is_locked) return true;
+    if (r.status === 'Inspected' || r.status === 'Completed') return true;
+    if (qcRecords && qcRecords.some(q => q.return_id === r.id || q.challan_no === r.vendor_external_challan_no)) return true;
+    return false;
+  };
 
   // Filter logic
   const filtered = returns.filter((r) => {
@@ -280,18 +288,24 @@ export default function ProcessReturnList({
 
                     {/* Status */}
                     <td className="text-center">
-                      <span
-                        className="badge px-2.5 py-1 rounded-pill"
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#047857',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                          fontSize: '11px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        <i className="ti ti-check me-1"></i> {r.status || 'Received'}
-                      </span>
+                      {isReturnLocked(r) ? (
+                        <span className="badge px-2.5 py-1 rounded-pill bg-secondary-subtle text-secondary border fs-11 fw-semibold d-inline-flex align-items-center gap-1">
+                          <i className="ti ti-lock fs-11"></i> QC Done (Locked)
+                        </span>
+                      ) : (
+                        <span
+                          className="badge px-2.5 py-1 rounded-pill"
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#047857',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            fontSize: '11px',
+                            fontWeight: '600'
+                          }}
+                        >
+                          <i className="ti ti-check me-1"></i> {r.status || 'Received'}
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -304,14 +318,14 @@ export default function ProcessReturnList({
                         <button
                           type="button"
                           className="btn btn-light btn-sm p-1.5 rounded-2 text-dark border shadow-xs"
-                          title="Open & Edit Return Details"
+                          title={isReturnLocked(r) ? "View Locked Return" : "Open & Edit Return Details"}
                           style={{ borderColor: '#cbd5e1' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRowClick(r);
                           }}
                         >
-                          <i className="ti ti-pencil fs-14"></i>
+                          <i className={`ti ${isReturnLocked(r) ? 'ti-eye' : 'ti-pencil'} fs-14`}></i>
                         </button>
 
                         {/* Inspect in QC Button */}

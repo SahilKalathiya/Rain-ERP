@@ -6,10 +6,21 @@ import React, { useState } from 'react';
  * Screen-fitted responsive table with ZERO horizontal overflow (No left-right scroll)
  * Fully clickable table rows to view/edit record directly
  */
-export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, onCreateChallanFromPO }) {
+export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, onCreateChallanFromPO, challans = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [vendorFilter, setVendorFilter] = useState('ALL');
+
+  const isPoLocked = (po) => {
+    if (po.is_locked) return true;
+    if (po.status === 'Sent to Vendor' || po.status === 'Completed') return true;
+    if (challans && challans.some(c => c.linked_pos && (
+      c.linked_pos.includes(po.id) ||
+      c.linked_pos.includes(po.po_number) ||
+      c.linked_pos.includes(`PPO-${po.po_number}`)
+    ))) return true;
+    return false;
+  };
 
   const filtered = pos.filter((po) => {
     const term = searchTerm.toLowerCase();
@@ -169,30 +180,38 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
 
                       {/* Status */}
                       <td className="text-center">
-                        <span className={`badge rounded-pill fs-11 fw-semibold ${badgeClass}`}>
-                          {po.status}
-                        </span>
+                        {isPoLocked(po) ? (
+                          <span className="badge rounded-pill fs-11 fw-semibold bg-secondary-subtle text-secondary border border-secondary-subtle d-inline-flex align-items-center gap-1">
+                            <i className="ti ti-lock fs-11"></i> Locked ({po.status})
+                          </span>
+                        ) : (
+                          <span className={`badge rounded-pill fs-11 fw-semibold ${badgeClass}`}>
+                            {po.status}
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions with stopPropagation */}
                       <td className="text-end" onClick={(e) => e.stopPropagation()}>
                         <div className="d-flex align-items-center justify-content-end gap-1.5">
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs"
-                            style={{
-                              background: '#4f46e5',
-                              borderColor: '#4f46e5',
-                              fontSize: '11.5px',
-                              height: '28px',
-                              whiteSpace: 'nowrap'
-                            }}
-                            title="Dispatch fabric to vendor via Process Challan (Next Step in PDF)"
-                            onClick={() => onCreateChallanFromPO && onCreateChallanFromPO(po)}
-                          >
-                            <i className="ti ti-truck-delivery fs-13"></i>
-                            <span className="fw-semibold">+ Challan</span>
-                          </button>
+                          {!isPoLocked(po) && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs"
+                              style={{
+                                background: '#4f46e5',
+                                borderColor: '#4f46e5',
+                                fontSize: '11.5px',
+                                height: '28px',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Dispatch fabric to vendor via Process Challan"
+                              onClick={() => onCreateChallanFromPO && onCreateChallanFromPO(po)}
+                            >
+                              <i className="ti ti-truck-delivery fs-13"></i>
+                              <span className="fw-semibold">+ Challan</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn btn-outline-secondary btn-sm p-1 rounded-2"
@@ -206,10 +225,10 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                             type="button"
                             className="btn btn-outline-primary btn-sm p-1 rounded-2"
                             style={{ width: '28px', height: '28px' }}
-                            title="View / Edit PO"
+                            title={isPoLocked(po) ? "View Locked PO" : "View / Edit PO"}
                             onClick={() => onViewPO(po)}
                           >
-                            <i className="ti ti-eye fs-14"></i>
+                            <i className={`ti ${isPoLocked(po) ? 'ti-lock-access' : 'ti-eye'} fs-14`}></i>
                           </button>
                         </div>
                       </td>

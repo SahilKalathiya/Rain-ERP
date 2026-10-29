@@ -14,11 +14,19 @@ export default function ProcessChallanList({
   onNewChallan,
   onEditChallan,
   onPrintChallan,
-  onRecordReturnFromChallan
+  onRecordReturnFromChallan,
+  returns = []
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [vendorFilter, setVendorFilter] = useState('ALL');
+
+  const isChallanLocked = (c) => {
+    if (c.is_locked) return true;
+    if (c.status === 'Completed' || c.status === 'Inwarded') return true;
+    if (returns && returns.some(r => r.linked_challan_id && (r.linked_challan_id === c.challan_number || r.linked_challan_id === c.id))) return true;
+    return false;
+  };
 
   // Filter logic
   const filtered = challans.filter((c) => {
@@ -311,7 +319,11 @@ export default function ProcessChallanList({
 
                       {/* PO Link Status */}
                       <td className="text-center">
-                        {isEmergency ? (
+                        {isChallanLocked(c) ? (
+                          <span className="badge px-2.5 py-1 rounded-pill bg-secondary-subtle text-secondary border fs-11 fw-semibold d-inline-flex align-items-center gap-1">
+                            <i className="ti ti-lock fs-11"></i> Inwarded (Locked)
+                          </span>
+                        ) : isEmergency ? (
                           <span
                             className="badge px-2.5 py-1 rounded-pill"
                             style={{
@@ -358,14 +370,14 @@ export default function ProcessChallanList({
                           <button
                             type="button"
                             className="btn btn-light btn-sm p-1.5 rounded-2 text-dark border shadow-xs"
-                            title="Open & Edit Challan Details"
+                            title={isChallanLocked(c) ? "View Locked Challan" : "Open & Edit Challan Details"}
                             style={{ borderColor: '#cbd5e1' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRowClick(c);
                             }}
                           >
-                            <i className="ti ti-pencil fs-14"></i>
+                            <i className={`ti ${isChallanLocked(c) ? 'ti-eye' : 'ti-pencil'} fs-14`}></i>
                           </button>
 
                           {/* Print Button */}

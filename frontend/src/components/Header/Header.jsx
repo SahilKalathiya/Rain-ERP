@@ -142,6 +142,62 @@ export default function Header({
       }
     });
 
+    // 6. Process POs (Section 13.2 Global Search)
+    const processPOs = getSaved('erp_process_pos');
+    processPOs.forEach((po) => {
+      if (
+        (po.po_number || '').toLowerCase().includes(q) ||
+        (po.id || '').toLowerCase().includes(q) ||
+        (po.vendor_name || '').toLowerCase().includes(q) ||
+        (po.customer_brand_name || '').toLowerCase().includes(q) ||
+        (po.style_names || []).some(s => s.toLowerCase().includes(q))
+      ) {
+        results.push({
+          icon: '📋',
+          title: `Process PO #${po.po_number || po.id}`,
+          subtitle: `${po.vendor_name} • ${po.total_meters}m • ${po.status}`,
+          category: 'Process PO',
+          route: '/process-po'
+        });
+      }
+    });
+
+    // 7. Process Challans (Section 13.2 Global Search)
+    const processChallans = getSaved('erp_process_challans');
+    processChallans.forEach((ch) => {
+      if (
+        (ch.challan_number || '').toLowerCase().includes(q) ||
+        (ch.id || '').toLowerCase().includes(q) ||
+        (ch.vendor_name || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: '🚚',
+          title: `Process Challan #${ch.challan_number || ch.id}`,
+          subtitle: `${ch.vendor_name} • ${ch.grand_total_meters}m • ${ch.po_link_status}`,
+          category: 'Process Challan',
+          route: '/process-challan'
+        });
+      }
+    });
+
+    // 8. Process Returns (Section 13.2 Global Search)
+    const processReturns = getSaved('erp_process_returns');
+    processReturns.forEach((ret) => {
+      if (
+        (ret.vendor_external_challan_no || '').toLowerCase().includes(q) ||
+        (ret.id || '').toLowerCase().includes(q) ||
+        (ret.vendor_name || '').toLowerCase().includes(q)
+      ) {
+        results.push({
+          icon: '📥',
+          title: `Inward Return #${ret.vendor_external_challan_no || ret.id}`,
+          subtitle: `${ret.vendor_name} • ${ret.total_meters}m • ${ret.status}`,
+          category: 'Process Return',
+          route: '/process-return'
+        });
+      }
+    });
+
     return results.slice(0, 10);
   }, [searchGlobalQuery]);
 

@@ -3483,6 +3483,10 @@ export default function OrderDetailView({
                     } else if (onTriggerProcurement) {
                       onTriggerProcurement('Create PO', order);
                     }
+                  } else if (item.action === 'Send to Process') {
+                    if (onNavigateToProcurement) {
+                      onNavigateToProcurement('/process-po', order);
+                    }
                   } else if (item.action === 'QC Batch') {
                     if (onNavigateToProcurement) {
                       onNavigateToProcurement('/quality-batches', order);

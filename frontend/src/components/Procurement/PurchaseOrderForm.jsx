@@ -796,6 +796,8 @@ export default function PurchaseOrderForm({
 
   // View Mode by default for existing POs, Edit Mode for new POs. If PO is locked, strictly view mode.
   const [isEditing, setIsEditing] = useState(!isExisting && !isPoLocked);
+  const userToggledColorRef = useRef(false);
+  const [showColorColumn, setShowColorColumn] = useState(true);
 
   // Sync state whenever selected `po` changes
   useEffect(() => {
