@@ -403,7 +403,7 @@ export default function GRNDetailView({
               )}
             </h2>
             <p className="text-secondary fs-13 mb-0">
-              Against <strong>{linkedPoId ? `${linkedPoId}` : 'Direct Inward'}</strong> · {grn.vendorName || 'Vendor'}
+              Against <strong>{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</strong> · {grn.vendorName || 'Vendor'}
             </p>
           </div>
 

@@ -14,6 +14,56 @@ import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
 
 /**
+ * Error Boundary to catch render errors and prevent white blank screen
+ */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ERP ErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4 mx-auto" style={{ maxWidth: 600 }}>
+          <i className="ti ti-alert-triangle fs-40 text-danger mb-3 d-block"></i>
+          <h5 className="fw-bold text-dark mb-2">Something went wrong</h5>
+          <p className="text-secondary fs-13 mb-3">{this.state.error?.message || 'An unexpected error occurred while rendering this page.'}</p>
+          <div className="d-flex justify-content-center gap-2">
+            <button
+              type="button"
+              className="btn btn-primary px-4 py-2 rounded-3"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+            >
+              <i className="ti ti-refresh me-1"></i> Reload Page
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary px-4 py-2 rounded-3"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                if (this.props.onReset) this.props.onReset();
+              }}
+            >
+              <i className="ti ti-arrow-left me-1"></i> Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/**
  * Main ERP Rain Application Component
  */
 export default function App() {
@@ -242,7 +292,11 @@ export default function App() {
           onOpenAuth={() => setIsAuthenticated(false)}
           onLogout={handleLogout}
         />
-        <main className="flex-grow-1 overflow-auto">{renderContent()}</main>
+        <main className="flex-grow-1 overflow-auto">
+          <ErrorBoundary onReset={() => setCurrentRoute('/dashboard')}>
+            {renderContent()}
+          </ErrorBoundary>
+        </main>
       </div>
     </div>
   );

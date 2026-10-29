@@ -432,7 +432,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     fabricPerMeterLace: '',
 
     // Tassels
-    tasselType: 'Ready Made',
+    tasselType: '',
     jobWorkRows: [{ size: '', threadConsumption: '' }],
 
     // Dori (Section 6.4)
@@ -1250,117 +1250,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           ))}
                         </select>
                       </div>
-
-                      <div className="mb-3">
-                        <label className="form-label fw-semibold text-dark small mb-1.5">Tassel type</label>
-                        <select
-                          className="form-select"
-                          disabled={!isModalEditMode}
-                          value={formData.tasselType || 'Ready Made'}
-                          onChange={(e) => {
-                            const newType = e.target.value;
-                            setFormData({
-                              ...formData,
-                              tasselType: newType,
-                              jobWorkRows: (newType === 'Job Work' && (!formData.jobWorkRows || formData.jobWorkRows.length === 0))
-                                ? [{ size: '', threadConsumption: '' }]
-                                : (formData.jobWorkRows || [{ size: '', threadConsumption: '' }])
-                            });
-                          }}
-                          style={{ height: '42px', borderRadius: '8px' }}
-                        >
-                          <option value="Ready Made">Ready Made</option>
-                          <option value="Job Work">Job Work</option>
-                        </select>
-                      </div>
-
-                      {formData.tasselType === 'Job Work' && (
-                        <div className="mb-3 p-3 bg-light rounded-3 border">
-                          <div className="fw-semibold text-dark small mb-2">
-                            Size &amp; thread consumption:
-                          </div>
-                          {((formData.jobWorkRows && formData.jobWorkRows.length > 0)
-                            ? formData.jobWorkRows
-                            : [{ size: '', threadConsumption: '' }]
-                          ).map((r, i) => (
-                            <div key={i} className="row g-2 align-items-end mb-2">
-                              <div className="col-5">
-                                <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Size</label>
-                                <input
-                                  type="text"
-                                  className="form-control form-control-sm"
-                                  placeholder="e.g. Small / 2 inch"
-                                  disabled={!isModalEditMode}
-                                  value={r.size || ''}
-                                  onChange={(e) => {
-                                    const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
-                                      ? [...formData.jobWorkRows]
-                                      : [{ size: '', threadConsumption: '' }];
-                                    currentRows[i] = { ...currentRows[i], size: e.target.value };
-                                    setFormData({ ...formData, jobWorkRows: currentRows });
-                                  }}
-                                  style={{ height: '36px', borderRadius: '6px' }}
-                                />
-                              </div>
-                              <div className="col-5">
-                                <label className="form-label text-muted mb-1" style={{ fontSize: '11.5px' }}>Thread consumption</label>
-                                <input
-                                  type="text"
-                                  className="form-control form-control-sm"
-                                  placeholder="e.g. 5m / piece"
-                                  disabled={!isModalEditMode}
-                                  value={r.threadConsumption || ''}
-                                  onChange={(e) => {
-                                    const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
-                                      ? [...formData.jobWorkRows]
-                                      : [{ size: '', threadConsumption: '' }];
-                                    currentRows[i] = { ...currentRows[i], threadConsumption: e.target.value };
-                                    setFormData({ ...formData, jobWorkRows: currentRows });
-                                  }}
-                                  style={{ height: '36px', borderRadius: '6px' }}
-                                />
-                              </div>
-                              <div className="col-2 pb-1 text-end">
-                                {isModalEditMode && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                    onClick={() => {
-                                      const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
-                                        ? [...formData.jobWorkRows]
-                                        : [{ size: '', threadConsumption: '' }];
-                                      const updated = currentRows.filter((_, idx) => idx !== i);
-                                      setFormData({
-                                        ...formData,
-                                        jobWorkRows: updated.length > 0 ? updated : [{ size: '', threadConsumption: '' }]
-                                      });
-                                    }}
-                                  >
-                                    Remove
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {isModalEditMode && (
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold"
-                              onClick={() => {
-                                const currentRows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
-                                  ? [...formData.jobWorkRows]
-                                  : [{ size: '', threadConsumption: '' }];
-                                setFormData({
-                                  ...formData,
-                                  jobWorkRows: [...currentRows, { size: '', threadConsumption: '' }]
-                                });
-                              }}
-                            >
-                              + Add more
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </>
                   )}
 
@@ -1478,139 +1367,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               </span>
                             </div>
 
-                            {/* Thread Per Stitch (metres) - Default 15m, editable */}
-                            <div className="mb-3">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Thread Per Stitch (metres required for 1m of stitching) <span className="text-danger">*</span>
-                              </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="form-control fw-bold"
-                                  placeholder="e.g. 15"
-                                  value={formData.threadPerStitch !== undefined && formData.threadPerStitch !== null ? formData.threadPerStitch : ''}
-                                  onChange={(e) => setFormData({ ...formData, threadPerStitch: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
-                                  style={{ height: '36px' }}
-                                />
-                                <span className="input-group-text bg-white text-muted">m / stitch</span>
-                              </div>
-                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Default: 15 m per metre of stitching, remains editable.
-                              </div>
-                            </div>
-
-                            {/* Available Boxes (Reels Per Box x Metres Per Reel = 6000 m) */}
-                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <div className="d-flex align-items-center justify-content-between mb-2">
-                                <label className="form-label fw-bold text-dark small mb-0">
-                                  Available Boxes (Each box = 6000 m)
-                                </label>
-                                <span className="badge bg-light text-muted border" style={{ fontSize: '11px' }}>
-                                  Reels Per Box &times; Metres Per Reel
-                                </span>
-                              </div>
-                              {(() => {
-                                const boxList = (formData.boxes && formData.boxes.length > 0)
-                                  ? formData.boxes
-                                  : [{ reelsPerBox: '', metersPerReel: '' }];
-                                return boxList.map((b, i, arr) => {
-                                  const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
-                                  return (
-                                    <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
-                                      <div className="col-4">
-                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Reels Per Box</label>
-                                        <input
-                                          type="number"
-                                          className="form-control form-control-sm fw-bold"
-                                          placeholder="e.g. 15"
-                                          value={b.reelsPerBox ?? ''}
-                                          onChange={(e) => {
-                                            const updated = [...arr];
-                                            updated[i] = { ...updated[i], reelsPerBox: e.target.value };
-                                            setFormData({ ...formData, boxes: updated });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="col-4">
-                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Metres Per Reel</label>
-                                        <input
-                                          type="number"
-                                          className="form-control form-control-sm fw-bold"
-                                          placeholder="e.g. 400"
-                                          value={b.metersPerReel ?? ''}
-                                          onChange={(e) => {
-                                            const updated = [...arr];
-                                            updated[i] = { ...updated[i], metersPerReel: e.target.value };
-                                            setFormData({ ...formData, boxes: updated });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="col-3 text-center">
-                                        <span className={`badge ${totalBoxMetres === 6000 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-dark'}`} style={{ fontSize: '11px' }}>
-                                          = {totalBoxMetres || 0} m
-                                        </span>
-                                      </div>
-                                      <div className="col-1 text-end">
-                                        <button
-                                          type="button"
-                                          className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                          onClick={() => {
-                                            const updated = arr.filter((_, idx) => idx !== i);
-                                            setFormData({
-                                              ...formData,
-                                              boxes: updated.length ? updated : [{ reelsPerBox: '', metersPerReel: '' }]
-                                            });
-                                          }}
-                                        >
-                                          <i className="ti ti-trash"></i>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                              <button
-                                type="button"
-                                className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
-                                style={{ fontSize: '12px' }}
-                                onClick={() => {
-                                  const current = (formData.boxes && formData.boxes.length > 0)
-                                    ? formData.boxes
-                                    : [{ reelsPerBox: '', metersPerReel: '' }];
-                                  setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
-                                }}
-                              >
-                                <i className="ti ti-plus"></i> Add Box Configuration
-                              </button>
-                            </div>
-
-                            {/* Available Cone Sizes (Repeatable) */}
-                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <TagInput
-                                label="Available Cone Sizes (e.g. 5000 m, 10000 m)"
-                                tags={formData.coneSizes || []}
-                                onChange={(newTags) => setFormData({ ...formData, coneSizes: newTags })}
-                                placeholder="Type cone size (e.g. 5000 m) and press Enter"
-                                suggestions={['5000 m', '10000 m', '20000 m']}
-                                disabled={!isModalEditMode}
-                              />
-                            </div>
-
-                            {/* Available Placements (Repeatable chips/buttons) */}
-                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <label className="form-label fw-bold text-dark small mb-1">
-                                Available Placements (Predefined & Manufacturing Defaults)
-                              </label>
-                              <TagInput
-                                label=""
-                                tags={formData.placements || []}
-                                onChange={(newTags) => setFormData({ ...formData, placements: newTags })}
-                                placeholder="Add placement (e.g. Sleeves, Collar) and press Enter"
-                                suggestions={['Sleeves', 'Front', 'Back', 'Collar', 'Hemline', 'Pocket', 'Placket']}
-                                disabled={!isModalEditMode}
-                              />
-                            </div>
 
                             {/* Article -> Placement -> Thread Line Chain (Section 7.2 table, Page 12 functional points, Section 10.2 wireframe) */}
                             <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
@@ -1774,27 +1530,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               </button>
                             </div>
 
-                            {/* One-Time Global Thread Stitching Metric (Page 12, Page 18) */}
-                            <div className="p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <label className="form-label fw-bold text-dark small mb-1">
-                                One-Time Global Thread Stitching Metric <span className="text-danger">*</span>
-                              </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '280px' }}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="form-control fw-bold"
-                                  placeholder="e.g. 15"
-                                  value={formData.globalThreadMetric !== undefined && formData.globalThreadMetric !== null ? formData.globalThreadMetric : ''}
-                                  onChange={(e) => setFormData({ ...formData, globalThreadMetric: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
-                                  style={{ height: '36px' }}
-                                />
-                                <span className="input-group-text bg-white text-muted">m / stitch metre</span>
-                              </div>
-                              <div className="form-text text-muted" style={{ fontSize: '11px' }}>
-                                Entered once and applies to both Kantha and Couching — separate from and in addition to per-placement Thread Required values.
-                              </div>
-                            </div>
                           </div>
                         )}
 
@@ -1809,31 +1544,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 <span className="fw-bold text-dark fs-14">Pattern Configuration</span>
                               </div>
                               <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
-                            </div>
-
-                            {/* Meters of thread required for 1m stitching (single-time entry) */}
-                            <div className="mb-3">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Meters of thread required for 1m stitching (single‑time entry) <span className="text-danger">*</span>
-                              </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '260px' }}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="form-control fw-bold"
-                                  placeholder="e.g. 15"
-                                  value={formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== null && formData.metersPerMeterStitching !== '' ? formData.metersPerMeterStitching : (formData.threadPerStitch !== undefined && formData.threadPerStitch !== null && formData.threadPerStitch !== '' ? formData.threadPerStitch : '')}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
-                                    setFormData({ ...formData, metersPerMeterStitching: val, threadPerStitch: val });
-                                  }}
-                                  style={{ height: '36px' }}
-                                />
-                                <span className="input-group-text bg-white text-muted">m / 1m stitch</span>
-                              </div>
-                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Single-time entry: Metres of thread required for 1m stitching.
-                              </div>
                             </div>
 
                             {/* Thread Per Piece - Default 60m, editable */}
@@ -1856,102 +1566,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
                                 Auto-populates BOM Quantity per Piece (editable).
                               </div>
-                            </div>
-
-                            {/* Available Boxes (Same structure as Kantha) */}
-                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <div className="d-flex align-items-center justify-content-between mb-2">
-                                <label className="form-label fw-bold text-dark small mb-0">
-                                  Available Boxes (Each box = 6000 m)
-                                </label>
-                                <span className="badge bg-light text-muted border" style={{ fontSize: '11px' }}>
-                                  Reels Per Box &times; Metres Per Reel
-                                </span>
-                              </div>
-                              {(() => {
-                                const boxList = (formData.boxes && formData.boxes.length > 0)
-                                  ? formData.boxes
-                                  : [{ reelsPerBox: '', metersPerReel: '' }];
-                                return boxList.map((b, i, arr) => {
-                                  const totalBoxMetres = (parseFloat(b.reelsPerBox) || 0) * (parseFloat(b.metersPerReel) || 0);
-                                  return (
-                                    <div key={i} className="row g-2 align-items-center mb-2 p-2 bg-light rounded-2 border">
-                                      <div className="col-4">
-                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Reels Per Box</label>
-                                        <input
-                                          type="number"
-                                          className="form-control form-control-sm fw-bold"
-                                          placeholder="e.g. 15"
-                                          value={b.reelsPerBox ?? ''}
-                                          onChange={(e) => {
-                                            const updated = [...arr];
-                                            updated[i] = { ...updated[i], reelsPerBox: e.target.value };
-                                            setFormData({ ...formData, boxes: updated });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="col-4">
-                                        <label className="form-label small text-muted mb-0" style={{ fontSize: '11px' }}>Metres Per Reel</label>
-                                        <input
-                                          type="number"
-                                          className="form-control form-control-sm fw-bold"
-                                          placeholder="e.g. 400"
-                                          value={b.metersPerReel ?? ''}
-                                          onChange={(e) => {
-                                            const updated = [...arr];
-                                            updated[i] = { ...updated[i], metersPerReel: e.target.value };
-                                            setFormData({ ...formData, boxes: updated });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="col-3 text-center">
-                                        <span className={`badge ${totalBoxMetres === 6000 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-dark'}`} style={{ fontSize: '11px' }}>
-                                          = {totalBoxMetres || 0} m
-                                        </span>
-                                      </div>
-                                      <div className="col-1 text-end">
-                                        <button
-                                          type="button"
-                                          className="btn btn-sm btn-link text-danger p-0 text-decoration-none"
-                                          onClick={() => {
-                                            const updated = arr.filter((_, idx) => idx !== i);
-                                            setFormData({
-                                              ...formData,
-                                              boxes: updated.length ? updated : [{ reelsPerBox: '', metersPerReel: '' }]
-                                            });
-                                          }}
-                                        >
-                                          <i className="ti ti-trash"></i>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                              <button
-                                type="button"
-                                className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 mt-1"
-                                style={{ fontSize: '12px' }}
-                                onClick={() => {
-                                  const current = (formData.boxes && formData.boxes.length > 0)
-                                    ? formData.boxes
-                                    : [{ reelsPerBox: '', metersPerReel: '' }];
-                                  setFormData({ ...formData, boxes: [...current, { reelsPerBox: '', metersPerReel: '' }] });
-                                }}
-                              >
-                                <i className="ti ti-plus"></i> Add Box Configuration
-                              </button>
-                            </div>
-
-                            {/* Available Cone Sizes (Repeatable) */}
-                            <div className="mb-3 p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <TagInput
-                                label="Available Cone Sizes (e.g. 5000 m, 10000 m)"
-                                tags={formData.coneSizes || []}
-                                onChange={(newTags) => setFormData({ ...formData, coneSizes: newTags })}
-                                placeholder="Type cone size (e.g. 5000 m) and press Enter"
-                                suggestions={['5000 m', '10000 m', '20000 m']}
-                              />
                             </div>
 
                             {/* Targeted Articles (Multi-Select) & Dynamic Thread Consumption per 100 Pieces (per Article) */}
@@ -3474,25 +3088,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     )
                   )}
 
-                  {selectedAccessory.category === 'Tassels' && (
-                    <div className="d-flex flex-column gap-2.5">
-                      <div>
-                        <div className="text-muted small">Tassel Type</div>
-                        <span className="badge bg-primary-subtle text-primary px-2.5 py-1">{selectedAccessory.tasselType || 'Ready Made'}</span>
-                      </div>
-                      {selectedAccessory.tasselType === 'Job Work' && (
-                        <div>
-                          <div className="text-muted small mb-1">Job Work Sizes & Thread Consumption:</div>
-                          {(selectedAccessory.jobWorkRows || []).map((row, rIdx) => (
-                            <div key={rIdx} className="p-2 bg-light rounded border mb-1 small d-flex justify-content-between">
-                              <span>Size: <strong>{row.size}</strong></span>
-                              <span>Consumption: <strong>{row.threadConsumption} m</strong></span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
 
                   {selectedAccessory.category === 'Dori' && (
                     <div className="d-flex flex-column gap-2.5">
@@ -3582,56 +3178,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                       {['Kantha', 'Couching'].includes(selectedAccessory.threadPattern) && (
                         <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <div className="text-muted small">Thread Per Stitch</div>
-                              <div className="fw-bold text-dark">{selectedAccessory.threadPerStitch || '—'} m / stitch</div>
-                            </div>
-                            <div className="col-6">
-                              <div className="text-muted small">Global Stitching Metric</div>
-                              <div className="fw-bold text-primary">{selectedAccessory.globalThreadMetric || '—'} m / stitch metre</div>
-                            </div>
-                          </div>
-
-                          {selectedAccessory.boxes && selectedAccessory.boxes.length > 0 && (
-                            <div>
-                              <div className="text-muted small mb-1">Available Boxes:</div>
-                              <div className="d-flex flex-wrap gap-1.5">
-                                {selectedAccessory.boxes.map((b, i) => (
-                                  <span key={i} className="badge bg-light text-dark border px-2 py-1 small">
-                                    {b.reelsPerBox} reels &times; {b.metersPerReel}m ({(parseFloat(b.reelsPerBox)||0)*(parseFloat(b.metersPerReel)||0)}m)
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {selectedAccessory.coneSizes && selectedAccessory.coneSizes.length > 0 && (
-                            <div>
-                              <div className="text-muted small mb-1">Cone Sizes:</div>
-                              <div className="d-flex flex-wrap gap-1">
-                                {selectedAccessory.coneSizes.map((cs, i) => (
-                                  <span key={i} className="badge rounded-pill bg-white text-secondary border px-2 py-0.5" style={{ fontSize: '11px' }}>
-                                    {cs}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {selectedAccessory.placements && selectedAccessory.placements.length > 0 && (
-                            <div>
-                              <div className="text-muted small mb-1">Available Placements:</div>
-                              <div className="d-flex flex-wrap gap-1">
-                                {selectedAccessory.placements.map((p, i) => (
-                                  <span key={i} className="badge rounded-pill bg-light text-dark border px-2 py-0.5" style={{ fontSize: '11px' }}>
-                                    {p}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
                           {selectedAccessory.articlePlacements && selectedAccessory.articlePlacements.length > 0 && (
                             <div>
                               <div className="text-muted small mb-1.5 fw-semibold">Article &rarr; Placement &rarr; Thread Line Chain:</div>
@@ -3654,17 +3200,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                       {selectedAccessory.threadPattern === 'Stitching' && (
                         <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                          <div className="row g-2">
-                            <div className="col-sm-6">
-                              <div className="text-muted small">Meters of Thread for 1m Stitching</div>
-                              <div className="fw-bold text-dark fs-14">
-                                {selectedAccessory.metersPerMeterStitching || selectedAccessory.threadPerStitch || '—'} m / 1m stitch
-                              </div>
-                            </div>
-                            <div className="col-sm-6">
-                              <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                              <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
-                            </div>
+                          <div>
+                            <div className="text-muted small">Thread Per Piece (BOM Default)</div>
+                            <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
                           </div>
 
                           {((selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0) || (selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0)) && (
@@ -3684,19 +3222,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     </span>
                                   );
                                 })}
-                              </div>
-                            </div>
-                          )}
-
-                          {selectedAccessory.boxes && selectedAccessory.boxes.length > 0 && (
-                            <div>
-                              <div className="text-muted small mb-1">Available Boxes:</div>
-                              <div className="d-flex flex-wrap gap-1.5">
-                                {selectedAccessory.boxes.map((b, i) => (
-                                  <span key={i} className="badge bg-light text-dark border px-2 py-1 small">
-                                    {b.reelsPerBox} reels &times; {b.metersPerReel}m ({(parseFloat(b.reelsPerBox)||0)*(parseFloat(b.metersPerReel)||0)}m)
-                                  </span>
-                                ))}
                               </div>
                             </div>
                           )}
@@ -3955,21 +3480,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         }}
                       >
                         Pattern: {acc.threadPattern}
-                      </div>
-                    )}
-                    {acc.tasselType && (
-                      <div
-                        style={{
-                          backgroundColor: '#fff7ed',
-                          border: '1px solid #ffedd5',
-                          borderRadius: '8px',
-                          padding: '3px 8px',
-                          fontSize: '11.5px',
-                          color: '#c2410c',
-                          fontWeight: 600
-                        }}
-                      >
-                        Type: {acc.tasselType}
                       </div>
                     )}
                   </div>

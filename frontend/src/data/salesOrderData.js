@@ -33,7 +33,17 @@ export const setStoredData = (key, data) => {
 };
 
 export const getStoredAccessoriesMaster = () => {
-  return getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
+  const data = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
+  if (Array.isArray(data)) {
+    return data.map(item => {
+      if (item && item.tasselType) {
+        const { tasselType, ...rest } = item;
+        return rest;
+      }
+      return item;
+    });
+  }
+  return data;
 };
 
 const LEGACY_MOCK_NAMES = [

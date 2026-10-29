@@ -201,15 +201,15 @@ export default function PurchaseOrderList({
           <table className="table table-hover align-middle mb-0 fs-13">
             <thead className="text-secondary" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <tr>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PO No.</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fabrics / Qualities</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expected Date</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buffer %</th>
-                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Amount</th>
-                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
-                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '120px', whiteSpace: 'nowrap' }}>PO No.</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '100px', whiteSpace: 'nowrap' }}>Date</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '140px' }}>Vendor</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '200px' }}>Fabrics / Qualities</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '125px', whiteSpace: 'nowrap' }}>Expected Date</th>
+                <th className="text-center" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '90px', whiteSpace: 'nowrap' }}>Buffer %</th>
+                <th className="text-end" style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '130px', whiteSpace: 'nowrap' }}>Total Amount</th>
+                <th style={{ padding: '12px 14px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '160px' }}>Status</th>
+                <th className="text-end" style={{ padding: '12px 16px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: '250px', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -285,7 +285,7 @@ export default function PurchaseOrderList({
                             <span>{po.status === 'Sent' ? 'Sent to Vendor' : po.status}</span>
                           </span>
 
-                          {isPoGrnLocked(po) && (
+                          {isPoGrnLocked(po) && po.status !== 'Completed' && (
                             <span
                               className="badge bg-light text-secondary border px-1.5 py-0.5 rounded-pill fs-11 d-inline-flex align-items-center gap-1 shadow-2xs"
                               title="Requirement 15: Non-editable (GRN process started)"
@@ -296,95 +296,125 @@ export default function PurchaseOrderList({
                           )}
 
                           {po.status === 'Partially Received' && (
-                            <div className="mt-0.5" style={{ fontSize: '11px', lineHeight: 1.35 }}>
-                              <div className="text-muted">
-                                Recv: <strong className="text-dark">{receivedMeters.toLocaleString()}m</strong> / {totalOrdered.toLocaleString()}m
+                            <div className="mt-1 p-1.5 rounded-2 bg-light border border-info border-opacity-25 w-100" style={{ fontSize: '11px', lineHeight: 1.4 }}>
+                              <div className="d-flex align-items-center justify-content-between text-muted">
+                                <span>Received:</span>
+                                <strong className="text-dark">{receivedMeters.toLocaleString()}m</strong>
                               </div>
-                              <div className="text-danger fw-semibold">
-                                Pending: {pendingMeters.toLocaleString()}m
+                              <div className="d-flex align-items-center justify-content-between text-danger fw-semibold">
+                                <span>Pending:</span>
+                                <span>{pendingMeters.toLocaleString()}m</span>
                               </div>
                             </div>
                           )}
                           {po.status === 'Completed' && totalOrdered > 0 && (
-                            <div className="text-success fw-medium" style={{ fontSize: '11px' }}>
-                              {totalOrdered.toLocaleString()}m received
+                            <div className="mt-0.5 text-success fw-medium d-flex align-items-center gap-1" style={{ fontSize: '11px' }}>
+                              <i className="ti ti-check fs-12"></i>
+                              <span>All {totalOrdered.toLocaleString()}m received</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="text-center" style={{ whiteSpace: 'nowrap' }}>
-                        <div className="d-inline-flex align-items-center justify-content-center gap-1">
-                          {poGrns.length > 0 ? (
+                      <td className="text-end" style={{ whiteSpace: 'nowrap', verticalAlign: 'middle', padding: '10px 14px' }}>
+                        <div className="d-inline-flex align-items-center justify-content-end gap-2 flex-nowrap">
+                          {/* GRN Inward Buttons / Badges */}
+                          <div className="d-inline-flex align-items-center gap-1.5 flex-nowrap">
+                            {/* 1. Show existing GRNs created for this PO */}
+                            {poGrns.map((g, gIdx) => (
+                              <button
+                                key={g.id || gIdx}
+                                type="button"
+                                className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                                style={{
+                                  background: '#f0fdf4',
+                                  color: '#16a34a',
+                                  border: '1px solid #bbf7d0',
+                                  height: '30px',
+                                  fontSize: '11.5px',
+                                  lineHeight: 1,
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={`GRN ${g.id} (${(Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toLocaleString()}m). Click to view.`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onViewGRN) {
+                                    onViewGRN(g);
+                                  } else if (onInwardGRN) {
+                                    onInwardGRN(po);
+                                  }
+                                }}
+                              >
+                                <i className="ti ti-check fs-12"></i>
+                                <span className="fw-bold">{g.id}</span>
+                              </button>
+                            ))}
+
+                            {/* 2. As long as PO is not fully fulfilled, allow creating multiple installment GRNs */}
+                            {pendingMeters > 0 && po.status !== 'Draft' && po.status !== 'Cancelled' && po.status !== 'Completed' ? (
+                              <button
+                                type="button"
+                                className="btn btn-sm px-2.5 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap shadow-xs"
+                                style={{
+                                  background: poGrns.length > 0 ? '#eff6ff' : '#ecfdf5',
+                                  color: poGrns.length > 0 ? '#1d4ed8' : '#059669',
+                                  border: poGrns.length > 0 ? '1px solid #bfdbfe' : '1px solid #a7f3d0',
+                                  height: '30px',
+                                  fontSize: '11.5px',
+                                  lineHeight: 1,
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={poGrns.length > 0
+                                  ? `Inward Remaining ${pendingMeters.toLocaleString()}m for this PO (${poGrns.length} GRN(s) already created)`
+                                  : "Create Inward Delivery GRN for this PO"}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onInwardGRN) onInwardGRN({ ...po, pendingQtyToReceive: pendingMeters });
+                                }}
+                              >
+                                <i className={poGrns.length > 0 ? "ti ti-truck-delivery fs-13" : "ti ti-package fs-13"}></i>
+                                <span className="fw-bold">
+                                  {poGrns.length > 0 ? `+ GRN (${pendingMeters.toLocaleString()}m)` : '+ GRN'}
+                                </span>
+                              </button>
+                            ) : ((pendingMeters <= 0 && totalOrdered > 0) || po.status === 'Completed') ? (
+                              <span
+                                className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
+                                style={{ height: '30px' }}
+                                title={`PO 100% Fulfilled: All ${totalOrdered.toLocaleString()}m received across ${poGrns.length} GRN(s). No further GRN allowed.`}
+                              >
+                                <i className="ti ti-circle-check fs-12"></i>
+                                <span>Fully Received</span>
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {/* Standard View and Print Action Icons Group */}
+                          <div className="btn-group btn-group-sm shadow-2xs" role="group" style={{ flexShrink: 0 }}>
                             <button
                               type="button"
-                              className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
-                              style={{
-                                background: '#f0fdf4',
-                                color: '#16a34a',
-                                border: '1px solid #bbf7d0',
-                                height: '32px',
-                                lineHeight: 1,
-                                whiteSpace: 'nowrap'
-                              }}
-                              title={`GRN ${poGrns[0].id} already created for this PO. Click to view.`}
+                              className="btn btn-white border px-2 d-inline-flex align-items-center justify-content-center text-primary"
+                              style={{ width: '31px', height: '30px', borderColor: '#cbd5e1' }}
+                              title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onViewGRN) {
-                                  onViewGRN(poGrns[0]);
-                                } else if (onInwardGRN) {
-                                  onInwardGRN(po);
-                                }
+                                if (onSelectPO) onSelectPO(po);
                               }}
                             >
-                              <i className="ti ti-check fs-13"></i>
-                              <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>{poGrns[0].id}</span>
+                              <i className="ti ti-eye fs-14"></i>
                             </button>
-                          ) : !hasExistingGrn && po.status !== 'Completed' && po.status !== 'Draft' ? (
                             <button
                               type="button"
-                              className="btn btn-sm px-2 py-1 rounded-2 fw-semibold d-inline-flex align-items-center gap-1 text-nowrap"
-                              style={{
-                                background: '#ecfdf5',
-                                color: '#059669',
-                                border: '1px solid #a7f3d0',
-                                height: '32px',
-                                lineHeight: 1,
-                                whiteSpace: 'nowrap'
-                              }}
-                              title="Create Inward Delivery GRN for this PO"
+                              className="btn btn-white border px-2 d-inline-flex align-items-center justify-content-center text-secondary"
+                              style={{ width: '31px', height: '30px', borderColor: '#cbd5e1' }}
+                              title="Print PO Invoice"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onInwardGRN) onInwardGRN(po);
+                                if (onPrintPO) onPrintPO(po);
                               }}
                             >
-                              <i className="ti ti-package fs-13"></i>
-                              <span className="fs-12 fw-bold" style={{ letterSpacing: '0.02em' }}>+ GRN</span>
+                              <i className="ti ti-printer fs-14"></i>
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn btn-outline-primary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
-                            style={{ width: '32px', height: '32px' }}
-                            title={isPoGrnLocked(po) ? "View PO Details (Locked - Non-editable: GRN process started)" : "View / Edit PO Details"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onSelectPO) onSelectPO(po);
-                            }}
-                          >
-                            <i className="ti ti-eye fs-15"></i>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline-secondary btn-sm px-2 rounded-2 d-inline-flex align-items-center justify-content-center"
-                            style={{ width: '32px', height: '32px' }}
-                            title="Print PO Invoice"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onPrintPO) onPrintPO(po);
-                            }}
-                          >
-                            <i className="ti ti-printer fs-15"></i>
-                          </button>
+                          </div>
                         </div>
                       </td>
                     </tr>

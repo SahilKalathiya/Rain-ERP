@@ -182,6 +182,84 @@ export default function OrderDetailView({
     setShowToast(true);
   };
 
+  // Sourced directly from Fabric configuration or Fabric Master (Buffer % allowance per article fabric)
+  const getArticleFabricBuffer = (articleName) => {
+    const artNameClean = String(articleName || '').toLowerCase().trim();
+
+    // 1. Check order.fabricConsumptions
+    if (Array.isArray(order?.fabricConsumptions)) {
+      const match = order.fabricConsumptions.find(fc => String(fc.articleName || fc.article || '').toLowerCase().trim() === artNameClean);
+      if (match) {
+        const raw = match.bufferPercent !== undefined && match.bufferPercent !== null && match.bufferPercent !== ''
+          ? match.bufferPercent
+          : match.bufferPct;
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0) return val;
+        }
+      }
+    }
+
+    // 2. Check order.articles
+    if (Array.isArray(order?.articles)) {
+      const match = order.articles.find(a => String(a.name || a.articleName || '').toLowerCase().trim() === artNameClean);
+      if (match) {
+        const raw = match.bufferPercent !== undefined && match.bufferPercent !== null && match.bufferPercent !== ''
+          ? match.bufferPercent
+          : match.bufferPct;
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0) return val;
+        }
+        if (Array.isArray(match.fabrics) && match.fabrics.length > 0) {
+          for (const f of match.fabrics) {
+            const fBuf = f.bufferPercent !== undefined && f.bufferPercent !== null && f.bufferPercent !== ''
+              ? f.bufferPercent
+              : (f.bufferPct !== undefined && f.bufferPct !== null && f.bufferPct !== ''
+                  ? f.bufferPct
+                  : f.maxBuffer);
+            if (fBuf !== undefined && fBuf !== null && fBuf !== '') {
+              const val = parseFloat(fBuf);
+              if (!isNaN(val) && val >= 0) return val;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Check Fabric Master
+    let allFabrics = Array.isArray(masterFabricsList) && masterFabricsList.length > 0 ? [...masterFabricsList] : [];
+    try {
+      const stored = getStoredData('raindrop_fabrics_v1', null);
+      if (Array.isArray(stored) && stored.length > 0) {
+        allFabrics = [...allFabrics, ...stored];
+      }
+    } catch (e) {}
+    if (Array.isArray(procurementFabrics) && procurementFabrics.length > 0) {
+      allFabrics = [...allFabrics, ...procurementFabrics];
+    }
+    const artObj = (order?.articles || []).find(a => String(a.name || a.articleName || '').toLowerCase().trim() === artNameClean);
+    const fabQ = artObj?.fabricQuality || artObj?.fabrics?.[0]?.fabricQuality || '';
+    if (fabQ) {
+      const fqClean = String(fabQ).toLowerCase().trim();
+      const matched = allFabrics.find(f => {
+        const q = String(f.qualityName || f.quality_name || f.quality || f.name || '').toLowerCase().trim();
+        return q && (q === fqClean || fqClean.includes(q) || q.includes(fqClean));
+      });
+      if (matched) {
+        const raw = matched.maxBuffer ?? matched.bufferPercent ?? matched.buffer ?? matched.bufferPct;
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0) return val;
+        }
+      }
+    }
+
+    // 4. Default fallback matching prototype mock
+    if (artNameClean.includes('pant')) return 8;
+    return 10;
+  };
+
   const CATEGORY_METADATA = {
     'Buttons': { name: 'Buttons', icon: 'ti ti-circle-dot', iconColor: '#475569', bgColor: '#f1f5f9', poBtnText: 'Button PO', poBtnColor: '#2563eb', defaultUnit: 'PCS' },
     'Lace': { name: 'Lace', icon: 'ti ti-cut', iconColor: '#2563eb', bgColor: '#eff6ff', poBtnText: 'Lace PO', poBtnColor: '#9333ea', defaultUnit: 'METER' },
@@ -334,6 +412,11 @@ export default function OrderDetailView({
             const rawSize = r.size || '';
             const rawReq = r.reqPerPiece ?? r.reqPerPc ?? '';
             const rawExtra = r.extraPerPack ?? '';
+            const defaultBuf = getArticleFabricBuffer(r.article || acc.article || 'Kurta');
+            const hasUserEdited = r._userEditedBuffer === true;
+            const resBuf = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+              ? r.bufferPct
+              : defaultBuf;
             flattened.push({
               id: `acc_${acc.category || 'acc'}_${aIdx}_${rIdx}`,
               category: acc.category || 'Buttons',
@@ -348,7 +431,7 @@ export default function OrderDetailView({
               source: (r.source === 'Ready Made' && (!rawReq || String(rawReq) === '5')) ? '' : (r.source || ''),
               reqPerPc: (String(rawReq) === '5' || String(rawReq) === '0') ? '' : String(rawReq),
               extraPerPack: (String(rawExtra) === '0' || String(rawExtra) === '10') ? '' : String(rawExtra),
-              bufferPct: '',
+              bufferPct: resBuf,
               total: r.totalQuantity || '0.0'
             });
           });
@@ -358,6 +441,11 @@ export default function OrderDetailView({
           const rawSize = acc.size || '';
           const rawReq = acc.reqPerPiece ?? acc.reqPerPc ?? '';
           const rawExtra = acc.extraPerPack ?? '';
+          const defaultBuf = getArticleFabricBuffer(acc.article || 'Kurta');
+          const hasUserEdited = acc._userEditedBuffer === true;
+          const resBuf = (acc.bufferPct !== undefined && acc.bufferPct !== null && acc.bufferPct !== '' && (hasUserEdited || parseFloat(acc.bufferPct) > 0))
+            ? acc.bufferPct
+            : defaultBuf;
           flattened.push({
             ...acc,
             placement: (rawPlacement === 'Front Placket' || rawPlacement === 'Front..') ? '' : rawPlacement,
@@ -365,7 +453,8 @@ export default function OrderDetailView({
             size: (rawSize === '18L' || rawSize === '—') ? '' : rawSize,
             source: (acc.source === 'Ready Made' && (!rawReq || String(rawReq) === '5')) ? '' : (acc.source || ''),
             reqPerPc: (String(rawReq) === '5' || String(rawReq) === '0') ? '' : String(rawReq),
-            extraPerPack: (String(rawExtra) === '0' || String(rawExtra) === '10') ? '' : String(rawExtra)
+            extraPerPack: (String(rawExtra) === '0' || String(rawExtra) === '10') ? '' : String(rawExtra),
+            bufferPct: resBuf
           });
         }
       });
@@ -399,14 +488,18 @@ export default function OrderDetailView({
       const cat = (acc.category || '').toLowerCase();
       if (cat.includes('button')) {
         if (acc.articleRows && typeof acc.articleRows === 'object') {
-          Object.values(acc.articleRows).forEach(rows => {
+          Object.entries(acc.articleRows).forEach(([artName, rows]) => {
             if (Array.isArray(rows)) {
+              const defaultBuf = getArticleFabricBuffer(artName);
               rows.forEach(r => {
                 const reqVal = parseFloat(r.reqPerPc) || 0;
                 const packInput = r.extraPerPack !== undefined && r.extraPerPack !== null ? String(r.extraPerPack).trim() : '';
                 const packNum = parseFloat(packInput);
                 const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
-                const bufVal = parseFloat(r.bufferPct) || 0;
+                const hasUserEdited = r._userEditedBuffer === true;
+                const bufVal = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+                  ? (parseFloat(r.bufferPct) || 0)
+                  : defaultBuf;
                 const artPcs = parseFloat(r.totalQty) || 0;
                 const reqQty = artPcs * reqVal;
                 const packQty = artPcs * packVal;
@@ -630,6 +723,8 @@ export default function OrderDetailView({
     const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
     const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
+    const defaultBuffer = getArticleFabricBuffer(articleName);
+
     if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
       // Deduplicate rows according to article color (eliminating duplicates caused by multiple fabrics)
       const seen = new Set();
@@ -641,8 +736,13 @@ export default function OrderDetailView({
         if (!seen.has(key)) {
           seen.add(key);
           const matchedOpt = colorOpts.find(co => co.color.toLowerCase() === key || co.display.toLowerCase() === raw.toLowerCase());
+          const hasUserEdited = r._userEditedBuffer === true;
+          const resolvedBuffer = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+            ? r.bufferPct
+            : defaultBuffer;
           deduped.push({
             ...r,
+            bufferPct: resolvedBuffer,
             totalQty: matchedOpt ? matchedOpt.qty : (key === 'all colours' ? totalAllQty : r.totalQty)
           });
         }
@@ -663,7 +763,7 @@ export default function OrderDetailView({
       fabricColor: (item.fabricColor && item.fabricColor !== '—') ? item.fabricColor : '',
       reqPerPc: item.reqPerPc || '',
       extraPerPack: item.extraPerPack || '',
-      bufferPct: item.bufferPct || '',
+      bufferPct: (item.bufferPct !== undefined && item.bufferPct !== '' && (item._userEditedBuffer || parseFloat(item.bufferPct) > 0)) ? item.bufferPct : defaultBuffer,
       dyedRate: item.dyedRate || '',
       shrinkPct: item.shrinkPct || '',
       lines: item.lines || ''
@@ -680,7 +780,7 @@ export default function OrderDetailView({
         fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
-        bufferPct: ''
+        bufferPct: defaultBuffer
       }
     ];
   };
@@ -720,13 +820,23 @@ export default function OrderDetailView({
               custom[field] = true;
             }
           }
-          return { ...r, [field]: finalValue, customized: custom };
+          return {
+            ...r,
+            [field]: finalValue,
+            ...(field === 'bufferPct' ? { _userEditedBuffer: true } : {}),
+            customized: custom
+          };
         }
 
         if (isAllColoursRow) {
           const custom = { ...(r.customized || {}) };
           delete custom[field];
-          return { ...r, [field]: finalValue, customized: custom };
+          return {
+            ...r,
+            [field]: finalValue,
+            ...(field === 'bufferPct' ? { _userEditedBuffer: true } : {}),
+            customized: custom
+          };
         }
 
         if (rowIndex === 0) {
@@ -734,7 +844,11 @@ export default function OrderDetailView({
             ? Boolean(r.customized[field])
             : (r[field] !== undefined && r[field] !== '' && r[field] !== currentRows[0]?.[field]);
           if (!isCustomized) {
-            return { ...r, [field]: finalValue };
+            return {
+              ...r,
+              [field]: finalValue,
+              ...(field === 'bufferPct' ? { _userEditedBuffer: true } : {})
+            };
           }
         }
 
@@ -821,6 +935,7 @@ export default function OrderDetailView({
       const initialArticleRows = {};
       orderArticles.forEach(art => {
         const colorOpts = getArticleColorOptions(art.name);
+        const defaultBuffer = getArticleFabricBuffer(art.name);
         initialArticleRows[art.name] = colorOpts.map((co, cIdx) => ({
           id: `row_${art.name}_${cIdx}`,
           articleColor: co.display,
@@ -832,7 +947,7 @@ export default function OrderDetailView({
           fabricColor: '',
           reqPerPc: '',
           extraPerPack: '',
-          bufferPct: '',
+          bufferPct: defaultBuffer,
           dyedRate: '',
           shrinkPct: '',
           lines: ''
@@ -858,7 +973,7 @@ export default function OrderDetailView({
         fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
-        bufferPct: '',
+        bufferPct: getArticleFabricBuffer(targetArticle),
         total: '0.0'
       });
 
@@ -1128,7 +1243,11 @@ export default function OrderDetailView({
                   const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
                   const packNum = parseFloat(packInput);
                   const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
-                  const bufVal = parseFloat(row.bufferPct) || 0;
+                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const hasUserEdited = row._userEditedBuffer === true;
+                  const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                    ? (parseFloat(row.bufferPct) || 0)
+                    : defaultBuf;
                   const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const reqQty = artPcs * reqVal;
                   const packQty = artPcs * packVal;
@@ -1330,8 +1449,8 @@ export default function OrderDetailView({
                               max="10"
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct ?? ''}
-                              placeholder="0"
+                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
+                              placeholder={String(defaultBuf)}
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1344,7 +1463,7 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                            {bufVal}%
                           </span>
                         )}
                       </td>
@@ -1397,7 +1516,11 @@ export default function OrderDetailView({
                   const dyedVal = parseFloat(row.dyedRate) || 0;
                   const shrinkVal = parseFloat(row.shrinkPct) || 0;
                   const greigeVal = dyedVal * (1 + shrinkVal / 100);
-                  const bufferVal = parseFloat(row.bufferPct) || 0;
+                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const hasUserEdited = row._userEditedBuffer === true;
+                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                    ? (parseFloat(row.bufferPct) || 0)
+                    : defaultBuf;
                   const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const totalValNum = (greigeVal * qtyVal * (1 + bufferVal / 100));
                   const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
@@ -1470,8 +1593,8 @@ export default function OrderDetailView({
                               max="10"
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct ?? ''}
-                              placeholder="0"
+                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
+                              placeholder={String(defaultBuf)}
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1484,7 +1607,7 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                            {bufferVal}%
                           </span>
                         )}
                       </td>
@@ -1536,7 +1659,11 @@ export default function OrderDetailView({
                 return rows.map((row, rIdx) => {
                   const isAllColours = row.articleColor === 'All colours';
                   const reqVal = parseFloat(row.reqPerPc) || 0;
-                  const bufferVal = parseFloat(row.bufferPct) || 0;
+                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const hasUserEdited = row._userEditedBuffer === true;
+                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                    ? (parseFloat(row.bufferPct) || 0)
+                    : defaultBuf;
                   const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
                   const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
@@ -1626,8 +1753,8 @@ export default function OrderDetailView({
                               max="10"
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct ?? ''}
-                              placeholder="0"
+                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
+                              placeholder={String(defaultBuf)}
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1640,7 +1767,7 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
+                            {bufferVal}%
                           </span>
                         )}
                       </td>
@@ -1690,7 +1817,11 @@ export default function OrderDetailView({
               return rows.map((row, rIdx) => {
                 const isAllColours = row.articleColor === 'All colours';
                 const reqVal = parseFloat(row.reqPerPc) || 0;
-                const bufferVal = parseFloat(row.bufferPct) || 0;
+                const defaultBuf = getArticleFabricBuffer(currentArticle);
+                const hasUserEdited = row._userEditedBuffer === true;
+                const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                  ? (parseFloat(row.bufferPct) || 0)
+                  : defaultBuf;
                 const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                 const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
                 const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
@@ -1792,33 +1923,33 @@ export default function OrderDetailView({
                         <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.reqPerPc || '0'}</span>
                       )}
                     </td>
-                    <td style={{ minWidth: '80px', padding: '6px 8px' }}>
-                      {isEditing ? (
-                        <div className="d-flex flex-column align-items-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-control form-control-sm text-center"
-                            value={row.bufferPct ?? ''}
-                            placeholder="0"
-                            onKeyDown={(e) => {
-                              if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
-                            style={inputStyle}
-                          />
-                          <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
-                        </div>
-                      ) : (
-                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                          {row.bufferPct !== undefined && row.bufferPct !== '' ? row.bufferPct + '%' : '0%'}
-                        </span>
-                      )}
-                    </td>
+                      <td style={{ minWidth: '80px', padding: '6px 8px' }}>
+                        {isEditing ? (
+                          <div className="d-flex flex-column align-items-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              className="form-control form-control-sm text-center"
+                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
+                              placeholder={String(defaultBuf)}
+                              onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
+                              style={inputStyle}
+                            />
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                          </div>
+                        ) : (
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                            {bufferVal}%
+                          </span>
+                        )}
+                      </td>
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
                       <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
                         {totalVal} PCS

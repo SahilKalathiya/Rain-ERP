@@ -67,9 +67,21 @@ export default function GRNForm({
     const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || (vendors[0]?.id || ''));
     const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : (vendors[0]?.name || ''));
 
+    // Check if PO has previous GRNs and remaining pending balance
+    let poPendingBalance = '';
+    if (defaultPO && !isExisting) {
+      const poTotalM = (defaultPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const prevM = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(defaultPO.id)) || g.poId === defaultPO.id)
+        .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+      const pend = Math.max(0, poTotalM - prevM);
+      if (pend > 0) poPendingBalance = String(pend);
+    }
+
     const defaultDeclared = (grn && grn.totalQty !== undefined && grn.totalQty !== '')
       ? grn.totalQty
-      : (grn?.declaredTotalMeters ? grn.declaredTotalMeters : '');
+      : (grn?.declaredTotalMeters
+          ? grn.declaredTotalMeters
+          : (grn?.pendingQtyToReceive ? String(grn.pendingQtyToReceive) : poPendingBalance));
 
     const cleanDate = (d) => {
       if (!d) return new Date().toISOString().split('T')[0];
@@ -257,8 +269,10 @@ export default function GRNForm({
           weight: grn.weight !== undefined ? grn.weight : prev.weight,
           totalQty: (grn && grn.totalQty !== undefined && grn.totalQty !== '')
             ? String(grn.totalQty)
-            : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')),
-          declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0),
+            : (grn?.declaredTotalMeters
+                ? String(grn.declaredTotalMeters)
+                : (grn?.pendingQtyToReceive ? String(grn.pendingQtyToReceive) : (prev.totalQty || ''))),
+          declaredTotalMeters: Number(grn?.totalQty || grn?.declaredTotalMeters || grn?.pendingQtyToReceive || prev.declaredTotalMeters || 0),
           totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
           status: grn.status || prev.status,
           bales: initialBales.length > 0 ? initialBales : prev.bales
@@ -303,26 +317,108 @@ export default function GRNForm({
   // Visual save feedback for Section 1 (Receipt details)
   const [isSectionSaved, setIsSectionSaved] = useState(false);
 
-  // Visual save feedback per bale
-  const [savedBaleMap, setSavedBaleMap] = useState({});
+  // Visual save feedback per bale: tracks saved status permanently
+  const [savedBaleMap, setSavedBaleMap] = useState(() => {
+    const initialMap = {};
+    (formData.bales || []).forEach((b, idx) => {
+      if (b.isSaved) initialMap[idx] = true;
+    });
+    return initialMap;
+  });
 
-  // Current active PO
-  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : null) || null;
+  // Multi-PO selection state (Point 26: Consolidate multiple POs received in same shipment)
+  const [showMultiPoPicker, setShowMultiPoPicker] = useState(false);
+  const [selectedPoToAdd, setSelectedPoToAdd] = useState('');
 
-  // Ordered meters on PO (for display in Total qty label)
-  const poOrderedMeters = currentPO && currentPO.items && currentPO.items.length > 0
-    ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
-    : Number(grn?.poOrderedMeters || 0);
+  // Collect all linked PO IDs
+  const linkedPoIds = (formData.linkedPOs && formData.linkedPOs.length > 0)
+    ? formData.linkedPOs
+    : (formData.poId && formData.poId !== 'PO-DIRECT' ? [formData.poId] : []);
 
-  // Existing previous GRNs for this PO (excluding current GRN being edited)
+  // Collect all linked PO objects
+  const linkedPOObjects = linkedPoIds
+    .map((id) => purchaseOrders.find((p) => p.id === id))
+    .filter(Boolean);
+
+  // Current active PO (primary or first linked)
+  const currentPO = purchaseOrders.find((p) => p.id === formData.poId) ||
+    linkedPOObjects[0] ||
+    (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : null) ||
+    null;
+
+  // Ordered meters across ALL linked POs
+  const poOrderedMeters = linkedPOObjects.length > 0
+    ? linkedPOObjects.reduce((sum, po) => sum + (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)
+    : (currentPO && currentPO.items && currentPO.items.length > 0
+        ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
+        : Number(grn?.poOrderedMeters || 0));
+
+  // Existing previous GRNs for these POs (excluding current GRN being edited)
   const previousGrnsForPo = (grns || []).filter(
-    (g) => g && g.id !== formData.id && ((g.linkedPOs && g.linkedPOs.includes(formData.poId)) || g.poId === formData.poId)
+    (g) => g && g.id !== formData.id && (
+      (g.linkedPOs && g.linkedPOs.some((pId) => linkedPoIds.includes(pId))) ||
+      linkedPoIds.includes(g.poId)
+    )
   );
   const alreadyReceivedMeters = previousGrnsForPo.reduce(
     (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
     0
   );
   const poPendingMeters = Math.max(0, poOrderedMeters - alreadyReceivedMeters);
+
+  // Requirement: Once PO is 100% fulfilled (e.g. 2,000m / 2,000m received), NO further GRN can be created!
+  const isPoAlreadyCompleted = Boolean(
+    !isExisting &&
+    currentPO &&
+    (currentPO.status === 'Completed' || (poOrderedMeters > 0 && poPendingMeters <= 0))
+  );
+
+  // Available POs from same vendor to consolidate into this shipment (exclude completed POs with 0m pending)
+  const currentVendorId = formData.vendorId || currentPO?.vendorId || (linkedPOObjects[0]?.vendorId);
+  const availableVendorPOs = (eligiblePOs || []).filter((p) => {
+    if (!p || !p.id) return false;
+    if (linkedPoIds.includes(p.id)) return false;
+    if (currentVendorId && p.vendorId && p.vendorId !== currentVendorId) return false;
+    const poTotalMtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    const poPrevReceived = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(p.id)) || g.poId === p.id)
+      .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+    const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
+    if (!isExisting && (p.status === 'Completed' || (poTotalMtrs > 0 && poBalPending <= 0))) return false;
+    return true;
+  });
+
+  // Link another PO to this shipment (Point 26)
+  const handleAddLinkedPO = (poIdToAdd) => {
+    if (!poIdToAdd) return;
+    const addedPO = purchaseOrders.find((p) => p.id === poIdToAdd);
+    setFormData((prev) => {
+      const cur = prev.linkedPOs && prev.linkedPOs.length > 0 ? prev.linkedPOs : (prev.poId ? [prev.poId] : []);
+      if (cur.includes(poIdToAdd)) return prev;
+      const nextLinked = [...cur, poIdToAdd];
+      return {
+        ...prev,
+        poId: prev.poId || poIdToAdd,
+        linkedPOs: nextLinked,
+        vendorId: prev.vendorId || addedPO?.vendorId || '',
+        vendorName: prev.vendorName || (addedPO ? getPoVendorName(addedPO) : '')
+      };
+    });
+    setSelectedPoToAdd('');
+    showToast(`PO ${poIdToAdd} linked to this shipment!`, 'info');
+  };
+
+  // Unlink a PO from this shipment
+  const handleUnlinkPO = (poIdToRemove) => {
+    setFormData((prev) => {
+      const cur = (prev.linkedPOs || []).filter((id) => id !== poIdToRemove);
+      return {
+        ...prev,
+        linkedPOs: cur,
+        poId: cur[0] || ''
+      };
+    });
+    showToast(`PO ${poIdToRemove} unlinked from shipment.`, 'info');
+  };
 
   // Build PO item options for bales
   const getPoItemLabel = (item) => {
@@ -333,8 +429,23 @@ export default function GRNForm({
     return `${name}${width}${color}`;
   };
 
-  const poItems = currentPO && currentPO.items && currentPO.items.length > 0 ? currentPO.items : [];
-  const poItemLabels = poItems.map((it) => getPoItemLabel(it));
+  // Collect line items across all linked POs
+  const allLinkedPoItems = [];
+  linkedPOObjects.forEach((po) => {
+    (po.items || []).forEach((it) => {
+      allLinkedPoItems.push({
+        ...it,
+        poId: po.id,
+        label: linkedPOObjects.length > 1 ? `[${po.id}] ${getPoItemLabel(it)}` : getPoItemLabel(it)
+      });
+    });
+  });
+
+  const poItems = allLinkedPoItems.length > 0
+    ? allLinkedPoItems
+    : (currentPO && currentPO.items && currentPO.items.length > 0 ? currentPO.items : []);
+
+  const poItemLabels = poItems.map((it) => it.label || getPoItemLabel(it));
 
   // Build master fabric options (Cotton, Rayon, Silk, Georgette, etc.)
   const masterFabricLabels = [];
@@ -389,7 +500,12 @@ export default function GRNForm({
     if (!selectedPO) return;
 
     const vName = getPoVendorName(selectedPO);
-    const poTotalMeters = (selectedPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+
+    // Calculate remaining pending balance for the selected PO
+    const poTotalM = (selectedPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    const prevM = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(selectedPO.id)) || g.poId === selectedPO.id)
+      .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+    const pend = Math.max(0, poTotalM - prevM);
 
     setFormData((prev) => {
       // If bales exist, keep their assignments or update default
@@ -398,7 +514,8 @@ export default function GRNForm({
         return {
           ...b,
           itemIdx: 0,
-          fabricItemLabel: b.fabricItemLabel || (item ? getPoItemLabel(item) : defaultFabricLabel)
+          fabricItemLabel: b.fabricItemLabel || (item ? getPoItemLabel(item) : defaultFabricLabel),
+          isSaved: false
         };
       });
 
@@ -408,8 +525,8 @@ export default function GRNForm({
         linkedPOs: [newPoId],
         vendorId: selectedPO.vendorId,
         vendorName: vName,
-        totalQty: '',
-        declaredTotalMeters: 0,
+        totalQty: pend > 0 ? String(pend) : '',
+        declaredTotalMeters: pend > 0 ? pend : 0,
         bales: updatedBales
       };
     });
@@ -425,6 +542,10 @@ export default function GRNForm({
 
   // Generate Bales action
   const handleGenerateBales = () => {
+    if (isPoAlreadyCompleted) {
+      showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
+      return;
+    }
     if (isQcActioned) {
       showToast('Bales cannot be altered because this GRN is locked.', 'warning');
       return;
@@ -447,9 +568,11 @@ export default function GRNForm({
           baleNo: String(i + 1),
           itemIdx: i % (poItemLabels.length || 1),
           fabricItemLabel: assignedLabel,
+          isMixedFabric: false,
           piecesCount: '',
           pieces: [],
-          totalLength: 0
+          totalLength: 0,
+          isSaved: false
         });
       }
     }
@@ -471,6 +594,11 @@ export default function GRNForm({
         bales: updated
       };
     });
+    setSavedBaleMap((prev) => {
+      const nextMap = { ...prev };
+      delete nextMap[baleIdx];
+      return nextMap;
+    });
   };
 
   // Handle Bale Number change
@@ -479,23 +607,55 @@ export default function GRNForm({
       const updated = [...prev.bales];
       updated[baleIdx] = {
         ...updated[baleIdx],
-        baleNo: val
+        baleNo: val,
+        isSaved: false
       };
       return { ...prev, bales: updated };
     });
+    setSavedBaleMap((prev) => ({ ...prev, [baleIdx]: false }));
   };
 
-  // Handle Bale Fabric Selection change (Supports PO items + all master fabrics like Cotton, Rayon, Silk)
+  // Handle Bale Fabric Selection change (Supports PO items + all master fabrics + Mixed Bale for Point 27)
   const handleBaleFabricChange = (baleIdx, newFabricLabel) => {
     setFormData((prev) => {
       const updated = [...prev.bales];
+      const isMixed = newFabricLabel === 'MIXED_FABRIC';
+      const curPieces = updated[baleIdx]?.pieces || [];
+      const updatedPieces = curPieces.map((p) => ({
+        ...(typeof p === 'object' && p !== null ? p : { pieceNo: 'Pc 1', length: p }),
+        fabricQuality: isMixed ? (p.fabricQuality || defaultFabricLabel) : newFabricLabel
+      }));
+
       updated[baleIdx] = {
         ...updated[baleIdx],
         fabricItemLabel: newFabricLabel,
-        fabricName: newFabricLabel
+        fabricName: isMixed ? 'Mixed Fabric' : newFabricLabel,
+        isMixedFabric: isMixed,
+        pieces: updatedPieces,
+        isSaved: false
       };
       return { ...prev, bales: updated };
     });
+    setSavedBaleMap((prev) => ({ ...prev, [baleIdx]: false }));
+  };
+
+  // Handle Piece-level Fabric change (Point 27: single bale containing multiple fabric qualities)
+  const handlePieceFabricChange = (baleIdx, pieceIdx, newQuality) => {
+    setFormData((prev) => {
+      const updated = [...prev.bales];
+      const targetBale = { ...updated[baleIdx], isSaved: false };
+      const updatedPieces = [...(targetBale.pieces || [])];
+      updatedPieces[pieceIdx] = {
+        ...(typeof updatedPieces[pieceIdx] === 'object' && updatedPieces[pieceIdx] !== null
+          ? updatedPieces[pieceIdx]
+          : { pieceNo: `Pc ${pieceIdx + 1}`, length: updatedPieces[pieceIdx] }),
+        fabricQuality: newQuality
+      };
+      targetBale.pieces = updatedPieces;
+      updated[baleIdx] = targetBale;
+      return { ...prev, bales: updated };
+    });
+    setSavedBaleMap((prev) => ({ ...prev, [baleIdx]: false }));
   };
 
   // Set number of pieces inside a bale
@@ -514,7 +674,8 @@ export default function GRNForm({
         } else {
           nextPieces.push({
             pieceNo: `Pc ${p + 1}`,
-            length: ''
+            length: '',
+            fabricQuality: targetBale.isMixedFabric ? defaultFabricLabel : (targetBale.fabricItemLabel || defaultFabricLabel)
           });
         }
       }
@@ -522,10 +683,12 @@ export default function GRNForm({
       targetBale.piecesCount = newCount;
       targetBale.pieces = nextPieces;
       targetBale.totalLength = nextPieces.reduce((sum, it) => sum + (Number(it.length) || 0), 0);
+      targetBale.isSaved = false;
       updatedBales[baleIdx] = targetBale;
 
       return { ...prev, bales: updatedBales };
     });
+    setSavedBaleMap((prev) => ({ ...prev, [baleIdx]: false }));
   };
 
   // Piece meter input change
@@ -542,10 +705,12 @@ export default function GRNForm({
 
       targetBale.pieces = updatedPieces;
       targetBale.totalLength = updatedPieces.reduce((sum, it) => sum + (Number(it.length) || 0), 0);
+      targetBale.isSaved = false;
       updatedBales[baleIdx] = targetBale;
 
       return { ...prev, bales: updatedBales };
     });
+    setSavedBaleMap((prev) => ({ ...prev, [baleIdx]: false }));
   };
 
   // Calculate live total meters entered across all pieces in all bales
@@ -559,18 +724,30 @@ export default function GRNForm({
   const isMatch = declaredTotal > 0 && Math.abs(totalMetersEntered - declaredTotal) < 0.01;
   const hasBaleEntries = (formData.bales || []).some((b) => (b.pieces || []).length > 0);
 
-  // Live fabric breakdown across all bales (e.g. 300m Cotton, 200m Rayon, 500m Silk)
+  // Live fabric breakdown across all bales (supports mixed bales and multi-PO items)
   const fabricBreakdown = {};
   (formData.bales || []).forEach((b) => {
-    const fLabel = b.fabricItemLabel || defaultFabricLabel;
-    const bLen = Number(b.totalLength) || 0;
-    const pCount = (b.pieces || []).length || 0;
-    if (!fabricBreakdown[fLabel]) {
-      fabricBreakdown[fLabel] = { totalMeters: 0, baleCount: 0, pieceCount: 0 };
+    if (b.isMixedFabric && b.pieces && b.pieces.length > 0) {
+      b.pieces.forEach((p) => {
+        const fLabel = p.fabricQuality || defaultFabricLabel;
+        const pLen = Number(p.length) || 0;
+        if (!fabricBreakdown[fLabel]) {
+          fabricBreakdown[fLabel] = { totalMeters: 0, baleCount: 1, pieceCount: 0 };
+        }
+        fabricBreakdown[fLabel].totalMeters += pLen;
+        fabricBreakdown[fLabel].pieceCount += 1;
+      });
+    } else {
+      const fLabel = b.fabricItemLabel || defaultFabricLabel;
+      const bLen = Number(b.totalLength) || 0;
+      const pCount = (b.pieces || []).length || 0;
+      if (!fabricBreakdown[fLabel]) {
+        fabricBreakdown[fLabel] = { totalMeters: 0, baleCount: 0, pieceCount: 0 };
+      }
+      fabricBreakdown[fLabel].totalMeters += bLen;
+      fabricBreakdown[fLabel].baleCount += 1;
+      fabricBreakdown[fLabel].pieceCount += pCount;
     }
-    fabricBreakdown[fLabel].totalMeters += bLen;
-    fabricBreakdown[fLabel].baleCount += 1;
-    fabricBreakdown[fLabel].pieceCount += pCount;
   });
 
   // Cancel action: clears all fields and exits back to GRN list
@@ -602,8 +779,12 @@ export default function GRNForm({
     }
   };
 
-  // Save Progress (Finish Later) / Save This Section
+  // Point 36: Save This Section (Receipt Details)
   const handleSaveHeaderOnly = () => {
+    if (isPoAlreadyCompleted) {
+      showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
+      return;
+    }
     if (isQcActioned) {
       showToast('Receipt details are locked because this GRN has been submitted to QC.', 'warning');
       return;
@@ -655,9 +836,8 @@ export default function GRNForm({
     }));
 
     setIsSectionSaved(true);
-    setTimeout(() => {
-      setIsSectionSaved(false);
-    }, 3000);
+    // Transition Section 1 to saved summary view mode as per Section 13.3
+    setIsHeaderEditing(false);
 
     if (onSaveGRN) {
       try {
@@ -666,11 +846,15 @@ export default function GRNForm({
         console.warn('Error saving GRN header:', err);
       }
     }
-    showToast('Receipt details saved successfully!', 'success');
+    showToast('Receipt details saved successfully! Click "Edit" anytime to modify.', 'success');
   };
 
-  // Save all bales draft progress (including any individual bale saves)
+  // Point 36: Save an individual bale record or all bales
   const handleSaveAllBales = (specificBaleIdx = null) => {
+    if (isPoAlreadyCompleted) {
+      showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
+      return;
+    }
     if (isQcActioned) {
       showToast('Bale entries are locked because this GRN has been submitted to QC.', 'warning');
       return;
@@ -689,28 +873,34 @@ export default function GRNForm({
     const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
     const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
 
-    // Normalize bales so every bale has updated totalLength and clean piece entries
+    // Normalize bales and mark target bale(s) as saved
+    const isSingle = specificBaleIdx !== null && specificBaleIdx !== undefined;
+
     const normalizedBales = (formData.bales || []).map((b, idx) => {
       const rawPieces = b.pieces || [];
       const normPieces = rawPieces.map((p, pIdx) => {
         if (typeof p === 'object' && p !== null) {
           return {
             pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-            length: p.length !== undefined && p.length !== null ? p.length : ''
+            length: p.length !== undefined && p.length !== null ? p.length : '',
+            fabricQuality: p.fabricQuality || b.fabricItemLabel || fabricItem
           };
         }
         return {
           pieceNo: `Pc ${pIdx + 1}`,
-          length: p !== undefined && p !== null ? p : ''
+          length: p !== undefined && p !== null ? p : '',
+          fabricQuality: b.fabricItemLabel || fabricItem
         };
       });
       const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+      const isTarget = isSingle ? (idx === specificBaleIdx) : true;
       return {
         ...b,
         baleNo: b.baleNo !== undefined ? String(b.baleNo) : String(idx + 1),
         pieces: normPieces,
         totalLength: bTotal,
-        piecesCount: b.piecesCount !== undefined && b.piecesCount !== '' ? String(b.piecesCount) : String(normPieces.length)
+        piecesCount: b.piecesCount !== undefined && b.piecesCount !== '' ? String(b.piecesCount) : String(normPieces.length),
+        isSaved: isTarget ? true : Boolean(b.isSaved)
       };
     });
 
@@ -744,6 +934,16 @@ export default function GRNForm({
       ...payload
     }));
 
+    if (isSingle) {
+      setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
+    } else {
+      const newMap = {};
+      normalizedBales.forEach((_, idx) => {
+        newMap[idx] = true;
+      });
+      setSavedBaleMap(newMap);
+    }
+
     if (onSaveGRN) {
       try {
         onSaveGRN(payload, false);
@@ -752,16 +952,12 @@ export default function GRNForm({
       }
     }
 
-    if (specificBaleIdx !== null && specificBaleIdx !== undefined) {
-      const targetBale = normalizedBales[specificBaleIdx] || formData.bales[specificBaleIdx];
+    if (isSingle) {
+      const targetBale = normalizedBales[specificBaleIdx];
       const bNo = targetBale?.baleNo || (specificBaleIdx + 1);
       const pLen = (targetBale?.pieces || []).length;
       const bTot = targetBale?.totalLength || 0;
-      setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
       showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
-      setTimeout(() => {
-        setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: false }));
-      }, 3000);
     } else {
       const totalCount = normalizedBales.length;
       const configuredCount = normalizedBales.filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
@@ -769,11 +965,15 @@ export default function GRNForm({
     }
   };
 
-  // Keep alias for backward-compatible call sites
+  // Point 36: Alias for saving an individual bale record
   const handleSaveSingleBale = (bIdx) => handleSaveAllBales(bIdx);
 
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
+    if (isPoAlreadyCompleted) {
+      showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
+      return;
+    }
     if (isQcActioned) {
       showToast('This GRN is already completed and submitted to Quality Check (QC).', 'warning');
       return;
@@ -919,6 +1119,35 @@ export default function GRNForm({
         </div>
       ) : null}
 
+      {/* PO ALREADY FULLY RECEIVED LOCK BANNER */}
+      {isPoAlreadyCompleted ? (
+        <div className="alert alert-danger border border-danger d-flex align-items-center gap-3 rounded-3 shadow-sm mb-4 py-3 bg-danger-subtle text-danger-emphasis">
+          <i className="ti ti-ban fs-28 text-danger flex-shrink-0"></i>
+          <div className="flex-grow-1">
+            <div className="fw-bold fs-15 text-danger">
+              ⛔ Purchase Order Fully Received (0m Pending)
+            </div>
+            <div className="fs-13 text-secondary mt-0.5">
+              All <strong>{poOrderedMeters.toLocaleString()} meters</strong> for Purchase Order <strong>{currentPO?.id}</strong> have already arrived and been received across {previousGrnsForPo.length} previous GRN(s). No further GRN can be created for this completed Purchase Order.
+            </div>
+            {previousGrnsForPo.length > 0 && (
+              <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <span className="fs-12 text-muted fw-medium">Completed Inward Deliveries:</span>
+                {previousGrnsForPo.map((g) => (
+                  <span key={g.id} className="badge bg-white text-dark border px-2.5 py-1 fs-12 rounded-2 shadow-xs fw-semibold">
+                    <i className="ti ti-check text-success me-1"></i>
+                    {g.id}: {(Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toLocaleString()}m
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="badge bg-danger text-white px-3 py-1.5 rounded-pill fs-12 fw-semibold">
+            Locked (Fulfilled)
+          </span>
+        </div>
+      ) : null}
+
       {/* SECTION 1: RECEIPT DETAILS */}
       <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
         <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
@@ -960,9 +1189,16 @@ export default function GRNForm({
               <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
                 SOURCE DOCUMENT
               </div>
-              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.poId}>
-                {formData.poId || '—'}
+              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.linkedPOs && formData.linkedPOs.length > 1 ? formData.linkedPOs.join(', ') : formData.poId}>
+                {formData.linkedPOs && formData.linkedPOs.length > 1
+                  ? formData.linkedPOs.join(', ')
+                  : (formData.poId || '—')}
               </div>
+              {formData.linkedPOs && formData.linkedPOs.length > 1 && (
+                <div className="text-primary fs-11 fw-semibold">
+                  {formData.linkedPOs.length} POs Consolidated
+                </div>
+              )}
               {currentPO && getPoVendorName(currentPO) && (
                 <div className="text-muted fs-11 text-truncate" title={getPoVendorName(currentPO)}>
                   {getPoVendorName(currentPO)}
@@ -1068,9 +1304,22 @@ export default function GRNForm({
             <div className="row g-3 mb-2">
               {/* Row 1: Source document & Received date */}
               <div className="col-12 col-md-8">
-                <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-                  Source document <span className="text-danger">*</span>
-                </label>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <label className="form-label fs-13 fw-semibold text-secondary mb-0">
+                    Source document (Purchase Order) <span className="text-danger">*</span>
+                  </label>
+                  {!isQcActioned && (formData.poId || (formData.linkedPOs && formData.linkedPOs.length > 0)) && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-12 fw-semibold d-inline-flex align-items-center gap-1"
+                      onClick={() => setShowMultiPoPicker(!showMultiPoPicker)}
+                    >
+                      <i className="ti ti-link"></i>
+                      <span>{showMultiPoPicker ? 'Hide Multi-PO Controls' : '+ Link Multiple POs (Consolidated Shipment)'}</span>
+                    </button>
+                  )}
+                </div>
+
                 {isLinkedFromPO ? (
                   <div
                     className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium"
@@ -1085,7 +1334,7 @@ export default function GRNForm({
                       </span>
                     </div>
                     <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium">
-                      <i className="ti ti-lock me-1 text-muted"></i> Linked PO
+                      <i className="ti ti-lock me-1 text-muted"></i> Primary PO
                     </span>
                   </div>
                 ) : (
@@ -1100,13 +1349,173 @@ export default function GRNForm({
                     <option value="PO-DIRECT">Direct Inward (Without PO)</option>
                     {eligiblePOs.map((po) => {
                       const vName = getPoVendorName(po);
+                      const poTotalMtrs = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+                      const poPrevReceived = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(po.id)) || g.poId === po.id)
+                        .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+                      const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
+                      const isPoFull = po.status === 'Completed' || (poTotalMtrs > 0 && poBalPending <= 0);
+
                       return (
-                        <option key={po.id} value={po.id}>
-                          {po.id} — {vName || 'Vendor'} (fabric purchase)
+                        <option
+                          key={po.id}
+                          value={po.id}
+                          disabled={!isExisting && isPoFull}
+                          style={{ color: isPoFull ? '#94a3b8' : '#1e293b' }}
+                        >
+                          {po.id} — {vName || 'Vendor'} {isPoFull
+                            ? `[Fully Received: Complete — 0m Pending]`
+                            : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered]`}
                         </option>
                       );
                     })}
                   </select>
+                )}
+
+                {/* Point 26: Multi-PO Linking Banner and Tag List */}
+                {formData.linkedPOs && formData.linkedPOs.length > 1 && (
+                  <div className="p-2.5 rounded-3 bg-light border border-primary border-opacity-25 mt-2 shadow-xs">
+                    <div className="d-flex align-items-center justify-content-between mb-1.5">
+                      <span className="fs-12 fw-bold text-primary d-flex align-items-center gap-1.5">
+                        <i className="ti ti-layers-intersect"></i>
+                        Multiple POs Consolidated in Shipment ({formData.linkedPOs.length} POs):
+                      </span>
+                      <span className="badge bg-primary text-white fs-11 rounded-pill">
+                        Total Ordered: {totalLinkedOrderedMeters.toLocaleString()}m
+                      </span>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      {formData.linkedPOs.map((poId) => {
+                        const poObj = purchaseOrders.find((p) => p.id === poId);
+                        const poMtrs = (poObj?.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+                        return (
+                          <span key={poId} className="badge bg-white text-dark border px-2.5 py-1.5 rounded-3 fs-12 d-inline-flex align-items-center gap-2 shadow-xs">
+                            <span className="fw-bold text-primary">{poId}</span>
+                            <span className="text-muted">({poMtrs}m)</span>
+                            {!isQcActioned && formData.linkedPOs.length > 1 && (
+                              <i
+                                className="ti ti-x text-danger cursor-pointer"
+                                title={`Unlink ${poId}`}
+                                onClick={() => handleUnlinkPO(poId)}
+                              ></i>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Point 26: Add another PO picker dropdown */}
+                {showMultiPoPicker && !isQcActioned && (
+                  <div className="p-3 bg-white border rounded-3 mt-2 shadow-xs">
+                    <label className="form-label fs-12 fw-semibold text-dark mb-1">
+                      Link another PO from {formData.vendorName || 'same vendor'} to this delivery:
+                    </label>
+                    <div className="d-flex align-items-center gap-2">
+                      <select
+                        className="form-select fs-13"
+                        style={{ height: '38px', borderRadius: '8px' }}
+                        value={selectedPoToAdd}
+                        onChange={(e) => setSelectedPoToAdd(e.target.value)}
+                      >
+                        <option value="">-- Select PO to consolidate --</option>
+                        {availableVendorPOs.map((p) => {
+                          const mtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {p.id} — {p.date} ({mtrs}m ordered, status: {p.status})
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm px-3 fw-semibold text-white d-inline-flex align-items-center gap-1 flex-shrink-0"
+                        style={{ height: '38px', borderRadius: '8px', backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                        disabled={!selectedPoToAdd}
+                        onClick={() => handleAddLinkedPO(selectedPoToAdd)}
+                      >
+                        <i className="ti ti-plus"></i>
+                        <span>Link PO</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Multi-Installment PO Delivery Progress Card */}
+                {currentPO && poOrderedMeters > 0 && (
+                  <div
+                    className="p-3 rounded-3 border mt-2.5 shadow-xs"
+                    style={{
+                      backgroundColor: isPoAlreadyCompleted ? '#fef2f2' : (alreadyReceivedMeters > 0 ? '#f0fdf4' : '#f8fafc'),
+                      borderColor: isPoAlreadyCompleted ? '#fca5a5' : (alreadyReceivedMeters > 0 ? '#bbf7d0' : '#e2e8f0')
+                    }}
+                  >
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className={`ti ${isPoAlreadyCompleted ? 'ti-circle-check text-success' : 'ti-truck-delivery text-primary'} fs-17`}></i>
+                        <span className="fs-13 fw-bold text-dark">
+                          PO Delivery Status: {currentPO.id}
+                        </span>
+                      </div>
+                      <span className={`badge px-2.5 py-1 rounded-pill fs-11 fw-semibold ${
+                        isPoAlreadyCompleted
+                          ? 'bg-success text-white'
+                          : alreadyReceivedMeters > 0
+                            ? 'bg-primary text-white'
+                            : 'bg-secondary text-white'
+                      }`}>
+                        {isPoAlreadyCompleted
+                          ? '100% Fulfilled (Complete)'
+                          : alreadyReceivedMeters > 0
+                            ? `Multi-Installment (${Math.round((alreadyReceivedMeters / poOrderedMeters) * 100)}% Received)`
+                            : 'Initial Delivery'}
+                      </span>
+                    </div>
+
+                    <div className="row g-2 text-center fs-12 mb-2">
+                      <div className="col-4">
+                        <div className="p-2 rounded bg-white border">
+                          <div className="text-muted fs-11">Total Ordered</div>
+                          <div className="fw-bold text-dark fs-13">{poOrderedMeters.toLocaleString()} m</div>
+                        </div>
+                      </div>
+                      <div className="col-4">
+                        <div className="p-2 rounded bg-white border">
+                          <div className="text-muted fs-11">Previously Received</div>
+                          <div className="fw-bold text-success fs-13">{alreadyReceivedMeters.toLocaleString()} m</div>
+                        </div>
+                      </div>
+                      <div className="col-4">
+                        <div className="p-2 rounded bg-white border">
+                          <div className="text-muted fs-11">Remaining Pending</div>
+                          <div className={`fw-bold fs-13 ${poPendingMeters > 0 ? 'text-primary' : 'text-secondary'}`}>
+                            {poPendingMeters.toLocaleString()} m
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {previousGrnsForPo.length > 0 && (
+                      <div className="d-flex flex-wrap align-items-center gap-1.5 pt-1 border-top border-light-subtle fs-12">
+                        <span className="text-muted fs-11">Previous GRNs:</span>
+                        {previousGrnsForPo.map((g) => (
+                          <span key={g.id} className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill">
+                            {g.id}: {(Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toLocaleString()}m
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {!isPoAlreadyCompleted && poPendingMeters > 0 && (
+                      <div className="text-muted fs-11 mt-1.5 d-flex align-items-center gap-1">
+                        <i className="ti ti-info-circle text-primary"></i>
+                        <span>
+                          Multiple GRNs are supported for partial shipments. Once all {poOrderedMeters.toLocaleString()}m have arrived, no further GRN can be created.
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1308,8 +1717,7 @@ export default function GRNForm({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleGenerateBales();
-                    }
+                             }
                   }}
                 />
               </div>
@@ -1319,16 +1727,16 @@ export default function GRNForm({
                 className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 px-3 fw-semibold fs-13 text-white shadow-sm"
                 style={{
                   height: '40px',
-                  backgroundColor: isQcActioned ? '#94a3b8' : '#5b47fb',
-                  borderColor: isQcActioned ? '#94a3b8' : '#5b47fb',
+                  backgroundColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb',
+                  borderColor: (isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb',
                   borderRadius: '8px',
-                  cursor: isQcActioned ? 'not-allowed' : 'pointer'
+                  cursor: (isQcActioned || isPoAlreadyCompleted) ? 'not-allowed' : 'pointer'
                 }}
-                disabled={isQcActioned}
+                disabled={isQcActioned || isPoAlreadyCompleted}
                 onClick={handleGenerateBales}
-                title={isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales'}
+                title={isPoAlreadyCompleted ? 'PO is fully received (0m pending)' : (isQcActioned ? 'Bale entries are locked because QC has already started' : 'Generate container bales')}
               >
-                <i className={`ti ${isQcActioned ? 'ti-lock' : 'ti-package'} fs-15`}></i>
+                <i className={`ti ${(isQcActioned || isPoAlreadyCompleted) ? 'ti-lock' : 'ti-package'} fs-15`}></i>
                 <span>Generate Bales</span>
               </button>
 
@@ -1341,16 +1749,16 @@ export default function GRNForm({
                   height: '40px',
                   borderColor: isSectionSaved ? '#10b981' : '#cbd5e1',
                   borderRadius: '8px',
-                  backgroundColor: isQcActioned ? '#f1f5f9' : (isSectionSaved ? '#10b981' : '#ffffff'),
-                  cursor: isQcActioned ? 'not-allowed' : 'pointer',
-                  opacity: isQcActioned ? 0.6 : 1,
+                  backgroundColor: (isQcActioned || isPoAlreadyCompleted) ? '#f1f5f9' : (isSectionSaved ? '#10b981' : '#ffffff'),
+                  cursor: (isQcActioned || isPoAlreadyCompleted) ? 'not-allowed' : 'pointer',
+                  opacity: (isQcActioned || isPoAlreadyCompleted) ? 0.6 : 1,
                   transition: 'all 0.2s ease-in-out'
                 }}
-                disabled={isQcActioned}
+                disabled={isQcActioned || isPoAlreadyCompleted}
                 onClick={handleSaveHeaderOnly}
-                title={isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header'}
+                title={isPoAlreadyCompleted ? 'PO is fully received (0m pending)' : (isQcActioned ? 'Receipt details are locked because Quality Check has started' : 'Save Receipt Details header')}
               >
-                <i className={`ti ${isSectionSaved ? 'ti-check' : 'ti-device-floppy'} fs-15`} style={{ color: isSectionSaved ? '#ffffff' : (isQcActioned ? '#94a3b8' : '#5b47fb') }}></i>
+                <i className={`ti ${isSectionSaved ? 'ti-check' : 'ti-device-floppy'} fs-15`} style={{ color: isSectionSaved ? '#ffffff' : ((isQcActioned || isPoAlreadyCompleted) ? '#94a3b8' : '#5b47fb') }}></i>
                 <span>{isSectionSaved ? 'Section Saved' : 'Save This Section'}</span>
               </button>
             </div>
@@ -1379,7 +1787,7 @@ export default function GRNForm({
               <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold">
                 {formData.bales.length} Bale{formData.bales.length > 1 ? 's' : ''} Generated
               </span>
-              {!isQcActioned && (
+              {!isQcActioned && !isPoAlreadyCompleted && (
                 <button
                   type="button"
                   className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fs-12 fw-semibold rounded-3 text-white shadow-sm"
@@ -1463,23 +1871,34 @@ export default function GRNForm({
                       >
                         {isQcActioned ? 'Locked (QC Actioned)' : 'Editable'}
                       </span>
+                      {/* Point 36: Persistent Saved badge for individual bale */}
+                      {(savedBaleMap[bIdx] || bale.isSaved) && (
+                        <span
+                          className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1"
+                        >
+                          <i className="ti ti-check fs-12"></i>
+                          <span>Saved</span>
+                        </span>
+                      )}
                     </div>
 
-                    {!isQcActioned && (
+                    {!isQcActioned && !isPoAlreadyCompleted && (
                       <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                        {/* Point 36: Individual Bale Save Button with persistent Saved state */}
                         <button
                           type="button"
                           className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
                           style={{
-                            backgroundColor: savedBaleMap[bIdx] ? '#10b981' : '#7c3aed',
-                            borderColor: savedBaleMap[bIdx] ? '#10b981' : '#7c3aed',
-                            fontSize: '12.5px'
+                            backgroundColor: (savedBaleMap[bIdx] || bale.isSaved) ? '#10b981' : '#7c3aed',
+                            borderColor: (savedBaleMap[bIdx] || bale.isSaved) ? '#10b981' : '#7c3aed',
+                            fontSize: '12.5px',
+                            transition: 'all 0.2s ease-in-out'
                           }}
                           onClick={() => handleSaveSingleBale(bIdx)}
                           title={`Save Bale ${bale.baleNo || bIdx + 1}`}
                         >
-                          <i className={`ti ${savedBaleMap[bIdx] ? 'ti-check' : 'ti-device-floppy'}`} style={{ fontSize: '15px' }}></i>
-                          <span>{savedBaleMap[bIdx] ? 'Saved' : 'Save'}</span>
+                          <i className={`ti ${(savedBaleMap[bIdx] || bale.isSaved) ? 'ti-check' : 'ti-device-floppy'}`} style={{ fontSize: '15px' }}></i>
+                          <span>{(savedBaleMap[bIdx] || bale.isSaved) ? 'Saved' : 'Save'}</span>
                         </button>
                         <button
                           type="button"
@@ -1511,68 +1930,38 @@ export default function GRNForm({
                         />
                       </div>
 
-                      {/* Fabric Item */}
+                      {/* Fabric Item - Supports single fabric or Point 27: Mixed Fabric Bale */}
                       <div className="col-12 col-sm-6 col-md-7 flex-grow-1">
                         <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
                           Fabric Item / Quality <span className="text-danger">*</span>
                         </label>
-                        {isLinkedFromPO ? (
-                          poItemLabels.length <= 1 ? (
-                            <div
-                              className="form-control bg-light fs-13 d-flex align-items-center justify-content-between text-dark fw-medium px-3"
-                              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px', cursor: 'default' }}
-                            >
-                              <div className="d-flex align-items-center gap-2 text-truncate">
-                                <i className="ti ti-fabric text-primary fs-15"></i>
-                                <span className="fw-semibold text-dark text-truncate">
-                                  {bale.fabricItemLabel || poItemLabels[0] || 'Fabric Item'}
-                                </span>
-                              </div>
-                              <span className="badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill fw-medium flex-shrink-0">
-                                From PO
-                              </span>
-                            </div>
-                          ) : (
-                            <select
-                              className="form-select bg-white fs-13 px-3"
-                              style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                              value={bale.fabricItemLabel || poItemLabels[bIdx % poItemLabels.length] || poItemLabels[0]}
-                              disabled={isQcActioned}
-                              onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
-                            >
+                        <select
+                          className="form-select bg-white fs-13 px-3"
+                          style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
+                          value={bale.isMixedFabric ? 'MIXED_FABRIC' : (bale.fabricItemLabel || poItemLabels[0] || defaultFabricLabel)}
+                          disabled={isQcActioned}
+                          onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
+                        >
+                          <option value="MIXED_FABRIC" className="fw-bold text-primary">
+                            🔀 Mixed Bale (Multiple Fabric Qualities)
+                          </option>
+                          {poItemLabels.length > 0 && (
+                            <optgroup label="From Linked Purchase Orders">
                               {poItemLabels.map((lbl, oIdx) => (
                                 <option key={`po-${oIdx}`} value={lbl}>
                                   {lbl}
                                 </option>
                               ))}
-                            </select>
-                          )
-                        ) : (
-                          <select
-                            className="form-select bg-white fs-13 px-3"
-                            style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                            value={bale.fabricItemLabel || defaultFabricLabel}
-                            disabled={isQcActioned}
-                            onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
-                          >
-                            {poItemLabels.length > 0 && (
-                              <optgroup label={`From ${currentPO ? currentPO.id : 'Selected PO'} Items`}>
-                                {poItemLabels.map((lbl, oIdx) => (
-                                  <option key={`po-${oIdx}`} value={lbl}>
-                                    {lbl}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                            <optgroup label="All Master Fabrics">
-                              {masterFabricLabels.map((lbl, fIdx) => (
-                                <option key={`mf-${fIdx}`} value={lbl}>
-                                  {lbl}
-                                </option>
-                              ))}
                             </optgroup>
-                          </select>
-                        )}
+                          )}
+                          <optgroup label="All Master Fabrics">
+                            {masterFabricLabels.map((lbl, fIdx) => (
+                              <option key={`mf-${fIdx}`} value={lbl}>
+                                {lbl}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </select>
                       </div>
 
                       {/* No. of pieces */}
@@ -1603,7 +1992,7 @@ export default function GRNForm({
                           Piece-Wise Length (Meters)
                         </span>
                         <span className="fs-11 text-muted fw-medium">
-                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured
+                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured {bale.isMixedFabric ? '(Mixed Qualities Enabled)' : ''}
                         </span>
                       </div>
 
@@ -1616,15 +2005,39 @@ export default function GRNForm({
                         <div className="d-flex flex-wrap align-items-end gap-3 pt-1">
                           {bale.pieces.map((piece, pIdx) => {
                             const len = piece.length !== undefined ? piece.length : piece;
+                            const pFabric = piece.fabricQuality || poItemLabels[0] || masterFabricLabels[0] || defaultFabricLabel;
                             return (
                               <div
                                 key={pIdx}
                                 className="bg-white p-2.5 rounded-2 border shadow-none"
-                                style={{ width: '115px', borderColor: '#e2e8f0' }}
+                                style={{ width: bale.isMixedFabric ? '210px' : '115px', borderColor: '#e2e8f0' }}
                               >
-                                <label className="d-block fs-11 fw-semibold text-secondary text-center mb-1">
-                                  Pc {pIdx + 1} (m)
-                                </label>
+                                <div className="d-flex align-items-center justify-content-between mb-1">
+                                  <label className="d-block fs-11 fw-semibold text-secondary text-center mb-0">
+                                    Pc {pIdx + 1} (m)
+                                  </label>
+                                  {bale.isMixedFabric && (
+                                    <span className="badge bg-light text-secondary border px-1.5 py-0.5 fs-10 rounded">
+                                      Quality
+                                    </span>
+                                  )}
+                                </div>
+                                {bale.isMixedFabric && (
+                                  <select
+                                    className="form-select form-select-sm bg-white fs-11 px-2 mb-1.5"
+                                    style={{ height: '30px', borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                    value={pFabric}
+                                    disabled={isQcActioned}
+                                    onChange={(e) => handlePieceFabricChange(bIdx, pIdx, e.target.value)}
+                                  >
+                                    {poItemLabels.map((lbl, oIdx) => (
+                                      <option key={`p-po-${oIdx}`} value={lbl}>{lbl}</option>
+                                    ))}
+                                    {masterFabricLabels.map((lbl, fIdx) => (
+                                      <option key={`p-mf-${fIdx}`} value={lbl}>{lbl}</option>
+                                    ))}
+                                  </select>
+                                )}
                                 <input
                                   type="number"
                                   step="0.01"
@@ -1649,9 +2062,15 @@ export default function GRNForm({
                         <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold">
                           {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
                         </span>
-                        <span className="text-secondary text-truncate">
-                          Assigned: <strong className="text-dark">{bale.fabricItemLabel || currentFabricLabel}</strong>
-                        </span>
+                        {bale.isMixedFabric ? (
+                          <span className="badge bg-purple-subtle text-purple border px-2.5 py-1 rounded-pill fs-11 fw-semibold">
+                            Mixed Bale (Multiple Fabric Qualities)
+                          </span>
+                        ) : (
+                          <span className="text-secondary text-truncate">
+                            Assigned: <strong className="text-dark">{bale.fabricItemLabel || currentFabricLabel}</strong>
+                          </span>
+                        )}
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <span className="text-secondary fs-12 fw-medium">Bale Total:</span>
@@ -1757,6 +2176,26 @@ export default function GRNForm({
             <i className="ti ti-lock text-warning fs-18"></i>
             <span>This shipment is locked because it has been submitted to Quality Check (Non-editable).</span>
           </div>
+        </div>
+      ) : isPoAlreadyCompleted ? (
+        <div className="d-flex flex-wrap align-items-center gap-3 pt-1 mb-5">
+          <span className="badge bg-danger text-white px-3.5 py-2.5 fs-13 rounded-3 d-inline-flex align-items-center gap-2 shadow-xs fw-semibold">
+            <i className="ti ti-ban fs-17"></i>
+            <span>Purchase Order Fully Received (0m Pending) — GRN Creation Blocked</span>
+          </span>
+          <button
+            type="button"
+            className="btn btn-outline-secondary d-inline-flex align-items-center gap-2 px-4 py-2 fw-medium fs-13 shadow-sm bg-white"
+            style={{
+              borderColor: '#cbd5e1',
+              borderRadius: '8px',
+              height: '42px'
+            }}
+            onClick={handleCancel}
+          >
+            <i className="ti ti-arrow-left fs-15"></i>
+            <span>Back to Procurement</span>
+          </button>
         </div>
       ) : (
         <div className="d-flex flex-wrap align-items-center gap-3 pt-1 mb-5">

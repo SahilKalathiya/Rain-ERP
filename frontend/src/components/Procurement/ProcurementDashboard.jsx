@@ -569,7 +569,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   const handleInwardFromPO = (po) => {
     if (!po) return;
 
-    // Check if GRN already exists for this PO
+    // Check existing GRNs for this PO
     const existingGrnsForPo = (grns || []).filter((g) =>
       g && (
         (g.linkedPOs && g.linkedPOs.includes(po.id)) ||
@@ -579,17 +579,21 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       )
     );
 
-    if (existingGrnsForPo.length > 0) {
-      const existing = existingGrnsForPo[0];
-      alert(`GRN (${existing.id}) has already been created for PO ${po.id}. Only one GRN can be created per PO.`);
-      setSelectedGRN(existing);
-      setActiveGrnView('detail');
-      setActiveTab('grn');
-      if (onNavigate) onNavigate('/goods-inward');
+    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const alreadyReceived = existingGrnsForPo.reduce(
+      (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
+      0
+    );
+    const pendingMeters = po.pendingQtyToReceive !== undefined
+      ? Number(po.pendingQtyToReceive)
+      : Math.max(0, orderedMeters - alreadyReceived);
+
+    // If PO is already 100% fulfilled, block further GRN creation
+    if ((orderedMeters > 0 && pendingMeters <= 0) || po.status === 'Completed') {
+      alert(`Purchase Order ${po.id} is already fully received (${alreadyReceived.toLocaleString()}m received). All ordered goods have arrived and no further GRN can be created.`);
       return;
     }
 
-    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
     const fabricItem = po.items && po.items[0] ? po.items[0].fabricName || po.items[0].fabricQuality : '';
     const vMatch = vendors.find((v) => v.id === po.vendorId);
     const resolvedVendorName = po.vendorName || (vMatch ? vMatch.name : (po.vendorId || ''));
@@ -610,8 +614,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       isHeaderSaved: false,
       totalBales: '',
       poOrderedMeters: orderedMeters,
-      totalQty: '',
-      declaredTotalMeters: 0,
+      totalQty: pendingMeters > 0 ? String(pendingMeters) : '',
+      declaredTotalMeters: pendingMeters > 0 ? pendingMeters : 0,
+      pendingQtyToReceive: pendingMeters,
       bales: []
     };
     setSelectedGRN(newGrn);
@@ -639,95 +644,120 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setGrns(updated);
     api.saveGRN(enrichedGRN).catch((e) => console.warn('GRN save sync error:', e));
 
-    // Update Linked PO Status (Partial Delivery vs Full Delivery)
-    if (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0) {
-      const linkedPoId = enrichedGRN.linkedPOs[0];
-      const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
-      if (targetPo) {
-        const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-        const allGrnsForPo = updated.filter((g) => g && g.linkedPOs && g.linkedPOs.includes(linkedPoId));
-        const totalReceivedForPo = allGrnsForPo.reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
+    // Point 26: Update Linked PO Status (Partial Delivery vs Full Delivery across ALL linked POs)
+    const targetLinkedPoIds = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
+      ? enrichedGRN.linkedPOs
+      : (enrichedGRN.poId ? [enrichedGRN.poId] : []);
 
-        let newPoStatus = targetPo.status;
-        if (totalReceivedForPo >= poOrderedMeters) {
-          newPoStatus = 'Completed';
-        } else if (totalReceivedForPo > 0) {
-          newPoStatus = 'Partially Received';
+    if (targetLinkedPoIds.length > 0) {
+      targetLinkedPoIds.forEach((linkedPoId) => {
+        const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
+        if (targetPo) {
+          const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          const allGrnsForPo = updated.filter((g) => g && (
+            (g.linkedPOs && g.linkedPOs.includes(linkedPoId)) ||
+            g.poId === linkedPoId
+          ));
+
+          let totalReceivedForPo = 0;
+          allGrnsForPo.forEach((g) => {
+            let poMetersInGrn = 0;
+            (g.bales || []).forEach((b) => {
+              const bPo = b.poId || (b.fabricItemLabel && b.fabricItemLabel.includes(linkedPoId) ? linkedPoId : null);
+              if (bPo === linkedPoId) {
+                poMetersInGrn += Number(b.totalLength) || 0;
+              } else if (!bPo && (!g.linkedPOs || g.linkedPOs.length <= 1)) {
+                poMetersInGrn += Number(b.totalLength) || 0;
+              }
+            });
+            if (poMetersInGrn === 0) {
+              const grnTotal = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+              const count = (g.linkedPOs && g.linkedPOs.length > 0) ? g.linkedPOs.length : 1;
+              poMetersInGrn = Math.round(grnTotal / count);
+            }
+            totalReceivedForPo += poMetersInGrn;
+          });
+
+          let newPoStatus = targetPo.status;
+          if (totalReceivedForPo >= poOrderedMeters && poOrderedMeters > 0) {
+            newPoStatus = 'Completed';
+          } else if (totalReceivedForPo > 0) {
+            newPoStatus = 'Partially Received';
+          }
+
+          const updatedPo = {
+            ...targetPo,
+            status: newPoStatus,
+            receivedQty: totalReceivedForPo,
+            pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo),
+            isSystemSync: true
+          };
+          setPurchaseOrders((prev) => prev.map((p) => (p.id === linkedPoId ? updatedPo : p)));
+          api.savePurchaseOrder(updatedPo).catch((e) => console.warn('PO status sync error:', e));
         }
-
-        const updatedPo = {
-          ...targetPo,
-          status: newPoStatus,
-          receivedQty: totalReceivedForPo,
-          pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo),
-          isSystemSync: true
-        };
-        setPurchaseOrders((prev) => prev.map((p) => (p.id === linkedPoId ? updatedPo : p)));
-        api.savePurchaseOrder(updatedPo).catch((e) => console.warn('PO status sync error:', e));
-      }
+      });
     }
 
-    // If completed, automatically generate QC record(s) per fabric quality
+    // Point 27: If completed, automatically generate QC record(s) per fabric quality (supports multiple fabric qualities within single bale and multi-bale shipments)
     if (isCompleted && enrichedGRN.status === 'Completed') {
-      const linkedPO = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
-        ? purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id))
-        : purchaseOrders.find((p) => p.id === enrichedGRN.poId);
-
       const fabricBatches = [];
+      const fabricMap = {}; // fName -> { meters, pieces, bales }
 
-      if (linkedPO && linkedPO.items && linkedPO.items.length > 1) {
-        // Multi-fabric PO items
-        linkedPO.items.forEach((item, idx) => {
-          const fName = item.fabricName || item.fabricQuality || `Fabric Quality ${idx + 1}`;
-          let fMeters = 0;
-          (enrichedGRN.bales || []).forEach((b) => {
-            const bLbl = (b.fabricItemLabel || '').toLowerCase();
-            const itLbl = fName.toLowerCase();
-            if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
-              const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
-              fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
+      (enrichedGRN.bales || []).forEach((b, bIdx) => {
+        const bNo = b.baleNo || (bIdx + 1);
+        if (b.isMixedFabric && b.pieces && b.pieces.length > 0) {
+          // Point 27: Mixed fabric bale - scan pieces for individual fabric qualities
+          b.pieces.forEach((p, pIdx) => {
+            const fLbl = p.fabricQuality || b.fabricItemLabel || enrichedGRN.fabricName || 'Fabric';
+            const pLen = Number(p.length) || 0;
+            if (!fabricMap[fLbl]) {
+              fabricMap[fLbl] = { meters: 0, pieces: [], bales: new Set() };
             }
+            fabricMap[fLbl].meters += pLen;
+            fabricMap[fLbl].pieces.push({ pieceNo: p.pieceNo || `Pc ${pIdx + 1}`, length: pLen, baleNo: bNo });
+            fabricMap[fLbl].bales.add(bNo);
           });
-          if (fMeters <= 0) {
-            fMeters = Number(item.quantity) || Math.round((Number(enrichedGRN.declaredTotalMeters) || 0) / linkedPO.items.length);
+        } else {
+          const fLbl = b.fabricItemLabel || enrichedGRN.fabricName || 'Fabric';
+          const bLen = Number(b.totalLength) || (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+          if (!fabricMap[fLbl]) {
+            fabricMap[fLbl] = { meters: 0, pieces: [], bales: new Set() };
           }
+          fabricMap[fLbl].meters += bLen;
+          (b.pieces || []).forEach((p, pIdx) => {
+            const pLen = Number(typeof p === 'object' ? p.length : p) || 0;
+            fabricMap[fLbl].pieces.push({ pieceNo: (typeof p === 'object' ? p.pieceNo : null) || `Pc ${pIdx + 1}`, length: pLen, baleNo: bNo });
+          });
+          fabricMap[fLbl].bales.add(bNo);
+        }
+      });
+
+      const uniqueFabrics = Object.keys(fabricMap);
+      if (uniqueFabrics.length > 0) {
+        uniqueFabrics.forEach((fLbl, idx) => {
+          const data = fabricMap[fLbl];
+          const cleanFabricName = fLbl.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\([^)]*\)/, '').trim();
+          const matchingFabric = fabrics.find((f) => f.qualityName === fLbl || f.qualityName === cleanFabricName || fLbl.includes(f.qualityName));
           fabricBatches.push({
-            fabricName: fName,
-            fabricId: item.fabricId || '',
-            colorName: item.color || item.colorName || item.shade || enrichedGRN.colorName || 'Grey / Natural',
-            expectedWidth: String(item.width || '44'),
-            expectedFold: String(item.fold || '100'),
-            totalReceivedMeters: fMeters,
+            fabricName: fLbl,
+            fabricId: matchingFabric?.id || '',
+            colorName: enrichedGRN.colorName || 'Grey / Natural',
+            expectedWidth: matchingFabric?.pannaWidth ? String(matchingFabric.pannaWidth) : String(enrichedGRN.pannaWidth || '44'),
+            expectedFold: String(enrichedGRN.fabricFolding || '100'),
+            totalReceivedMeters: Math.round(data.meters * 100) / 100,
+            pieces: data.pieces,
+            baleRefs: Array.from(data.bales).join(', '),
             itemIdx: idx
           });
         });
-      } else {
-        // Check bales for multiple distinct fabric labels
-        const baleFabrics = Array.from(new Set((enrichedGRN.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
-        if (baleFabrics.length > 1) {
-          baleFabrics.forEach((fLbl, idx) => {
-            let fMeters = 0;
-            (enrichedGRN.bales || []).forEach((b) => {
-              if (b.fabricItemLabel === fLbl) {
-                const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
-                fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
-              }
-            });
-            fabricBatches.push({
-              fabricName: fLbl,
-              fabricId: '',
-              colorName: enrichedGRN.colorName || 'Grey / Natural',
-              expectedWidth: String(enrichedGRN.pannaWidth || '44'),
-              expectedFold: String(enrichedGRN.fabricFolding || '100'),
-              totalReceivedMeters: fMeters || Math.round((Number(enrichedGRN.declaredTotalMeters) || 0) / baleFabrics.length),
-              itemIdx: idx
-            });
-          });
-        }
       }
 
-      // If single fabric (fallback or standard)
+      // Fallback if no bales entered
       if (fabricBatches.length === 0) {
+        const linkedPO = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
+          ? purchaseOrders.find((p) => enrichedGRN.linkedPOs.includes(p.id))
+          : purchaseOrders.find((p) => p.id === enrichedGRN.poId);
+
         let expFold = '100';
         let expWidth = '44';
         let singleFabricName = enrichedGRN.fabricName || '';
@@ -755,6 +785,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           expectedWidth: expWidth,
           expectedFold: expFold,
           totalReceivedMeters: Number(enrichedGRN.declaredTotalMeters) || Number(enrichedGRN.totalQty) || 2000,
+          pieces: [],
+          baleRefs: '',
           itemIdx: 0
         });
       }
@@ -771,13 +803,14 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         const qcRecord = {
           id: existingQC ? existingQC.id : qcId,
           grnRef: enrichedGRN.id,
-          againstRef: linkedPO?.id || enrichedGRN.poId || '',
+          againstRef: (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.join(', ')) || enrichedGRN.poId || '',
           fabricName: batch.fabricName,
           fabricId: batch.fabricId,
           colorName: batch.colorName,
           inspectionScope: 'Whole Shipment',
-          baleRef: '',
-          pieceRef: '',
+          baleRef: batch.baleRefs ? `Bale ${batch.baleRefs}` : '',
+          pieceRef: batch.pieces && batch.pieces.length > 0 ? `${batch.pieces.length} Piece(s)` : '',
+          pieces: batch.pieces || [],
           inspectorName: '',
           expectedWidth: batch.expectedWidth,
           actualWidth: '',
