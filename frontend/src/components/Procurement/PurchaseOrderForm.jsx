@@ -1610,7 +1610,7 @@ export default function PurchaseOrderForm({
                           style={{
                             borderColor: '#cbd5e1',
                             height: '32px',
-                            minHeight: '32px',
+                            minHeight: '35px',
                             fontSize: '12px',
                             lineHeight: '1.2',
                             paddingTop: '2px',
@@ -1624,7 +1624,7 @@ export default function PurchaseOrderForm({
                           value={row.fabricType || 'Process'}
                           onChange={(e) => handleItemChange(row.id, 'fabricType', e.target.value)}
                         >
-                          <option value="Process">Process</option>
+                          <option value="Process">Dyed Fabric</option>
                           <option value="Greige Fabric">Greige Fabric</option>
                         </select>
                       ) : (
@@ -2118,10 +2118,10 @@ export default function PurchaseOrderForm({
                   color: '#5b47fb',
                   borderRadius: '8px'
                 }}
-                onClick={() => handleSubmit(isExisting && formData.status && formData.status !== 'Draft' ? formData.status : 'Sent')}
+                onClick={() => handleSubmit(isExisting && formData.status ? formData.status : 'Draft')}
               >
                 <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
-                <span>Save</span>
+                <span>Save Draft</span>
               </button>
 
               <button

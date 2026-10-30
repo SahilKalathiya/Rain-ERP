@@ -33746,7 +33746,7 @@
             style: {
               borderColor: "#cbd5e1",
               height: "32px",
-              minHeight: "32px",
+              minHeight: "35px",
               fontSize: "12px",
               lineHeight: "1.2",
               paddingTop: "2px",
@@ -33760,7 +33760,7 @@
             value: row.fabricType || "Process",
             onChange: (e) => handleItemChange(row.id, "fabricType", e.target.value)
           },
-          /* @__PURE__ */ import_react19.default.createElement("option", { value: "Process" }, "Process"),
+          /* @__PURE__ */ import_react19.default.createElement("option", { value: "Process" }, "Dyed Fabric"),
           /* @__PURE__ */ import_react19.default.createElement("option", { value: "Greige Fabric" }, "Greige Fabric")
         ) : /* @__PURE__ */ import_react19.default.createElement(
           "span",
@@ -34043,10 +34043,10 @@
           color: "#5b47fb",
           borderRadius: "8px"
         },
-        onClick: () => handleSubmit(isExisting && formData.status && formData.status !== "Draft" ? formData.status : "Sent")
+        onClick: () => handleSubmit(isExisting && formData.status ? formData.status : "Draft")
       },
       /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-device-floppy fs-15", style: { color: "#5b47fb" } }),
-      /* @__PURE__ */ import_react19.default.createElement("span", null, "Save")
+      /* @__PURE__ */ import_react19.default.createElement("span", null, "Save Draft")
     ), /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
