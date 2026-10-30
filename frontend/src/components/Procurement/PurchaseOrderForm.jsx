@@ -4,6 +4,7 @@ import VendorMasterView from './VendorMasterView';
 import FabricMasterView from './FabricMasterView';
 import AddColorModal from './AddColorModal';
 import { initialColors } from '../../data/procurementData';
+import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
 
 /**
  * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
@@ -642,13 +643,60 @@ export default function PurchaseOrderForm({
     return `1-${currentYear}-${random4}`;
   };
 
-  // Default orders if none passed
-  const orderList = orders.length > 0 ? orders : [
-    { id: 'ORD-2026-001', label: 'ORD-2026-001 - Zara India (Summer Kurti 2026)' },
-    { id: 'ORD-2026-002', label: 'ORD-2026-002 - FabIndia Retail (Designer Anarkali Gown)' },
-    { id: 'ORD-2026-003', label: 'ORD-2026-003 - Westside Styles (Festive Silk Kurta Set)' },
-    { id: 'ORD-2026-004', label: 'ORD-2026-004 - Pantaloons (Casual Printed Top)' }
-  ];
+  // Real Sales Orders from props or storage (No fake fallback dummy orders)
+  const [liveOrders, setLiveOrders] = useState(() => {
+    if (orders && orders.length > 0) return orders;
+    return getStoredData('erp_sales_orders_v1', initialSalesOrders || []);
+  });
+
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      setLiveOrders(orders);
+    }
+  }, [orders]);
+
+  useEffect(() => {
+    const handleSyncOrders = () => {
+      setLiveOrders(getStoredData('erp_sales_orders_v1', initialSalesOrders || []));
+    };
+    window.addEventListener('storage', handleSyncOrders);
+    window.addEventListener('erp_sales_order_updated', handleSyncOrders);
+    return () => {
+      window.removeEventListener('storage', handleSyncOrders);
+      window.removeEventListener('erp_sales_order_updated', handleSyncOrders);
+    };
+  }, []);
+
+  const orderList = useMemo(() => {
+    const source = (liveOrders && liveOrders.length > 0)
+      ? liveOrders
+      : (orders && orders.length > 0 ? orders : getStoredData('erp_sales_orders_v1', initialSalesOrders || []));
+
+    if (!Array.isArray(source) || source.length === 0) return [];
+
+    return source.map((ord) => {
+      if (ord.label && ord.id) return ord;
+      const orderId = ord.id || ord.orderId || '';
+      if (!orderId) return null;
+
+      let custName = ord.customer || ord.customerName || ord.party || '';
+      if (!custName && Array.isArray(ord.customerOrders) && ord.customerOrders.length > 0) {
+        custName = ord.customerOrders[0]?.customerName || ord.customerOrders[0]?.customer || '';
+      }
+
+      const style = ord.styleName || ord.style || '';
+      const parts = [orderId];
+      if (custName) parts.push(custName);
+      let label = parts.join(' - ');
+      if (style) label += ` (${style})`;
+
+      return {
+        id: orderId,
+        label: label,
+        raw: ord
+      };
+    }).filter(Boolean);
+  }, [liveOrders, orders]);
 
   // Today's date formatted as YYYY-MM-DD for date input
   const todayDateStr = new Date().toISOString().split('T')[0];
@@ -1157,10 +1205,13 @@ export default function PurchaseOrderForm({
     }
 
     const nextStatus = finalStatus || formData.status || 'Draft';
+    const isNowSent = nextStatus === 'Sent' || nextStatus === 'Sent to Vendor';
+    const todayDate = new Date().toISOString().split('T')[0];
 
     const payload = {
       ...formData,
       status: nextStatus,
+      sentToVendorDate: formData.sentToVendorDate || (isNowSent ? todayDate : (po?.sentToVendorDate || null)),
       totalAmount: poTotalAmount,
       terms: formData.discountTerms || formData.terms || 'Standard payment terms',
       items: formData.items.map((it) => {

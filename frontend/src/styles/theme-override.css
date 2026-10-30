@@ -832,3 +832,32 @@ html, body, #root, .table-responsive, div, main, aside, section, article, table 
   }
 }
 
+
+
+/* =========================================================================
+   Requirement 45: For all number fields, keep them as simple numeric/text fields.
+   Remove the scroll up/down (increment/decrement) spinner buttons across all browsers.
+   ========================================================================= */
+/* Chrome, Safari, Edge, Opera, and all WebKit browsers */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+/* Fallback for all browsers */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  margin: 0 !important;
+}

@@ -238,6 +238,8 @@ export default function App() {
       submodule = 'colors';
     } else if (currentRoute.startsWith('/transporters')) {
       submodule = 'transporters';
+    } else if (currentRoute.startsWith('/thread-master')) {
+      submodule = 'thread_master';
     }
 
     return (

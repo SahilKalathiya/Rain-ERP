@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import TransporterMasterView from './TransporterMasterView';
 
 /**
@@ -61,20 +61,30 @@ export default function GRNForm({
     const isFromPO = Boolean(grn?.poId || (grn?.linkedPOs && grn.linkedPOs.length > 0));
     const defaultPO = isFromPO
       ? eligiblePOs.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)))
-      : (eligiblePOs.length > 0 ? eligiblePOs[0] : null);
+      : null;
 
     const resolvedPoId = defaultPO ? defaultPO.id : (grn?.poId || grn?.linkedPOs?.[0] || '');
-    const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || (vendors[0]?.id || ''));
-    const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : (vendors[0]?.name || ''));
+    const resolvedVendorId = defaultPO ? defaultPO.vendorId : (grn?.vendorId || '');
+    const resolvedVendorName = grn?.vendorName || (defaultPO ? getPoVendorName(defaultPO) : '');
 
-    // For existing saved GRN, retain its saved declared total qty. For a new GRN, keep it blank for user to enter actual delivery qty.
-    const defaultDeclared = (isExisting && !grn?.isNew)
-      ? (grn && grn.totalQty !== undefined && grn.totalQty !== ''
-          ? grn.totalQty
-          : (grn?.declaredTotalMeters ? grn.declaredTotalMeters : ''))
-      : '';
+        const liveBaleMeters = (grn?.bales || []).reduce((sum, b) => {
+      const pLen = (b.pieces || []).reduce((ps, p) => ps + (Number(p.length) || 0), 0);
+      return sum + (pLen > 0 ? pLen : (Number(b.totalLength) || 0));
+    }, 0);
+    const grnEntered = Number(grn?.totalMetersEntered) || liveBaleMeters;
 
-    const cleanDate = (d) => {
+    let defaultDeclared = '';
+    if (grnEntered > 0 && (Number(grn?.declaredTotalMeters) === 2000 || !grn?.declaredTotalMeters)) {
+      defaultDeclared = String(grnEntered);
+    } else if (grn?.declaredTotalMeters && Number(grn.declaredTotalMeters) > 0) {
+      defaultDeclared = String(grn.declaredTotalMeters);
+    } else if (grn?.totalQty && Number(grn.totalQty) > 0) {
+      defaultDeclared = String(grn.totalQty);
+    } else if (grnEntered > 0) {
+      defaultDeclared = String(grnEntered);
+    }
+
+const cleanDate = (d) => {
       if (!d) return new Date().toISOString().split('T')[0];
       return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : String(d);
     };
@@ -158,14 +168,15 @@ export default function GRNForm({
 
   // Receipt details edit/view state toggle (Image 1 vs Image 2)
   const [isHeaderEditing, setIsHeaderEditing] = useState(() => {
+    // When editing GRN or explicitly requested to open full GRN, open Section 1 in edit mode!
+    if (grn?.openFullEdit || grn?.forceEditHeader) {
+      return true;
+    }
     // When creating a new GRN (e.g. from + GRN on PO), always open Section 1 in Edit mode
     if (!isExisting || grn?.isNew || grn?.isHeaderSaved === false) {
       return true;
     }
-    // Only show read-only summary card if header has actually been saved
-    if (grn?.isHeaderSaved === true || grn?.status === 'Header Saved' || (isExisting && (grn?.status === 'Completed' || (grn?.bales && grn.bales.length > 0)))) {
-      return false;
-    }
+    // Default to true so user has the entire GRN open for editing
     return true;
   });
 
@@ -182,8 +193,13 @@ export default function GRNForm({
   // Sync if grn prop changes
   useEffect(() => {
     if (grn && grn.id) {
-      if (lastGrnIdRef.current !== grn.id) {
+      const isNewId = lastGrnIdRef.current !== grn.id;
+      if (isNewId) {
         lastGrnIdRef.current = grn.id;
+      }
+
+      // If switching to a different GRN or when header is in saved/summary mode, sync latest prop data
+      if (isNewId || !isHeaderEditing) {
         const matchedPO = purchaseOrders.find((p) => p.id === grn.poId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)));
         const vName = grn.vendorName || (matchedPO ? getPoVendorName(matchedPO) : '');
 
@@ -240,6 +256,16 @@ export default function GRNForm({
           }
         }
 
+        const liveBaleM = (grn.bales || []).reduce((sum, b) => {
+          const pLen = (b.pieces || []).reduce((ps, p) => ps + (Number(p.length) || 0), 0);
+          return sum + (pLen > 0 ? pLen : (Number(b.totalLength) || 0));
+        }, 0);
+        const grnEntered = Number(grn.totalMetersEntered) || liveBaleM;
+        let resolvedMeters = Number(grn.declaredTotalMeters) || Number(grn.totalQty) || 0;
+        if (grnEntered > 0 && (resolvedMeters === 2000 || resolvedMeters === 0)) {
+          resolvedMeters = grnEntered;
+        }
+
         setFormData((prev) => ({
           ...prev,
           id: grn.id,
@@ -258,30 +284,61 @@ export default function GRNForm({
           lrNumber: grn.lrNumber || grn.lrNo || prev.lrNumber || '',
           lrDate: cleanDate(grn.lrDate) || prev.lrDate,
           weight: grn.weight !== undefined ? grn.weight : prev.weight,
-          totalQty: (isExisting && !grn?.isNew)
-            ? ((grn && grn.totalQty !== undefined && grn.totalQty !== '')
-                ? String(grn.totalQty)
-                : (grn?.declaredTotalMeters ? String(grn.declaredTotalMeters) : (prev.totalQty || '')))
-            : (grn?.isNew ? '' : (grn?.totalQty ? String(grn.totalQty) : '')),
-          declaredTotalMeters: (isExisting && !grn?.isNew)
-            ? Number(grn?.totalQty || grn?.declaredTotalMeters || prev.declaredTotalMeters || 0)
-            : 0,
+          totalQty: resolvedMeters > 0 ? String(resolvedMeters) : (isNewId && grn?.isNew ? '' : (prev.totalQty || '')),
+          declaredTotalMeters: resolvedMeters > 0 ? resolvedMeters : (isNewId && grn?.isNew ? 0 : (prev.declaredTotalMeters || 0)),
           totalBales: grn.totalBales || grn.numBales || (initialBales.length > 0 ? String(initialBales.length) : prev.totalBales),
           status: grn.status || prev.status,
           bales: initialBales.length > 0 ? initialBales : prev.bales
         }));
 
-        const isHeaderActuallySaved = Boolean(
-          isExisting &&
-          !grn.isNew &&
-          grn.status === 'Completed'
-        );
-        if (isHeaderActuallySaved) {
-          setIsHeaderEditing(false);
-        } else {
-          setIsHeaderEditing(true);
+        if (isNewId || grn?.openFullEdit || grn?.forceEditHeader) {
+          if (grn?.openFullEdit || grn?.forceEditHeader) {
+            setIsHeaderEditing(true);
+            if (grn?.openFullEdit) {
+              const allEdit = {};
+              const noSaved = {};
+              (initialBales || []).forEach((_, idx) => {
+                allEdit[idx] = true;
+                noSaved[idx] = false;
+              });
+              setEditingBaleMap(allEdit);
+              setSavedBaleMap(noSaved);
+            }
+          } else {
+            const isHeaderActuallySaved = Boolean(
+              !grn.isNew &&
+              (grn.isHeaderSaved === true || grn.status === 'Header Saved' || grn.status === 'Completed' || (grn.bales && grn.bales.length > 0))
+            );
+            setIsHeaderEditing(!isHeaderActuallySaved);
+          }
         }
       }
+    } else if (!grn && lastGrnIdRef.current !== null) {
+      lastGrnIdRef.current = null;
+      setFormData({
+        id: `GRN-${String(Math.floor(1000 + Math.random() * 9000))}`,
+        poId: '',
+        linkedPOs: [],
+        vendorId: '',
+        vendorName: '',
+        receivedDate: new Date().toISOString().split('T')[0],
+        vendorChallanNo: '',
+        vendorChallanDate: '',
+        vendorInvoiceNo: '',
+        vendorInvoiceDate: '',
+        transporterId: '',
+        transporterName: '',
+        lrNo: '',
+        lrNumber: '',
+        lrDate: '',
+        weight: '',
+        totalQty: '',
+        declaredTotalMeters: 0,
+        totalBales: '',
+        status: 'Bale Entry in Progress',
+        bales: []
+      });
+      setIsHeaderEditing(true);
     }
   }, [grn, purchaseOrders]);
 
@@ -319,11 +376,33 @@ export default function GRNForm({
   // Visual save feedback per bale: tracks saved status permanently
   const [savedBaleMap, setSavedBaleMap] = useState(() => {
     const initialMap = {};
-    (formData.bales || []).forEach((b, idx) => {
-      if (b.isSaved) initialMap[idx] = true;
-    });
+    if (!grn?.openFullEdit) {
+      (formData.bales || []).forEach((b, idx) => {
+        if (b.isSaved) initialMap[idx] = true;
+      });
+    }
     return initialMap;
   });
+
+  // Track which bales are currently opened in edit mode
+  const [editingBaleMap, setEditingBaleMap] = useState(() => {
+    const initialEditMap = {};
+    if (grn?.openFullEdit) {
+      (formData.bales || []).forEach((_, idx) => {
+        initialEditMap[idx] = true;
+      });
+    }
+    return initialEditMap;
+  });
+
+  const handleEditBale = (bIdx) => {
+    if (isQcActioned) {
+      showToast('Bale entries are locked because this GRN has been submitted to QC.', 'warning');
+      return;
+    }
+    setEditingBaleMap((prev) => ({ ...prev, [bIdx]: true }));
+    setSavedBaleMap((prev) => ({ ...prev, [bIdx]: false }));
+  };
 
   // Multi-PO selection state (Point 26: Consolidate multiple POs received in same shipment)
   const [showMultiPoPicker, setShowMultiPoPicker] = useState(false);
@@ -386,6 +465,234 @@ export default function GRNForm({
     if (!isExisting && (p.status === 'Completed' || (poTotalMtrs > 0 && poBalPending <= 0))) return false;
     return true;
   });
+
+  // Helper to standardize any date string to YYYY-MM-DD
+  const toStandardDateStr = (d) => {
+    if (!d) return '';
+    const str = String(d).split('T')[0].trim();
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts[0].length === 4) return str;
+      if (parts[2]?.length === 4) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts[2]?.length === 4) {
+        return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      }
+    }
+    return str;
+  };
+
+  // Requirement 49: Extract PO creation date and Sent to Vendor date
+  const getPoCreationAndSentDates = (poObj) => {
+    if (!poObj) return { creationDate: '', sentDate: '', minDate: '', reason: '' };
+
+    const cDate = toStandardDateStr(poObj.date || poObj.createdAt || poObj.poDate);
+    let sDate = toStandardDateStr(
+      poObj.sentToVendorDate ||
+      poObj.sentDate ||
+      poObj.vendorSentDate ||
+      poObj.dispatchedDate
+    );
+
+    if (!sDate && (poObj.status === 'Sent' || poObj.status === 'Sent to Vendor') && cDate) {
+      sDate = cDate;
+    }
+
+    let minDate = cDate;
+    let reason = 'PO creation date';
+    if (sDate && (!cDate || sDate > cDate)) {
+      minDate = sDate;
+      reason = 'Sent to Vendor date';
+    } else if (cDate) {
+      reason = 'PO creation date';
+    }
+
+    return { creationDate: cDate, sentDate: sDate, minDate, reason };
+  };
+
+  // Requirement 49: Earliest allowed Receive Date across all linked POs
+  const minAllowedReceiveInfo = useMemo(() => {
+    const targetPOs = (linkedPOObjects && linkedPOObjects.length > 0)
+      ? linkedPOObjects
+      : (currentPO ? [currentPO] : []);
+
+    if (targetPOs.length === 0) {
+      return { minDate: '', label: '', poId: '' };
+    }
+
+    let latestMinDate = '';
+    let latestLabel = '';
+    let latestPoId = '';
+
+    for (const poObj of targetPOs) {
+      const { minDate, reason } = getPoCreationAndSentDates(poObj);
+      if (minDate && (!latestMinDate || minDate > latestMinDate)) {
+        latestMinDate = minDate;
+        latestLabel = `${reason} (${minDate}) of PO ${poObj.id}`;
+        latestPoId = poObj.id;
+      }
+    }
+
+    return { minDate: latestMinDate, label: latestLabel, poId: latestPoId };
+  }, [linkedPOObjects, currentPO]);
+
+  // Requirement 49: Real-time validation message for Receive Date
+  const receiveDateValidationMsg = useMemo(() => {
+    if (!formData.receivedDate || !minAllowedReceiveInfo.minDate) return '';
+    const rec = toStandardDateStr(formData.receivedDate);
+    const minD = minAllowedReceiveInfo.minDate;
+    if (rec && minD && rec < minD) {
+      return `Receive Date (${formData.receivedDate}) cannot be earlier than ${minAllowedReceiveInfo.label}.`;
+    }
+    return '';
+  }, [formData.receivedDate, minAllowedReceiveInfo]);
+
+  // Requirement 49: Effective minimum allowed receive date (PO creation date / Sent to Vendor date, or today as fallback)
+  const effectiveMinDate = useMemo(() => {
+    return minAllowedReceiveInfo.minDate || new Date().toISOString().split('T')[0];
+  }, [minAllowedReceiveInfo.minDate]);
+
+  // Requirement 49: Custom restricted calendar state (Old dates completely hidden)
+  const datePickerRef = useRef(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [calViewYear, setCalViewYear] = useState(() => new Date().getFullYear());
+  const [calViewMonth, setCalViewMonth] = useState(() => new Date().getMonth());
+
+  // Auto-align receivedDate if it is earlier than effectiveMinDate
+  useEffect(() => {
+    if (effectiveMinDate) {
+      const cur = toStandardDateStr(formData.receivedDate);
+      if (!cur || cur < effectiveMinDate) {
+        setFormData((prev) => ({
+          ...prev,
+          receivedDate: effectiveMinDate
+        }));
+      }
+    }
+  }, [effectiveMinDate]);
+
+  // Click outside to close calendar
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    if (isDatePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDatePickerOpen]);
+
+  const handleOpenCalendar = () => {
+    const baseDate = formData.receivedDate || effectiveMinDate || new Date().toISOString().split('T')[0];
+    const parts = baseDate.split('-').map(Number);
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      setCalViewYear(parts[0]);
+      setCalViewMonth(parts[1] - 1);
+    }
+    setIsDatePickerOpen((prev) => !prev);
+  };
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const minParts = effectiveMinDate ? effectiveMinDate.split('-').map(Number) : [2000, 1, 1];
+  const minYear = minParts[0];
+  const minMonth = (minParts[1] || 1) - 1; // 0-indexed
+
+  const canGoPrevMonth = (calViewYear > minYear) || (calViewYear === minYear && calViewMonth > minMonth);
+
+  const handlePrevMonth = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canGoPrevMonth) return;
+    if (calViewMonth === 0) {
+      setCalViewYear((y) => y - 1);
+      setCalViewMonth(11);
+    } else {
+      setCalViewMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (calViewMonth === 11) {
+      setCalViewYear((y) => y + 1);
+      setCalViewMonth(0);
+    } else {
+      setCalViewMonth((m) => m + 1);
+    }
+  };
+
+  const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+  const firstDayIndex = (new Date(calViewYear, calViewMonth, 1).getDay() + 6) % 7; // Monday = 0
+
+  const renderCalendarDays = () => {
+    const cells = [];
+    for (let i = 0; i < firstDayIndex; i++) {
+      cells.push(<div key={`empty-${i}`} style={{ width: '34px', height: '34px' }} />);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayStr = `${calViewYear}-${String(calViewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isPast = dayStr < effectiveMinDate;
+      const isSelected = dayStr === formData.receivedDate;
+      const isToday = dayStr === new Date().toISOString().split('T')[0];
+
+      if (isPast) {
+        // Requirement: Old dates are NOT visible in the calendar!
+        cells.push(
+          <div
+            key={dayStr}
+            style={{
+              width: '34px',
+              height: '34px',
+              visibility: 'hidden'
+            }}
+          />
+        );
+      } else {
+        cells.push(
+          <button
+            key={dayStr}
+            type="button"
+            className="btn btn-sm p-0 d-flex align-items-center justify-content-center"
+            style={{
+              width: '34px',
+              height: '34px',
+              fontSize: '12px',
+              fontWeight: isSelected ? '700' : '500',
+              borderRadius: '8px',
+              border: isSelected ? '1px solid #4338ca' : (isToday ? '1px solid #6366f1' : '1px solid transparent'),
+              backgroundColor: isSelected ? '#4f46e5' : (isToday ? '#eef2ff' : '#f8fafc'),
+              color: isSelected ? '#ffffff' : (isToday ? '#4338ca' : '#1e293b'),
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setFormData((prev) => ({ ...prev, receivedDate: dayStr }));
+              setIsDatePickerOpen(false);
+            }}
+          >
+            {d}
+          </button>
+        );
+      }
+    }
+    return cells;
+  };
 
   // Link another PO to this shipment (Point 26)
   const handleAddLinkedPO = (poIdToAdd) => {
@@ -512,6 +819,16 @@ export default function GRNForm({
       const poWidth = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : '';
       const poFold = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : '';
 
+      // Requirement 49: Validate and align receivedDate to not be earlier than PO creation date or Sent to Vendor date
+      const { minDate } = getPoCreationAndSentDates(selectedPO);
+      const todayStr = new Date().toISOString().split('T')[0];
+      let nextReceivedDate = prev.receivedDate;
+      if (!nextReceivedDate) {
+        nextReceivedDate = (minDate && minDate > todayStr) ? minDate : todayStr;
+      } else if (minDate && toStandardDateStr(nextReceivedDate) < minDate) {
+        nextReceivedDate = minDate;
+      }
+
       // If bales exist, keep their assignments or update default
       const updatedBales = (prev.bales || []).map((b) => {
         const item = selectedPO.items && selectedPO.items[0];
@@ -529,6 +846,7 @@ export default function GRNForm({
         linkedPOs: [newPoId],
         vendorId: selectedPO.vendorId,
         vendorName: vName,
+        receivedDate: nextReceivedDate,
         width: poWidth || prev.width,
         pannaWidth: poWidth || prev.pannaWidth,
         fold: poFold || prev.fold,
@@ -727,7 +1045,7 @@ export default function GRNForm({
   ) / 100;
 
   // Declared total meters from header
-  const declaredTotal = Number(formData.totalQty || formData.declaredTotalMeters || 0);
+  const declaredTotal = Number(formData.declaredTotalMeters || formData.totalQty || 0);
 
   const isMatch = declaredTotal > 0 && Math.abs(totalMetersEntered - declaredTotal) < 0.01;
   const hasBaleEntries = (formData.bales || []).some((b) => (b.pieces || []).length > 0);
@@ -789,6 +1107,15 @@ export default function GRNForm({
 
   // Point 36: Save This Section (Receipt Details)
   const handleSaveHeaderOnly = () => {
+    if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
+      showToast('Please select a Source document (Purchase Order).', 'warning');
+      return;
+    }
+    // Requirement 49: Validate Receive Date against PO creation date / Sent to Vendor date
+    if (receiveDateValidationMsg) {
+      showToast(receiveDateValidationMsg, 'warning');
+      return;
+    }
     if (isPoAlreadyCompleted) {
       showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
       return;
@@ -798,7 +1125,7 @@ export default function GRNForm({
       return;
     }
 
-    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || (eligiblePOs[0]?.id) || 'PO-DIRECT';
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || 'PO-DIRECT';
 
     const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
     const firstPoItem = selectedPO?.items?.[0];
@@ -857,8 +1184,8 @@ export default function GRNForm({
       pannaWidth: widthVal,
       fold: foldVal,
       fabricFolding: foldVal,
-      declaredTotalMeters: declaredTotal,
-      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      declaredTotalMeters: (totalMetersEntered > 0 && (declaredTotal === 2000 || declaredTotal === 0)) ? totalMetersEntered : (declaredTotal > 0 ? declaredTotal : totalMetersEntered),
+      totalQty: (totalMetersEntered > 0 && (declaredTotal === 2000 || declaredTotal === 0)) ? String(totalMetersEntered) : (declaredTotal > 0 ? String(declaredTotal) : (totalMetersEntered > 0 ? String(totalMetersEntered) : (formData.totalQty || ''))),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
       totalBales: count > 0 ? String(count) : (formData.totalBales || ''),
@@ -871,6 +1198,8 @@ export default function GRNForm({
       ...prev,
       ...payload
     }));
+    setIsHeaderEditing(false);
+    setIsSectionSaved(true);
 
     setIsSectionSaved(true);
     // Transition Section 1 to saved summary view mode as per Section 13.3
@@ -888,6 +1217,11 @@ export default function GRNForm({
 
   // Point 36: Save an individual bale record or all bales
   const handleSaveAllBales = (specificBaleIdx = null) => {
+    // Requirement 49: Validate Receive Date against PO creation date / Sent to Vendor date
+    if (receiveDateValidationMsg) {
+      showToast(receiveDateValidationMsg, 'warning');
+      return;
+    }
     if (isPoAlreadyCompleted) {
       showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
       return;
@@ -896,7 +1230,7 @@ export default function GRNForm({
       showToast('Bale entries are locked because this GRN has been submitted to QC.', 'warning');
       return;
     }
-    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || (eligiblePOs[0]?.id) || 'PO-DIRECT';
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || 'PO-DIRECT';
 
     const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
     const firstPoItem = selectedPO?.items?.[0];
@@ -946,6 +1280,11 @@ export default function GRNForm({
       normalizedBales.reduce((sum, b) => sum + (Number(b.totalLength) || 0), 0) * 100
     ) / 100;
 
+    let finalDeclaredTotal = declaredTotal;
+    if (liveTotalMeters > 0 && (finalDeclaredTotal === 2000 || finalDeclaredTotal === 0)) {
+      finalDeclaredTotal = liveTotalMeters;
+    }
+
     const payload = {
       ...formData,
       poId: resolvedPoId,
@@ -962,8 +1301,8 @@ export default function GRNForm({
       pannaWidth: widthVal,
       fold: foldVal,
       fabricFolding: foldVal,
-      declaredTotalMeters: declaredTotal,
-      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      declaredTotalMeters: finalDeclaredTotal > 0 ? finalDeclaredTotal : liveTotalMeters,
+      totalQty: finalDeclaredTotal > 0 ? String(finalDeclaredTotal) : (liveTotalMeters > 0 ? String(liveTotalMeters) : (formData.totalQty || '')),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered: liveTotalMeters,
@@ -977,12 +1316,16 @@ export default function GRNForm({
 
     if (isSingle) {
       setSavedBaleMap((prev) => ({ ...prev, [specificBaleIdx]: true }));
+      setEditingBaleMap((prev) => ({ ...prev, [specificBaleIdx]: false }));
     } else {
       const newMap = {};
+      const newEditMap = {};
       normalizedBales.forEach((_, idx) => {
         newMap[idx] = true;
+        newEditMap[idx] = false;
       });
       setSavedBaleMap(newMap);
+      setEditingBaleMap(newEditMap);
     }
 
     if (onSaveGRN) {
@@ -1011,6 +1354,11 @@ export default function GRNForm({
 
   // Complete / Submit GRN to QC
   const handleCompleteGRN = () => {
+    // Requirement 49: Validate Receive Date against PO creation date / Sent to Vendor date
+    if (receiveDateValidationMsg) {
+      showToast(receiveDateValidationMsg, 'warning');
+      return;
+    }
     if (isPoAlreadyCompleted) {
       showToast(`Purchase Order ${currentPO?.id} is already 100% fulfilled (${poOrderedMeters.toLocaleString()}m received). No further GRN can be created.`, 'warning');
       return;
@@ -1080,7 +1428,7 @@ export default function GRNForm({
       fold: foldVal,
       fabricFolding: foldVal,
       declaredTotalMeters: declaredTotal,
-      totalQty: formData.totalQty !== undefined && formData.totalQty !== '' ? formData.totalQty : (declaredTotal ? String(declaredTotal) : ''),
+      totalQty: declaredTotal > 0 ? String(declaredTotal) : (formData.totalQty || ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
       totalMetersEntered
@@ -1229,24 +1577,19 @@ export default function GRNForm({
         {!isHeaderEditing ? (
           /* READ-ONLY / SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
           <div className="row g-4 fs-13 pt-1">
-            {/* 1. PO NO. */}
+            {/* 1. VENDOR (PO Source) */}
             <div className="col-12 col-sm-6 col-md-3 col-lg" style={{ minWidth: '150px' }}>
               <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
-                PO NO.
+                VENDOR
               </div>
-              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.linkedPOs && formData.linkedPOs.length > 1 ? formData.linkedPOs.join(', ') : formData.poId}>
-                {formData.linkedPOs && formData.linkedPOs.length > 1
-                  ? formData.linkedPOs.join(', ')
-                  : (formData.poId || '—')}
+              <div className="fw-bold text-dark fs-13 text-truncate" title={formData.poId ? `PO: ${formData.poId}` : ''}>
+                {currentPO && getPoVendorName(currentPO)
+                  ? getPoVendorName(currentPO)
+                  : (formData.vendorName || (formData.linkedPOs && formData.linkedPOs.length > 1 ? formData.linkedPOs.join(', ') : (formData.poId || '—')))}
               </div>
               {formData.linkedPOs && formData.linkedPOs.length > 1 && (
                 <div className="text-primary fs-11 fw-semibold">
                   {formData.linkedPOs.length} POs Consolidated
-                </div>
-              )}
-              {currentPO && getPoVendorName(currentPO) && (
-                <div className="text-muted fs-11 text-truncate" title={getPoVendorName(currentPO)}>
-                  {getPoVendorName(currentPO)}
                 </div>
               )}
             </div>
@@ -1326,8 +1669,14 @@ export default function GRNForm({
                 TOTAL QTY / BALES
               </div>
               <div className="fw-bold text-dark fs-13 font-monospace">
-                {Number(formData.totalQty || formData.declaredTotalMeters || 0).toLocaleString()}m / {formData.totalBales || (formData.bales ? formData.bales.length : 0)}
-              </div>
+                {(() => {
+                  const bCount = formData.totalBales || (formData.bales ? formData.bales.length : 0);
+                  const dec = Number(formData.declaredTotalMeters) || Number(formData.totalQty) || 0;
+                  const finalM = (totalMetersEntered > 0 && (dec === 2000 || dec === 0))
+                    ? totalMetersEntered
+                    : (dec > 0 ? dec : (totalMetersEntered > 0 ? totalMetersEntered : 0));
+                  return `${Number(finalM).toLocaleString()}m / ${bCount}`;
+                })()}</div>
             </div>
 
             {/* 5th column spacer for alignment on large screens */}
@@ -1564,13 +1913,138 @@ export default function GRNForm({
                 <label className="form-label fs-13 fw-semibold text-secondary mb-1">
                   Received date <span className="text-danger">*</span>
                 </label>
-                <input
-                  type="date"
-                  className="form-control bg-white fs-13"
-                  style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                  value={formData.receivedDate}
-                  onChange={(e) => setFormData({ ...formData, receivedDate: e.target.value })}
-                />
+                <div className="position-relative" ref={datePickerRef}>
+                  <div
+                    className={`input-group bg-white rounded-3 ${receiveDateValidationMsg ? 'border border-danger' : 'border'}`}
+                    style={{
+                      height: '40px',
+                      borderColor: receiveDateValidationMsg ? '#ef4444' : '#cbd5e1',
+                      overflow: 'hidden',
+                      cursor: 'pointer'
+                    }}
+                    onClick={handleOpenCalendar}
+                  >
+                    <input
+                      type="text"
+                      className="form-control bg-white border-0 fs-13 fw-semibold text-dark ps-3"
+                      style={{ height: '38px', cursor: 'pointer' }}
+                      value={formData.receivedDate || ''}
+                      placeholder="YYYY-MM-DD"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-light border-0 px-3 d-flex align-items-center justify-content-center text-primary"
+                      style={{ background: '#f8fafc' }}
+                      title="Open Calendar (Restricted to PO date onwards)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenCalendar();
+                      }}
+                    >
+                      <i className="ti ti-calendar fs-16"></i>
+                    </button>
+                  </div>
+
+                  {/* Custom Restricted Calendar Popup (Old dates completely hidden) */}
+                  {isDatePickerOpen && (
+                    <div
+                      className="position-absolute bg-white rounded-3 shadow-lg p-3 border"
+                      style={{
+                        top: '44px',
+                        left: 0,
+                        zIndex: 1050,
+                        width: '280px',
+                        borderColor: '#e2e8f0',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Month & Year Header */}
+                      <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-light p-1 px-2 border"
+                          disabled={!canGoPrevMonth}
+                          style={{
+                            opacity: canGoPrevMonth ? 1 : 0.25,
+                            cursor: canGoPrevMonth ? 'pointer' : 'not-allowed'
+                          }}
+                          onClick={handlePrevMonth}
+                          title={canGoPrevMonth ? "Previous Month" : "Cannot navigate to past months"}
+                        >
+                          <i className="ti ti-chevron-left"></i>
+                        </button>
+                        <span className="fw-bold fs-13 text-dark">
+                          {monthNames[calViewMonth]} {calViewYear}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-light p-1 px-2 border"
+                          onClick={handleNextMonth}
+                          title="Next Month"
+                        >
+                          <i className="ti ti-chevron-right"></i>
+                        </button>
+                      </div>
+
+                      {/* Day Names Header */}
+                      <div
+                        className="mb-1"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(7, 1fr)',
+                          gap: '2px',
+                          textAlign: 'center'
+                        }}
+                      >
+                        {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
+                          <span key={d} className="text-muted fw-semibold" style={{ fontSize: '11px' }}>
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Day Grid */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(7, 1fr)',
+                          gap: '2px',
+                          justifyItems: 'center'
+                        }}
+                      >
+                        {renderCalendarDays()}
+                      </div>
+
+                      {/* Footer Info */}
+                      <div className="mt-2 pt-2 border-top d-flex align-items-center justify-content-between">
+                        <span className="text-muted" style={{ fontSize: '11px' }}>
+                          Min allowed: <strong className="text-primary">{effectiveMinDate}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 text-decoration-none fs-11 fw-semibold text-danger"
+                          onClick={() => setIsDatePickerOpen(false)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {receiveDateValidationMsg ? (
+                  <div className="text-danger fs-11 mt-1 fw-medium d-flex align-items-center gap-1">
+                    <i className="ti ti-alert-triangle"></i>
+                    <span>{receiveDateValidationMsg}</span>
+                  </div>
+                ) : minAllowedReceiveInfo.minDate ? (
+                  <div className="text-muted fs-11 mt-1 d-flex align-items-center gap-1">
+                    <i className="ti ti-info-circle text-primary"></i>
+                    <span>Cannot be earlier than {minAllowedReceiveInfo.minDate} ({minAllowedReceiveInfo.poId})</span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1811,18 +2285,6 @@ export default function GRNForm({
               <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-3 py-1.5 fs-12 rounded-pill fw-semibold">
                 {formData.bales.length} Bale{formData.bales.length > 1 ? 's' : ''} Generated
               </span>
-              {!isQcActioned && !isPoAlreadyCompleted && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fs-12 fw-semibold rounded-3 text-white shadow-sm"
-                  style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                  onClick={() => handleSaveAllBales()}
-                  title="Save all generated bales and entered pieces"
-                >
-                  <i className="ti ti-device-floppy fs-14"></i>
-                  <span>Save All Bales</span>
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -1857,6 +2319,7 @@ export default function GRNForm({
               const currentFabricLabel = bale.fabricItemLabel || (
                 poItemLabels[0] || masterFabricLabels[0] || (fabrics[0]?.qualityName || 'Fabric')
               );
+              const isBaleSaved = Boolean((savedBaleMap[bIdx] || bale.isSaved) && !editingBaleMap[bIdx]);
 
               return (
                 <div
@@ -1885,45 +2348,42 @@ export default function GRNForm({
                       >
                         Container #{bIdx + 1}
                       </span>
-                      <span
-                        className={`badge px-3 py-1.5 fs-11 rounded-pill fw-medium ${
-                          isQcActioned
-                            ? 'bg-secondary-subtle text-secondary border'
-                            : 'bg-success-subtle text-success border border-success border-opacity-25'
-                        }`}
-                        style={{ display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        {isQcActioned ? 'Locked (QC Actioned)' : 'Editable'}
-                      </span>
-                      {/* Point 36: Persistent Saved badge for individual bale */}
-                      {(savedBaleMap[bIdx] || bale.isSaved) && (
+                      {isBaleSaved ? (
                         <span
                           className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1"
                         >
                           <i className="ti ti-check fs-12"></i>
                           <span>Saved</span>
                         </span>
+                      ) : (
+                        <span
+                          className={`badge px-3 py-1.5 fs-11 rounded-pill fw-medium ${
+                            isQcActioned
+                              ? 'bg-secondary-subtle text-secondary border'
+                              : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                          }`}
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          {isQcActioned ? 'Locked (QC Actioned)' : 'Editing'}
+                        </span>
                       )}
                     </div>
 
-                    {!isQcActioned && !isPoAlreadyCompleted && (
-                      <div className="d-flex align-items-center" style={{ gap: '8px' }}>
-                        {/* Point 36: Individual Bale Save Button with persistent Saved state */}
+                    <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                      {isBaleSaved && !isQcActioned && !isPoAlreadyCompleted && (
                         <button
                           type="button"
-                          className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
-                          style={{
-                            backgroundColor: (savedBaleMap[bIdx] || bale.isSaved) ? '#10b981' : '#7c3aed',
-                            borderColor: (savedBaleMap[bIdx] || bale.isSaved) ? '#10b981' : '#7c3aed',
-                            fontSize: '12.5px',
-                            transition: 'all 0.2s ease-in-out'
-                          }}
-                          onClick={() => handleSaveSingleBale(bIdx)}
-                          title={`Save Bale ${bale.baleNo || bIdx + 1}`}
+                          className="btn btn-sm btn-white border px-3 py-1 fs-12 fw-semibold rounded-2 text-dark shadow-xs d-inline-flex align-items-center gap-1.5"
+                          style={{ borderColor: '#cbd5e1' }}
+                          onClick={() => handleEditBale(bIdx)}
+                          title={`Edit Bale ${bale.baleNo || bIdx + 1}`}
                         >
-                          <i className={`ti ${(savedBaleMap[bIdx] || bale.isSaved) ? 'ti-check' : 'ti-device-floppy'}`} style={{ fontSize: '15px' }}></i>
-                          <span>{(savedBaleMap[bIdx] || bale.isSaved) ? 'Saved' : 'Save'}</span>
+                          <i className="ti ti-edit fs-14" style={{ color: '#f97316' }}></i>
+                          <span>Edit</span>
                         </button>
+                      )}
+
+                      {!isQcActioned && !isPoAlreadyCompleted && (
                         <button
                           type="button"
                           className="btn btn-link text-muted p-1"
@@ -1932,11 +2392,83 @@ export default function GRNForm({
                         >
                           <i className="ti ti-trash text-danger" style={{ fontSize: '16px' }}></i>
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
-                  <div className="px-4 px-md-4 py-3.5">
+                  {isBaleSaved ? (
+                    /* SAVED SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
+                    <div className="px-4 px-md-4 py-3.5">
+                      <div className="row g-4 fs-13 pt-1">
+                        {/* 1. BALE NO. */}
+                        <div className="col-6 col-sm-4 col-md-2" style={{ minWidth: '100px' }}>
+                          <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                            BALE NO.
+                          </div>
+                          <div className="fw-bold text-dark fs-13 font-monospace">
+                            {bale.baleNo || bIdx + 1}
+                          </div>
+                        </div>
+
+                        {/* 2. FABRIC QUALITY */}
+                        <div className="col-12 col-sm-6 col-md-3" style={{ minWidth: '170px' }}>
+                          <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                            FABRIC QUALITY
+                          </div>
+                          <div className="fw-bold text-dark fs-13 text-truncate" title={bale.fabricItemLabel || currentFabricLabel}>
+                            {bale.isMixedFabric ? (
+                              <span className="text-primary fw-semibold">🔀 Mixed Bale</span>
+                            ) : (
+                              bale.fabricItemLabel || currentFabricLabel
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3. TOTAL PIECES */}
+                        <div className="col-6 col-sm-4 col-md-2" style={{ minWidth: '110px' }}>
+                          <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                            NO. OF PIECES
+                          </div>
+                          <div className="fw-bold text-dark fs-13">
+                            {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        {/* 4. PIECE DETAILS (METERS) */}
+                        <div className="col-12 col-sm-6 col-md-3" style={{ minWidth: '180px' }}>
+                          <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                            PIECE DETAILS
+                          </div>
+                          <div className="d-flex flex-wrap gap-1.5 align-items-center">
+                            {(bale.pieces && bale.pieces.length > 0) ? (
+                              bale.pieces.map((p, pIdx) => {
+                                const pLen = typeof p === 'object' && p !== null ? p.length : p;
+                                return (
+                                  <span key={pIdx} className="badge bg-light text-dark border px-2 py-0.5 fs-11 font-monospace fw-semibold">
+                                    Pc {pIdx + 1}: {pLen || 0}m
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-muted fs-12">—</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 5. BALE TOTAL */}
+                        <div className="col-6 col-sm-4 col-md-2" style={{ minWidth: '120px' }}>
+                          <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>
+                            BALE TOTAL
+                          </div>
+                          <div className="fw-bold text-dark fs-14 font-monospace">
+                            {Number(bale.totalLength || 0).toLocaleString()}m
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* EDITING FORM INPUTS (Image 1) */
+                    <div className="px-4 px-md-4 py-3.5">
                     {/* Bale Fields: Bale No, Fabric Item, No. of pieces */}
                     <div className="row g-3 gx-4 align-items-start mb-3">
                       {/* Bale No */}
@@ -2104,9 +2636,28 @@ export default function GRNForm({
                         <span className="fs-14 fw-bold text-dark font-monospace px-2.5 py-0.5 rounded bg-light border">
                           {(bale.totalLength || 0).toFixed(2).replace(/\.00$/, '')} m
                         </span>
+                        {/* Save button moved to bale footer */}
+                        {!isQcActioned && !isPoAlreadyCompleted && (
+                          <button
+                            type="button"
+                            className="btn btn-sm text-white rounded-2 px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
+                            style={{
+                              backgroundColor: '#7c3aed',
+                              borderColor: '#7c3aed',
+                              fontSize: '12.5px',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                            onClick={() => handleSaveSingleBale(bIdx)}
+                            title={`Save Bale ${bale.baleNo || bIdx + 1}`}
+                          >
+                            <i className="ti ti-device-floppy" style={{ fontSize: '15px' }}></i>
+                            <span>Save</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
               );
             })}

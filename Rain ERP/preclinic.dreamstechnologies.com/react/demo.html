@@ -24,6 +24,18 @@
     --shadow: 0 1px 2px rgba(38,58,84,0.06);
     --shadow-hover: 0 6px 18px rgba(38,58,84,0.12);
   }
+    /* Requirement 45: Remove spin up/down buttons on all number fields */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+  }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -1747,6 +1759,14 @@ window.grnPieceKeydown = function(evt, bi, pi){
 };
 window.grnLockHeaderSection = function(){
   if(!grnDraft.receivedDate){ toast('Received date is required before saving'); return; }
+  const linkedPo = db.pos.find(p=>p.id===grnDraft.poId);
+  if(linkedPo){
+    const minD = linkedPo.sentToVendorDate || linkedPo.date;
+    if(minD && grnDraft.receivedDate < minD){
+      toast(`Receive Date cannot be earlier than PO date (${minD})`);
+      return;
+    }
+  }
   if(editingGrnId){
     const idx = db.grns.findIndex(g=>g.id===editingGrnId);
     db.grns[idx] = { ...grnDraft, id: editingGrnId, headerLocked:true };
@@ -1922,6 +1942,7 @@ function renderGRNDetail(grnId){
     <div class="card">
       <h3>Receipt details <button class="btn btn-small" onclick="openGRNHeaderEditModal(${grn.id})">Edit</button></h3>
       <div class="detail-grid">
+        <div><div class="dt">Vendor</div><div class="dd"><strong>${vendorName(src.vendorId) || grn.vendorName || '—'}</strong></div></div>
         <div><div class="dt">Received date</div><div class="dd">${grn.receivedDate}</div></div>
         <div><div class="dt">Vendor challan</div><div class="dd">${grn.challan||'—'} ${grn.challanDate?('· '+grn.challanDate):''}</div></div>
         <div><div class="dt">Vendor invoice</div><div class="dd">${grn.invoice||'—'} ${grn.invoiceDate?('· '+grn.invoiceDate):''}</div></div>
@@ -3068,10 +3089,25 @@ function paintAccessoryModal(){
       <div class="row"><div class="field"><label>Thread pattern</label><select onchange="accField('threadPattern',this.value)">${THREAD_PATTERNS.map(p=>`<option ${d.threadPattern===p?'selected':''}>${p}</option>`).join('')}</select></div></div>
       ${d.threadPattern==='Stitching' ? `
         <div class="row">
-          <div class="field"><label>Meters of thread required for 1m stitching (single‑time entry)</label><input type="text" value="${d.metersPerMeterStitching||''}" onchange="accField('metersPerMeterStitching',this.value)"></div>
+          <div class="field"><label>select Article - for ex Kurta</label>
+            <select onchange="accField('stitchingArticle',this.value); if(!d.threadPerPiece) accField('threadPerPiece', 60);">
+              <option value="Kurta" ${(d.stitchingArticle||'Kurta')==='Kurta'?'selected':''}>Kurta</option>
+              <option value="Pant" ${d.stitchingArticle==='Pant'?'selected':''}>Pant</option>
+              <option value="Dupatta" ${d.stitchingArticle==='Dupatta'?'selected':''}>Dupatta</option>
+              <option value="Shirt" ${d.stitchingArticle==='Shirt'?'selected':''}>Shirt</option>
+              <option value="Top" ${d.stitchingArticle==='Top'?'selected':''}>Top</option>
+              <option value="Tunic" ${d.stitchingArticle==='Tunic'?'selected':''}>Tunic</option>
+              <option value="Jacket" ${d.stitchingArticle==='Jacket'?'selected':''}>Jacket</option>
+            </select>
+          </div>
         </div>
-        <div class="row"><div class="field small"><label>Thread per piece (m)</label><input type="number" value="${d.threadPerPiece}" onchange="accField('threadPerPiece',this.value)"></div></div>
-        <div class="hint">Auto-fills the BOM quantity per piece; remains editable there.</div>
+        <div class="row">
+          <div class="field">
+            <label>qty (in mts) of thread required to stitch 1 ${d.stitchingArticle||'Kurta'} article - &lt;Enter 60&gt; mts</label>
+            <input type="number" value="${d.threadPerPiece||''}" placeholder="e.g. 60" onchange="accField('threadPerPiece',this.value)">
+          </div>
+        </div>
+        <div class="hint">qty of thread in meters required to stitch 1 article (default: 60 mts).</div>
       ` : ''}
       ${d.threadPattern==='Embroidery' ? `<div class="hint" style="margin-top:10px;">No additional measurements required for Embroidery.</div>` : ''}
       ${showProcessOnly ? `
@@ -3113,6 +3149,10 @@ function paintAccessoryModal(){
 window.accField = function(field, value){
   syncAccessoryTagsIntoDraft();
   window._accDraft[field] = value;
+  if(field === 'category' && value === 'Lace'){
+    delete window._accDraft.piecesPerUnit;
+    window._accDraft.unit = 'Meter';
+  }
   if(['category','threadPattern','tasselType','laceSizeValue','laceSizeUnit','sizeValue','sizeUnit'].includes(field)){ paintAccessoryModal(); }
 };
 window.accRowField = function(arrName, i, field, value){ window._accDraft[arrName][i][field]=value; };
@@ -3124,6 +3164,9 @@ window.saveAccessory = function(){
   const name = (d.name||'').trim();
   if(!name){ toast('Accessory name is required'); return; }
   d.name = name;
+  if(d.category === 'Lace'){
+    delete d.piecesPerUnit;
+  }
   let a;
   if(window._accEditId){ a=db.accessories.find(x=>x.id===window._accEditId); Object.assign(a, d); }
   else { a={id:nextId(), ...d}; db.accessories.push(a); }
@@ -4825,6 +4868,23 @@ window.printCuttingPO = function(cpId){
 
 /* init */
 go('dashboard');
+
+  // Requirement 45: Disable mouse wheel and Arrow Up/Down on all number inputs
+  window.addEventListener('wheel', (e) => {
+    if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number') {
+      e.target.blur();
+    }
+    if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+      document.activeElement.blur();
+    }
+  }, { passive: true });
+  window.addEventListener('keydown', (e) => {
+    if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number') {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+      }
+    }
+  });
 </script>
 </body>
 </html>

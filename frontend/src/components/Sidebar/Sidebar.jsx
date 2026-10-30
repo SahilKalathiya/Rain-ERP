@@ -140,6 +140,7 @@ export default function Sidebar({ currentRoute = '/orders', onNavigate }) {
                                 (sub.link === '/vendors' && currentRoute.startsWith('/vendors')) ||
                                 (sub.link === '/fabrics' && currentRoute.startsWith('/fabrics')) ||
                                 (sub.link === '/transporters' && currentRoute.startsWith('/transporters')) ||
+                                (sub.link === '/thread-master' && currentRoute.startsWith('/thread-master')) ||
                                 (sub.link === '/process-po' && (currentRoute === '/process-po' || currentRoute.startsWith('/processing/pos') || currentRoute === '/process')) ||
                                 (sub.link === '/process-challan' && currentRoute.startsWith('/process-challan')) ||
                                 (sub.link === '/process-return' && (currentRoute.startsWith('/process-return') || currentRoute.includes('inward'))) ||

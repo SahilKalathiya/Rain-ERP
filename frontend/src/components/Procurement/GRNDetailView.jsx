@@ -15,6 +15,7 @@ export default function GRNDetailView({
   onBack,
   onEditHeader,
   onEditBales,
+  onEditGRN,
   onSelectQCItem
 }) {
   const [showEditHeaderModal, setShowEditHeaderModal] = useState(false);
@@ -35,19 +36,19 @@ export default function GRNDetailView({
   useEffect(() => {
     if (grn) {
       setEditHeaderForm({
-        challan: grn.vendorChallanNo || '',
-        challanDate: grn.vendorChallanDate ? (typeof grn.vendorChallanDate === 'string' && grn.vendorChallanDate.includes('T') ? grn.vendorChallanDate.split('T')[0] : grn.vendorChallanDate) : '',
-        invoice: grn.vendorInvoiceNo || '',
-        invoiceDate: grn.vendorInvoiceDate ? (typeof grn.vendorInvoiceDate === 'string' && grn.vendorInvoiceDate.includes('T') ? grn.vendorInvoiceDate.split('T')[0] : grn.vendorInvoiceDate) : '',
+        challan: grn.vendorChallanNo || grn.challan || '',
+        challanDate: grn.vendorChallanDate ? (typeof grn.vendorChallanDate === 'string' && grn.vendorChallanDate.includes('T') ? grn.vendorChallanDate.split('T')[0] : grn.vendorChallanDate) : (grn.challanDate ? (typeof grn.challanDate === 'string' && grn.challanDate.includes('T') ? grn.challanDate.split('T')[0] : grn.challanDate) : ''),
+        invoice: grn.vendorInvoiceNo || grn.invoice || '',
+        invoiceDate: grn.vendorInvoiceDate ? (typeof grn.vendorInvoiceDate === 'string' && grn.vendorInvoiceDate.includes('T') ? grn.vendorInvoiceDate.split('T')[0] : grn.vendorInvoiceDate) : (grn.invoiceDate ? (typeof grn.invoiceDate === 'string' && grn.invoiceDate.includes('T') ? grn.invoiceDate.split('T')[0] : grn.invoiceDate) : ''),
         invoiceValue: grn.invoiceValue !== undefined && grn.invoiceValue !== null ? String(grn.invoiceValue) : (grn.totalAmount ? String(grn.totalAmount) : ''),
         transporter: grn.transporterName || grn.transporterId || '',
         lrNumber: grn.lrNumber || grn.lrNo || '',
         lrDate: grn.lrDate ? (typeof grn.lrDate === 'string' && grn.lrDate.includes('T') ? grn.lrDate.split('T')[0] : grn.lrDate) : '',
         weightKg: grn.weightKg !== undefined && grn.weightKg !== null ? String(grn.weightKg) : (grn.weight ? String(grn.weight) : ''),
         foldingCms: grn.foldingCms !== undefined && grn.foldingCms !== null ? String(grn.foldingCms) : (grn.fabricFolding ? String(grn.fabricFolding) : ''),
-        totalQty: grn.totalQty !== undefined && grn.totalQty !== null && grn.totalQty !== ''
-          ? String(grn.totalQty)
-          : (grn.declaredTotalMeters ? String(grn.declaredTotalMeters) : '')
+        totalQty: grn.declaredTotalMeters !== undefined && grn.declaredTotalMeters !== null && grn.declaredTotalMeters !== '' && Number(grn.declaredTotalMeters) > 0
+          ? String(grn.declaredTotalMeters)
+          : (grn.totalQty ? String(grn.totalQty).replace(/[^0-9.]/g, '') : '')
       });
     }
   }, [grn, showEditHeaderModal]);
@@ -68,8 +69,23 @@ export default function GRNDetailView({
   }
 
   // Find linked PO
-  const linkedPoId = grn.linkedPOs?.[0];
-  const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId);
+  const linkedPoId = grn.linkedPOs?.[0] || grn.poId;
+  const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)));
+
+  // Find vendor
+  const vendorObj = vendors.find((v) =>
+    (grn.vendorId && v.id === grn.vendorId) ||
+    (grn.vendor && (v.id === grn.vendor || v.name === grn.vendor)) ||
+    (grn.vendorName && v.name === grn.vendorName)
+  );
+
+  const vendorDisplayName =
+    grn.vendorName ||
+    grn.vendor ||
+    vendorObj?.name ||
+    linkedPO?.vendorName ||
+    vendors.find((v) => v.id === linkedPO?.vendorId)?.name ||
+    '—';
 
   // Find transporter
   const transporterObj = transporters.find((t) => t.id === grn.transporterId || t.name === grn.transporterName);
@@ -91,12 +107,23 @@ export default function GRNDetailView({
     ].filter(Boolean))
   );
 
+  // Extract clean numerical/alphanumeric suffix from GRN ID for matching QC records
+  const cleanGrnNum = String(grn.id || '').replace(/^GRN-/, '');
+
   // Find all QC records matching this GRN (both main and partitioned QC IDs)
-  const qcRecs = qualityChecks.filter((q) => q && (q.grnRef === grn.id || (grn.id && q.id && q.id.startsWith(`QC-${grn.id.replace('GRN-', '')}`))));
+  const qcRecs = (qualityChecks || []).filter((q) => {
+    if (!q) return false;
+    const qGrnRef = String(q.grnRef || '');
+    const grnIdStr = String(grn.id || '');
+    if (qGrnRef === grnIdStr) return true;
+    const qIdStr = String(q.id || '');
+    if (cleanGrnNum && (qIdStr === `QC-${cleanGrnNum}` || qIdStr.startsWith(`QC-${cleanGrnNum}-`))) return true;
+    return false;
+  });
   const mainQC = qcRecs[0];
 
   const declaredBaleCount = Math.max(0, parseInt(grn.totalBales || grn.numBales || 0, 10));
-  const rawBales = grn.bales || [];
+  const rawBales = Array.isArray(grn.bales) ? grn.bales : [];
   let bales = [...rawBales];
   if (declaredBaleCount > bales.length) {
     for (let i = bales.length; i < declaredBaleCount; i++) {
@@ -111,17 +138,18 @@ export default function GRNDetailView({
   }
 
   // Calculate declared total quantity entered
-  const declaredTotalQty = Number(grn.totalQty) || Number(grn.declaredTotalMeters) || 0;
+  const declaredTotalQty = Number(grn.totalQty ? String(grn.totalQty).replace(/[^0-9.]/g, '') : 0) || Number(grn.declaredTotalMeters) || 0;
 
   // Calculate actual total meters entered across bales and pieces
-  const baleMetersEntered = (grn.bales || []).reduce((s, b) => {
-    const pLen = (b.pieces || []).reduce((ps, p) => ps + (Number(p.length) || 0), 0);
-    return s + (pLen > 0 ? pLen : (Number(b.totalLength) || 0));
+  const baleMetersEntered = bales.reduce((s, b) => {
+    const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
+    const pLen = piecesArr.reduce((ps, p) => ps + (Number(typeof p === 'object' ? p?.length : p) || 0), 0);
+    return s + (pLen > 0 ? pLen : (Number(b?.totalLength) || 0));
   }, 0);
 
   // Requirement 21: QC should not proceed until the total quantity entered in GRN has complete bale entries.
   const isBaleEntriesComplete = declaredTotalQty > 0 &&
-    (grn.bales && grn.bales.length > 0) &&
+    (bales.length > 0) &&
     baleMetersEntered > 0 &&
     Math.abs(baleMetersEntered - declaredTotalQty) < 0.01;
 
@@ -157,15 +185,18 @@ export default function GRNDetailView({
 
   const anyPending = !isQcStarted;
 
-  const totalMeters = Number(grn.totalMetersEntered) || (bales.reduce((s, b) => s + (Number(b.totalLength) || 0), 0)) || Number(grn.declaredTotalMeters) || Number(grn.totalQty) || 0;
-  const totalPiecesCount = bales.reduce((sum, b) => sum + (b.pieces?.length || Number(b.piecesCount) || 0), 0) || grn.totalPieces || 0;
+  const totalMeters = Number(grn.totalMetersEntered) || baleMetersEntered || Number(grn.declaredTotalMeters) || declaredTotalQty || 0;
+  const totalPiecesCount = bales.reduce((sum, b) => {
+    const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
+    return sum + (piecesArr.length || Number(b?.piecesCount) || 0);
+  }, 0) || Number(grn.totalPieces) || 0;
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
   const expectedFold = mainQC?.expectedFold || grn.foldingCms || linkedPO?.items?.[0]?.fold || '100';
 
   const poItems = linkedPO?.items || [];
-  const baleFabrics = Array.from(new Set((grn.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
+  const baleFabrics = Array.from(new Set(bales.map((b) => b.fabricItemLabel).filter(Boolean)));
 
   // Requirement 38: Generate distinct QC inspection batches for each fabric quality
   const qcInspectionBatches = useMemo(() => {
@@ -182,11 +213,12 @@ export default function GRNDetailView({
         if (!fName) {
           fName = grn.fabricName || `Fabric Quality ${idx + 1}`;
         }
-        const bMeters = (grn.bales || []).reduce((sum, b) => {
-          const bLbl = (b.fabricItemLabel || '').toLowerCase();
+        const bMeters = bales.reduce((sum, b) => {
+          const bLbl = String(b.fabricItemLabel || '').toLowerCase();
           const qLbl = fName.toLowerCase();
           if (b.itemIdx === idx || (bLbl && (bLbl.includes(qLbl) || qLbl.includes(bLbl)))) {
-            const bLen = (b.pieces || []).reduce((ps, p) => ps + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
+            const bLen = piecesArr.reduce((ps, p) => ps + (Number(typeof p === 'object' ? p?.length : p) || 0), 0);
             return sum + (bLen > 0 ? bLen : (Number(b.totalLength) || 0));
           }
           return sum;
@@ -208,15 +240,16 @@ export default function GRNDetailView({
     if (poItems.length > 1) {
       return poItems.map((it, idx) => {
         const fName = it.fabricName || it.fabricQuality || `Fabric Quality ${idx + 1}`;
-        const partitionId = `QC-${grn.id.replace('GRN-', '')}-F${idx + 1}`;
+        const partitionId = `QC-${cleanGrnNum || '0001'}-F${idx + 1}`;
         const existingQc = qcRecs.find((q) => q.id === partitionId || q.fabricName === fName) || (idx === 0 ? qcRecs[0] : null);
 
         let fMeters = 0;
-        (grn.bales || []).forEach((b) => {
-          const bLbl = (b.fabricItemLabel || '').toLowerCase();
+        bales.forEach((b) => {
+          const bLbl = String(b.fabricItemLabel || '').toLowerCase();
           const itLbl = fName.toLowerCase();
           if (b.itemIdx === idx || (bLbl && (bLbl.includes(itLbl) || itLbl.includes(bLbl)))) {
-            const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
+            const bLen = piecesArr.reduce((s, p) => s + (Number(typeof p === 'object' ? p?.length : p) || 0), 0);
             fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
           }
         });
@@ -261,13 +294,14 @@ export default function GRNDetailView({
     // If multiple bale fabric labels exist
     if (baleFabrics.length > 1) {
       return baleFabrics.map((fLbl, idx) => {
-        const partitionId = `QC-${grn.id.replace('GRN-', '')}-F${idx + 1}`;
+        const partitionId = `QC-${cleanGrnNum || '0001'}-F${idx + 1}`;
         const existingQc = qcRecs.find((q) => q.id === partitionId || q.fabricName === fLbl) || (idx === 0 ? qcRecs[0] : null);
 
         let fMeters = 0;
-        (grn.bales || []).forEach((b) => {
+        bales.forEach((b) => {
           if (b.fabricItemLabel === fLbl) {
-            const bLen = (b.pieces || []).reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0);
+            const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
+            const bLen = piecesArr.reduce((s, p) => s + (Number(typeof p === 'object' ? p?.length : p) || 0), 0);
             fMeters += bLen > 0 ? bLen : (Number(b.totalLength) || 0);
           }
         });
@@ -307,14 +341,14 @@ export default function GRNDetailView({
 
     // Fallback: Single fabric item
     const singleQc = qcRecs[0] || {
-      id: `QC-${grn.id.replace('GRN-', '')}`,
+      id: `QC-${cleanGrnNum || '0001'}`,
       grnRef: grn.id,
       againstRef: linkedPO?.id || grn.poId || '',
       fabricName: grn.fabricName || 'Modal Satin Premium',
       totalReceivedMeters: totalMeters,
       receivedQty: totalMeters,
-      expectedWidth: String(expectedWidth).replace(/"/g, ''),
-      expectedFold: String(expectedFold).replace(/%/g, ''),
+      expectedWidth: String(expectedWidth || '44').replace(/"/g, ''),
+      expectedFold: String(expectedFold || '100').replace(/%/g, ''),
       qcStatus: grn.status === 'QC Approved' ? 'Approved' : 'Pending'
     };
 
@@ -329,7 +363,7 @@ export default function GRNDetailView({
         qcRecord: singleQc
       }
     ];
-  }, [qcRecs, poItems, baleFabrics, grn, linkedPO, totalMeters, expectedWidth, expectedFold]);
+  }, [qcRecs, poItems, baleFabrics, grn, linkedPO, totalMeters, expectedWidth, expectedFold, cleanGrnNum, bales]);
 
   const handleSaveHeader = (e) => {
     e.preventDefault();
@@ -403,7 +437,10 @@ export default function GRNDetailView({
               )}
             </h2>
             <p className="text-secondary fs-13 mb-0">
-              Against <strong>{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</strong> · {grn.vendorName || 'Vendor'}
+              Against <strong>{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</strong>
+              {vendorDisplayName && vendorDisplayName !== '—' && (
+                <> · <span className="fw-semibold text-dark">{vendorDisplayName}</span></>
+              )}
             </p>
           </div>
 
@@ -413,8 +450,14 @@ export default function GRNDetailView({
                 type="button"
                 className="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-1.5 fw-semibold fs-13 rounded-2 shadow-sm text-white"
                 style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                onClick={() => onEditBales && onEditBales(grn)}
-                title="Edit GRN record and container bales"
+                onClick={() => {
+                  if (onEditGRN) {
+                    onEditGRN(grn);
+                  } else if (onEditBales) {
+                    onEditBales(grn);
+                  }
+                }}
+                title="Edit entire GRN record and container bales"
               >
                 <i className="ti ti-edit fs-15"></i>
                 <span>Edit GRN</span>
@@ -451,36 +494,43 @@ export default function GRNDetailView({
         </div>
 
         <div className="row g-4 fs-13">
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR</div>
+            <div className="fw-bold text-dark fs-14 text-truncate" title={vendorDisplayName}>
+              {vendorDisplayName}
+            </div>
+          </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">RECEIVED DATE</div>
-            <div className="fw-bold text-dark">{grn.date || '2026-10-07'}</div>
+            <div className="fw-bold text-dark">{grn.date || grn.receivedDate || '2026-10-07'}</div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR CHALLAN</div>
             <div className="fw-bold text-dark">
-              {grn.vendorChallanNo || '—'}
-              {grn.vendorChallanDate && (
-                <div className="text-muted fs-11 fw-normal">{grn.vendorChallanDate}</div>
+              {grn.vendorChallanNo || grn.challan || '—'}
+              {(grn.vendorChallanDate || grn.challanDate) && (
+                <div className="text-muted fs-11 fw-normal">{grn.vendorChallanDate || grn.challanDate}</div>
               )}
             </div>
           </div>
           <div className="col-6 col-sm-4 col-md-3">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR INVOICE</div>
             <div className="fw-bold text-dark">
-              {grn.vendorInvoiceNo || '—'}
-              {grn.vendorInvoiceDate && (
-                <div className="text-muted fs-11 fw-normal">{grn.vendorInvoiceDate}</div>
+              {grn.vendorInvoiceNo || grn.invoice || '—'}
+              {(grn.vendorInvoiceDate || grn.invoiceDate) && (
+                <div className="text-muted fs-11 fw-normal">{grn.vendorInvoiceDate || grn.invoiceDate}</div>
               )}
-              {grn.invoiceValue && (
-                <div className="text-success fs-11 fw-semibold">₹{Number(grn.invoiceValue).toLocaleString()}</div>
+              {(grn.invoiceValue || grn.totalAmount) && (
+                <div className="text-success fs-11 fw-semibold">₹{Number(grn.invoiceValue || grn.totalAmount).toLocaleString()}</div>
               )}
             </div>
           </div>
-          <div className="col-6 col-sm-4 col-md-3">
+          <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TRANSPORTER</div>
             <div className="fw-bold text-dark">{grn.transporterName || transporterObj?.name || 'Bhiwandi Roadlines'}</div>
           </div>
-          <div className="col-6 col-sm-4 col-md-2">
+
+          <div className="col-6 col-sm-4 col-md-3">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">LR NO. / DATE</div>
             <div className="fw-bold text-dark">
               {grn.lrNumber || grn.lrNo || '—'}
@@ -489,20 +539,25 @@ export default function GRNDetailView({
               )}
             </div>
           </div>
-
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">WEIGHT</div>
             <div className="fw-bold text-dark">{grn.weightKg || grn.weight || '—'} kg</div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL QUANTITY</div>
-            <div className="fw-bold text-dark">{totalMeters}m</div>
+            <div className="fw-bold text-dark">
+              {(() => {
+                const dec = Number(grn.declaredTotalMeters) || Number(grn.totalQty) || 0;
+                const finalM = (totalMeters > 0 && (dec === 2000 || dec === 0)) ? totalMeters : (dec > 0 ? dec : totalMeters);
+                return `${Number(finalM).toLocaleString()}m`;
+              })()}
+            </div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">NO. OF BALES</div>
             <div className="fw-bold text-dark">{bales.length || grn.totalBales || 0}</div>
           </div>
-          <div className="col-6 col-sm-4 col-md-2">
+          <div className="col-6 col-sm-4 col-md-3">
             <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL PIECES</div>
             <div className="fw-bold text-dark">{totalPiecesCount}</div>
           </div>
@@ -553,11 +608,12 @@ export default function GRNDetailView({
                 bales.map((bale, idx) => {
                   const bNo = bale.baleNo || `Bale ${idx + 1}`;
                   const fabricLabel = bale.fabricItemLabel || bale.fabric || grn.fabricName || 'Grey Cotton Rayon';
-                  const pcsCount = (bale.pieces && bale.pieces.length > 0)
-                    ? bale.pieces.length
+                  const piecesArr = Array.isArray(bale.pieces) ? bale.pieces : [];
+                  const pcsCount = piecesArr.length > 0
+                    ? piecesArr.length
                     : (Number(bale.piecesCount) || 0);
-                  const bMeters = (bale.pieces && bale.pieces.length > 0)
-                    ? bale.pieces.reduce((s, p) => s + (Number(p.length) || 0), 0)
+                  const bMeters = piecesArr.length > 0
+                    ? piecesArr.reduce((s, p) => s + (Number(typeof p === 'object' ? p?.length : p) || 0), 0)
                     : (Number(bale.totalLength) || 0);
                   const isQcLocked = isQcStarted || bale.qcStatus === 'Approved' || bale.qcStatus === 'OK';
 
@@ -771,6 +827,10 @@ export default function GRNDetailView({
 
                 {/* Modal Body with 10 fields */}
                 <div className="modal-body px-4 py-2.5">
+                  <div className="p-2 mb-2 rounded-2 bg-light border d-flex align-items-center justify-content-between">
+                    <span className="text-secondary fs-12 fw-medium">Vendor:</span>
+                    <span className="text-dark fs-12 fw-bold">{vendorDisplayName}</span>
+                  </div>
                   <div className="row g-2.5">
                     {/* 1. Vendor challan no. */}
                     <div className="col-12 col-sm-7">
@@ -914,12 +974,12 @@ export default function GRNDetailView({
                     <div className="col-12 col-sm-6">
                       <label className="form-label fs-11 fw-medium text-dark mb-1">Total quantity (m)</label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         className="form-control form-control-sm fs-12 rounded-3 bg-white"
                         style={{ borderColor: '#d1d5db', minHeight: '34px' }}
                         value={editHeaderForm.totalQty}
-                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, totalQty: e.target.value })}
+                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, totalQty: e.target.value.replace(/[^0-9.]/g, '') })}
                         placeholder="e.g. 500"
                       />
                     </div>

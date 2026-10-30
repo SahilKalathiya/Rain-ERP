@@ -44,7 +44,8 @@ export const navigationMenu = [
           { label: 'Accessories', link: '/accessories' },
           { label: 'Fabrics', link: '/fabrics' },
           { label: 'Vendors', link: '/vendors' },
-          { label: 'Transporters', link: '/transporters' }
+          { label: 'Transporters', link: '/transporters' },
+          { label: 'Thread Master', link: '/thread-master' }
         ]
       },
       {

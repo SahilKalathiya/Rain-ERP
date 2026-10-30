@@ -316,6 +316,7 @@ const getGRNs = async (req, res) => {
         vendorChallanDate: g.vendor_challan_date,
         totalBales: g.total_bales,
         declaredTotalMeters: g.declared_total_meters,
+        totalQty: g.declared_total_meters ? String(g.declared_total_meters) : '',
         totalMetersEntered: g.total_meters_entered,
         status: g.status,
         adminApprovalNeeded: Boolean(g.admin_approval_needed),

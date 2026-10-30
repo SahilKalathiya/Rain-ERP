@@ -477,7 +477,7 @@ export function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
 
 export default function AccessoriesMasterView({ isInline = false, onSaveInline, onCloseInline }) {
   const [accessories, setAccessories] = useState(() => getStoredAccessoriesMaster());
-  const [selectedCategory, setSelectedCategory] = useState('Buttons');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditing, setIsEditing] = useState(isInline);
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
@@ -622,8 +622,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     id: isInline ? `ACC-${Date.now().toString().slice(-4)}` : '',
     name: '',
     category: cat,
-    unit: cat === 'Thread' ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
-    piecesPerUnit: 1,
+    unit: ['Thread', 'Lace', 'Laces', 'Dori', 'Elastic'].includes(cat) ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
+    piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(cat) ? '' : 1,
     maxBuffer: '',
     hsnCode: '',
     description: '',
@@ -662,7 +662,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     metersPerMeterStitching: '',
     threadPerPiece: '',
     articlePlacements: [],
-    stitchingArticles: [],
+    stitchingArticles: ['Kurta'],
+    consumptionPerPiece: {},
     consumptionPer100Pcs: {},
     processRemarks: ''
   });
@@ -730,11 +731,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
     setFormData(prev => {
       const current = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+      const currentPiece = { ...(prev.consumptionPerPiece || {}) };
       const currentCons = { ...(prev.consumptionPer100Pcs || {}) };
-      const defaultCons = prev.threadPerPiece ? Number((parseFloat(prev.threadPerPiece) * 100).toFixed(2)) : '';
+      const defaultPiece = prev.threadPerPiece || '';
+      const defaultCons = defaultPiece ? Number(defaultPiece) * 100 : '';
       return {
         ...prev,
         stitchingArticles: current.includes(formatted) ? current : [...current, formatted],
+        consumptionPerPiece: {
+          ...currentPiece,
+          [formatted]: currentPiece[formatted] !== undefined && currentPiece[formatted] !== '' ? currentPiece[formatted] : defaultPiece
+        },
         consumptionPer100Pcs: {
           ...currentCons,
           [formatted]: currentCons[formatted] !== undefined && currentCons[formatted] !== '' ? currentCons[formatted] : defaultCons
@@ -846,8 +853,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       fabricPerMeterLace: acc.fabricPerMeterLace || '',
       sizeValue: acc.sizeValue !== undefined ? acc.sizeValue : (acc.threadSize ? parseFloat(acc.threadSize) || '' : ''),
       sizeUnit: acc.sizeUnit || 'mm',
-      unit: acc.unit || (acc.category === 'Thread' ? 'Meter' : (CONTINUOUS_UNITS.includes(cat => cat === acc.category) ? 'Meter' : 'Piece')),
-      piecesPerUnit: acc.piecesPerUnit !== undefined && acc.piecesPerUnit !== '' ? acc.piecesPerUnit : 1,
+      unit: acc.unit || (['Thread', 'Lace', 'Laces', 'Dori', 'Elastic'].includes(acc.category) ? 'Meter' : (acc.category === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(acc.category) ? 'Meter' : 'Piece'))),
+      piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(acc.category) ? '' : (acc.piecesPerUnit !== undefined && acc.piecesPerUnit !== '' ? acc.piecesPerUnit : 1),
       threadPattern: acc.threadPattern || '',
       threadSize: acc.threadSize || acc.size || '',
       threadSizeCustom: acc.threadSizeCustom || '',
@@ -857,13 +864,18 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         ? acc.stitchingArticles
         : (typeof acc.stitchingArticles === 'string' && acc.stitchingArticles.trim()
             ? acc.stitchingArticles.split(',').map(s => s.trim()).filter(Boolean)
-            : (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object'
+            : (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object' && Object.keys(acc.consumptionPer100Pcs).length > 0
                 ? Object.keys(acc.consumptionPer100Pcs)
-                : [])),
+                : (acc.threadPattern === 'Stitching' ? ['Kurta'] : []))),
+      consumptionPerPiece: (acc.consumptionPerPiece && typeof acc.consumptionPerPiece === 'object')
+        ? acc.consumptionPerPiece
+        : (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object' && Object.keys(acc.consumptionPer100Pcs).length > 0
+            ? Object.fromEntries(Object.entries(acc.consumptionPer100Pcs).map(([k, v]) => [k, Number(v) / 100]))
+            : (acc.threadPattern === 'Stitching' ? (acc.threadPerPiece ? { Kurta: acc.threadPerPiece } : {}) : {})),
       consumptionPer100Pcs: (acc.consumptionPer100Pcs && typeof acc.consumptionPer100Pcs === 'object' && !Array.isArray(acc.consumptionPer100Pcs))
         ? acc.consumptionPer100Pcs
-        : {},
-      threadPerPiece: acc.threadPerPiece !== undefined ? acc.threadPerPiece : '',
+        : (acc.threadPattern === 'Stitching' ? (acc.threadPerPiece ? { Kurta: Number(acc.threadPerPiece) * 100 } : {}) : {}),
+      threadPerPiece: acc.threadPerPiece !== undefined && acc.threadPerPiece !== '' ? acc.threadPerPiece : '',
       processRemarks: acc.processRemarks || '',
       tasselType: parseTasselTypes(acc.tasselType),
       jobWorkRows: (acc.jobWorkRows && acc.jobWorkRows.length > 0)
@@ -936,18 +948,27 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         : (formData.sizes || []),
       threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
       threadSizeCustom: formData.threadSizeCustom || '',
-      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (formData.category === 'Elastic' || formData.category === 'Dori' || formData.category === 'Thread' ? 'Meter' : 'Piece'))),
-      piecesPerUnit: parseInt(formData.piecesPerUnit, 10) || 1,
+      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (['Elastic', 'Dori', 'Thread', 'Lace', 'Laces'].includes(formData.category) ? 'Meter' : 'Piece'))),
+      piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(formData.category) ? undefined : (parseInt(formData.piecesPerUnit, 10) || 1),
       threadPattern: (formData.category === 'Thread') ? (formData.threadPattern || 'Stitching') : '',
       tasselType: (formData.category === 'Tassel' || formData.category === 'Tassels')
         ? (Array.isArray(formData.tasselType) ? formData.tasselType.join(', ') : (formData.tasselType || 'Ready Made'))
         : '',
       jobWorkRows: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.jobWorkRows || []) : [],
       metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? formData.metersPerMeterStitching : '',
-      threadPerPiece: (formData.threadPerPiece !== undefined && formData.threadPerPiece !== '') ? (parseFloat(formData.threadPerPiece) || 0) : '',
+      threadPerPiece: (formData.category === 'Thread' && formData.threadPattern === 'Stitching')
+        ? (formData.consumptionPerPiece?.[(formData.stitchingArticles || [])[0]] || formData.threadPerPiece || '')
+        : ((formData.threadPerPiece !== undefined && formData.threadPerPiece !== '') ? (parseFloat(formData.threadPerPiece) || 0) : ''),
       articlePlacements: formData.articlePlacements || [],
-      stitchingArticles: Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [],
-      consumptionPer100Pcs: (formData.consumptionPer100Pcs && typeof formData.consumptionPer100Pcs === 'object') ? formData.consumptionPer100Pcs : {},
+      stitchingArticles: Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0
+        ? formData.stitchingArticles
+        : (formData.category === 'Thread' && formData.threadPattern === 'Stitching' ? ['Kurta'] : []),
+      consumptionPerPiece: formData.consumptionPerPiece || {},
+      consumptionPer100Pcs: (formData.category === 'Thread' && formData.threadPattern === 'Stitching')
+        ? (formData.consumptionPer100Pcs && Object.keys(formData.consumptionPer100Pcs).length > 0
+            ? formData.consumptionPer100Pcs
+            : Object.fromEntries((formData.stitchingArticles || []).filter(art => formData.consumptionPerPiece?.[art]).map(art => [art, (Number(formData.consumptionPerPiece[art]) * 100)])))
+        : ((formData.consumptionPer100Pcs && typeof formData.consumptionPer100Pcs === 'object') ? formData.consumptionPer100Pcs : {}),
       doriRequiredSize: formData.doriRequiredSize || formData.size || '',
       doriUnit: formData.doriUnit || formData.unit || 'Meter',
       doriFabricEntries: formData.doriFabricEntries || [],
@@ -1358,7 +1379,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           setFormData({
                             ...formData,
                             category: cat,
-                            unit: cat === 'Thread' ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
+                            unit: ['Thread', 'Lace', 'Laces', 'Dori', 'Elastic'].includes(cat) ? 'Meter' : (cat === 'Beads & Sequins' ? 'Gram' : (CONTINUOUS_UNITS.includes(cat) ? 'Meter' : 'Piece')),
+                            piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(cat) ? '' : (formData.piecesPerUnit || 1),
                             fabricRows: (!formData.fabricRows || formData.fabricRows.length === 0)
                               ? [{ fabricName: '', fabricQuality: '', size: '', unit: cat === 'Beads & Sequins' ? 'Gram' : 'Meter', consumption: '' }]
                               : formData.fabricRows,
@@ -1420,7 +1442,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {/* ============================================================== */}
                   {/* CATEGORY 2: LACE (SCREENSHOT 1)                                */}
                   {/* ============================================================== */}
-                  {formData.category === 'Lace' && (
+                  {(formData.category === 'Lace' || formData.category === 'Laces') && (
                     <>
                       <div className="mb-3">
                         <TagInput
@@ -1468,7 +1490,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {(formData.category === 'Tassel' || formData.category === 'Tassels') && (
                     <>
                       <div className="row g-2 mb-3">
-                        <div className="col-md-6">
+                        <div className="col-12">
                           <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
                           <select
                             className="form-select"
@@ -1480,17 +1502,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               <option key={u} value={u}>{u}</option>
                             ))}
                           </select>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold text-dark small mb-1.5">Pieces per unit</label>
-                          <input
-                            type="number"
-                            min="1"
-                            className="form-control"
-                            value={formData.piecesPerUnit !== undefined ? formData.piecesPerUnit : 1}
-                            onChange={(e) => setFormData({ ...formData, piecesPerUnit: e.target.value })}
-                            style={{ height: '42px', borderRadius: '8px' }}
-                          />
                         </div>
                       </div>
 
@@ -1673,13 +1684,19 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               className="form-select form-select-sm fw-bold"
                               value={formData.threadPattern || ''}
                               onChange={(e) => {
-                                const pat = e.target.value;
-                                // Section 12.4: Changing thread pattern must not carry incompatible data across
-                                setFormData(prev => ({
-                                  ...prev,
-                                  threadPattern: pat
-                                }));
-                              }}
+                                  const pat = e.target.value;
+                                  // Section 12.4: Changing thread pattern must not carry incompatible data across
+                                  setFormData(prev => {
+                                    const next = { ...prev, threadPattern: pat };
+                                    if (pat === 'Stitching' && (!prev.stitchingArticles || prev.stitchingArticles.length === 0)) {
+                                      next.stitchingArticles = ['Kurta'];
+                                      next.consumptionPerPiece = prev.consumptionPerPiece || {};
+                                      next.threadPerPiece = prev.threadPerPiece || '';
+                                      next.consumptionPer100Pcs = prev.consumptionPer100Pcs || {};
+                                    }
+                                    return next;
+                                  });
+                                }}
                               style={{ height: '40px', borderRadius: '7px', borderColor: '#2e37a4', color: '#1e293b' }}
                             >
                               <option value="">-- Select Thread Pattern --</option>
@@ -1884,99 +1901,32 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
                             </div>
 
-                            {/* Meters of thread required for 1m stitching (single-time entry) */}
-                            <div className="mb-3">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Meters of thread required for 1m stitching <span className="text-muted fw-normal">(single-time entry)</span> <span className="text-danger">*</span>
-                              </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
-                                <input
-                                  type="text"
-                                  className="form-control fw-bold"
-                                  placeholder="e.g. 15"
-                                  value={formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== null ? formData.metersPerMeterStitching : ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setFormData(prev => ({ ...prev, metersPerMeterStitching: val }));
-                                  }}
-                                  style={{ height: '36px' }}
-                                />
-                                <span className="input-group-text bg-white text-muted">m / 1m stitch</span>
-                              </div>
-                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Single-time entry for thread required per 1 metre of stitching.
-                              </div>
-                            </div>
-
-                            {/* Thread Per Piece - Default 60m, editable */}
-                            <div className="mb-3">
-                              <label className="form-label fw-semibold text-dark small mb-1">
-                                Thread Per Piece (metres) <span className="text-danger">*</span>
-                              </label>
-                              <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="form-control fw-bold"
-                                  placeholder="e.g. 60"
-                                  value={formData.threadPerPiece !== undefined && formData.threadPerPiece !== null ? formData.threadPerPiece : ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setFormData(prev => ({ ...prev, threadPerPiece: val }));
-                                  }}
-                                  style={{ height: '36px' }}
-                                />
-                                <span className="input-group-text bg-white text-muted">m / piece</span>
-                              </div>
-                              <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
-                                Auto-populates BOM Quantity per Piece (editable).
-                              </div>
-                            </div>
-
-                            {/* Targeted Articles (Multi-Select) & Dynamic Thread Consumption per 100 Pieces (per Article) */}
-                            <div className="p-3 bg-white rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                            {/* select Article - for ex Kurta */}
+                            <div className="p-3 bg-white rounded-3 border mb-3" style={{ borderColor: '#e2e8f0' }}>
+                              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                 <label className="form-label fw-bold text-dark small mb-0">
-                                  Targeted Articles &amp; Consumption per 100 Pieces <span className="text-danger">*</span>
+                                  select Article <span className="text-muted fw-normal">(for ex Kurta)</span> <span className="text-danger">*</span>
                                 </label>
                                 <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                                  {formData.threadPerPiece && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-xs btn-outline-primary py-0.5 px-2"
-                                      style={{ fontSize: '11px' }}
-                                      title="Auto-calculate consumption as Thread Per Piece x 100"
-                                      onClick={() => {
-                                        const calc = Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2));
-                                        if (!isNaN(calc)) {
-                                          const nextCons = { ...(formData.consumptionPer100Pcs || {}) };
-                                          (formData.stitchingArticles || []).forEach(art => {
-                                            nextCons[art] = calc;
-                                          });
-                                          setFormData(prev => ({ ...prev, consumptionPer100Pcs: nextCons }));
-                                        }
-                                      }}
-                                    >
-                                      ⚡ Auto-fill 100 pcs (x 100)
-                                    </button>
-                                  )}
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-outline-secondary py-0.5 px-2"
                                     style={{ fontSize: '11px' }}
                                     onClick={() => {
                                       const allNames = availableTargetArticles.map(a => a.name);
-                                      const newConsumption = { ...(formData.consumptionPer100Pcs || {}) };
-                                      const defaultVal = formData.threadPerPiece ? Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2)) : '';
+                                      const newPerPiece = { ...(formData.consumptionPerPiece || {}) };
+                                      const new100 = { ...(formData.consumptionPer100Pcs || {}) };
                                       allNames.forEach(name => {
-                                        if (newConsumption[name] === undefined || newConsumption[name] === '') {
-                                          newConsumption[name] = defaultVal;
-                                        }
+                                        const val = newPerPiece[name] !== undefined ? newPerPiece[name] : (formData.threadPerPiece || '');
+                                        newPerPiece[name] = val;
+                                        new100[name] = Number(val) * 100;
                                       });
                                       setFormData(prev => ({
                                         ...prev,
                                         stitchingArticles: allNames,
-                                        consumptionPer100Pcs: newConsumption
+                                        consumptionPerPiece: newPerPiece,
+                                        consumptionPer100Pcs: new100,
+                                        threadPerPiece: newPerPiece[allNames[0]] || ''
                                       }));
                                     }}
                                   >
@@ -1989,23 +1939,25 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     onClick={() => {
                                       setFormData(prev => ({
                                         ...prev,
-                                        stitchingArticles: [],
-                                        consumptionPer100Pcs: {}
+                                        stitchingArticles: ['Kurta'],
+                                        consumptionPerPiece: {}, consumptionPer100Pcs: {}, threadPerPiece: ''
                                       }));
                                     }}
                                   >
-                                    Deselect All
+                                    Reset (Kurta)
                                   </button>
                                 </div>
                               </div>
                               <div className="form-text text-muted mb-2.5" style={{ fontSize: '11.5px' }}>
-                                Select targeted articles via multi-select; for each article, record Thread Consumption per 100 Pieces (strictly in metres).
+                                Choose article type (e.g. Kurta, Pant, Shirt). You can select one or multiple articles.
                               </div>
 
                               {/* Multi-select chips for articles */}
                               <div className="d-flex flex-wrap gap-1.5 mb-2.5">
                                 {availableTargetArticles.map((art) => {
-                                  const currentArticles = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
+                                  const currentArticles = (Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0)
+                                    ? formData.stitchingArticles
+                                    : ['Kurta'];
                                   const isSelected = currentArticles.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
                                     <button
@@ -2016,24 +1968,25 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       }`}
                                       style={{ fontSize: '12px' }}
                                       onClick={() => {
-                                        const current = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
-                                        const next = isSelected
-                                          ? current.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim())
-                                          : [...current, art.name];
-                                        
-                                        const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
+                                        let next;
                                         if (isSelected) {
-                                          delete nextConsumption[art.name];
+                                          next = currentArticles.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim());
+                                          if (next.length === 0) next = ['Kurta'];
                                         } else {
-                                          if (nextConsumption[art.name] === undefined || nextConsumption[art.name] === '') {
-                                            const defaultVal = formData.threadPerPiece ? Number((parseFloat(formData.threadPerPiece) * 100).toFixed(2)) : '';
-                                            nextConsumption[art.name] = defaultVal;
-                                          }
+                                          next = [...currentArticles, art.name];
+                                        }
+                                        const newPerPiece = { ...(formData.consumptionPerPiece || {}) };
+                                        const new100 = { ...(formData.consumptionPer100Pcs || {}) };
+                                        if (!newPerPiece[art.name]) {
+                                          newPerPiece[art.name] = formData.threadPerPiece || '';
+                                          if (newPerPiece[art.name] !== '') new100[art.name] = Number(newPerPiece[art.name]) * 100;
                                         }
                                         setFormData(prev => ({
                                           ...prev,
                                           stitchingArticles: next,
-                                          consumptionPer100Pcs: nextConsumption
+                                          consumptionPerPiece: newPerPiece,
+                                          consumptionPer100Pcs: new100,
+                                          threadPerPiece: newPerPiece[next[0]] || ''
                                         }));
                                       }}
                                     >
@@ -2046,7 +1999,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               </div>
 
                               {/* Quick add custom article */}
-                              <div className="d-flex align-items-center gap-2 mb-3">
+                              <div className="d-flex align-items-center gap-2">
                                 <div className="input-group input-group-sm" style={{ maxWidth: '280px' }}>
                                   <input
                                     type="text"
@@ -2073,78 +2026,79 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   (Add garment type if not in the list)
                                 </span>
                               </div>
+                            </div>
 
-                              {/* Dynamic input boxes per selected article */}
-                              {(Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0) ? (
-                                <div className="p-2.5 bg-light rounded-3 border">
-                                  <div className="d-flex align-items-center justify-content-between mb-2">
-                                    <div className="small fw-semibold text-dark">
-                                      Thread Consumption per 100 Pieces (strictly in metres):
+                            {/* qty (in mts) of thread required to stitch 1 [Article] article - <Enter 60> mts */}
+                            <div className="d-flex flex-column gap-2.5">
+                              {((Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0)
+                                ? formData.stitchingArticles
+                                : ['Kurta']
+                              ).map((artName) => {
+                                const val = (formData.consumptionPerPiece?.[artName] !== undefined && formData.consumptionPerPiece?.[artName] !== '')
+                                  ? formData.consumptionPerPiece[artName]
+                                  : (formData.threadPerPiece !== undefined && formData.threadPerPiece !== '' ? formData.threadPerPiece : (formData.consumptionPer100Pcs?.[artName] ? formData.consumptionPer100Pcs[artName] / 100 : ''));
+                                return (
+                                  <div key={artName} className="p-3 bg-white rounded-3 border shadow-2xs" style={{ borderColor: '#e2e8f0' }}>
+                                    <div className="d-flex align-items-center justify-content-between mb-1.5">
+                                      <label className="form-label fw-bold text-dark small mb-0">
+                                        qty (in mts) of thread required to stitch 1 <span className="text-primary">{artName}</span> article - <span className="text-muted fw-normal">&lt;Enter 60&gt; mts</span> <span className="text-danger">*</span>
+                                      </label>
+                                      {formData.stitchingArticles && formData.stitchingArticles.length > 1 && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-link text-danger p-0 text-decoration-none"
+                                          title={`Remove ${artName}`}
+                                          onClick={() => {
+                                            const next = formData.stitchingArticles.filter(a => a !== artName);
+                                            const newPerPiece = { ...(formData.consumptionPerPiece || {}) };
+                                            delete newPerPiece[artName];
+                                            const new100 = { ...(formData.consumptionPer100Pcs || {}) };
+                                            delete new100[artName];
+                                            setFormData(prev => ({
+                                              ...prev,
+                                              stitchingArticles: next.length > 0 ? next : ['Kurta'],
+                                              consumptionPerPiece: newPerPiece,
+                                              consumptionPer100Pcs: new100
+                                            }));
+                                          }}
+                                        >
+                                          <i className="ti ti-x"></i>
+                                        </button>
+                                      )}
                                     </div>
-                                    <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '11px' }}>
-                                      {formData.stitchingArticles.length} Selected
-                                    </span>
+                                    <div className="input-group" style={{ maxWidth: '280px' }}>
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        className="form-control fw-bold fs-14"
+                                        placeholder="e.g. 60"
+                                        value={val}
+                                        onChange={(e) => {
+                                          const numVal = e.target.value;
+                                          setFormData(prev => {
+                                            const newPerPiece = { ...(prev.consumptionPerPiece || {}), [artName]: numVal };
+                                            const new100 = { ...(prev.consumptionPer100Pcs || {}) };
+                                            if (numVal !== '') {
+                                              new100[artName] = Number(numVal) * 100;
+                                            }
+                                            return {
+                                              ...prev,
+                                              threadPerPiece: artName === 'Kurta' || (prev.stitchingArticles || [])[0] === artName ? numVal : (prev.threadPerPiece || numVal),
+                                              consumptionPerPiece: newPerPiece,
+                                              consumptionPer100Pcs: new100
+                                            };
+                                          });
+                                        }}
+                                        style={{ height: '38px' }}
+                                      />
+                                      <span className="input-group-text bg-light text-dark fw-semibold">mts</span>
+                                    </div>
+                                    <div className="form-text text-muted" style={{ fontSize: '11.5px' }}>
+                                      Thread requirement in metres to stitch 1 {artName} article.
+                                    </div>
                                   </div>
-                                  <div className="row g-2">
-                                    {formData.stitchingArticles.map((artName) => (
-                                      <div key={artName} className="col-md-6">
-                                        <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-2 shadow-2xs">
-                                          <div className="d-flex align-items-center gap-1.5 text-truncate" style={{ maxWidth: '140px' }}>
-                                            <span className="fw-semibold text-dark small" style={{ fontSize: '12.5px' }} title={artName}>
-                                              {artName}:
-                                            </span>
-                                          </div>
-                                          <div className="d-flex align-items-center gap-1">
-                                            <div className="input-group input-group-sm" style={{ width: '150px' }}>
-                                              <input
-                                                type="number"
-                                                step="any"
-                                                className="form-control fw-bold"
-                                                placeholder="e.g. 6000"
-                                                value={formData.consumptionPer100Pcs?.[artName] ?? ''}
-                                                onChange={(e) => {
-                                                  const val = e.target.value;
-                                                  setFormData(prev => ({
-                                                    ...prev,
-                                                    consumptionPer100Pcs: {
-                                                      ...(prev.consumptionPer100Pcs || {}),
-                                                      [artName]: val
-                                                    }
-                                                  }));
-                                                }}
-                                              />
-                                              <span className="input-group-text bg-light text-muted" style={{ fontSize: '11px' }}>m / 100pcs</span>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              className="btn btn-sm btn-link text-danger p-0 ms-1 text-decoration-none"
-                                              title={`Remove ${artName}`}
-                                              onClick={() => {
-                                                const current = Array.isArray(formData.stitchingArticles) ? formData.stitchingArticles : [];
-                                                const next = current.filter(a => a !== artName);
-                                                const nextConsumption = { ...(formData.consumptionPer100Pcs || {}) };
-                                                delete nextConsumption[artName];
-                                                setFormData(prev => ({
-                                                  ...prev,
-                                                  stitchingArticles: next,
-                                                  consumptionPer100Pcs: nextConsumption
-                                                }));
-                                              }}
-                                            >
-                                              <i className="ti ti-x"></i>
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="alert alert-warning py-2 px-3 rounded-2 small mb-0 d-flex align-items-center gap-2">
-                                  <i className="ti ti-alert-triangle"></i>
-                                  <span>No articles selected yet. Click any of the article chips above to enter consumption per 100 pieces.</span>
-                                </div>
-                              )}
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -2745,7 +2699,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   {/* ============================================================== */}
                   {/* OTHER CATEGORIES (HOOK, ZIPPER, LABEL, PACKAGING, OTHER)       */}
                   {/* ============================================================== */}
-                  {!['Button', 'Buttons', 'Lace', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(formData.category) && (
+                  {!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(formData.category) && (
                     <div className="row g-3 mb-3">
                       <div className="col-md-7">
                         <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
@@ -3138,7 +3092,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       </span>
                     </div>
                     <div className="text-muted small mt-0.5">
-                      Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` (${selectedAccessory.piecesPerUnit || 1} pcs/unit)`}
+                      Category: <strong>{selectedAccessory.category}</strong> &bull; Unit: {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(selectedAccessory.category) && ` (${selectedAccessory.piecesPerUnit || 1} pcs/unit)`}
                     </div>
                   </div>
                 </div>
@@ -3234,7 +3188,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         )}
                       </div>
                       <div className="row g-2">
-                        <div className={!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) ? 'col-6' : 'col-12'}>
+                        <div className={!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(sectionFormData.category) ? 'col-6' : 'col-12'}>
                           <label className="form-label small fw-semibold text-muted">Unit</label>
                           <input
                             type="text"
@@ -3243,7 +3197,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             onChange={(e) => setSectionFormData({ ...sectionFormData, unit: e.target.value })}
                           />
                         </div>
-                        {!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(sectionFormData.category) && (
+                        {!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(sectionFormData.category) && (
                           <div className="col-6">
                             <label className="form-label small fw-semibold text-muted">Pieces Per Unit</label>
                             <input
@@ -3285,9 +3239,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         </span>
                       </div>
                       <div>
-                        <div className="text-muted small">{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) ? 'Unit & Pieces' : 'Unit'}</div>
+                        <div className="text-muted small">{!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(selectedAccessory.category) ? 'Unit & Pieces' : 'Unit'}</div>
                         <div className="fw-semibold text-dark">
-                          {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Tassel', 'Tassels', 'Thread'].includes(selectedAccessory.category) && ` • ${selectedAccessory.piecesPerUnit || 1} pcs per unit`}
+                          {selectedAccessory.unit || 'Piece'}{!['Button', 'Buttons', 'Lace', 'Laces', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(selectedAccessory.category) && ` • ${selectedAccessory.piecesPerUnit || 1} pcs per unit`}
                         </div>
                       </div>
                     </div>
@@ -3326,9 +3280,23 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       className="btn btn-xs btn-light text-primary rounded-2 px-2.5 py-1 small fw-semibold border"
                       onClick={() => {
                         setEditingSection('category');
+                        const sArt = (Array.isArray(selectedAccessory.stitchingArticles) && selectedAccessory.stitchingArticles.length > 0)
+                          ? selectedAccessory.stitchingArticles
+                          : (selectedAccessory.threadPattern === 'Stitching' ? ['Kurta'] : []);
+                        const sPerPiece = (selectedAccessory.consumptionPerPiece && typeof selectedAccessory.consumptionPerPiece === 'object')
+                          ? { ...selectedAccessory.consumptionPerPiece }
+                          : {};
+                        sArt.forEach(a => {
+                          if (sPerPiece[a] === undefined || sPerPiece[a] === '') {
+                            sPerPiece[a] = selectedAccessory.consumptionPer100Pcs?.[a] ? selectedAccessory.consumptionPer100Pcs[a] / 100 : (selectedAccessory.threadPerPiece || '');
+                          }
+                        });
                         setSectionFormData({
                           ...selectedAccessory,
-                          tasselType: parseTasselTypes(selectedAccessory.tasselType)
+                          tasselType: parseTasselTypes(selectedAccessory.tasselType),
+                          stitchingArticles: sArt,
+                          consumptionPerPiece: sPerPiece,
+                          threadPerPiece: sPerPiece[sArt[0]] || selectedAccessory.threadPerPiece || ''
                         });
                       }}
                     >
@@ -3724,45 +3692,23 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         </div>
 
                         {sectionFormData.threadPattern === 'Stitching' && (
-                          <div className="p-3 bg-light rounded-3 border">
-                            <div className="row g-2 mb-2">
-                              <div className="col-md-6">
-                                <label className="form-label small fw-semibold text-dark mb-1">
-                                  Meters of thread required for 1m stitching <span className="text-danger">*</span>
-                                </label>
-                                <div className="input-group input-group-sm">
-                                  <input
-                                    type="text"
-                                    className="form-control fw-bold"
-                                    placeholder="e.g. 15"
-                                    value={sectionFormData.metersPerMeterStitching !== undefined ? sectionFormData.metersPerMeterStitching : ''}
-                                    onChange={(e) => setSectionFormData({ ...sectionFormData, metersPerMeterStitching: e.target.value })}
-                                  />
-                                  <span className="input-group-text bg-white text-muted">m / 1m</span>
-                                </div>
-                              </div>
-                              <div className="col-md-6">
-                                <label className="form-label small fw-semibold text-dark mb-1">
-                                  Thread Per Piece (metres) <span className="text-danger">*</span>
-                                </label>
-                                <div className="input-group input-group-sm">
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    className="form-control fw-bold"
-                                    placeholder="e.g. 60"
-                                    value={sectionFormData.threadPerPiece !== undefined ? sectionFormData.threadPerPiece : ''}
-                                    onChange={(e) => setSectionFormData({ ...sectionFormData, threadPerPiece: e.target.value })}
-                                  />
-                                  <span className="input-group-text bg-white text-muted">m / pc</span>
-                                </div>
-                              </div>
+                          <div className="mt-3 p-3 rounded-2 border" style={{ backgroundColor: '#f8faff', borderColor: '#c7d2fe' }}>
+                            <div className="d-flex align-items-center justify-content-between mb-2">
+                              <span className="badge rounded-pill px-2.5 py-1 text-white" style={{ backgroundColor: '#2e37a4' }}>
+                                Stitching
+                              </span>
+                              <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
                             </div>
-                            <div className="mt-2">
-                              <label className="form-label small fw-bold text-dark mb-1">Targeted Articles &amp; Consumption per 100 Pieces</label>
+
+                            <div className="mb-3">
+                              <label className="form-label small fw-bold text-dark mb-1">
+                                select Article <span className="text-muted fw-normal">(for ex Kurta)</span> <span className="text-danger">*</span>
+                              </label>
                               <div className="d-flex flex-wrap gap-1.5 mb-2">
                                 {availableTargetArticles.map((art) => {
-                                  const selList = Array.isArray(sectionFormData.stitchingArticles) ? sectionFormData.stitchingArticles : [];
+                                  const selList = (Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0)
+                                    ? sectionFormData.stitchingArticles
+                                    : ['Kurta'];
                                   const isSel = selList.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
                                     <button
@@ -3770,15 +3716,27 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       type="button"
                                       className={`btn btn-xs rounded-pill border ${isSel ? 'btn-primary text-white fw-semibold' : 'btn-light text-dark'}`}
                                       onClick={() => {
-                                        const nextList = isSel ? selList.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim()) : [...selList, art.name];
-                                        const nextCons = { ...(sectionFormData.consumptionPer100Pcs || {}) };
+                                        let nextList;
                                         if (isSel) {
-                                          delete nextCons[art.name];
+                                          nextList = selList.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim());
+                                          if (nextList.length === 0) nextList = ['Kurta'];
                                         } else {
-                                          const def = sectionFormData.threadPerPiece ? Number((parseFloat(sectionFormData.threadPerPiece) * 100).toFixed(2)) : '';
-                                          if (nextCons[art.name] === undefined || nextCons[art.name] === '') nextCons[art.name] = def;
+                                          nextList = [...selList, art.name];
                                         }
-                                        setSectionFormData({ ...sectionFormData, stitchingArticles: nextList, consumptionPer100Pcs: nextCons });
+                                        const nextPerPiece = { ...(sectionFormData.consumptionPerPiece || {}) };
+                                        const nextCons = { ...(sectionFormData.consumptionPer100Pcs || {}) };
+                                        if (!nextPerPiece[art.name]) {
+                                          const def = sectionFormData.threadPerPiece || '';
+                                          nextPerPiece[art.name] = def;
+                                          if (def !== '') nextCons[art.name] = Number(def) * 100;
+                                        }
+                                        setSectionFormData({
+                                          ...sectionFormData,
+                                          stitchingArticles: nextList,
+                                          consumptionPerPiece: nextPerPiece,
+                                          consumptionPer100Pcs: nextCons,
+                                          threadPerPiece: nextPerPiece[nextList[0]] || ''
+                                        });
                                       }}
                                     >
                                       {art.name} {isSel ? '✓' : '+'}
@@ -3786,40 +3744,49 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   );
                                 })}
                               </div>
-                              {Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0 && (
-                                <div className="row g-2">
-                                  {sectionFormData.stitchingArticles.map(artName => (
-                                    <div key={artName} className="col-md-6">
-                                      <div className="p-2 bg-white rounded-2 border d-flex align-items-center justify-content-between gap-1 shadow-2xs">
-                                        <span className="small fw-semibold text-truncate" style={{ maxWidth: '120px' }}>{artName}:</span>
-                                        <div className="input-group input-group-sm" style={{ width: '130px' }}>
-                                          <input
-                                            type="number"
-                                            step="any"
-                                            className="form-control fw-bold"
-                                            value={sectionFormData.consumptionPer100Pcs?.[artName] ?? ''}
-                                            onChange={(e) => {
-                                              const v = e.target.value;
-                                              setSectionFormData({
-                                                ...sectionFormData,
-                                                consumptionPer100Pcs: {
-                                                  ...(sectionFormData.consumptionPer100Pcs || {}),
-                                                  [artName]: v
-                                                }
-                                              });
-                                            }}
-                                          />
-                                          <span className="input-group-text p-1 small text-muted">m/100</span>
-                                        </div>
-                                      </div>
+                            </div>
+
+                            <div className="d-flex flex-column gap-2.5">
+                              {((Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0)
+                                ? sectionFormData.stitchingArticles
+                                : ['Kurta']
+                              ).map(artName => {
+                                const val = (sectionFormData.consumptionPerPiece?.[artName] !== undefined && sectionFormData.consumptionPerPiece?.[artName] !== '')
+                                  ? sectionFormData.consumptionPerPiece[artName]
+                                  : (sectionFormData.threadPerPiece !== undefined && sectionFormData.threadPerPiece !== '' ? sectionFormData.threadPerPiece : (sectionFormData.consumptionPer100Pcs?.[artName] ? sectionFormData.consumptionPer100Pcs[artName] / 100 : ''));
+                                return (
+                                  <div key={artName} className="p-2.5 bg-white rounded-2 border shadow-2xs">
+                                    <label className="form-label small fw-bold text-dark mb-1 d-block">
+                                      qty (in mts) of thread required to stitch 1 <span className="text-primary">{artName}</span> article - <span className="text-muted fw-normal">&lt;Enter 60&gt; mts</span>:
+                                    </label>
+                                    <div className="input-group input-group-sm" style={{ maxWidth: '240px' }}>
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        className="form-control fw-bold"
+                                        placeholder="e.g. 60"
+                                        value={val}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          const nextPerPiece = { ...(sectionFormData.consumptionPerPiece || {}), [artName]: v };
+                                          const nextCons = { ...(sectionFormData.consumptionPer100Pcs || {}) };
+                                          if (v !== '') nextCons[artName] = Number(v) * 100;
+                                          setSectionFormData({
+                                            ...sectionFormData,
+                                            threadPerPiece: artName === 'Kurta' || (sectionFormData.stitchingArticles || [])[0] === artName ? v : (sectionFormData.threadPerPiece || v),
+                                            consumptionPerPiece: nextPerPiece,
+                                            consumptionPer100Pcs: nextCons
+                                          });
+                                        }}
+                                      />
+                                      <span className="input-group-text bg-light text-muted">mts</span>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                        )}
-                      </div>
+                        )}</div>
                     ) : (
                       <div className="d-flex flex-column gap-3">
                         <div className="row g-2">
@@ -3860,41 +3827,35 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                         {selectedAccessory.threadPattern === 'Stitching' && (
                           <div className="d-flex flex-column gap-2.5 pt-2 border-top">
-                            <div className="row g-2 mb-2">
-                              <div className="col-md-6">
-                                <div className="text-muted small">Meters of thread required for 1m stitching (single‑time entry)</div>
-                                <div className="fw-bold text-dark fs-14">
-                                  {selectedAccessory.metersPerMeterStitching !== undefined && selectedAccessory.metersPerMeterStitching !== ''
-                                    ? `${selectedAccessory.metersPerMeterStitching} m / 1m stitch`
-                                    : '—'}
-                                </div>
-                              </div>
-                              <div className="col-md-6">
-                                <div className="text-muted small">Thread Per Piece (BOM Default)</div>
-                                <div className="fw-bold text-dark fs-14">{selectedAccessory.threadPerPiece || '—'} m / piece</div>
-                              </div>
+                            <div className="d-flex align-items-center justify-content-between mb-1">
+                              <span className="badge rounded-pill px-2.5 py-1 text-white" style={{ backgroundColor: '#2e37a4' }}>
+                                Stitching
+                              </span>
+                              <span className="small text-muted" style={{ fontSize: '11.5px' }}>Garment Assembly</span>
                             </div>
 
-                            {((selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0) || (selectedAccessory.consumptionPer100Pcs && Object.keys(selectedAccessory.consumptionPer100Pcs).length > 0)) && (
-                              <div>
-                                <div className="text-muted small mb-1.5 fw-semibold">Targeted Articles &amp; Consumption per 100 pcs:</div>
-                                <div className="d-flex flex-wrap gap-2">
-                                  {(selectedAccessory.stitchingArticles && selectedAccessory.stitchingArticles.length > 0
-                                    ? selectedAccessory.stitchingArticles
-                                    : Object.keys(selectedAccessory.consumptionPer100Pcs || {})
-                                  ).map((art) => {
-                                    const m = selectedAccessory.consumptionPer100Pcs?.[art];
-                                    return (
-                                      <span key={art} className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-                                        <span className="fw-bold">{art}:</span>
-                                        <span className="text-primary font-monospace fw-bold">{m !== undefined && m !== '' ? `${m} m` : '—'}</span>
-                                        <span className="text-muted" style={{ fontSize: '10.5px' }}>/ 100 pcs</span>
+                            <div>
+                              <div className="text-muted small mb-2 fw-semibold">Thread Requirement per Article:</div>
+                              <div className="d-flex flex-column gap-2">
+                                {((Array.isArray(selectedAccessory.stitchingArticles) && selectedAccessory.stitchingArticles.length > 0)
+                                  ? selectedAccessory.stitchingArticles
+                                  : (selectedAccessory.consumptionPerPiece ? Object.keys(selectedAccessory.consumptionPerPiece) : ['Kurta'])
+                                ).map((art) => {
+                                  const qty = selectedAccessory.consumptionPerPiece?.[art]
+                                    ?? (selectedAccessory.consumptionPer100Pcs?.[art] ? selectedAccessory.consumptionPer100Pcs[art] / 100 : (selectedAccessory.threadPerPiece || ''));
+                                  return (
+                                    <div key={art} className="p-2.5 bg-white rounded-2 border d-flex align-items-center justify-content-between shadow-2xs">
+                                      <span className="small fw-semibold text-dark">
+                                        qty (in mts) of thread required to stitch 1 <span className="text-primary">{art}</span> article:
                                       </span>
-                                    );
-                                  })}
-                                </div>
+                                      <span className="badge bg-primary-subtle text-primary border px-2.5 py-1.5 fs-13 fw-bold font-monospace">
+                                        {qty !== '' && qty !== undefined ? `${qty} mts` : '—'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            )}
+                            </div>
                           </div>
                         )}
 

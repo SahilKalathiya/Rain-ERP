@@ -36,11 +36,16 @@ export const getStoredAccessoriesMaster = () => {
   const data = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
   if (Array.isArray(data)) {
     return data.map(item => {
-      if (item && item.category && !['Thread'].includes(item.category) && item.threadPattern) {
-        const { threadPattern, ...rest } = item;
-        return rest;
+      let current = item;
+      if (current && current.category && !['Thread'].includes(current.category) && current.threadPattern) {
+        const { threadPattern, ...rest } = current;
+        current = rest;
       }
-      return item;
+      if (current && ['Lace', 'Laces'].includes(current.category) && current.piecesPerUnit !== undefined) {
+        const { piecesPerUnit, ...rest } = current;
+        current = rest;
+      }
+      return current;
     });
   }
   return data;
