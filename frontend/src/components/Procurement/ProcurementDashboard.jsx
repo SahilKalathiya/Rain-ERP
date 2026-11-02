@@ -20,7 +20,7 @@ import ColorMasterView from './ColorMasterView';
 import TransporterMasterView from './TransporterMasterView';
 import ThreadMasterView from './ThreadMasterView';
 import ActivityHistoryModal from './ActivityHistoryModal';
-import { getMetersForPoFromGrn } from '../../utils/procurementUtils';
+import { getMetersForPoFromGrn, calculateFifoPoAllocations } from '../../utils/procurementUtils';
 
 // Seed Data
 import {
@@ -49,6 +49,8 @@ import { api } from '../../services/api';
  *   - Master catalogs (Vendors, Fabrics, Transporters)
  *   - Runtime Activity History audit logging (9.4)
  */
+const normGrnId = (id) => String(id || '').trim().toUpperCase().replace(/^GRN-?0*/, '');
+
 export default function ProcurementDashboard({ initialSubmodule = 'overview', onNavigate, sidebarClickCount = 0, extraData = null }) {
   // Tabs: 'overview', 'pos', 'grn', 'qc', 'rejected_stock', 'vendors', 'fabrics', 'transporters'
   const [activeTab, setActiveTab] = useState(initialSubmodule);
@@ -425,11 +427,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       const isExplicitlySent = Boolean(
         g.isSubmittedToQC === true ||
         ['Submitted to QC', 'QC In Progress', 'QC Approved', 'QC Passed', 'QC Rejected', 'Pending Admin Approval'].includes(g.status)
-      ) && g.status !== 'Draft' && g.status !== 'Bale Entry in Progress';
+      ) && !['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(g.status);
 
       if (!isExplicitlySent) {
         // If GRN is not yet submitted to QC, remove any unsubmitted QC records!
-        const matchingPendingQCs = updatedQCs.filter((q) => q && (q.grnRef === g.id || (g.id && q.id && q.id.startsWith(`QC-${g.id.replace('GRN-', '')}`))));
+        const matchingPendingQCs = updatedQCs.filter((q) => q && (normGrnId(q.grnRef) === normGrnId(g.id)));
         if (matchingPendingQCs.length > 0) {
           updatedQCs = updatedQCs.filter((q) => !matchingPendingQCs.includes(q));
           hasUpdates = true;
@@ -693,6 +695,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       vendorName: resolvedVendorName,
       fabricName: fabricItem,
       status: 'Draft',
+      isSubmittedToQC: false,
       isNew: true,
       isHeaderSaved: false,
       totalBales: '',
@@ -708,7 +711,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     if (onNavigate) onNavigate('/goods-inward');
   };
 
-  const handleSaveGRN = (grnData, isCompleted = true, shouldExitToList = false) => {
+  const handleSaveGRN = (grnData, isCompleted = false, shouldExitToList = false) => {
     const isEdit = grns.some((g) => g.id === grnData.id);
     const now = Date.now();
     const liveM = (grnData.bales || []).reduce((sum, b) => {
@@ -720,8 +723,27 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     if (liveEntered > 0 && (resolvedDecMeters === 2000 || resolvedDecMeters === 0)) {
       resolvedDecMeters = liveEntered;
     }
+    // Requirement 57: Calculate FIFO poAllocations across linked POs
+    const targetLinkedPoIds = (grnData.linkedPOs && grnData.linkedPOs.length > 0)
+      ? grnData.linkedPOs
+      : (grnData.poId ? [grnData.poId] : []);
+
+    let poAllocations = grnData.poAllocations || {};
+    if (targetLinkedPoIds.length > 1) {
+      const linkedPoObjs = targetLinkedPoIds
+        .map((id) => purchaseOrders.find((p) => p && String(p.id).trim() === String(id).trim()))
+        .filter(Boolean);
+      const priorGrns = grns.filter((g) => g && g.id !== grnData.id);
+      const fifoAllocs = calculateFifoPoAllocations(linkedPoObjs, liveEntered > 0 ? liveEntered : resolvedDecMeters, priorGrns);
+      poAllocations = {};
+      fifoAllocs.forEach((a) => {
+        poAllocations[a.poId] = a.allocatedInThisGrn;
+      });
+    }
+
     const enrichedGRN = {
       ...grnData,
+      poAllocations: Object.keys(poAllocations).length > 0 ? poAllocations : grnData.poAllocations,
       declaredTotalMeters: resolvedDecMeters,
       totalQty: resolvedDecMeters > 0 ? String(resolvedDecMeters) : (grnData.totalQty || ''),
       totalMetersEntered: liveEntered > 0 ? liveEntered : (grnData.totalMetersEntered || resolvedDecMeters),
@@ -739,17 +761,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setGrns(updated);
     api.saveGRN(enrichedGRN).catch((e) => console.warn('GRN save sync error:', e));
 
-    // Requirement 51: If GRN is saved as Draft, in progress, or not yet submitted to QC, purge any QC records
-    if (!isCompleted || enrichedGRN.status === 'Draft' || enrichedGRN.status === 'Bale Entry in Progress' || !enrichedGRN.isSubmittedToQC) {
-      setQualityChecks((prev) => (prev || []).filter((q) => q && q.grnRef !== enrichedGRN.id && (!q.id || !q.id.startsWith(`QC-${enrichedGRN.id.replace('GRN-', '')}`))));
-    }
-
-    // Point 26: Update Linked PO Status (Partial Delivery vs Full Delivery across ALL linked POs)
-    const targetLinkedPoIds = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
-      ? enrichedGRN.linkedPOs
-      : (enrichedGRN.poId ? [enrichedGRN.poId] : []);
-
+    // Requirement 57: Update Linked PO Status & Quantities according to FIFO Allocation
     if (targetLinkedPoIds.length > 0) {
+      const updatedPoMap = {};
       targetLinkedPoIds.forEach((linkedPoId) => {
         const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
         if (targetPo) {
@@ -761,7 +775,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
           let totalReceivedForPo = 0;
           allGrnsForPo.forEach((g) => {
-            totalReceivedForPo += getMetersForPoFromGrn(g, linkedPoId, targetPo.items);
+            totalReceivedForPo += getMetersForPoFromGrn(g, linkedPoId, targetPo.items, purchaseOrders);
           });
 
           let newPoStatus = targetPo.status;
@@ -778,14 +792,39 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
             pendingQty: Math.max(0, poOrderedMeters - totalReceivedForPo),
             isSystemSync: true
           };
-          setPurchaseOrders((prev) => prev.map((p) => (p.id === linkedPoId ? updatedPo : p)));
+          updatedPoMap[linkedPoId] = updatedPo;
           api.savePurchaseOrder(updatedPo).catch((e) => console.warn('PO status sync error:', e));
         }
       });
+      if (Object.keys(updatedPoMap).length > 0) {
+        setPurchaseOrders((prev) => prev.map((p) => updatedPoMap[p.id] || p));
+      }
     }
 
-    // Point 27: If completed, automatically generate QC record(s) per fabric quality (supports multiple fabric qualities within single bale and multi-bale shipments)
-    if (isCompleted && enrichedGRN.status === 'Completed') {
+    // Requirement 51: A GRN is appearing in the QC Inspection queue even though it has not yet been submitted for QC.
+    // QC records must ONLY exist if the GRN has been explicitly submitted to QC!
+    const isExplicitlySubmitted = Boolean(
+      isCompleted &&
+      enrichedGRN.isSubmittedToQC === true &&
+      !['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(enrichedGRN.status)
+    );
+
+    if (!isExplicitlySubmitted) {
+      // Purge any QC records for this unsubmitted GRN
+      setQualityChecks((prev) => (prev || []).filter((q) => {
+        if (!q) return false;
+        return normGrnId(q.grnRef) !== normGrnId(enrichedGRN.id);
+      }));
+      setSelectedGRN(enrichedGRN);
+      if (shouldExitToList) {
+        setActiveGrnView('list');
+        setActiveTab('grn');
+      }
+      return;
+    }
+
+    // Point 27 & Requirement 51: Automatically generate QC records ONLY when explicitly submitted to QC
+    if (isCompleted && enrichedGRN.isSubmittedToQC === true && (enrichedGRN.status === 'Completed' || enrichedGRN.status === 'Submitted to QC')) {
       const fabricBatches = [];
       const fabricMap = {}; // fName -> { meters, pieces, bales }
 

@@ -230,7 +230,7 @@ export default function PurchaseOrderList({
                   const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
                   const poGrns = (grns || []).filter((g) => (g.linkedPOs && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
                   const hasExistingGrn = poGrns.length > 0 || (Number(po.receivedQty) > 0) || po.status === 'Partially Received' || po.status === 'Completed';
-                  const receivedMeters = poGrns.reduce((sum, g) => sum + getMetersForPoFromGrn(g, po.id, po.items), 0) || Number(po.receivedQty) || 0;
+                  const receivedMeters = poGrns.reduce((sum, g) => sum + getMetersForPoFromGrn(g, po.id, po.items, purchaseOrders), 0) || Number(po.receivedQty) || 0;
                   const pendingMeters = Math.max(0, totalOrdered - receivedMeters);
 
                   return (

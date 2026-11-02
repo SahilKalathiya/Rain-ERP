@@ -832,7 +832,7 @@ export default function PurchaseOrderForm({
 
   // 3. Quantity pending in QC
   const quantityPendingInQC = allPoGrns.reduce((sum, g) => {
-    const gMetersThisPo = getMetersForPoFromGrn(g, currentPoId, formData.items);
+    const gMetersThisPo = getMetersForPoFromGrn(g, currentPoId, formData.items, purchaseOrders);
     const qc = findQcForGrn(g);
     const isDone = qc && (
       ['Passed', 'Passed with Deviation', 'Rejected', 'Approved'].includes(qc.qcStatus) ||
@@ -1333,7 +1333,7 @@ export default function PurchaseOrderForm({
             )}
             {allPoGrns.length > 0 && allPoGrns.map((g) => {
               const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
-              const thisPoMtrs = getMetersForPoFromGrn(g, currentPoId, formData.items);
+              const thisPoMtrs = getMetersForPoFromGrn(g, currentPoId, formData.items, purchaseOrders);
               const isConsolidated = Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1;
               return (
                 <button

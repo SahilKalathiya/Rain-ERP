@@ -13,7 +13,125 @@
  * @param {Array} poItems - Items array of the target Purchase Order (optional, for fabric matching fallback)
  * @returns {number} Exact meters received for this PO in this GRN
  */
-export function getMetersForPoFromGrn(grn, poId, poItems = []) {
+
+/**
+ * Issue 57: Calculates FIFO (First-In, First-Out chronological) allocation of a GRN's meters
+ * across multiple linked Purchase Orders for the same vendor/fabric.
+ *
+ * Earliest created PO is fulfilled 100% first; any remaining meters cascade to subsequent POs.
+ *
+ * @param {Array} linkedPos - Array of linked Purchase Order objects
+ * @param {number} totalGrnMeters - Total meters entering in the GRN
+ * @param {Array} previousGrns - Previous GRNs in system (excluding current)
+ * @returns {Array} Array of allocation objects per PO
+ */
+export function calculateFifoPoAllocations(linkedPos = [], totalGrnMeters = 0, previousGrns = []) {
+  if (!Array.isArray(linkedPos) || linkedPos.length === 0) return [];
+
+  // Sort POs strictly in chronological order (earliest created PO first)
+  const sortedPos = [...linkedPos].sort((a, b) => {
+    const parseTime = (po) => {
+      if (!po) return 0;
+      if (po.createdAt && typeof po.createdAt === 'number') return po.createdAt;
+      const dStr = po.date || po.poDate || po.createdAt || '';
+      if (dStr) {
+        const t = new Date(dStr).getTime();
+        if (!isNaN(t)) return t;
+      }
+      return 0;
+    };
+    const tA = parseTime(a);
+    const tB = parseTime(b);
+    if (tA && tB && tA !== tB) return tA - tB;
+    // Numeric ID comparison fallback (e.g. PO-1001 < PO-1002)
+    const numA = parseInt(String(a.id || a.poNumber || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(String(b.id || b.poNumber || '').replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
+  let remainingGrnMeters = Math.max(0, Number(totalGrnMeters) || 0);
+
+  const allocations = sortedPos.map((po, index) => {
+    const pId = String(po.id || '').trim();
+    const ordered = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+
+    // Calculate how much this PO previously received from prior GRNs
+    let prevReceived = 0;
+    (previousGrns || []).forEach((g) => {
+      if (!g) return;
+      const isLinked = (Array.isArray(g.linkedPOs) && g.linkedPOs.map(String).includes(pId)) ||
+        String(g.poId || '').trim() === pId;
+      if (isLinked) {
+        if (g.poAllocations && g.poAllocations[pId] !== undefined) {
+          prevReceived += Number(g.poAllocations[pId]) || 0;
+        } else {
+          // Attribute meters from prior GRN
+          const gTot = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+          if (Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1) {
+            // If prior GRN had multiple POs without poAllocations, proportionate or single
+            prevReceived += Number(g.poAllocations?.[pId]) || 0;
+          } else {
+            prevReceived += gTot;
+          }
+        }
+      }
+    });
+
+    if (prevReceived === 0 && Number(po.receivedQty) > 0 && (previousGrns || []).length === 0) {
+      prevReceived = Number(po.receivedQty);
+    }
+
+    const pendingBeforeGrn = Math.max(0, ordered - prevReceived);
+
+    // FIFO: Fulfill earliest PO first!
+    let allocatedInThisGrn = 0;
+    if (remainingGrnMeters > 0) {
+      allocatedInThisGrn = Math.min(remainingGrnMeters, pendingBeforeGrn);
+      remainingGrnMeters = Math.round((remainingGrnMeters - allocatedInThisGrn) * 100) / 100;
+    }
+
+    // If all pending balances are satisfied and leftover meters remain, allocate excess to the last PO
+    if (index === sortedPos.length - 1 && remainingGrnMeters > 0) {
+      allocatedInThisGrn += remainingGrnMeters;
+      remainingGrnMeters = 0;
+    }
+
+    allocatedInThisGrn = Math.round(allocatedInThisGrn * 100) / 100;
+    const remainingBalance = Math.max(0, Math.round((pendingBeforeGrn - allocatedInThisGrn) * 100) / 100);
+    const totalReceivedToDate = Math.round((prevReceived + allocatedInThisGrn) * 100) / 100;
+
+    const isComplete = ordered > 0 && totalReceivedToDate >= ordered;
+    const isPartial = totalReceivedToDate > 0 && !isComplete;
+    const fulfillmentPercent = ordered > 0 ? Math.min(100, Math.round((totalReceivedToDate / ordered) * 100)) : 0;
+
+    let statusText = 'Pending';
+    if (isComplete) statusText = 'Completed';
+    else if (isPartial) statusText = 'Partially Received';
+
+    return {
+      po,
+      poId: pId,
+      poNumber: po.poNumber || pId,
+      poDate: po.date || po.poDate || '',
+      index: index + 1,
+      isFirstOrder: index === 0,
+      ordered,
+      prevReceived,
+      pendingBeforeGrn,
+      allocatedInThisGrn,
+      remainingBalance,
+      totalReceivedToDate,
+      isComplete,
+      isPartial,
+      fulfillmentPercent,
+      statusText
+    };
+  });
+
+  return allocations;
+}
+
+export function getMetersForPoFromGrn(grn, poId, poItems = [], allPurchaseOrders = []) {
   if (!grn || !poId) return 0;
 
   const targetPoId = String(poId).trim();
@@ -132,7 +250,22 @@ export function getMetersForPoFromGrn(grn, poId, poItems = []) {
     }
   }
 
-  // Fallback 3: Equal distribution across linked POs
+  // Fallback 3 (Issue 57): FIFO Chronological Allocation across linked POs
+  if (Array.isArray(allPurchaseOrders) && allPurchaseOrders.length > 0 && linkedPoIds.length > 1) {
+    const linkedPoObjs = linkedPoIds
+      .map((id) => allPurchaseOrders.find((p) => p && String(p.id).trim() === String(id).trim()))
+      .filter(Boolean);
+
+    if (linkedPoObjs.length > 1) {
+      const fifoAllocs = calculateFifoPoAllocations(linkedPoObjs, grnTotalMeters, []);
+      const match = fifoAllocs.find((a) => a.poId === targetPoId);
+      if (match) {
+        return match.allocatedInThisGrn;
+      }
+    }
+  }
+
+  // Fallback 4: Equal distribution across linked POs if PO details unavailable
   const count = linkedPoIds.length > 0 ? linkedPoIds.length : 1;
   return Math.round(grnTotalMeters / count);
 }

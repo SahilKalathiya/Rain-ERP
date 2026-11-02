@@ -6,6 +6,8 @@ import React, { useState } from 'react';
  * Includes status tabs: All, Pending, Admin Approval, Completed, Damaged / Rejected Pieces.
  * Columns: GRN, AGAINST, FABRIC, WIDTH / COLOUR, QTY, STATUS, ACTION.
  */
+const normGrnId = (id) => String(id || '').trim().toUpperCase().replace(/^GRN-?0*/, '');
+
 export default function QualityCheckList({
   qcRecords = [],
   grns = [],
@@ -22,17 +24,19 @@ export default function QualityCheckList({
     const result = [];
     (qcRecords || []).forEach((qc) => {
       if (!qc) return;
-      const matchedGrn = grns.find(
-        (g) => g && (g.id === qc.grnRef || (qc.grnRef && g.id.includes(qc.grnRef.replace('GRN-', ''))))
-      );
+      if (!qc || !qc.grnRef) return;
+      const qcNorm = normGrnId(qc.grnRef);
+      const matchedGrn = (grns || []).find((g) => g && normGrnId(g.id) === qcNorm);
 
       // Requirement 51: A GRN is appearing in the QC Inspection queue even though it has not yet been submitted for QC.
       // QC inspection records should ONLY be visible after the GRN has been explicitly sent for QC.
+      if (!matchedGrn) {
+        return; // Skip: Do NOT include orphan records or missing GRNs in QC inspection queue!
+      }
+
       const isExplicitlySentToQC = Boolean(
-        matchedGrn &&
         (matchedGrn.isSubmittedToQC === true || ['Submitted to QC', 'QC In Progress', 'QC Approved', 'QC Passed', 'QC Rejected', 'Pending Admin Approval'].includes(matchedGrn.status)) &&
-        matchedGrn.status !== 'Draft' &&
-        matchedGrn.status !== 'Bale Entry in Progress'
+        !['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(matchedGrn.status)
       );
 
       if (!isExplicitlySentToQC) {
@@ -129,9 +133,7 @@ export default function QualityCheckList({
 
   // Helper to resolve GRN & PO details for each QC
   const getRecordDetails = (qc) => {
-    const matchedGrn = grns.find(
-      (g) => g && (g.id === qc.grnRef || (qc.grnRef && g.id.includes(qc.grnRef.replace('GRN-', ''))))
-    );
+    const matchedGrn = (grns || []).find((g) => g && normGrnId(g.id) === normGrnId(qc.grnRef));
     const againstRef =
       qc.againstRef ||
       (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.length > 0
