@@ -245,9 +245,29 @@ export const reorderArticlePositions = (allArticles, fromIndex, toIndex) => {
   }));
 };
 
+export const DEFAULT_MASTER_ARTICLES = [
+  { id: 'ART-001', name: 'Kurta', articleType: 'Kurta', icon: '👘', sortOrder: 1, active: true, description: 'Men & Women Long Tunics / Kurtas' },
+  { id: 'ART-002', name: 'Pant', articleType: 'Pant', icon: '👖', sortOrder: 2, active: true, description: 'Pants, Churidars & Trousers' },
+  { id: 'ART-003', name: 'Dupatta', articleType: 'Dupatta', icon: '🎀', sortOrder: 3, active: true, description: 'Stoles & Chiffon/Mulmul Dupattas' },
+  { id: 'ART-004', name: 'Shirt', articleType: 'Shirt', icon: '👔', sortOrder: 4, active: true, description: 'Shirts & Formals' },
+  { id: 'ART-005', name: 'Top', articleType: 'Top', icon: '👚', sortOrder: 5, active: true, description: 'Women Tops & Short Tunics' },
+  { id: 'ART-006', name: 'Tunic', articleType: 'Other', icon: '👗', sortOrder: 6, active: true, description: 'Tunics & Dresses' },
+  { id: 'ART-007', name: 'Jacket', articleType: 'Jacket', icon: '🧥', sortOrder: 7, active: true, description: 'Nehru & Modi Cut Waistcoats' }
+];
+
 export default function ArticleMasterView({ isInline = false, onSaveInline, onCloseInline }) {
   const [articles, setArticles] = useState(() => {
-    const list = getStoredData('erp_articles_v1', initialArticles);
+    let list = getStoredData('erp_articles_v1', null);
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      const fallback = getStoredData('erp_articles_master', null);
+      if (Array.isArray(fallback) && fallback.length > 0) {
+        list = fallback;
+      } else if (Array.isArray(initialArticles) && initialArticles.length > 0) {
+        list = initialArticles;
+      } else {
+        list = DEFAULT_MASTER_ARTICLES;
+      }
+    }
     const normalized = normalizeArticleOrders(list);
     setStoredData('erp_articles_v1', normalized);
     return normalized;
@@ -749,7 +769,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
               </div>
 
               {isPickerOpen && (
-                <div className="position-absolute" style={{ zIndex: 1070, right: '0px', marginTop: '6px' }}>
+                <div className="position-absolute" style={{ zIndex: 1085, right: '0px', marginTop: '6px' }}>
                   <WhatsAppEmojiPicker
                     onSelect={(emoji) => {
                       setFormData({ ...formData, customIcon: emoji, icon: emoji });
@@ -836,7 +856,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
   // Inline Modal Mode (Section 2.2 / 4.2)
   if (isInline) {
     return (
-      <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
+      <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1075 }}>
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content shadow-lg border-0 rounded-4 bg-white">
             <div className="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center">

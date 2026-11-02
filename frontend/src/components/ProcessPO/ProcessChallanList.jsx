@@ -64,6 +64,26 @@ export default function ProcessChallanList({
 
   return (
     <div className="process-challan-container">
+      {/* PDF Section 4.3: Persistent Admin Approval Alert for Emergency Challans without a PO */}
+      {challans.some(c => c.po_link_status === 'Pending PO Link') && (
+        <div className="alert alert-danger border-danger border-opacity-25 rounded-3 d-flex align-items-center justify-content-between p-3 mb-3 shadow-xs" style={{ background: '#fef2f2' }}>
+          <div className="d-flex align-items-center gap-2.5">
+            <div className="p-2 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+              <i className="ti ti-alert-triangle fs-16"></i>
+            </div>
+            <div>
+              <strong className="text-danger fs-13 d-block">Admin Approval Alert &bull; Emergency Dispatch Without PO</strong>
+              <span className="text-secondary fs-12">
+                One or more Challans were dispatched urgently without an associated Process PO. They are flagged in red until a PO is formally linked.
+              </span>
+            </div>
+          </div>
+          <span className="badge bg-danger text-white px-3 py-1.5 fs-11 fw-bold rounded-pill">
+            Action Required
+          </span>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* SEARCH & FILTER CONTROLS BAR                                              */}
       {/* ========================================================================= */}
@@ -325,16 +345,15 @@ export default function ProcessChallanList({
                           </span>
                         ) : isEmergency ? (
                           <span
-                            className="badge px-2.5 py-1 rounded-pill"
+                            className="badge px-2.5 py-1 rounded-pill fw-bold"
                             style={{
-                              background: 'rgba(245, 158, 11, 0.1)',
-                              color: '#b45309',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
-                              fontSize: '11px',
-                              fontWeight: '600'
+                              background: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #ef4444',
+                              fontSize: '11px'
                             }}
                           >
-                            <i className="ti ti-alert-triangle me-1"></i> Pending Link
+                            <i className="ti ti-alert-triangle me-1"></i> Pending PO Link
                           </span>
                         ) : (
                           <span

@@ -388,6 +388,10 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setShowPOForm(false);
               setEditingPO(null);
             }}
+            onBack={() => {
+              setShowPOForm(false);
+              setEditingPO(null);
+            }}
             onCreateChallan={handleCreateChallanFromPO}
             onPrintPO={handlePrintPO}
             readOnlyDefault={Boolean(editingPO)}

@@ -520,9 +520,7 @@ export default function GRNDetailView({
               {(grn.vendorInvoiceDate || grn.invoiceDate) && (
                 <div className="text-muted fs-11 fw-normal">{grn.vendorInvoiceDate || grn.invoiceDate}</div>
               )}
-              {(grn.invoiceValue || grn.totalAmount) && (
-                <div className="text-success fs-11 fw-semibold">₹{Number(grn.invoiceValue || grn.totalAmount).toLocaleString()}</div>
-              )}
+              {/* Invoice value removed per requirement */}
             </div>
           </div>
           <div className="col-6 col-sm-4 col-md-2">
@@ -882,21 +880,6 @@ export default function GRNDetailView({
                       />
                     </div>
 
-                    {/* 5. Invoice value (₹) */}
-                    <div className="col-12 col-sm-6">
-                      <label className="form-label fs-11 fw-medium text-dark mb-1">Invoice value (₹)</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
-                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
-                        value={editHeaderForm.invoiceValue}
-                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, invoiceValue: e.target.value })}
-                        placeholder=""
-                      />
-                    </div>
-
-                    {/* Empty column spacer */}
-                    <div className="col-12 col-sm-6"></div>
 
                     {/* 6. Transporter */}
                     <div className="col-12 col-sm-7">

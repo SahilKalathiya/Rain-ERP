@@ -13,26 +13,34 @@ import {
   initialArticles
 } from '../../data/salesOrderData';
 import { initialFabrics } from '../../data/procurementData';
+import ArticleMasterView from './ArticleMasterView';
 
 export const DEFAULT_TARGETED_ARTICLES = [
-  { id: 'ART-001', name: 'Kurta', icon: '👘' },
-  { id: 'ART-002', name: 'Pant', icon: '👖' },
-  { id: 'ART-003', name: 'Dupatta', icon: '🎀' },
-  { id: 'ART-004', name: 'Shirt', icon: '👔' },
-  { id: 'ART-005', name: 'Top', icon: '👚' },
-  { id: 'ART-006', name: 'Tunic', icon: '👗' },
-  { id: 'ART-007', name: 'Jacket', icon: '🧥' }
+  { id: 'ART-001', name: 'Kurta', icon: '👘', sortOrder: 1, active: true },
+  { id: 'ART-002', name: 'Pant', icon: '👖', sortOrder: 2, active: true },
+  { id: 'ART-003', name: 'Dupatta', icon: '🎀', sortOrder: 3, active: true },
+  { id: 'ART-004', name: 'Shirt', icon: '👔', sortOrder: 4, active: true },
+  { id: 'ART-005', name: 'Top', icon: '👚', sortOrder: 5, active: true },
+  { id: 'ART-006', name: 'Tunic', icon: '👗', sortOrder: 6, active: true },
+  { id: 'ART-007', name: 'Jacket', icon: '🧥', sortOrder: 7, active: true }
 ];
 
 export const getStoredArticlesList = () => {
   try {
-    const stored = getStoredData('erp_articles_v1', null) || getStoredData('erp_articles_master', null);
-    if (Array.isArray(stored) && stored.length > 0) {
-      return stored.map((a, idx) => ({
-        id: a.id || `ART-${idx + 1}`,
-        name: a.name || a.label || `Article ${idx + 1}`,
-        icon: a.icon || a.emoji || '👕'
-      }));
+    const stored = getStoredData('erp_articles_v1', null) !== null
+      ? getStoredData('erp_articles_v1', null)
+      : getStoredData('erp_articles_master', null);
+    if (Array.isArray(stored)) {
+      return stored
+        .filter((a) => a && a.active !== false)
+        .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
+        .map((a, idx) => ({
+          id: a.id || `ART-${idx + 1}`,
+          name: a.name || a.label || `Article ${idx + 1}`,
+          icon: a.icon || a.emoji || '👕',
+          sortOrder: a.sortOrder || idx + 1,
+          active: a.active !== false
+        }));
     }
   } catch (e) {}
   return DEFAULT_TARGETED_ARTICLES;
@@ -528,17 +536,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     };
     const handleArticlesUpdate = () => {
       try {
-        const stored = getStoredData('erp_articles_v1', null) || getStoredData('erp_articles_master', null);
-        if (Array.isArray(stored) && stored.length > 0) {
-          setArticlesList(stored
-            .filter((a) => a && a.active !== false)
-            .map((a, idx) => ({
-              id: a.id || `ART-${idx + 1}`,
-              name: a.name || a.label || `Article ${idx + 1}`,
-              icon: a.icon || a.emoji || '👕',
-              active: a.active !== false
-            })));
-        }
+        setArticlesList(getStoredArticlesList());
       } catch (e) {}
     };
     window.addEventListener('storage', handleFabricsUpdate);
@@ -733,7 +731,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     metersPerMeterStitching: '',
     threadPerPiece: '',
     articlePlacements: [],
-    stitchingArticles: ['Kurta'],
+    stitchingArticles: [],
     consumptionPerPiece: {},
     consumptionPer100Pcs: {},
     processRemarks: ''
@@ -765,21 +763,46 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     isDuplicateAccessoryName(sectionFormData.name, selectedAccessory.id)
   );
 
+  // Available target articles strictly synchronized with Article Master
   const availableTargetArticles = useMemo(() => {
-    const list = [...articlesList];
-    const rawSelected = formData?.stitchingArticles;
-    const selectedNames = Array.isArray(rawSelected)
-      ? rawSelected
-      : (typeof rawSelected === 'string' && rawSelected.trim()
-          ? rawSelected.split(',').map(s => s.trim()).filter(Boolean)
-          : []);
-    selectedNames.forEach(name => {
-      if (name && typeof name === 'string' && !list.some(a => (a.name || '').toLowerCase() === name.toLowerCase())) {
-        list.push({ id: `art-${name}`, name, icon: '👕' });
-      }
-    });
-    return list;
-  }, [articlesList, formData?.stitchingArticles]);
+    return (articlesList || []).filter((a) => a && a.active !== false);
+  }, [articlesList]);
+
+  // Ensure selected stitching articles strictly exist in Article Master (without force pre-selection)
+  useEffect(() => {
+    if (availableTargetArticles.length > 0) {
+      const validNames = availableTargetArticles.map((a) => (a.name || '').toLowerCase().trim());
+      setFormData((prev) => {
+        const cur = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+        const filtered = cur.filter((name) => validNames.includes(String(name).toLowerCase().trim()));
+        if (
+          cur.length === filtered.length &&
+          cur.every((val, idx) => val.toLowerCase().trim() === filtered[idx].toLowerCase().trim())
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          stitchingArticles: filtered
+        };
+      });
+
+      setSectionFormData((prev) => {
+        const cur = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+        const filtered = cur.filter((name) => validNames.includes(String(name).toLowerCase().trim()));
+        if (
+          cur.length === filtered.length &&
+          cur.every((val, idx) => val.toLowerCase().trim() === filtered[idx].toLowerCase().trim())
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          stitchingArticles: filtered
+        };
+      });
+    }
+  }, [availableTargetArticles]);
 
   const handleAddCustomArticle = () => {
     const trimmed = (customArticleInput || '').trim();
@@ -1758,7 +1781,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   setFormData(prev => {
                                     const next = { ...prev, threadPattern: pat };
                                     if (pat === 'Stitching' && (!prev.stitchingArticles || prev.stitchingArticles.length === 0)) {
-                                      next.stitchingArticles = ['Kurta'];
+                                      next.stitchingArticles = prev.stitchingArticles || [];
                                       next.consumptionPerPiece = prev.consumptionPerPiece || {};
                                       next.threadPerPiece = prev.threadPerPiece || '';
                                       next.consumptionPer100Pcs = prev.consumptionPer100Pcs || {};
@@ -1940,7 +1963,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 style={{ fontSize: '12px' }}
                                 onClick={() => {
                                   const current = formData.articlePlacements || [];
-                                  const nextArticleName = articlesList[current.length % articlesList.length]?.name || 'Kurta';
+                                  const nextArticleName = articlesList[current.length % articlesList.length]?.name || (articlesList[0]?.name || '');
                                   setFormData({
                                     ...formData,
                                     articlePlacements: [
@@ -1974,7 +1997,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             <div className="p-3 bg-white rounded-3 border mb-3" style={{ borderColor: '#e2e8f0' }}>
                               <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                 <label className="form-label fw-bold text-dark small mb-0">
-                                  select Article <span className="text-muted fw-normal">(for ex Kurta)</span> <span className="text-danger">*</span>
+                                  select Article <span className="text-danger">*</span>
                                 </label>
                                 <div className="d-flex align-items-center gap-1.5 flex-wrap">
                                   <button
@@ -2007,25 +2030,25 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     onClick={() => {
                                       setFormData(prev => ({
                                         ...prev,
-                                        stitchingArticles: ['Kurta'],
+                                        stitchingArticles: [],
                                         consumptionPerPiece: {}, consumptionPer100Pcs: {}, threadPerPiece: ''
                                       }));
                                     }}
                                   >
-                                    Reset (Kurta)
+                                    Reset Selection
                                   </button>
                                 </div>
                               </div>
                               <div className="form-text text-muted mb-2.5" style={{ fontSize: '11.5px' }}>
-                                Choose article type (e.g. Kurta, Pant, Shirt). You can select one or multiple articles.
+                                Choose article type ({availableTargetArticles.slice(0, 3).map(a => a.name).join(', ') || 'from Article Master'}). You can select one or multiple articles.
                               </div>
 
                               {/* Multi-select chips for articles */}
                               <div className="d-flex flex-wrap gap-1.5 mb-2.5">
                                 {availableTargetArticles.map((art) => {
-                                  const currentArticles = (Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0)
-                                    ? formData.stitchingArticles
-                                    : ['Kurta'];
+                                  const currentArticles = Array.isArray(formData.stitchingArticles)
+                                    ? formData.stitchingArticles.filter(name => availableTargetArticles.some(a => a.name.toLowerCase() === String(name).toLowerCase()))
+                                    : [];
                                   const isSelected = currentArticles.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
                                     <button
@@ -2039,7 +2062,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                         let next;
                                         if (isSelected) {
                                           next = currentArticles.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim());
-                                          if (next.length === 0) next = ['Kurta'];
                                         } else {
                                           next = [...currentArticles, art.name];
                                         }
@@ -2070,7 +2092,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   type="button"
                                   className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 fw-semibold px-3 py-1.5 rounded-3 shadow-2xs"
                                   onClick={() => {
-                                    setNewArticleModalForm({ name: customArticleInput || '', articleType: 'Kurta', icon: '👘', description: '' });
+                                    // Open Master Modal directly
                                     setShowAddArticleModal(true);
                                   }}
                                 >
@@ -2084,11 +2106,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             </div>
 
                             {/* qty (in mts) of thread required to stitch 1 [Article] article - <Enter 60> mts */}
+                            {(Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0) ? (
                             <div className="d-flex flex-column gap-2.5">
-                              {((Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0)
-                                ? formData.stitchingArticles
-                                : ['Kurta']
-                              ).map((artName) => {
+                              {formData.stitchingArticles
+                                .filter(name => availableTargetArticles.some(a => a.name.toLowerCase() === String(name).toLowerCase()))
+                                .map((artName) => {
                                 const val = (formData.consumptionPerPiece?.[artName] !== undefined && formData.consumptionPerPiece?.[artName] !== null)
                                   ? String(formData.consumptionPerPiece[artName])
                                   : '';
@@ -2098,7 +2120,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                       <label className="form-label fw-bold text-dark small mb-0">
                                         qty (in mts) of thread required to stitch 1 <span className="text-primary">{artName}</span> article - <span className="text-muted fw-normal">&lt;Enter 60&gt; mts</span> <span className="text-danger">*</span>
                                       </label>
-                                      {formData.stitchingArticles && formData.stitchingArticles.length > 1 && (
+                                      {formData.stitchingArticles && formData.stitchingArticles.length > 0 && (
                                         <button
                                           type="button"
                                           className="btn btn-xs btn-link text-danger p-0 text-decoration-none"
@@ -2111,7 +2133,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                             delete new100[artName];
                                             setFormData(prev => ({
                                               ...prev,
-                                              stitchingArticles: next.length > 0 ? next : ['Kurta'],
+                                              stitchingArticles: next,
                                               consumptionPerPiece: newPerPiece,
                                               consumptionPer100Pcs: new100
                                             }));
@@ -2156,6 +2178,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 );
                               })}
                             </div>
+                            ) : null}
                           </div>
                         )}
 
@@ -3758,13 +3781,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                             <div className="mb-3">
                               <label className="form-label small fw-bold text-dark mb-1">
-                                select Article <span className="text-muted fw-normal">(for ex Kurta)</span> <span className="text-danger">*</span>
+                                select Article <span className="text-danger">*</span>
                               </label>
                               <div className="d-flex flex-wrap gap-1.5 mb-2">
                                 {availableTargetArticles.map((art) => {
-                                  const selList = (Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0)
-                                    ? sectionFormData.stitchingArticles
-                                    : ['Kurta'];
+                                  const selList = Array.isArray(sectionFormData.stitchingArticles)
+                                    ? sectionFormData.stitchingArticles.filter(name => availableTargetArticles.some(a => a.name.toLowerCase() === String(name).toLowerCase()))
+                                    : [];
                                   const isSel = selList.some(a => String(a).toLowerCase().trim() === String(art.name).toLowerCase().trim());
                                   return (
                                     <button
@@ -3775,7 +3798,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                         let nextList;
                                         if (isSel) {
                                           nextList = selList.filter(a => String(a).toLowerCase().trim() !== String(art.name).toLowerCase().trim());
-                                          if (nextList.length === 0) nextList = ['Kurta'];
                                         } else {
                                           nextList = [...selList, art.name];
                                         }
@@ -3804,8 +3826,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
                             <div className="d-flex flex-column gap-2.5">
                               {((Array.isArray(sectionFormData.stitchingArticles) && sectionFormData.stitchingArticles.length > 0)
-                                ? sectionFormData.stitchingArticles
-                                : ['Kurta']
+                                ? sectionFormData.stitchingArticles.filter(name => availableTargetArticles.some(a => a.name.toLowerCase() === String(name).toLowerCase()))
+                                : []
                               ).map(artName => {
                                 const val = (sectionFormData.consumptionPerPiece?.[artName] !== undefined && sectionFormData.consumptionPerPiece?.[artName] !== '')
                                   ? sectionFormData.consumptionPerPiece[artName]
@@ -3829,7 +3851,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                           if (v !== '') nextCons[artName] = Number(v) * 100;
                                           setSectionFormData({
                                             ...sectionFormData,
-                                            threadPerPiece: artName === 'Kurta' || (sectionFormData.stitchingArticles || [])[0] === artName ? v : (sectionFormData.threadPerPiece || v),
+                                            threadPerPiece: (sectionFormData.stitchingArticles || [])[0] === artName ? v : (sectionFormData.threadPerPiece || v),
                                             consumptionPerPiece: nextPerPiece,
                                             consumptionPer100Pcs: nextCons
                                           });
@@ -4506,114 +4528,37 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         </div>
       )}
 
-      {/* ADD ARTICLE POPUP MODAL */}
+      {/* ARTICLE MASTER POPUP MODAL (IDENTICAL TO ARTICLE MASTER MODAL) */}
       {showAddArticleModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', zIndex: 1070 }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '440px' }}>
-            <div className="modal-content shadow-lg border-0 rounded-4 bg-white overflow-hidden">
-              <div className="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center" style={{ backgroundColor: '#f8fafc' }}>
-                <div className="d-flex align-items-center gap-2">
-                  <div className="p-2 bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center">
-                    <i className="ti ti-shirt fs-5"></i>
-                  </div>
-                  <div>
-                    <h6 className="modal-title fw-bold text-dark mb-0">Add New Article</h6>
-                    <div className="text-muted fs-11">Register new garment type in Article Master</div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowAddArticleModal(false)}
-                ></button>
-              </div>
-
-              <div className="modal-body p-4">
-                <div className="mb-3">
-                  <label className="form-label fw-semibold small text-muted mb-1">
-                    Article Name <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. Gown, Kurti, Sherwani"
-                    autoFocus
-                    value={newArticleModalForm.name}
-                    onChange={(e) => setNewArticleModalForm({ ...newArticleModalForm, name: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSaveNewArticleFromModal();
-                      }
-                    }}
-                  />
-                  <div className="form-text small text-muted">Auto-capitalised word by word</div>
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold small text-muted mb-1">
-                    Article Type / Category
-                  </label>
-                  <select
-                    className="form-select"
-                    value={newArticleModalForm.articleType}
-                    onChange={(e) => setNewArticleModalForm({ ...newArticleModalForm, articleType: e.target.value })}
-                  >
-                    <option value="Kurta">Kurta</option>
-                    <option value="Pant">Pant</option>
-                    <option value="Dupatta">Dupatta</option>
-                    <option value="Jacket">Jacket</option>
-                    <option value="Top">Top</option>
-                    <option value="Bottom">Bottom</option>
-                    <option value="Dress">Dress</option>
-                    <option value="Shirt">Shirt</option>
-                    <option value="Set">Set</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="mb-2">
-                  <label className="form-label fw-semibold small text-muted mb-1">
-                    Garment Icon / Emoji
-                  </label>
-                  <div className="d-flex flex-wrap gap-2 p-2.5 rounded-3 bg-light border">
-                    {['👘', '👗', '👚', '👔', '🧥', '👖', '🎀', '🥻', '👕', '🧵', '🩳', '🧣'].map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        className={`btn btn-sm p-1 rounded-2 border fs-5 d-flex align-items-center justify-content-center ${
-                          newArticleModalForm.icon === emoji ? 'btn-primary border-primary shadow-xs' : 'btn-white bg-white'
-                        }`}
-                        style={{ width: '38px', height: '38px' }}
-                        onClick={() => setNewArticleModalForm({ ...newArticleModalForm, icon: emoji })}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer border-top py-2.5 px-4 bg-light d-flex justify-content-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-white border px-3"
-                  onClick={() => setShowAddArticleModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary px-3 fw-semibold d-inline-flex align-items-center gap-1.5"
-                  onClick={handleSaveNewArticleFromModal}
-                >
-                  <i className="ti ti-check"></i>
-                  <span>Save Article</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ArticleMasterView
+          isInline={true}
+          onCloseInline={() => setShowAddArticleModal(false)}
+          onSaveInline={(savedArticle) => {
+            setShowAddArticleModal(false);
+            const updated = getStoredArticlesList();
+            setArticlesList(updated);
+            if (savedArticle && savedArticle.name) {
+              const artName = savedArticle.name;
+              setFormData((prev) => {
+                const current = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+                const nextArticles = current.some(
+                  (a) => String(a).toLowerCase().trim() === String(artName).toLowerCase().trim()
+                )
+                  ? current
+                  : [...current, artName];
+                const newPerPiece = { ...(prev.consumptionPerPiece || {}) };
+                if (newPerPiece[artName] === undefined) {
+                  newPerPiece[artName] = '';
+                }
+                return {
+                  ...prev,
+                  stitchingArticles: nextArticles,
+                  consumptionPerPiece: newPerPiece
+                };
+              });
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -271,6 +271,71 @@ export default function QualityCheckForm({
     return true;
   });
 
+  // Handlers for Bale / Piece dropdown selection (Requirement 24)
+  const handleBaleFilterChange = (val) => {
+    if (val && val.startsWith('piece:')) {
+      const pKey = val.replace('piece:', '');
+      setSelectedPieceKey(pKey);
+      const targetPc = grnPieces.find((p) => p.key === pKey);
+      if (targetPc) {
+        setSelectedBaleFilter(String(targetPc.baleNo));
+        setPieceInspections((prev) => {
+          const cur = prev[pKey] || {};
+          const expW = formData.actualWidth || formData.expectedWidth || '44';
+          const expF = formData.actualFold || formData.expectedFold || '100';
+          return {
+            ...prev,
+            [pKey]: {
+              ...cur,
+              checked: true,
+              actualWidth: cur.actualWidth || expW,
+              actualFold: cur.actualFold || expF,
+              status: cur.status || 'OK'
+            }
+          };
+        });
+      }
+    } else {
+      setSelectedBaleFilter(val);
+      setSelectedPieceKey('');
+    }
+  };
+
+  const handlePieceSelectChange = (val) => {
+    setSelectedPieceKey(val);
+    if (val) {
+      const targetPc = grnPieces.find((p) => p.key === val);
+      if (targetPc) {
+        setSelectedBaleFilter(String(targetPc.baleNo));
+        setPieceInspections((prev) => {
+          const cur = prev[val] || {};
+          const expW = formData.actualWidth || formData.expectedWidth || '44';
+          const expF = formData.actualFold || formData.expectedFold || '100';
+          return {
+            ...prev,
+            [val]: {
+              ...cur,
+              checked: true,
+              actualWidth: cur.actualWidth || expW,
+              actualFold: cur.actualFold || expF,
+              status: cur.status || 'OK'
+            }
+          };
+        });
+      }
+    }
+  };
+
+  const handleInspectionScopeChange = (scopeVal) => {
+    setInspectionScope(scopeVal);
+    if (scopeVal === 'all') {
+      setSelectedBaleFilter('all');
+      setSelectedPieceKey('');
+    } else if (scopeVal === 'piece') {
+      handleBatchCheckAll(true);
+    }
+  };
+
   const updatePieceField = (key, field, val) => {
     setPieceInspections((prev) => ({
       ...prev,
@@ -925,14 +990,16 @@ export default function QualityCheckForm({
                   <div className="col-12 col-sm-4">
                     <label className="form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1">
                       <i className="ti ti-box fs-13 text-primary"></i>
-                      <span>Select Bale Dropdown:</span>
+                      <span>Select Bale / Filter:</span>
                     </label>
                     <select
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
-                      value={selectedBaleFilter}
+                      value={selectedPieceKey ? 'piece:' + selectedPieceKey : selectedBaleFilter}
                       onChange={(e) => handleBaleFilterChange(e.target.value)}
                     >
-                      <option value="all">All Bales ({uniqueBaleNumbers.length} Bales &middot; {grnPieces.length} Pieces)</option>
+                      <option value="all">
+                        All Bales ({uniqueBaleNumbers.length} {uniqueBaleNumbers.length === 1 ? 'Bale' : 'Bales'} &middot; {grnPieces.length} {grnPieces.length === 1 ? 'Piece' : 'Pieces'})
+                      </option>
                       {uniqueBaleNumbers.map((bNo) => {
                         const bPieces = grnPieces.filter((p) => String(p.baleNo) === String(bNo));
                         const count = bPieces.length;
@@ -940,10 +1007,19 @@ export default function QualityCheckForm({
                         const inspCount = bPieces.filter((p) => pieceInspections[p.key]?.checked).length;
                         return (
                           <option key={bNo} value={bNo}>
-                            Bale #{bNo} &mdash; {count} pieces ({meters}m){inspCount > 0 ? ` [${inspCount}/${count} inspected]` : ''}
+                            Bale #{bNo} &mdash; {count} {count === 1 ? 'piece' : 'pieces'} ({meters}m){inspCount > 0 ? ` [${inspCount}/${count} inspected]` : ''}
                           </option>
                         );
                       })}
+                      {grnPieces.length > 0 && (
+                        <optgroup label="── Specific Pieces ──">
+                          {grnPieces.map((pc) => (
+                            <option key={'p_' + pc.key} value={'piece:' + pc.key}>
+                              Bale #{pc.baleNo} &middot; Piece {pc.pieceIdx + 1} ({pc.meters}m)
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
 
@@ -951,7 +1027,7 @@ export default function QualityCheckForm({
                   <div className="col-12 col-sm-5">
                     <label className="form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1">
                       <i className="ti ti-eye fs-13 text-primary"></i>
-                      <span>Inspect Specific Piece Dropdown:</span>
+                      <span>Inspect Specific Piece:</span>
                     </label>
                     <select
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
@@ -1072,14 +1148,6 @@ export default function QualityCheckForm({
                     title="Check all listed pieces"
                   >
                     <i className="ti ti-checks me-1 text-primary"></i> Check All
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary btn-sm fs-11 py-1 px-2"
-                    onClick={handleBatchFillExpected}
-                    title="Auto-fill expected Width and Fold for all listed pieces"
-                  >
-                    <i className="ti ti-bolt me-1"></i> Auto-Fill Expected ({formData.expectedWidth}&quot; / {formData.expectedFold}%)
                   </button>
                   <button
                     type="button"

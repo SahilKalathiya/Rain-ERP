@@ -332,17 +332,30 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   };
 
   // Subviews: If extraData is present, start directly in 'form' view
+  const [consumedExtraData, setConsumedExtraData] = useState(false);
   const [activePoView, setActivePoView] = useState(() => (extraData ? 'form' : 'list'));
   const [selectedPO, setSelectedPO] = useState(() => (extraData ? createAutoPO(extraData) : null));
 
   // Auto-populate & open PO form when navigated with extraData
   useEffect(() => {
-    if (extraData && (initialSubmodule === 'pos' || activeTab === 'pos')) {
+    if (extraData && !consumedExtraData && (initialSubmodule === 'pos' || activeTab === 'pos')) {
       const autoPO = createAutoPO(extraData);
       setSelectedPO(autoPO);
       setActivePoView('form');
     }
-  }, [extraData, initialSubmodule, activeTab]);
+  }, [extraData, consumedExtraData, initialSubmodule, activeTab]);
+
+  const handleExitPOForm = () => {
+    setConsumedExtraData(true);
+    setSelectedPO(null);
+    setActivePoView('list');
+    try {
+      sessionStorage.removeItem('erp_route_extra_data');
+    } catch (e) {}
+    if (onNavigate) {
+      onNavigate('/procurement-pos', null);
+    }
+  };
 
 
   // 5. GRNs State
@@ -1443,8 +1456,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               orders={salesOrders}
               grns={grns}
               qualityChecks={qualityChecks}
-              onBack={() => setActivePoView('list')}
-              onSavePO={handleSavePO}
+              onBack={handleExitPOForm}
+              onCancel={handleExitPOForm}
+              onSavePO={(savedPo) => {
+                handleSavePO(savedPo);
+                handleExitPOForm();
+              }}
               onPrintPO={(po) => {
                 setSelectedPO(po);
                 setActivePoView('print');

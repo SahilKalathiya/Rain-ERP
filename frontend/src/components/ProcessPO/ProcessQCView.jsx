@@ -108,18 +108,22 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
       }
     }
 
+    // PDF Section 12.4: A Colour Fastness "Fail" result must route the affected pieces back into the QC rejection branch
+    const finalOutcome = colorFastness === 'Fail' ? 'Full Rejection' : qcOutcome;
+    const finalRejAction = finalOutcome === 'Full Rejection' ? rejectionAction : null;
+
     const payload = {
       id: selectedPiece.id || `PQC-${Date.now().toString().slice(-4)}`,
       return_id: 'PRN-2196',
       piece_no: selectedPiece.piece_no,
       original_length: selectedPiece.original_length,
-      qc_outcome: qcOutcome,
-      rejection_action: qcOutcome === 'Full Rejection' ? rejectionAction : null,
-      reprocessing_challan_id: rejectionAction === 'Reprocess' ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null,
-      reprocessing_loop_status: rejectionAction === 'Reprocess' ? 'In Loop' : 'Cleared',
-      division_type: qcOutcome === 'Accepted' ? divisionType : 'None',
-      piece_splits: divisionType === 'Piece Division' ? pieceSplits : [],
-      lot_batch_id: divisionType === 'Lot Division' ? lotBatchId : 'Batch 1',
+      qc_outcome: finalOutcome,
+      rejection_action: finalRejAction,
+      reprocessing_challan_id: (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess') ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null,
+      reprocessing_loop_status: (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess') ? 'In Loop' : 'Cleared',
+      division_type: finalOutcome === 'Accepted' ? divisionType : 'None',
+      piece_splits: (finalOutcome === 'Accepted' && divisionType === 'Piece Division') ? pieceSplits : [],
+      lot_batch_id: (finalOutcome === 'Accepted' && divisionType === 'Lot Division') ? lotBatchId : 'Batch 1',
       paper_qc_report_photo: paperDefectPhoto,
       adjusted_yield: parseInt(adjustedYield, 10) || 0,
       color_fastness: colorFastness,
@@ -511,8 +515,11 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                       className={`btn w-100 p-3 text-start border rounded-3 d-flex align-items-center justify-content-between ${qcOutcome === 'Accepted' ? 'border-success bg-success-subtle shadow-xs' : 'border-light-subtle bg-white'}`}
                       style={{ transition: 'all 0.15s ease' }}
                       onClick={() => {
+                        if (colorFastness === 'Fail') {
+                          alert('PDF Rule (Sec 12.4): Piece cannot be Accepted because Color Fastness has FAILED. It must be routed to Rejection (Reprocess or Scrap).');
+                          return;
+                        }
                         setQcOutcome('Accepted');
-                        if (colorFastness === 'Fail') setColorFastness('Pass');
                       }}
                     >
                       <div>

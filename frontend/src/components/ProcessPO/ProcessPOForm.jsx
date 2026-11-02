@@ -19,11 +19,16 @@ export default function ProcessPOForm({
   initialPO,
   onSave,
   onCancel,
+  onBack,
   readOnlyDefault = false,
   onCreateChallan,
   onPrintPO,
   challans = []
 }) {
+  const handleExit = () => {
+    if (onCancel) onCancel();
+    else if (onBack) onBack();
+  };
   const isEditingExisting = Boolean(initialPO && initialPO.id);
 
   // Workflow Locking: PO cannot be edited once a Challan has been created or if status is not Draft
@@ -47,97 +52,160 @@ export default function ProcessPOForm({
   // Starting Direction Choice
   const [startDirection, setStartDirection] = useState('style');
 
-  // Available Sales Orders
-  const availableSalesOrders = [
-    {
-      id: 'ORD-2026-001',
-      customer: 'Zara India (Inditex Retail)',
-      brand: 'Raindrop Signature',
-      deliveryDate: '2026-09-10',
-      status: 'In Production',
-      styles: ['Graphic Boota Kurta', 'A-Line Festive Kurta'],
-      items: [
-        {
-          id: 'ORD1-IT1',
-          style: 'Graphic Boota Kurta',
-          fabric: '100x100 Voile (Grey)',
-          fabricId: 'FAB-001',
-          color: 'Beige',
-          colorHex: '#F5F5DC',
-          article: 'Kurta',
-          width: '48',
-          requiredMeters: 525.00,
-          alreadyReceivedMeters: 471.40,
-          orderedMeters: 525.00,
-          pendingMeters: 0.00,
-          status: 'Already Ordered',
-          consumption: 2.60,
-          shrinkage: 4.0
-        },
-        {
-          id: 'ORD1-IT2',
-          style: 'Graphic Boota Kurta',
-          fabric: 'Rayon 14kg Liva',
-          fabricId: 'FAB-002',
-          color: 'Navy Blue',
-          colorHex: '#000080',
-          article: 'Kurta Set',
-          width: '58',
-          requiredMeters: 800.00,
-          alreadyReceivedMeters: 300.00,
-          orderedMeters: 500.00,
-          pendingMeters: 300.00,
-          status: 'Partially Ordered',
-          consumption: 2.80,
-          shrinkage: 5.0
-        },
-        {
-          id: 'ORD1-IT3',
-          style: 'A-Line Festive Kurta',
-          fabric: 'Cotton Cambric 60*60',
-          fabricId: 'FAB-003',
-          color: 'Dusty Rose',
-          colorHex: '#DCAE96',
-          article: 'Kurta',
-          width: '44',
-          requiredMeters: 450.00,
-          alreadyReceivedMeters: 0.00,
-          orderedMeters: 0.00,
-          pendingMeters: 450.00,
-          status: 'Not Ordered',
-          consumption: 2.50,
-          shrinkage: 3.5
-        }
-      ]
-    },
-    {
-      id: 'ORD-2026-002',
-      customer: 'FabIndia Overseas',
-      brand: 'Raindrop Ethnic',
-      deliveryDate: '2026-09-18',
-      status: 'Cutting Ready',
-      styles: ['Straight Cut Kurti', 'Casual Printed Top'],
-      items: [
-        {
-          id: 'ORD2-IT1',
-          style: 'Straight Cut Kurti',
-          fabric: '100x100 Voile (Grey)',
-          fabricId: 'FAB-001',
-          color: 'White',
-          colorHex: '#FFFFFF',
-          article: 'Top',
-          width: '48',
-          requiredMeters: 300.00,
-          alreadyReceivedMeters: 0.00,
-          orderedMeters: 0.00,
-          pendingMeters: 300.00,
-          status: 'Not Ordered',
-          consumption: 2.20,
-          shrinkage: 4.0
-        }
-      ]
-    }
-  ];
+  // Dynamic Sales Orders (Loaded from Order Master Store with Seed Fallback)
+  const loadDynamicSalesOrders = () => {
+    const seed = [
+      {
+        id: 'ORD-2026-001',
+        customer: 'Zara India (Inditex Retail)',
+        brand: 'Raindrop Signature',
+        deliveryDate: '2026-09-10',
+        status: 'In Production',
+        styles: ['Graphic Boota Kurta', 'A-Line Festive Kurta'],
+        items: [
+          {
+            id: 'ORD1-IT1',
+            style: 'Graphic Boota Kurta',
+            fabric: '100x100 Voile (Grey)',
+            fabricId: 'FAB-001',
+            color: 'Beige',
+            colorHex: '#F5F5DC',
+            article: 'Kurta',
+            width: '48',
+            requiredMeters: 525.00,
+            alreadyReceivedMeters: 471.40,
+            orderedMeters: 525.00,
+            pendingMeters: 0.00,
+            status: 'Already Ordered',
+            consumption: 2.60,
+            shrinkage: 4.0
+          },
+          {
+            id: 'ORD1-IT2',
+            style: 'Graphic Boota Kurta',
+            fabric: 'Rayon 14kg Liva',
+            fabricId: 'FAB-002',
+            color: 'Navy Blue',
+            colorHex: '#000080',
+            article: 'Kurta Set',
+            width: '58',
+            requiredMeters: 800.00,
+            alreadyReceivedMeters: 300.00,
+            orderedMeters: 500.00,
+            pendingMeters: 300.00,
+            status: 'Partially Ordered',
+            consumption: 2.80,
+            shrinkage: 5.0
+          },
+          {
+            id: 'ORD1-IT3',
+            style: 'A-Line Festive Kurta',
+            fabric: 'Cotton Cambric 60*60',
+            fabricId: 'FAB-003',
+            color: 'Dusty Rose',
+            colorHex: '#DCAE96',
+            article: 'Kurta',
+            width: '44',
+            requiredMeters: 450.00,
+            alreadyReceivedMeters: 0.00,
+            orderedMeters: 0.00,
+            pendingMeters: 450.00,
+            status: 'Not Ordered',
+            consumption: 2.50,
+            shrinkage: 3.5
+          }
+        ]
+      },
+      {
+        id: 'ORD-2026-002',
+        customer: 'FabIndia Overseas',
+        brand: 'Raindrop Ethnic',
+        deliveryDate: '2026-09-18',
+        status: 'Cutting Ready',
+        styles: ['Straight Cut Kurti', 'Casual Printed Top'],
+        items: [
+          {
+            id: 'ORD2-IT1',
+            style: 'Straight Cut Kurti',
+            fabric: '100x100 Voile (Grey)',
+            fabricId: 'FAB-001',
+            color: 'White',
+            colorHex: '#FFFFFF',
+            article: 'Top',
+            width: '48',
+            requiredMeters: 300.00,
+            alreadyReceivedMeters: 0.00,
+            orderedMeters: 0.00,
+            pendingMeters: 300.00,
+            status: 'Not Ordered',
+            consumption: 2.20,
+            shrinkage: 4.0
+          }
+        ]
+      }
+    ];
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
+      if (Array.isArray(stored) && stored.length > 0) {
+        const mapped = stored.map(o => {
+          const styles = Array.isArray(o.styles) && o.styles.length > 0
+            ? o.styles
+            : (o.styleName ? [o.styleName] : ['Standard Style']);
+          const items = [];
+          if (Array.isArray(o.fabricConsumptions)) {
+            o.fabricConsumptions.forEach((fc, idx) => {
+              const req = parseFloat(fc.totalFabricMeters || fc.requiredMeters || 500);
+              const ord = parseFloat(fc.orderedMeters || 0);
+              const rec = parseFloat(fc.receivedMeters || 0);
+              items.push({
+                id: `${o.id}-IT${idx + 1}`,
+                style: fc.styleName || o.styleName || styles[0],
+                fabric: fc.fabricQuality || fc.fabricName || 'Fabric',
+                fabricId: fc.fabricId || 'FAB-001',
+                color: fc.color || fc.colorName || 'Standard',
+                colorHex: fc.colorHex || '#cbd5e1',
+                article: fc.article || fc.articleName || 'Kurta',
+                width: String(fc.width || '44').replace(/"/g, ''),
+                requiredMeters: req,
+                alreadyReceivedMeters: rec,
+                orderedMeters: ord,
+                pendingMeters: Math.max(0, req - ord),
+                status: ord >= req ? 'Already Ordered' : (ord > 0 ? 'Partially Ordered' : 'Not Ordered'),
+                consumption: parseFloat(fc.consumption || 2.60),
+                shrinkage: parseFloat(fc.shrinkage || 4.0)
+              });
+            });
+          }
+          return {
+            id: o.id,
+            customer: o.customerName || o.customer || 'Customer',
+            brand: o.brandName || o.brand || 'Raindrop Brand',
+            deliveryDate: o.deliveryDate || '',
+            status: o.status || 'In Production',
+            styles: styles,
+            items: items.length > 0 ? items : seed[0].items
+          };
+        });
+        const existingIds = new Set(mapped.map(m => m.id));
+        const filteredSeed = seed.filter(s => !existingIds.has(s.id));
+        return [...mapped, ...filteredSeed];
+      }
+    } catch (e) {}
+    return seed;
+  };
+
+  const [availableSalesOrders, setAvailableSalesOrders] = useState(loadDynamicSalesOrders);
+
+  useEffect(() => {
+    const handleOrdersSync = () => setAvailableSalesOrders(loadDynamicSalesOrders());
+    window.addEventListener('storage', handleOrdersSync);
+    window.addEventListener('erp_orders_updated', handleOrdersSync);
+    return () => {
+      window.removeEventListener('storage', handleOrdersSync);
+      window.removeEventListener('erp_orders_updated', handleOrdersSync);
+    };
+  }, []);
 
   // Helper function to read Fabric Master from localStorage
   const loadFabricsFromMaster = () => {
@@ -581,7 +649,7 @@ export default function ProcessPOForm({
             <button
               type="button"
               className="btn btn-light btn-sm border d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-2"
-              onClick={onCancel}
+              onClick={handleExit}
               style={{ borderColor: '#cbd5e1' }}
             >
               <i className="ti ti-arrow-left fs-14"></i>
@@ -1566,7 +1634,7 @@ export default function ProcessPOForm({
         <button
           type="button"
           className="btn btn-light border px-4 py-2 text-secondary fs-13 fw-semibold rounded-2"
-          onClick={onCancel}
+          onClick={handleExit}
           style={{ borderColor: '#cbd5e1' }}
         >
           {isLocked ? 'Close' : 'Cancel'}

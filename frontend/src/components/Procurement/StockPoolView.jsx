@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getStoredOpenBales } from '../../data/processData';
 
 // Common color hex lookup dictionary
 const COLOR_HEX_MAP = {
@@ -190,6 +191,19 @@ export default function StockPoolView({
   onNavigateToPO
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [openBalesList, setOpenBalesList] = useState(getStoredOpenBales);
+  const [activeAuditBale, setActiveAuditBale] = useState(null);
+
+  // Sync open bales on updates
+  useEffect(() => {
+    const handleOpenBalesUpdate = () => setOpenBalesList(getStoredOpenBales());
+    window.addEventListener('raindrop_open_bales_updated', handleOpenBalesUpdate);
+    window.addEventListener('storage', handleOpenBalesUpdate);
+    return () => {
+      window.removeEventListener('raindrop_open_bales_updated', handleOpenBalesUpdate);
+      window.removeEventListener('storage', handleOpenBalesUpdate);
+    };
+  }, []);
   const [internalSelectedKey, setInternalSelectedKey] = useState(propSelectedGroupKey || null);
 
   useEffect(() => {
@@ -234,6 +248,51 @@ export default function StockPoolView({
     }
     groups[key].totalQty += Number(item.qty) || 0;
     groups[key].lots.push(item);
+  });
+
+  // Section 5.3: Integrate Open Bales (unprocessed grey fabric returned from job work dyeing)
+  (openBalesList || []).forEach((b) => {
+    if (b.status === 'Available' || !b.status || Number(b.remaining_meters) > 0) {
+      const bMeters = Number(b.remaining_meters !== undefined ? b.remaining_meters : b.returned_meters) || 0;
+      if (bMeters <= 0) return;
+      const bFab = b.fabric_name || '100x100 Voile (Grey)';
+      const bWidthClean = b.width ? String(b.width).replace(/[^\d.]/g, '') : '48';
+      const bWidth = `${bWidthClean}"`;
+      const bColor = 'Raw / Greige';
+      const key = `${bFab}_${bWidth}_${bColor}`;
+
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          fabricName: bFab,
+          fabricId: b.fabric_id || 'FAB-001',
+          width: bWidth,
+          colorName: bColor,
+          colorHex: '#DCD7CE',
+          isGreige: true,
+          totalQty: 0,
+          lots: [],
+          openBalesCount: 0
+        };
+      }
+      groups[key].totalQty += bMeters;
+      groups[key].openBalesCount = (groups[key].openBalesCount || 0) + 1;
+      groups[key].lots.push({
+        id: b.id,
+        lotNo: b.id,
+        grnId: b.return_id || 'Job Work Return',
+        poId: b.original_vendor_invoice_ref || 'Original Vendor Invoice',
+        originalInvoiceRef: b.original_vendor_invoice_ref,
+        qty: bMeters,
+        source: 'Open Bale (Grey Return)',
+        isOpenBale: true,
+        auditTrail: b.audit_trail || [
+          { date: '2026-08-12', action: 'Issued under Process Challan #4903' },
+          { date: '2026-08-27', action: `Returned unutilised under Inward Return ${b.return_id || '#PRN-2196'} as Open Bale` }
+        ],
+        decidedAt: b.created_at ? new Date(b.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')
+      });
+    }
   });
 
   const groupList = Object.values(groups).filter((g) => {
@@ -428,9 +487,16 @@ export default function StockPoolView({
                         {Number(lot.qty).toFixed(1)}m
                       </td>
                       <td className="py-3">
-                        <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
-                          {lot.source || 'QC approved'}
-                        </span>
+                        {lot.isOpenBale ? (
+                          <span className="badge bg-warning-subtle text-warning-emphasis border border-warning px-2.5 py-1 fs-11 rounded-pill fw-bold d-inline-flex align-items-center gap-1 shadow-xs" style={{ background: '#fef3c7', color: '#92400e' }}>
+                            <i className="ti ti-package-import fs-12"></i>
+                            <span>Open Bale (Grey Return)</span>
+                          </span>
+                        ) : (
+                          <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
+                            {lot.source || 'QC approved'}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 fw-semibold text-secondary">
                         {docLabel}
@@ -439,7 +505,19 @@ export default function StockPoolView({
                         {lot.decidedAt || lot.date || new Date().toLocaleDateString('en-GB')}
                       </td>
                       <td className="pe-4 py-3 text-end">
-                        {(lot.grnId || lot.grnRef) && onNavigateToGRN ? (
+                        {lot.isOpenBale ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-warning border fw-semibold px-2 py-1 fs-11 rounded-2 d-inline-flex align-items-center gap-1 shadow-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveAuditBale(lot);
+                            }}
+                          >
+                            <i className="ti ti-history fs-12"></i>
+                            <span>Audit Trail</span>
+                          </button>
+                        ) : (lot.grnId || lot.grnRef) && onNavigateToGRN ? (
                           <button
                             type="button"
                             className="btn btn-sm btn-link text-decoration-none fw-semibold p-0 text-primary d-inline-flex align-items-center gap-1"
@@ -662,6 +740,66 @@ export default function StockPoolView({
           </table>
         </div>
       </div>
-    </div>
+    
+      {/* Modal: Open Bale Full Audit Trail (PDF Section 5.3) */}
+      {activeAuditBale && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1055 }}
+          tabIndex="-1"
+          onClick={() => setActiveAuditBale(null)}
+        >
+          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+              <div className="modal-header bg-warning bg-opacity-10 py-3 px-4 border-bottom">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="bg-warning text-dark p-2 rounded-3 fs-16 d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px' }}>
+                    <i className="ti ti-package-import"></i>
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark fs-16 mb-0">Open Bale Audit Trail: {activeAuditBale.id}</h5>
+                    <small className="text-muted fs-12">PDF Section 5.3 &bull; Unutilised Grey Fabric Return</small>
+                  </div>
+                </div>
+                <button type="button" className="btn-close" onClick={() => setActiveAuditBale(null)}></button>
+              </div>
+              <div className="modal-body p-4">
+                <div className="p-3 bg-light rounded-3 mb-3 border">
+                  <div className="row g-2 fs-13">
+                    <div className="col-6">
+                      <span className="text-muted d-block fs-11">Original Purchase Invoice</span>
+                      <strong className="text-dark">{activeAuditBale.originalInvoiceRef || 'INV-MS-0091 (M.S. Textiles)'}</strong>
+                    </div>
+                    <div className="col-6">
+                      <span className="text-muted d-block fs-11">Unutilised Meterage</span>
+                      <strong className="text-primary fs-15">{Number(activeAuditBale.qty).toFixed(1)} metres</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <h6 className="fw-bold text-secondary text-uppercase fs-11 mb-2.5" style={{ letterSpacing: '0.5px' }}>
+                  Lifecycle History &amp; Traceability
+                </h6>
+                <div className="position-relative ps-3 border-start border-2 border-warning ms-2">
+                  {(activeAuditBale.auditTrail || []).map((step, sIdx) => (
+                    <div key={sIdx} className="mb-3 position-relative">
+                      <div className="position-absolute rounded-circle bg-warning" style={{ width: '10px', height: '10px', left: '-20px', top: '4px' }}></div>
+                      <div className="fs-12 fw-bold text-dark">{step.date}</div>
+                      <div className="fs-13 text-secondary">{step.action}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="modal-footer bg-light px-4 py-2.5 border-top">
+                <button type="button" className="btn btn-secondary btn-sm px-3 rounded-2" onClick={() => setActiveAuditBale(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+</div>
   );
 }

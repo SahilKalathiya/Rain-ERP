@@ -626,6 +626,7 @@ export default function PurchaseOrderForm({
   grns = [],
   qualityChecks = [],
   onBack,
+  onCancel,
   onSavePO,
   onPrintPO,
   onInwardGRN,
@@ -1249,41 +1250,13 @@ export default function PurchaseOrderForm({
     setIsEditing(false);
   };
 
-  // Cancel action: clears all form fields and exits form
+  // Cancel action: exits PO form and returns to Purchase Order list
   const handleCancel = () => {
-    setFormData({
-      id: '',
-      vendorId: '',
-      vendorName: '',
-      linkedOrder: '',
-      date: '',
-      expectedDeliveryDate: '',
-      discountTerms: '',
-      terms: '',
-      notes: '',
-      status: 'Draft',
-      bufferAllowed: false,
-      bufferPercent: 0,
-      items: [
-        {
-          id: `item-${Date.now()}`,
-          fabricId: '',
-          fabricName: '',
-          colorName: '',
-          width: '44',
-          quantity: '',
-          rate: '',
-          fold: '',
-          amount: 0
-        }
-      ]
-    });
-    setShowColorColumn(true);
-    userToggledColorRef.current = false;
-    if (onBack) {
+    setIsEditing(false);
+    if (onCancel) {
+      onCancel();
+    } else if (onBack) {
       onBack();
-    } else {
-      setIsEditing(false);
     }
   };
 
@@ -1305,12 +1278,12 @@ export default function PurchaseOrderForm({
       {/* Top Header / Action Bar */}
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         <div className="d-flex align-items-center gap-2">
-          {onBack && (
+          {(onBack || onCancel) && (
             <button
               type="button"
               className="btn btn-sm btn-light border rounded-circle p-0 d-flex align-items-center justify-content-center"
               style={{ width: '34px', height: '34px' }}
-              onClick={onBack}
+              onClick={onCancel || onBack}
               title="Back to Purchase Orders"
             >
               <i className="ti ti-arrow-left fs-16 text-dark"></i>
