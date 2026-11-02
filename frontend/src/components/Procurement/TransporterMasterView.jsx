@@ -100,9 +100,15 @@ export default function TransporterMasterView({
     }
 
     setTransporterList(updatedList);
-    setSelectedTransporter(dataToSave);
+    setSelectedTransporter(null);
     setIsEditing(false);
     setIsCreatingNew(false);
+
+    try {
+      localStorage.setItem('raindrop_transporters_v1', JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('raindrop_transporters_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err) {}
 
     if (onSaveTransporter) {
       onSaveTransporter(dataToSave);

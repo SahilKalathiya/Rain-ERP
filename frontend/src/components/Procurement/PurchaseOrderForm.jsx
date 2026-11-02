@@ -5,6 +5,7 @@ import FabricMasterView from './FabricMasterView';
 import AddColorModal from './AddColorModal';
 import { initialColors } from '../../data/procurementData';
 import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
+import { getMetersForPoFromGrn, getPoFulfillmentData, calculatePoFabricFulfillment } from '../../utils/procurementUtils';
 
 /**
  * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
@@ -617,6 +618,7 @@ export const checkAllRawFabrics = (itemsList, fabricMasterList = []) => {
 
 export default function PurchaseOrderForm({
   po,
+  purchaseOrders = [],
   vendors = [],
   fabrics = [],
   colors = [],
@@ -794,16 +796,21 @@ export default function PurchaseOrderForm({
 
   const isPoLocked = Boolean(hasGrnStarted || (isSentOrBeyond && hasGrnStarted));
 
-  const totalOrderedMtrs = (formData.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+  const currentPoId = po?.id || formData?.id;
+  const fulfillmentData = getPoFulfillmentData(
+    { ...formData, id: currentPoId, receivedQty: po?.receivedQty || formData?.receivedQty },
+    grns,
+    purchaseOrders
+  );
 
-  // 1. Quantity received
-  const totalQuantityReceived = allPoGrns.reduce(
-    (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
-    0
-  ) || Number(po?.receivedQty) || Number(formData?.receivedQty) || 0;
+  const totalOrderedMtrs = fulfillmentData.totalOrdered || (formData.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
 
-  const pendingQuantityToReceive = Math.max(0, totalOrderedMtrs - totalQuantityReceived);
-  const fulfillmentPercent = totalOrderedMtrs > 0 ? Math.min(100, Math.round((totalQuantityReceived / totalOrderedMtrs) * 100)) : 0;
+  // 1. Quantity received (multi-PO consolidated shipment aware)
+  const totalQuantityReceived = fulfillmentData.totalReceived;
+  const pendingQuantityToReceive = fulfillmentData.totalPending;
+  const fulfillmentPercent = fulfillmentData.fulfillmentPercent;
+  const grnBreakdowns = fulfillmentData.grnBreakdowns || [];
+  const itemFulfillments = fulfillmentData.itemFulfillments || [];
 
   // 2. Number of GRNs created
   const numGrnsCreated = allPoGrns.length;
@@ -824,14 +831,14 @@ export default function PurchaseOrderForm({
 
   // 3. Quantity pending in QC
   const quantityPendingInQC = allPoGrns.reduce((sum, g) => {
-    const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+    const gMetersThisPo = getMetersForPoFromGrn(g, currentPoId, formData.items);
     const qc = findQcForGrn(g);
     const isDone = qc && (
       ['Passed', 'Passed with Deviation', 'Rejected', 'Approved'].includes(qc.qcStatus) ||
       ['Passed', 'Passed with Deviation', 'Rejected', 'Approved'].includes(qc.status) ||
       Boolean(qc.adminDecision)
     );
-    return isDone ? sum : sum + gMeters;
+    return isDone ? sum : sum + gMetersThisPo;
   }, 0);
 
   const quantityPassedQC = Math.max(0, totalQuantityReceived - quantityPendingInQC);
@@ -875,6 +882,9 @@ export default function PurchaseOrderForm({
       (it) => (it.fabricType || 'Process') === 'Process'
     );
   }, [formData.items]);
+
+  // Live computed check: show delivery fulfillment columns (Received / Pending / Status) when GRNs exist
+  const showDeliveryColumns = allPoGrns.length > 0;
 
   // Sync state whenever selected `po` changes
   useEffect(() => {
@@ -1350,12 +1360,16 @@ export default function PurchaseOrderForm({
             )}
             {allPoGrns.length > 0 && allPoGrns.map((g) => {
               const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+              const thisPoMtrs = getMetersForPoFromGrn(g, currentPoId, formData.items);
+              const isConsolidated = Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1;
               return (
                 <button
                   key={g.id}
                   type="button"
-                  className="btn btn-sm btn-outline-success d-flex align-items-center gap-1.5 px-2.5 py-1.5 rounded-3 fs-12 fw-semibold"
-                  title={`GRN ${g.id} (${gMeters.toLocaleString()}m). Click to view.`}
+                  className={`btn btn-sm ${isConsolidated ? 'btn-outline-primary' : 'btn-outline-success'} d-flex align-items-center gap-1.5 px-2.5 py-1.5 rounded-3 fs-12 fw-semibold shadow-xs`}
+                  title={isConsolidated
+                    ? `Consolidated Shipment (${g.linkedPOs.length} POs): ${thisPoMtrs.toLocaleString()}m received for this PO (Total GRN: ${gMeters.toLocaleString()}m). Click to view.`
+                    : `GRN ${g.id} (${gMeters.toLocaleString()}m received for this PO). Click to view.`}
                   onClick={() => {
                     if (onViewGRN) {
                       onViewGRN(g);
@@ -1364,8 +1378,12 @@ export default function PurchaseOrderForm({
                     }
                   }}
                 >
-                  <i className="ti ti-check fs-14"></i>
-                  <span>{g.id} ({gMeters.toLocaleString()}m)</span>
+                  <i className={isConsolidated ? "ti ti-layers-intersect fs-14 text-primary" : "ti ti-check fs-14 text-success"}></i>
+                  <span>
+                    {isConsolidated
+                      ? `${g.id} (${thisPoMtrs.toLocaleString()}m / ${gMeters.toLocaleString()}m)`
+                      : `${g.id} (${gMeters.toLocaleString()}m)`}
+                  </span>
                 </button>
               );
             })}
@@ -1552,6 +1570,215 @@ export default function PurchaseOrderForm({
         </div>
       </div>
 
+      {/* DELIVERY & SHIPMENT TRACKING (Requirement: Multi-PO linking breakdown & meters tracking) */}
+      {isExisting && (
+        <div
+          className="card mb-4 shadow-none"
+          style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Card Header */}
+          <div
+            className="d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom flex-wrap gap-2"
+            style={{ backgroundColor: '#f8fafc' }}
+          >
+            <div className="d-flex align-items-center gap-2">
+              <span
+                className="d-inline-flex align-items-center justify-content-center rounded-2 bg-primary-subtle text-primary"
+                style={{ width: '28px', height: '28px' }}
+              >
+                <i className="ti ti-truck-delivery fs-16"></i>
+              </span>
+              <div>
+                <span
+                  className="fw-bold text-secondary text-uppercase d-block"
+                  style={{ fontSize: '12px', letterSpacing: '0.05em' }}
+                >
+                  Delivery &amp; Shipment Tracking
+                </span>
+                <span className="text-muted" style={{ fontSize: '11px' }}>
+                  Goods Receipt Notes (GRN), Linked Consolidations &amp; Meter Fulfillment
+                </span>
+              </div>
+            </div>
+
+            <div className="d-flex align-items-center gap-2">
+              {allPoGrns.length === 0 ? (
+                <span className="badge bg-light text-muted border px-2.5 py-1 fs-11 fw-medium">
+                  <i className="ti ti-clock me-1"></i>Awaiting First GRN Delivery
+                </span>
+              ) : pendingQuantityToReceive <= 0 ? (
+                <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-12 fw-semibold">
+                  <i className="ti ti-circle-check me-1"></i>100% Fulfilled
+                </span>
+              ) : (
+                <span className="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-12 fw-semibold">
+                  <i className="ti ti-clock me-1"></i>Partially Received ({fulfillmentPercent}%)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-3">
+            {/* KPI Stat Cards Grid */}
+            <div className="row g-2 mb-3">
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-2 bg-light border text-center">
+                  <span className="text-muted fs-11 d-block mb-0.5">Total Ordered</span>
+                  <span className="fs-15 fw-bold text-dark">{totalOrderedMtrs.toLocaleString()} <span className="fs-12 fw-normal text-muted">m</span></span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-2 border text-center" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                  <span className="text-success fs-11 d-block mb-0.5 fw-medium">Received for this PO</span>
+                  <span className="fs-15 fw-bold text-success">{totalQuantityReceived.toLocaleString()} <span className="fs-12 fw-normal text-success text-opacity-75">m</span></span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-2 border text-center" style={{ backgroundColor: pendingQuantityToReceive > 0 ? '#fff7ed' : '#f8fafc', borderColor: pendingQuantityToReceive > 0 ? '#fed7aa' : '#e2e8f0' }}>
+                  <span className="fs-11 d-block mb-0.5 fw-medium" style={{ color: pendingQuantityToReceive > 0 ? '#c2410c' : '#64748b' }}>
+                    Pending to Inward
+                  </span>
+                  <span className="fs-15 fw-bold" style={{ color: pendingQuantityToReceive > 0 ? '#ea580c' : '#64748b' }}>
+                    {pendingQuantityToReceive.toLocaleString()} <span className="fs-12 fw-normal">m</span>
+                  </span>
+                </div>
+              </div>
+              <div className="col-6 col-md-3">
+                <div className="p-2.5 rounded-2 bg-light border text-center">
+                  <span className="text-muted fs-11 d-block mb-0.5">Total GRN Inwards</span>
+                  <span className="fs-15 fw-bold text-primary">{allPoGrns.length} <span className="fs-12 fw-normal text-muted">Shipment{allPoGrns.length !== 1 ? 's' : ''}</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Fulfillment Progress Bar */}
+            <div className="mb-3">
+              <div className="d-flex align-items-center justify-content-between fs-11 mb-1">
+                <span className="text-muted fw-medium">PO Inward Fulfillment Progress</span>
+                <span className="fw-bold text-dark">{fulfillmentPercent}% ({totalQuantityReceived.toLocaleString()}m / {totalOrderedMtrs.toLocaleString()}m)</span>
+              </div>
+              <div className="progress" style={{ height: '7px', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
+                <div
+                  className={`progress-bar ${fulfillmentPercent >= 100 ? 'bg-success' : 'bg-primary'}`}
+                  style={{ width: `${fulfillmentPercent}%`, borderRadius: '4px', transition: 'width 0.4s ease' }}
+                />
+              </div>
+            </div>
+
+            {/* Inward Shipments & Consolidated PO Table */}
+            {grnBreakdowns.length === 0 ? (
+              <div className="p-3 text-center text-muted fs-12 bg-light rounded-2 border border-dashed">
+                <i className="ti ti-package fs-18 d-block mb-1 text-secondary opacity-50"></i>
+                No inward deliveries have been created yet for this Purchase Order.
+              </div>
+            ) : (
+              <div className="table-responsive rounded-2 border" style={{ borderColor: '#dee2e6' }}>
+                <table className="table table-sm align-middle mb-0 fs-12">
+                  <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #dee2e6' }}>
+                    <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                      <th style={{ padding: '7px 10px' }}>GRN NO.</th>
+                      <th style={{ padding: '7px 10px' }}>RECEIVE DATE</th>
+                      <th style={{ padding: '7px 10px' }}>SHIPMENT TYPE</th>
+                      <th style={{ padding: '7px 10px' }} className="text-center">THIS PO DELIVERED</th>
+                      <th style={{ padding: '7px 10px' }} className="text-center">SHIPMENT TOTAL</th>
+                      <th style={{ padding: '7px 10px' }}>CONSOLIDATED / LINKED POS BREAKDOWN</th>
+                      <th style={{ padding: '7px 10px' }} className="text-center">QC STATUS</th>
+                      <th style={{ padding: '7px 8px' }} className="text-end">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grnBreakdowns.map((b) => (
+                      <tr key={b.grnId} style={{ borderBottom: '1px solid #eef2f6' }}>
+                        <td style={{ padding: '8px 10px' }}>
+                          <span className="fw-bold text-primary font-monospace">{b.grnId}</span>
+                        </td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          <span className="text-dark">{b.receivedDate || '—'}</span>
+                        </td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          {b.isConsolidated ? (
+                            <span className="badge bg-purple-subtle text-purple border border-purple border-opacity-25 px-2 py-0.5 fs-11 d-inline-flex align-items-center gap-1">
+                              <i className="ti ti-layers-intersect"></i>
+                              Consolidated ({b.linkedPoCount} POs)
+                            </span>
+                          ) : (
+                            <span className="badge bg-light text-secondary border px-2 py-0.5 fs-11">
+                              Direct Delivery
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px' }} className="text-center">
+                          <span className="fw-bold text-success fs-13">
+                            {b.metersForThisPo.toLocaleString()} <span className="fs-10 fw-normal">m</span>
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px' }} className="text-center text-muted fs-12">
+                          {b.totalShipmentMeters.toLocaleString()} m
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {b.isConsolidated ? (
+                            <div className="d-flex flex-wrap gap-1.5 py-0.5">
+                              {b.consolidatedBreakdown.map((c) => (
+                                <span
+                                  key={c.poId}
+                                  className={`badge px-2 py-1 fs-11 border d-inline-flex align-items-center gap-1.5 ${
+                                    c.isCurrentPo
+                                      ? 'bg-success-subtle text-success border-success border-opacity-25 fw-bold'
+                                      : 'bg-light text-dark border-secondary border-opacity-25'
+                                  }`}
+                                  title={`${c.poId}: ${c.receivedInThisGrn.toLocaleString()}m in this shipment. Ordered: ${c.orderedMtrs.toLocaleString()}m, Total Received: ${c.totalReceivedToDate.toLocaleString()}m, Pending: ${c.pendingMtrs.toLocaleString()}m.`}
+                                >
+                                  <span>{c.poId}{c.isCurrentPo ? ' (This PO)' : ''}:</span>
+                                  <strong className={c.isCurrentPo ? 'text-success' : 'text-primary'}>
+                                    {c.receivedInThisGrn.toLocaleString()}m
+                                  </strong>
+                                  <span className="text-muted fw-normal">
+                                    ({c.pendingMtrs.toLocaleString()}m bal)
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted fs-11">100% allocated to this Purchase Order</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px' }} className="text-center">
+                          <span className={`badge ${
+                            b.qcStatus === 'Passed' || b.qcStatus === 'Approved'
+                              ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : b.qcStatus === 'Rejected'
+                              ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
+                              : 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                          } px-2 py-0.5 fs-11`}>
+                            {b.qcStatus || 'Pending'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 8px' }} className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-primary py-0.5 px-2 fs-11 rounded"
+                            onClick={() => {
+                              if (onViewGRN) onViewGRN(b.grn);
+                            }}
+                          >
+                            View GRN
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
 
       {/* SECTION 2: Fabric Line Items (FULL BORDERED GRID - Image 3 Style) */}
       <div className="mb-4">
@@ -1618,25 +1845,49 @@ export default function PurchaseOrderForm({
                 <th style={{ width: showColorColumn ? '11%' : '13%', minWidth: '80px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-start">
                   WIDTH *
                 </th>
-                <th style={{ width: showColorColumn ? '12%' : '13%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
-                  QTY (MTRS) *
-                </th>
-                <th style={{ width: showColorColumn ? '11%' : '12%', minWidth: '80px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                {showDeliveryColumns ? (
+                  <>
+                    <th style={{ width: showColorColumn ? '9%' : '10%', minWidth: '75px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                      ORDERED (MTRS)
+                    </th>
+                    <th style={{ width: showColorColumn ? '9%' : '10%', minWidth: '75px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap', backgroundColor: '#f0fdf4', color: '#166534' }} className="text-center">
+                      RECEIVED (MTRS)
+                    </th>
+                    <th style={{ width: showColorColumn ? '9%' : '10%', minWidth: '75px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap', backgroundColor: '#fff7ed', color: '#c2410c' }} className="text-center">
+                      PENDING (MTRS)
+                    </th>
+                  </>
+                ) : (
+                  <th style={{ width: showColorColumn ? '12%' : '13%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                    QTY (MTRS) *
+                  </th>
+                )}
+                <th style={{ width: showColorColumn ? '10%' : '11%', minWidth: '80px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
                   RATE (₹) *
                 </th>
-                <th style={{ width: showColorColumn ? '8%' : '9%', minWidth: '65px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                <th style={{ width: showColorColumn ? '7%' : '8%', minWidth: '60px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
                   FOLD %
                 </th>
-                <th style={{ width: showColorColumn ? '13%' : '13%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-end">
+                <th style={{ width: showColorColumn ? '11%' : '12%', minWidth: '85px', padding: '8px 6px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-end">
                   AMOUNT (₹)
                 </th>
+                {showDeliveryColumns && (
+                  <th style={{ width: '8%', minWidth: '70px', padding: '8px 4px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center">
+                    STATUS
+                  </th>
+                )}
                 {isEditing && (
                   <th style={{ width: '32px', minWidth: '32px', padding: '8px 2px', border: '1px solid #dee2e6', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="text-center"></th>
                 )}
               </tr>
             </thead>
             <tbody>
-              {formData.items.map((row) => {
+              {formData.items.map((row, rowIdx) => {
+                const itemFul = (itemFulfillments || []).find((it) => it.index === rowIdx) || null;
+                const orderedMtrs = Number(row.quantity) || 0;
+                const receivedMtrs = itemFul ? itemFul.received : (formData.items.length === 1 ? totalQuantityReceived : 0);
+                const pendingMtrs = Math.max(0, orderedMtrs - receivedMtrs);
+                const fulfillmentPct = orderedMtrs > 0 ? Math.min(100, Math.round((receivedMtrs / orderedMtrs) * 100)) : 0;
                 const currentFabric = fabrics.find(
                   (f) => f.id === row.fabricId || (f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || '').toLowerCase())
                 );
@@ -1803,8 +2054,8 @@ export default function PurchaseOrderForm({
                     </td>
 
                     {/* Quantity (Mtrs) */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '85px' }} className="text-center">
-                      {isEditing ? (
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '75px' }} className="text-center">
+                      {isEditing && !isPoLocked ? (
                         <input
                           type="number"
                           step="any"
@@ -1816,10 +2067,33 @@ export default function PurchaseOrderForm({
                         />
                       ) : (
                         <div className="text-center fw-medium text-dark fs-12">
-                          {Number(row.quantity || 0).toLocaleString()} Mtrs
+                          {orderedMtrs.toLocaleString()} Mtrs
                         </div>
                       )}
                     </td>
+
+                    {/* Received Quantity (Mtrs) - Shown when GRNs exist */}
+                    {showDeliveryColumns && (
+                      <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '75px', backgroundColor: receivedMtrs > orderedMtrs ? '#fef2f2' : '#f0fdf4' }} className="text-center">
+                        <div className="text-center fw-bold fs-12" style={{ color: receivedMtrs > orderedMtrs ? '#dc2626' : '#166534' }}>
+                          {receivedMtrs.toLocaleString()} m
+                          {receivedMtrs > orderedMtrs && (
+                            <span className="badge bg-danger text-white fs-10 d-block mt-0.5" title={`Over-received by ${(receivedMtrs - orderedMtrs).toLocaleString()}m`}>
+                              Over (+{(receivedMtrs - orderedMtrs).toLocaleString()}m)
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* Pending Quantity (Mtrs) - Shown when GRNs exist */}
+                    {showDeliveryColumns && (
+                      <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '75px', backgroundColor: '#fff7ed' }} className="text-center">
+                        <div className="text-center fw-bold text-danger fs-12">
+                          {pendingMtrs.toLocaleString()} m
+                        </div>
+                      </td>
+                    )}
 
                     {/* Rate / Mtr (₹) */}
                     <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '80px' }} className="text-center">
@@ -1841,7 +2115,7 @@ export default function PurchaseOrderForm({
                     </td>
 
                     {/* Fold % */}
-                    <td style={{ border: '1px solid #dee2e6', padding: '4px 4px', minWidth: '65px' }} className="text-center">
+                    <td style={{ border: '1px solid #dee2e6', padding: '4px 4px', minWidth: '60px' }} className="text-center">
                       {isEditing ? (
                         <input
                           type="number"
@@ -1870,6 +2144,25 @@ export default function PurchaseOrderForm({
                       </div>
                     </td>
 
+                    {/* Status Column - Shown when GRNs exist */}
+                    {showDeliveryColumns && (
+                      <td style={{ border: '1px solid #dee2e6', padding: '4px 6px', minWidth: '70px' }} className="text-center">
+                        {pendingMtrs <= 0 && orderedMtrs > 0 ? (
+                          <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-1.5 py-0.5 fs-10 fw-semibold">
+                            Fulfilled
+                          </span>
+                        ) : receivedMtrs > 0 ? (
+                          <span className="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-1.5 py-0.5 fs-10 fw-semibold">
+                            {fulfillmentPct}% Inwarded
+                          </span>
+                        ) : (
+                          <span className="badge bg-light text-muted border px-1.5 py-0.5 fs-10">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    )}
+
                     {/* Action: Trash Icon */}
                     {isEditing && (
                       <td style={{ border: '1px solid #dee2e6', padding: '4px 2px', width: '32px', minWidth: '32px' }} className="text-center">
@@ -1893,11 +2186,20 @@ export default function PurchaseOrderForm({
             <tfoot style={{ background: '#f8fafc', borderTop: '2px solid #dee2e6' }}>
               <tr>
                 <td
-                  colSpan={showColorColumn ? 7 : 6}
+                  colSpan={showDeliveryColumns ? (showColorColumn ? 9 : 8) : (showColorColumn ? 7 : 6)}
                   className="text-end fw-bold text-dark fs-14"
                   style={{ border: '1px solid #dee2e6', padding: '10px 14px' }}
                 >
-                  PO Total Amount:
+                  <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    {showDeliveryColumns ? (
+                      <div className="d-flex align-items-center gap-3 fs-12 fw-medium text-secondary">
+                        <span>Total Ordered: <strong className="text-dark">{totalOrderedMtrs.toLocaleString()}m</strong></span>
+                        <span>Received for this PO: <strong className="text-success">{totalQuantityReceived.toLocaleString()}m</strong></span>
+                        <span>Pending to Inward: <strong className="text-danger">{pendingQuantityToReceive.toLocaleString()}m</strong></span>
+                      </div>
+                    ) : <div />}
+                    <span>PO Total Amount:</span>
+                  </div>
                 </td>
                 <td
                   className="text-end fw-bold text-primary fs-15 font-monospace"
@@ -1909,6 +2211,7 @@ export default function PurchaseOrderForm({
                     maximumFractionDigits: 2
                   })}
                 </td>
+                {showDeliveryColumns && <td style={{ border: '1px solid #dee2e6' }}></td>}
                 {isEditing && <td style={{ border: '1px solid #dee2e6' }}></td>}
               </tr>
             </tfoot>

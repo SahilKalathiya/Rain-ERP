@@ -39,6 +39,7 @@ export default function VendorMasterView({
   const [isEditing, setIsEditing] = useState(isInline);
   const [activeSection, setActiveSection] = useState(isInline ? 'all' : 'none'); // 'all', 'basic', 'contact', 'tax', 'bank'
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
+  const [isModalEditMode, setIsModalEditMode] = useState(isInline);
 
   React.useEffect(() => {
     if (vendors && vendors.length > 0) {
@@ -127,11 +128,12 @@ export default function VendorMasterView({
     setFormErrors({});
     setIsCreatingNew(true);
     setIsEditing(true);
+    setIsModalEditMode(true);
     setActiveSection('all');
     setSelectedVendor(null);
   };
 
-  const handleSelectVendor = (vendor) => {
+  const handleSelectVendor = (vendor, editDirectly = false) => {
     setSelectedVendor(vendor);
     const standardOptions = STANDARD_VENDOR_TYPES.filter(t => t !== 'Other');
     const isStandard = standardOptions.includes(vendor.type);
@@ -140,9 +142,20 @@ export default function VendorMasterView({
       type: isStandard ? vendor.type : (vendor.type ? 'Other' : ''),
       customType: isStandard ? '' : (vendor.type || '')
     });
+    setFormErrors({});
     setIsCreatingNew(false);
-    setIsEditing(true);
+    setIsEditing(editDirectly);
+    setIsModalEditMode(editDirectly);
     setActiveSection('all');
+  };
+
+  const handleCloseModal = () => {
+    setSelectedVendor(null);
+    setIsCreatingNew(false);
+    setIsEditing(false);
+    setIsModalEditMode(false);
+    setFormErrors({});
+    if (isInline && onCloseInline) onCloseInline(null);
   };
 
   // Capitalize word by word
@@ -201,6 +214,7 @@ export default function VendorMasterView({
     setSelectedVendor(null);
     setIsEditing(false);
     setIsCreatingNew(false);
+    setIsModalEditMode(false);
 
     if (onSaveVendor) {
       onSaveVendor(updatedVendor);
@@ -220,6 +234,7 @@ export default function VendorMasterView({
       setSelectedVendor(null);
       setIsEditing(false);
       setIsCreatingNew(false);
+      setIsModalEditMode(false);
     }
     try {
       localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
@@ -379,7 +394,7 @@ export default function VendorMasterView({
                       <tr
                         key={v.id}
                         className={`cursor-pointer ${isSelected ? 'table-primary' : ''}`}
-                        onClick={() => handleSelectVendor(v)}
+                        onClick={() => handleSelectVendor(v, false)}
                       >
                         <td className="fw-medium text-dark">{v.name}</td>
                         <td>
@@ -407,7 +422,10 @@ export default function VendorMasterView({
                             type="button"
                             className="btn btn-sm btn-light text-primary p-1.5 rounded-2 me-1"
                             title="Edit Vendor"
-                            onClick={() => handleSelectVendor(v)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectVendor(v, true);
+                            }}
                           >
                             <i className="ti ti-edit fs-5"></i>
                           </button>
@@ -448,89 +466,114 @@ export default function VendorMasterView({
                     </span>
                     <div>
                       <h5 className="fw-bold text-dark mb-0 fs-18">
-                        {isCreatingNew ? 'Create New Vendor' : formData.name || 'Vendor Details'}
+                        {isCreatingNew
+                          ? 'Create New Vendor'
+                          : (isModalEditMode ? `Edit Vendor: ${formData.name || ''}` : (formData.name || 'Vendor Details'))}
                       </h5>
                     </div>
                   </div>
 
                   <div className="d-flex align-items-center gap-2">
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setActiveSection('all');
-                        }}
-                      >
-                        <i className="ti ti-edit fs-14"></i>
-                        <span>Edit All</span>
-                      </button>
+                    {!isCreatingNew && (
+                      !isModalEditMode ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                          onClick={() => {
+                            setIsModalEditMode(true);
+                            setIsEditing(true);
+                            setActiveSection('all');
+                          }}
+                        >
+                          <i className="ti ti-edit"></i>
+                          <span>Edit</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-light border text-secondary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5"
+                          onClick={() => {
+                            if (selectedVendor) {
+                              const standardOptions = STANDARD_VENDOR_TYPES.filter(t => t !== 'Other');
+                              const isStandard = standardOptions.includes(selectedVendor.type);
+                              setFormData({
+                                ...selectedVendor,
+                                type: isStandard ? selectedVendor.type : (selectedVendor.type ? 'Other' : ''),
+                                customType: isStandard ? '' : (selectedVendor.type || '')
+                              });
+                            }
+                            setFormErrors({});
+                            setIsModalEditMode(false);
+                            setIsEditing(false);
+                          }}
+                        >
+                          <i className="ti ti-eye"></i>
+                          <span>View Mode</span>
+                        </button>
+                      )
                     )}
                     <button
                       type="button"
                       className="btn-close ms-2"
-                      onClick={() => {
-                        setSelectedVendor(null);
-                        setIsCreatingNew(false);
-                        setIsEditing(false);
-                        if (isInline && onCloseInline) onCloseInline(null);
-                      }}
+                      onClick={handleCloseModal}
                     ></button>
                   </div>
                 </div>
 
                 <form onSubmit={handleSave}>
                   <div style={{ maxHeight: 'calc(80vh - 140px)', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* SECTION 1: Basic Information */}
-                <div className="mb-4 p-3 bg-light rounded-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
-                      1. Basic Information
-                    </span>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setActiveSection('basic');
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
+                    {/* SECTION 1: Basic Information */}
+                    <div className="mb-4 p-3 bg-light rounded-3">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
+                          1. Basic Information
+                        </span>
+                        {!isModalEditMode && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold"
+                            onClick={() => {
+                              setIsModalEditMode(true);
+                              setIsEditing(true);
+                              setActiveSection('all');
+                            }}
+                          >
+                            <i className="ti ti-edit me-1"></i>Edit
+                          </button>
+                        )}
+                      </div>
 
-                  <div className="row g-2">
-                    <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">Vendor Name *</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
-                        <>
+                      <div className="row g-2">
+                        <div className="col-12">
+                          <label className="form-label fs-12 fw-semibold mb-1">Vendor Name *</label>
                           <input
                             type="text"
                             required
-                            className={`form-control form-control-sm bg-white ${
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className={`form-control form-control-sm ${
                               formErrors.name ? 'is-invalid' : ''
                             }`}
-                            value={formData.name}
+                            placeholder="e.g. Sahil Textile Mill"
+                            value={formData.name || ''}
                             onChange={(e) => handleTextChange('name', e.target.value, true)}
                           />
-                          <div className="form-text small text-muted">Auto-capitalised word by word</div>
-                        </>
-                      ) : (
-                        <div className="fw-semibold text-dark fs-14">{formData.name || '-'}</div>
-                      )}
-                    </div>
+                          {isModalEditMode && (
+                            <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                          )}
+                          {formErrors.name && (
+                            <div className="invalid-feedback fs-11 d-block">{formErrors.name}</div>
+                          )}
+                        </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
-                        <>
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
                           <select
-                            className={`form-select form-select-sm bg-white ${
+                            className={`form-select form-select-sm ${
                               formErrors.type ? 'is-invalid' : ''
                             }`}
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
                             value={formData.type || ''}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -553,165 +596,166 @@ export default function VendorMasterView({
                             <div className="mt-1.5">
                               <input
                                 type="text"
-                                className={`form-control form-control-sm bg-white ${
+                                disabled={!isModalEditMode}
+                                style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                                className={`form-control form-control-sm ${
                                   formErrors.type ? 'is-invalid' : ''
                                 }`}
                                 placeholder="Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)"
                                 value={formData.customType || ''}
                                 onChange={(e) => handleTextChange('customType', e.target.value, true)}
-                                autoFocus
+                                autoFocus={isModalEditMode}
                               />
                             </div>
                           )}
                           {formErrors.type && (
                             <div className="invalid-feedback fs-11 d-block">{formErrors.type}</div>
                           )}
-                        </>
-                      ) : (
-                        <div className="text-secondary fs-13">{formData.type || '—'}</div>
-                      )}
-                    </div>
-
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Rating (1-5 ★)</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'basic') ? (
-                        <div className="d-flex align-items-center gap-1 cursor-pointer text-warning fs-18">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <span
-                              key={star}
-                              onClick={() => setFormData({ ...formData, rating: star })}
-                            >
-                              {star <= formData.rating ? '★' : '☆'}
-                            </span>
-                          ))}
                         </div>
-                      ) : (
-                        <div className="text-warning fs-14">
-                          {'★'.repeat(formData.rating || 5)}
-                        </div>
-                      )}
-                    </div>
 
-                    <div className="col-12 mt-2">
-                      <div className="form-check form-switch">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="activeToggle"
-                          disabled={!isEditing}
-                          checked={formData.active}
-                          onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                        />
-                        <label className="form-check-label fs-12 fw-semibold" htmlFor="activeToggle">
-                          Active Vendor (Available for new POs/GRNs)
-                        </label>
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Rating (1-5 ★)</label>
+                          <div
+                            className="d-flex align-items-center gap-1 text-warning fs-18"
+                            style={{
+                              cursor: isModalEditMode ? 'pointer' : 'default',
+                              pointerEvents: isModalEditMode ? 'auto' : 'none'
+                            }}
+                          >
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <span
+                                key={star}
+                                onClick={() => isModalEditMode && setFormData({ ...formData, rating: star })}
+                              >
+                                {star <= (formData.rating || 5) ? '★' : '☆'}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="col-12 mt-2">
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id="activeToggle"
+                              disabled={!isModalEditMode}
+                              style={{ cursor: isModalEditMode ? 'pointer' : 'default' }}
+                              checked={formData.active}
+                              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                            />
+                            <label className="form-check-label fs-12 fw-semibold" htmlFor="activeToggle">
+                              Active Vendor (Available for new POs/GRNs)
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* SECTION 2: Contact & Address */}
-                <div className="mb-4 p-3 bg-light rounded-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
-                      2. Contact &amp; Address
-                    </span>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setActiveSection('contact');
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
+                    {/* SECTION 2: Contact & Address */}
+                    <div className="mb-4 p-3 bg-light rounded-3">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
+                          2. Contact &amp; Address
+                        </span>
+                        {!isModalEditMode && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold"
+                            onClick={() => {
+                              setIsModalEditMode(true);
+                              setIsEditing(true);
+                              setActiveSection('all');
+                            }}
+                          >
+                            <i className="ti ti-edit me-1"></i>Edit
+                          </button>
+                        )}
+                      </div>
 
-                  <div className="row g-2">
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Phone Number</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <input
-                          type="text"
-                          maxLength="10"
-                          placeholder="e.g. 9876543210"
-                          className="form-control form-control-sm bg-white"
-                          value={formData.phone}
-                          onChange={(e) => handleTextChange('phone', e.target.value.replace(/\D/g, ''))}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.phone || '-'}</div>
-                      )}
-                    </div>
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Phone Number</label>
+                          <input
+                            type="text"
+                            maxLength="10"
+                            placeholder="e.g. 9876543210"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className={`form-control form-control-sm ${
+                              formErrors.phone ? 'is-invalid' : ''
+                            }`}
+                            value={formData.phone || ''}
+                            onChange={(e) => handleTextChange('phone', e.target.value.replace(/\D/g, ''))}
+                          />
+                          {formErrors.phone && (
+                            <div className="invalid-feedback fs-11 d-block">{formErrors.phone}</div>
+                          )}
+                        </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Contact Person</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <input
-                          type="text"
-                          placeholder="e.g. Rajesh Shah"
-                          className="form-control form-control-sm bg-white"
-                          value={formData.contactPerson}
-                          onChange={(e) => handleTextChange('contactPerson', e.target.value, true)}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.contactPerson || '-'}</div>
-                      )}
-                    </div>
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Contact Person</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Rajesh Shah"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm"
+                            value={formData.contactPerson || ''}
+                            onChange={(e) => handleTextChange('contactPerson', e.target.value, true)}
+                          />
+                        </div>
 
-                    <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">Email</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <input
-                          type="email"
-                          placeholder="e.g. contact@supplier.com"
-                          className="form-control form-control-sm bg-white"
-                          value={formData.email}
-                          onChange={(e) => handleTextChange('email', e.target.value)}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.email || '-'}</div>
-                      )}
-                    </div>
+                        <div className="col-12">
+                          <label className="form-label fs-12 fw-semibold mb-1">Email</label>
+                          <input
+                            type="email"
+                            placeholder="e.g. contact@supplier.com"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className={`form-control form-control-sm ${
+                              formErrors.email ? 'is-invalid' : ''
+                            }`}
+                            value={formData.email || ''}
+                            onChange={(e) => handleTextChange('email', e.target.value)}
+                          />
+                          {formErrors.email && (
+                            <div className="invalid-feedback fs-11 d-block">{formErrors.email}</div>
+                          )}
+                        </div>
 
-                    <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">Address</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <textarea
-                          rows="2"
-                          placeholder="e.g. Plot No. 42, GIDC Industrial Estate"
-                          className="form-control form-control-sm bg-white fs-12"
-                          value={formData.address}
-                          onChange={(e) => handleTextChange('address', e.target.value)}
-                        ></textarea>
-                      ) : (
-                        <div className="text-secondary fs-13">{formData.address || '-'}</div>
-                      )}
-                    </div>
+                        <div className="col-12">
+                          <label className="form-label fs-12 fw-semibold mb-1">Address</label>
+                          <textarea
+                            rows="2"
+                            placeholder="e.g. Plot No. 42, GIDC Industrial Estate"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm fs-12"
+                            value={formData.address || ''}
+                            onChange={(e) => handleTextChange('address', e.target.value)}
+                          ></textarea>
+                        </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">City</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
-                        <input
-                          type="text"
-                          placeholder="e.g. Surat"
-                          className="form-control form-control-sm bg-white"
-                          value={formData.city}
-                          onChange={(e) => handleTextChange('city', e.target.value, true)}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.city || '-'}</div>
-                      )}
-                    </div>
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">City</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Surat"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm"
+                            value={formData.city || ''}
+                            onChange={(e) => handleTextChange('city', e.target.value, true)}
+                          />
+                        </div>
 
-                      <div className="col-6">
-                        <label className="form-label fs-12 fw-semibold mb-1">State</label>
-                        {isEditing && (activeSection === 'all' || activeSection === 'contact') ? (
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">State</label>
                           <select
-                            className="form-select form-select-sm bg-white"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-select form-select-sm"
                             value={formData.state || ''}
                             onChange={(e) => handleTextChange('state', e.target.value)}
                           >
@@ -720,126 +764,147 @@ export default function VendorMasterView({
                               <option key={st} value={st}>{st}</option>
                             ))}
                           </select>
-                        ) : (
-                          <div className="text-dark fs-13">{formData.state || '-'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: Tax & Banking Information */}
+                    <div className="mb-4 p-3 bg-light rounded-3">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
+                          3. GSTIN &amp; Banking Details
+                        </span>
+                        {!isModalEditMode && (
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold"
+                            onClick={() => {
+                              setIsModalEditMode(true);
+                              setIsEditing(true);
+                              setActiveSection('all');
+                            }}
+                          >
+                            <i className="ti ti-edit me-1"></i>Edit
+                          </button>
                         )}
                       </div>
-                  </div>
-                </div>
 
-                {/* SECTION 3: Tax & Banking Information */}
-                <div className="mb-4 p-3 bg-light rounded-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="fw-bold text-secondary fs-12 text-uppercase tracking-wider">
-                      3. GSTIN &amp; Banking Details
-                    </span>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setActiveSection('tax');
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="row g-2">
-                    <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">GSTIN (15 characters)</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
-                        <input
-                          type="text"
-                          maxLength="15"
-                          placeholder="e.g. 24AFQPA0986G1ZA"
-                          className={`form-control form-control-sm bg-white font-monospace text-uppercase ${
-                            formErrors.gstin ? 'is-invalid' : ''
-                          }`}
-                          value={formData.gstin}
-                          onChange={(e) => handleTextChange('gstin', e.target.value.toUpperCase())}
-                        />
-                      ) : (
-                        <div className="font-monospace fw-bold text-dark fs-13">
-                          {formData.gstin || '-'}
+                      <div className="row g-2">
+                        <div className="col-12">
+                          <label className="form-label fs-12 fw-semibold mb-1">GSTIN (15 characters)</label>
+                          <input
+                            type="text"
+                            maxLength="15"
+                            placeholder="e.g. 24AFQPA0986G1ZA"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className={`form-control form-control-sm font-monospace text-uppercase ${
+                              formErrors.gstin ? 'is-invalid' : ''
+                            }`}
+                            value={formData.gstin || ''}
+                            onChange={(e) => handleTextChange('gstin', e.target.value.toUpperCase())}
+                          />
+                          {formErrors.gstin && (
+                            <div className="invalid-feedback fs-11 d-block">{formErrors.gstin}</div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="col-12">
-                      <label className="form-label fs-12 fw-semibold mb-1">Bank Name</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
-                        <input
-                          type="text"
-                          placeholder="e.g. HDFC Bank"
-                          className="form-control form-control-sm bg-white"
-                          value={formData.bankName}
-                          onChange={(e) => handleTextChange('bankName', e.target.value, true)}
-                        />
-                      ) : (
-                        <div className="text-dark fs-13">{formData.bankName || '-'}</div>
-                      )}
-                    </div>
-
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">Account Number</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
-                        <input
-                          type="text"
-                          placeholder="e.g. 50200012345678"
-                          className="form-control form-control-sm bg-white font-monospace"
-                          value={formData.accountNumber}
-                          onChange={(e) => handleTextChange('accountNumber', e.target.value)}
-                        />
-                      ) : (
-                        <div className="font-monospace text-dark fs-13">
-                          {formData.accountNumber || '-'}
+                        <div className="col-12">
+                          <label className="form-label fs-12 fw-semibold mb-1">Bank Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. HDFC Bank"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm"
+                            value={formData.bankName || ''}
+                            onChange={(e) => handleTextChange('bankName', e.target.value, true)}
+                          />
                         </div>
-                      )}
-                    </div>
 
-                    <div className="col-6">
-                      <label className="form-label fs-12 fw-semibold mb-1">IFSC Code</label>
-                      {isEditing && (activeSection === 'all' || activeSection === 'tax') ? (
-                        <input
-                          type="text"
-                          maxLength="11"
-                          placeholder="e.g. HDFC0001234"
-                          className="form-control form-control-sm bg-white font-monospace text-uppercase"
-                          value={formData.ifscCode}
-                          onChange={(e) => handleTextChange('ifscCode', e.target.value.toUpperCase())}
-                        />
-                      ) : (
-                        <div className="font-monospace text-dark fs-13">
-                          {formData.ifscCode || '-'}
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">Account Number</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 50200012345678"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm font-monospace"
+                            value={formData.accountNumber || ''}
+                            onChange={(e) => handleTextChange('accountNumber', e.target.value)}
+                          />
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
+                        <div className="col-6">
+                          <label className="form-label fs-12 fw-semibold mb-1">IFSC Code</label>
+                          <input
+                            type="text"
+                            maxLength="11"
+                            placeholder="e.g. HDFC0001234"
+                            disabled={!isModalEditMode}
+                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
+                            className="form-control form-control-sm font-monospace text-uppercase"
+                            value={formData.ifscCode || ''}
+                            onChange={(e) => handleTextChange('ifscCode', e.target.value.toUpperCase())}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Modal Footer Buttons */}
                   <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
-                    <button
-                      type="button"
-                      className="btn btn-light px-4 rounded-3"
-                      onClick={() => {
-                        setSelectedVendor(null);
-                        setIsCreatingNew(false);
-                        setIsEditing(false);
-                        if (isInline && onCloseInline) onCloseInline(null);
-                      }}
-                    >
-                      {isEditing ? 'Cancel' : 'Close'}
-                    </button>
-                    {isEditing && (
-                      <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
-                        <i className="ti ti-check me-1"></i> Save Vendor
-                      </button>
+                    {!isModalEditMode ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-light px-4 rounded-3"
+                          onClick={handleCloseModal}
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary rounded-3 px-4 fw-semibold d-flex align-items-center gap-1.5"
+                          onClick={() => {
+                            setIsModalEditMode(true);
+                            setIsEditing(true);
+                            setActiveSection('all');
+                          }}
+                        >
+                          <i className="ti ti-edit me-1"></i> Edit Vendor
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-light px-4 rounded-3"
+                          onClick={() => {
+                            if (isCreatingNew) {
+                              handleCloseModal();
+                            } else {
+                              if (selectedVendor) {
+                                const standardOptions = STANDARD_VENDOR_TYPES.filter(t => t !== 'Other');
+                                const isStandard = standardOptions.includes(selectedVendor.type);
+                                setFormData({
+                                  ...selectedVendor,
+                                  type: isStandard ? selectedVendor.type : (selectedVendor.type ? 'Other' : ''),
+                                  customType: isStandard ? '' : (selectedVendor.type || '')
+                                });
+                              }
+                              setFormErrors({});
+                              setIsModalEditMode(false);
+                              setIsEditing(false);
+                            }
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary px-4 fw-semibold rounded-3 shadow-sm">
+                          <i className="ti ti-check me-1"></i> Save Vendor
+                        </button>
+                      </>
                     )}
                   </div>
                 </form>

@@ -20,6 +20,7 @@ import ColorMasterView from './ColorMasterView';
 import TransporterMasterView from './TransporterMasterView';
 import ThreadMasterView from './ThreadMasterView';
 import ActivityHistoryModal from './ActivityHistoryModal';
+import { getMetersForPoFromGrn } from '../../utils/procurementUtils';
 
 // Seed Data
 import {
@@ -405,6 +406,24 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
     grns.forEach((g) => {
       if (!g || !g.id) return;
+
+      // Requirement 51: A GRN is appearing in the QC Inspection queue even though it has not yet been submitted for QC.
+      // QC inspection records should ONLY be visible after the GRN has been explicitly sent for QC.
+      const isExplicitlySent = Boolean(
+        g.isSubmittedToQC === true ||
+        ['Submitted to QC', 'QC In Progress', 'QC Approved', 'QC Passed', 'QC Rejected', 'Pending Admin Approval'].includes(g.status)
+      ) && g.status !== 'Draft' && g.status !== 'Bale Entry in Progress';
+
+      if (!isExplicitlySent) {
+        // If GRN is not yet submitted to QC, remove any unsubmitted QC records!
+        const matchingPendingQCs = updatedQCs.filter((q) => q && (q.grnRef === g.id || (g.id && q.id && q.id.startsWith(`QC-${g.id.replace('GRN-', '')}`))));
+        if (matchingPendingQCs.length > 0) {
+          updatedQCs = updatedQCs.filter((q) => !matchingPendingQCs.includes(q));
+          hasUpdates = true;
+        }
+        return;
+      }
+
       const linkedPO = (g.linkedPOs && g.linkedPOs.length > 0)
         ? purchaseOrders.find((p) => g.linkedPOs.includes(p.id))
         : purchaseOrders.find((p) => p.id === g.poId);
@@ -676,7 +695,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     if (onNavigate) onNavigate('/goods-inward');
   };
 
-  const handleSaveGRN = (grnData, isCompleted = true) => {
+  const handleSaveGRN = (grnData, isCompleted = true, shouldExitToList = false) => {
     const isEdit = grns.some((g) => g.id === grnData.id);
     const now = Date.now();
     const liveM = (grnData.bales || []).reduce((sum, b) => {
@@ -707,6 +726,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     setGrns(updated);
     api.saveGRN(enrichedGRN).catch((e) => console.warn('GRN save sync error:', e));
 
+    // Requirement 51: If GRN is saved as Draft, in progress, or not yet submitted to QC, purge any QC records
+    if (!isCompleted || enrichedGRN.status === 'Draft' || enrichedGRN.status === 'Bale Entry in Progress' || !enrichedGRN.isSubmittedToQC) {
+      setQualityChecks((prev) => (prev || []).filter((q) => q && q.grnRef !== enrichedGRN.id && (!q.id || !q.id.startsWith(`QC-${enrichedGRN.id.replace('GRN-', '')}`))));
+    }
+
     // Point 26: Update Linked PO Status (Partial Delivery vs Full Delivery across ALL linked POs)
     const targetLinkedPoIds = (enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0)
       ? enrichedGRN.linkedPOs
@@ -724,21 +748,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
 
           let totalReceivedForPo = 0;
           allGrnsForPo.forEach((g) => {
-            let poMetersInGrn = 0;
-            (g.bales || []).forEach((b) => {
-              const bPo = b.poId || (b.fabricItemLabel && b.fabricItemLabel.includes(linkedPoId) ? linkedPoId : null);
-              if (bPo === linkedPoId) {
-                poMetersInGrn += Number(b.totalLength) || 0;
-              } else if (!bPo && (!g.linkedPOs || g.linkedPOs.length <= 1)) {
-                poMetersInGrn += Number(b.totalLength) || 0;
-              }
-            });
-            if (poMetersInGrn === 0) {
-              const grnTotal = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
-              const count = (g.linkedPOs && g.linkedPOs.length > 0) ? g.linkedPOs.length : 1;
-              poMetersInGrn = Math.round(grnTotal / count);
-            }
-            totalReceivedForPo += poMetersInGrn;
+            totalReceivedForPo += getMetersForPoFromGrn(g, linkedPoId, targetPo.items);
           });
 
           let newPoStatus = targetPo.status;
@@ -951,13 +961,17 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       return;
     }
 
-    // If saving draft progress (e.g. Save Bale, Save All Bales, Save Header), keep user on current form!
-    if (!isCompleted) {
+    // If saving draft progress (e.g. Save Bale, Save All Bales, Save Header) without requesting exit, keep user on current form!
+    if (!isCompleted && !shouldExitToList) {
       setSelectedGRN(enrichedGRN);
       return;
     }
 
+    // Exiting out to GRN List (Save Progress, Complete, etc.)
+    setSelectedGRN(null);
     setActiveGrnView('list');
+    setActiveTab('grn');
+    if (onNavigate) onNavigate('/goods-inward');
   };
 
   const handleSaveQC = (qcData) => {
@@ -1423,6 +1437,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           {activePoView === 'form' && (
             <PurchaseOrderForm
               po={selectedPO}
+              purchaseOrders={purchaseOrders}
               vendors={vendors}
               fabrics={fabrics}
               orders={salesOrders}
@@ -1666,17 +1681,19 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               qualityChecks={qualityChecks}
               grns={grns}
               onBack={() => {
-                const existsInGrns = selectedGRN && (grns || []).some((g) => g && g.id === selectedGRN.id);
-                if (existsInGrns) {
-                  setActiveGrnView('detail');
-                } else {
-                  setSelectedGRN(null);
-                  setActiveGrnView('list');
-                }
+                setSelectedGRN(null);
+                setActiveGrnView('list');
+                setActiveTab('grn');
+                if (onNavigate) onNavigate('/goods-inward');
               }}
-              onSaveGRN={(grnData, isCompleted) => {
-                handleSaveGRN(grnData, isCompleted);
-                setSelectedGRN(grnData);
+              onExitToList={() => {
+                setSelectedGRN(null);
+                setActiveGrnView('list');
+                setActiveTab('grn');
+                if (onNavigate) onNavigate('/goods-inward');
+              }}
+              onSaveGRN={(grnData, isCompleted, shouldExitToList = false) => {
+                handleSaveGRN(grnData, isCompleted, shouldExitToList);
               }}
               onSaveTransporter={(t) => {
                 setTransporters((prev) => {

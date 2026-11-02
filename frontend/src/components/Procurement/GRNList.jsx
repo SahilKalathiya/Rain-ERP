@@ -288,10 +288,12 @@ function parseDateForSort(d, id) {
                               ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
                               : g.status === 'Pending Admin Approval'
                               ? 'bg-warning-subtle text-warning border border-warning border-opacity-25'
+                              : g.status === 'Draft' || !g.status
+                              ? 'bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
                               : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
                           }`}
                         >
-                          {g.status || 'Completed'}
+                          {g.status || 'Draft'}
                         </span>
                       </td>
 

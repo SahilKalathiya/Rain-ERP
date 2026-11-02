@@ -25,6 +25,20 @@ export default function QualityCheckList({
       const matchedGrn = grns.find(
         (g) => g && (g.id === qc.grnRef || (qc.grnRef && g.id.includes(qc.grnRef.replace('GRN-', ''))))
       );
+
+      // Requirement 51: A GRN is appearing in the QC Inspection queue even though it has not yet been submitted for QC.
+      // QC inspection records should ONLY be visible after the GRN has been explicitly sent for QC.
+      const isExplicitlySentToQC = Boolean(
+        matchedGrn &&
+        (matchedGrn.isSubmittedToQC === true || ['Submitted to QC', 'QC In Progress', 'QC Approved', 'QC Passed', 'QC Rejected', 'Pending Admin Approval'].includes(matchedGrn.status)) &&
+        matchedGrn.status !== 'Draft' &&
+        matchedGrn.status !== 'Bale Entry in Progress'
+      );
+
+      if (!isExplicitlySentToQC) {
+        return; // Skip: Do NOT include unsubmitted GRNs in QC inspection queue!
+      }
+
       const againstRef =
         qc.againstRef ||
         (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.length > 0

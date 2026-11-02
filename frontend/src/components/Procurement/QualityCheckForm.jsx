@@ -148,7 +148,11 @@ export default function QualityCheckForm({
   // Dropdown states for Bale / Piece-level inspection (Requirement 24)
   const [selectedBaleFilter, setSelectedBaleFilter] = useState('all');
   const [selectedPieceKey, setSelectedPieceKey] = useState('');
-  const [inspectionScope, setInspectionScope] = useState('all');
+  const [inspectionScope, setInspectionScope] = useState(() => {
+    if (qc?.inspectionScope === 'Piece-Level' || qc?.inspectionScope === 'piece') return 'piece';
+    if (qc?.inspectionScope === 'Bale-Level' || qc?.inspectionScope === 'bale') return 'bale';
+    return 'all';
+  });
 
   const showToast = (message, type = 'success') => {
     setToastNotification({ message, type });
@@ -283,6 +287,68 @@ export default function QualityCheckForm({
       }
     }));
   };
+
+  // Batch actions for listed pieces in QC toolbar
+  const handleBatchCheckAll = (shouldCheck) => {
+    const expW = formData.actualWidth || formData.expectedWidth || '44';
+    const expF = formData.actualFold || formData.expectedFold || '100';
+    setPieceInspections((prev) => {
+      const updated = { ...prev };
+      displayedPieces.forEach((pc) => {
+        const cur = updated[pc.key] || {};
+        updated[pc.key] = {
+          ...cur,
+          checked: shouldCheck,
+          actualWidth: (shouldCheck && !cur.actualWidth) ? expW : (cur.actualWidth || ''),
+          actualFold: (shouldCheck && !cur.actualFold) ? expF : (cur.actualFold || ''),
+          status: cur.status || 'OK'
+        };
+      });
+      return updated;
+    });
+    showToast(shouldCheck ? `Checked all ${displayedPieces.length} pieces.` : 'Unchecked all pieces.', 'info');
+  };
+
+  const handleBatchFillExpected = () => {
+    const expW = formData.actualWidth || formData.expectedWidth || '44';
+    const expF = formData.actualFold || formData.expectedFold || '100';
+    setPieceInspections((prev) => {
+      const updated = { ...prev };
+      displayedPieces.forEach((pc) => {
+        const cur = updated[pc.key] || {};
+        updated[pc.key] = {
+          ...cur,
+          checked: true,
+          actualWidth: expW,
+          actualFold: expF,
+          status: cur.status || 'OK'
+        };
+      });
+      return updated;
+    });
+    showToast(`Filled expected Width (${expW}") and Fold (${expF}%) for all listed pieces.`, 'success');
+  };
+
+  const handleBatchMarkStatus = (newStatus = 'OK') => {
+    const expW = formData.actualWidth || formData.expectedWidth || '44';
+    const expF = formData.actualFold || formData.expectedFold || '100';
+    setPieceInspections((prev) => {
+      const updated = { ...prev };
+      displayedPieces.forEach((pc) => {
+        const cur = updated[pc.key] || {};
+        updated[pc.key] = {
+          ...cur,
+          checked: true,
+          actualWidth: cur.actualWidth || expW,
+          actualFold: cur.actualFold || expF,
+          status: newStatus
+        };
+      });
+      return updated;
+    });
+    showToast(`Marked listed pieces as ${newStatus}.`, 'success');
+  };
+
 
   const handlePiecePhotoUpload = (key, e) => {
     const files = Array.from(e.target.files);
@@ -864,18 +930,17 @@ export default function QualityCheckForm({
                     <select
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
                       value={selectedBaleFilter}
-                      onChange={(e) => {
-                        setSelectedBaleFilter(e.target.value);
-                        setSelectedPieceKey('');
-                      }}
+                      onChange={(e) => handleBaleFilterChange(e.target.value)}
                     >
                       <option value="all">All Bales ({uniqueBaleNumbers.length} Bales &middot; {grnPieces.length} Pieces)</option>
                       {uniqueBaleNumbers.map((bNo) => {
-                        const count = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).length;
-                        const meters = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).reduce((s, p) => s + (Number(p.meters) || 0), 0);
+                        const bPieces = grnPieces.filter((p) => String(p.baleNo) === String(bNo));
+                        const count = bPieces.length;
+                        const meters = bPieces.reduce((s, p) => s + (Number(p.meters) || 0), 0);
+                        const inspCount = bPieces.filter((p) => pieceInspections[p.key]?.checked).length;
                         return (
                           <option key={bNo} value={bNo}>
-                            Bale #{bNo} &mdash; {count} pieces ({meters}m)
+                            Bale #{bNo} &mdash; {count} pieces ({meters}m){inspCount > 0 ? ` [${inspCount}/${count} inspected]` : ''}
                           </option>
                         );
                       })}
@@ -891,37 +956,15 @@ export default function QualityCheckForm({
                     <select
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
                       value={selectedPieceKey}
-                      onChange={(e) => {
-                        const key = e.target.value;
-                        setSelectedPieceKey(key);
-                        if (key) {
-                          const targetPiece = grnPieces.find((p) => p.key === key);
-                          if (targetPiece) {
-                            setSelectedBaleFilter(String(targetPiece.baleNo));
-                            setPieceInspections((prev) => ({
-                              ...prev,
-                              [key]: {
-                                ...(prev[key] || {
-                                  actualWidth: '',
-                                  actualFold: '',
-                                  status: 'OK',
-                                  notes: '',
-                                  photos: []
-                                }),
-                                checked: true
-                              }
-                            }));
-                          }
-                        }
-                      }}
+                      onChange={(e) => handlePieceSelectChange(e.target.value)}
                     >
-                      <option value="">-- All Pieces in Selected Bale --</option>
+                      <option value="">{selectedBaleFilter === 'all' ? '-- All Pieces in All Bales --' : `-- All Pieces in Bale #${selectedBaleFilter} --`}</option>
                       {(selectedBaleFilter === 'all' ? grnPieces : grnPieces.filter((p) => String(p.baleNo) === String(selectedBaleFilter))).map((pc) => {
-                        const st = pieceInspections[pc.key]?.status || 'OK';
                         const isInspected = Boolean(pieceInspections[pc.key]?.checked);
+                        const st = isInspected ? (pieceInspections[pc.key]?.status || 'OK') : 'Unchecked';
                         return (
                           <option key={pc.key} value={pc.key}>
-                            Bale {pc.baleNo} &middot; Piece {pc.pieceIdx + 1} ({pc.meters}m) &mdash; [{isInspected ? st : 'Unchecked'}]
+                            Bale {pc.baleNo} &middot; Piece {pc.pieceIdx + 1} ({pc.meters}m) &mdash; [{st}]
                           </option>
                         );
                       })}
@@ -937,7 +980,7 @@ export default function QualityCheckForm({
                     <select
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
                       value={inspectionScope}
-                      onChange={(e) => setInspectionScope(e.target.value)}
+                      onChange={(e) => handleInspectionScopeChange(e.target.value)}
                     >
                       <option value="all">Full Shipment Inspection</option>
                       <option value="bale">Bale-Level Focus</option>
@@ -946,11 +989,21 @@ export default function QualityCheckForm({
                   </div>
                 </div>
 
-                {selectedPieceKey && (
-                  <div className="d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
-                    <span className="fs-12 text-secondary">
-                      Showing selected piece: <strong>{selectedPieceKey}</strong>
+                {/* Scope guidance & active filter toolbar */}
+                <div className="d-flex flex-wrap align-items-center justify-content-between mt-2 pt-2 border-top gap-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-white text-secondary border fs-11">
+                      {inspectionScope === 'piece' ? '🔬 Piece-Level Detailed Mode' : (inspectionScope === 'bale' ? '📦 Bale-Level Focus Mode' : '🌐 Full Shipment Inspection')}
                     </span>
+                    <span className="fs-12 text-muted">
+                      {inspectionScope === 'piece'
+                        ? 'All individual pieces expanded with independent width/fold checks.'
+                        : (inspectionScope === 'bale'
+                          ? `Focusing inspection on Bale #${selectedBaleFilter === 'all' ? 'All' : selectedBaleFilter}.`
+                          : 'Shipment-wide inspection. Top fields apply to all pieces.')}
+                    </span>
+                  </div>
+                  {(selectedPieceKey || selectedBaleFilter !== 'all') && (
                     <button
                       type="button"
                       className="btn btn-link btn-sm p-0 text-decoration-none fs-12 fw-semibold"
@@ -960,10 +1013,91 @@ export default function QualityCheckForm({
                         setSelectedBaleFilter('all');
                       }}
                     >
-                      Clear Filter (Show All)
+                      <i className="ti ti-x me-1"></i> Reset Filters (Show All)
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Selected Piece Banner if specific piece active */}
+                {selectedPieceKey && (() => {
+                  const targetPiece = grnPieces.find((p) => p.key === selectedPieceKey);
+                  if (!targetPiece) return null;
+                  const pStatus = pieceInspections[selectedPieceKey]?.status || 'OK';
+                  return (
+                    <div className="mt-2 p-2 bg-white rounded border d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fs-12 text-secondary">Showing piece:</span>
+                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-12 fw-semibold">
+                          Bale {targetPiece.baleNo} &mdash; Piece {targetPiece.pieceIdx + 1} ({targetPiece.meters}m)
+                        </span>
+                        <span className={`badge fs-11 ${
+                          pStatus === 'OK' ? 'bg-success-subtle text-success border border-success-subtle' :
+                          pStatus === 'Reject' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
+                          'bg-warning-subtle text-warning border border-warning-subtle'
+                        }`}>
+                          {pStatus}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm py-0 px-2 fs-11"
+                        onClick={() => setSelectedPieceKey('')}
+                      >
+                        Show All Pieces
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Quick Action Toolbar for displayed pieces */}
+            {grnPieces.length > 0 && (
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 bg-light rounded-2 border mb-3">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="fs-12 fw-semibold text-dark">
+                    {displayedPieces.length} {displayedPieces.length === 1 ? 'Piece' : 'Pieces'} Listed
+                  </span>
+                  {inspectedList.length > 0 && (
+                    <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
+                      {inspectedList.length} Inspected
+                    </span>
+                  )}
+                </div>
+                <div className="d-flex flex-wrap align-items-center gap-1">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm fs-11 py-1 px-2"
+                    onClick={() => handleBatchCheckAll(true)}
+                    title="Check all listed pieces"
+                  >
+                    <i className="ti ti-checks me-1 text-primary"></i> Check All
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary btn-sm fs-11 py-1 px-2"
+                    onClick={handleBatchFillExpected}
+                    title="Auto-fill expected Width and Fold for all listed pieces"
+                  >
+                    <i className="ti ti-bolt me-1"></i> Auto-Fill Expected ({formData.expectedWidth}&quot; / {formData.expectedFold}%)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-success btn-sm fs-11 py-1 px-2"
+                    onClick={() => handleBatchMarkStatus('OK')}
+                    title="Mark checked pieces as OK"
+                  >
+                    <i className="ti ti-check me-1"></i> Mark OK
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-light btn-sm fs-11 py-1 px-2 text-muted border"
+                    onClick={() => handleBatchCheckAll(false)}
+                    title="Uncheck and collapse all pieces"
+                  >
+                    <i className="ti ti-x me-1"></i> Uncheck All
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1005,20 +1139,34 @@ export default function QualityCheckForm({
                           id={`chk-${pc.key}`}
                           checked={isChecked}
                           onChange={(e) => {
+                            const isNowChecked = e.target.checked;
+                            const expW = formData.actualWidth || formData.expectedWidth || '44';
+                            const expF = formData.actualFold || formData.expectedFold || '100';
                             setPieceInspections({
                               ...pieceInspections,
                               [pc.key]: {
                                 ...pieceData,
-                                checked: e.target.checked
+                                actualWidth: (isNowChecked && !pieceData.actualWidth) ? expW : pieceData.actualWidth,
+                                actualFold: (isNowChecked && !pieceData.actualFold) ? expF : pieceData.actualFold,
+                                checked: isNowChecked
                               }
                             });
                           }}
                         />
                         <label
-                          className="form-check-label fw-bold text-dark fs-13 cursor-pointer user-select-none"
+                          className="form-check-label fw-bold text-dark fs-13 cursor-pointer user-select-none d-flex align-items-center gap-2"
                           htmlFor={`chk-${pc.key}`}
                         >
-                          Bale {pc.baleNo} &mdash; Piece {pc.pieceIdx + 1} ({pc.meters}m)
+                          <span>Bale {pc.baleNo} &mdash; Piece {pc.pieceIdx + 1} ({pc.meters}m)</span>
+                          {isChecked && (
+                            <span className={`badge fs-10 ${
+                              pieceData.status === 'OK' ? 'bg-success-subtle text-success border border-success-subtle' :
+                              pieceData.status === 'Reject' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
+                              'bg-warning-subtle text-warning border border-warning-subtle'
+                            }`}>
+                              {pieceData.status}
+                            </span>
+                          )}
                         </label>
                       </div>
 

@@ -28383,6 +28383,13 @@
     const [threadColors, setThreadColors] = (0, import_react14.useState)(() => getStoredThreadBrandColors());
     const [articlesList, setArticlesList] = (0, import_react14.useState)(() => getStoredArticlesList());
     const [customArticleInput, setCustomArticleInput] = (0, import_react14.useState)("");
+    const [showAddArticleModal, setShowAddArticleModal] = (0, import_react14.useState)(false);
+    const [newArticleModalForm, setNewArticleModalForm] = (0, import_react14.useState)({
+      name: "",
+      articleType: "Kurta",
+      icon: "\u{1F458}",
+      description: ""
+    });
     const [masterFabrics, setMasterFabrics] = (0, import_react14.useState)(() => {
       try {
         const stored = getStoredData("raindrop_fabrics_v1", null);
@@ -28413,10 +28420,11 @@
         try {
           const stored = getStoredData("erp_articles_v1", null) || getStoredData("erp_articles_master", null);
           if (Array.isArray(stored) && stored.length > 0) {
-            setArticlesList(stored.map((a, idx) => ({
+            setArticlesList(stored.filter((a) => a && a.active !== false).map((a, idx) => ({
               id: a.id || `ART-${idx + 1}`,
               name: a.name || a.label || `Article ${idx + 1}`,
-              icon: a.icon || a.emoji || "\u{1F455}"
+              icon: a.icon || a.emoji || "\u{1F455}",
+              active: a.active !== false
             })));
           }
         } catch (e) {
@@ -28437,6 +28445,58 @@
         window.removeEventListener("erp_articles_updated", handleArticlesUpdate);
       };
     }, []);
+    const handleSaveNewArticleFromModal = () => {
+      const rawName = (newArticleModalForm.name || "").trim();
+      if (!rawName) {
+        alert("Please enter Article Name.");
+        return;
+      }
+      const formatted = autoCapitalizeWords8(rawName);
+      const existingArticles = getStoredData("erp_articles_v1", []) || [];
+      const isDup = existingArticles.some((a) => (a.name || "").trim().toLowerCase() === formatted.toLowerCase()) || articlesList.some((a) => (a.name || "").trim().toLowerCase() === formatted.toLowerCase());
+      let targetArticle;
+      if (isDup) {
+        targetArticle = existingArticles.find((a) => (a.name || "").trim().toLowerCase() === formatted.toLowerCase()) || articlesList.find((a) => (a.name || "").trim().toLowerCase() === formatted.toLowerCase());
+      } else {
+        const nextSortOrder = existingArticles.length + 1;
+        targetArticle = {
+          id: `ART-${String(nextSortOrder).padStart(3, "0")}`,
+          name: formatted,
+          articleType: newArticleModalForm.articleType || "Other",
+          icon: newArticleModalForm.icon || "\u{1F455}",
+          description: (newArticleModalForm.description || "").trim(),
+          active: true,
+          sortOrder: nextSortOrder,
+          createdBy: "Saksham Garg (Procurement & Quality Manager)",
+          createdDate: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        const updatedList = [...existingArticles, targetArticle];
+        setStoredData("erp_articles_v1", updatedList);
+        try {
+          window.dispatchEvent(new Event("erp_articles_updated"));
+          window.dispatchEvent(new Event("storage"));
+        } catch (e) {
+        }
+        setArticlesList((prev) => [...prev.filter((a) => (a.name || "").toLowerCase() !== formatted.toLowerCase()), targetArticle]);
+      }
+      setFormData((prev) => {
+        const current = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
+        const artName = targetArticle.name;
+        const nextArticles = current.some((a) => String(a).toLowerCase().trim() === String(artName).toLowerCase().trim()) ? current : [...current, artName];
+        const newPerPiece = { ...prev.consumptionPerPiece || {} };
+        if (newPerPiece[artName] === void 0) {
+          newPerPiece[artName] = "";
+        }
+        return {
+          ...prev,
+          stitchingArticles: nextArticles,
+          consumptionPerPiece: newPerPiece
+        };
+      });
+      setShowAddArticleModal(false);
+      setNewArticleModalForm({ name: "", articleType: "Kurta", icon: "\u{1F458}", description: "" });
+      setCustomArticleInput("");
+    };
     const formatWidthTag = (w) => {
       if (w === void 0 || w === null || w === "") return "";
       const clean = String(w).trim().replace(/"/g, "");
@@ -28589,18 +28649,16 @@
         const current = Array.isArray(prev.stitchingArticles) ? prev.stitchingArticles : [];
         const currentPiece = { ...prev.consumptionPerPiece || {} };
         const currentCons = { ...prev.consumptionPer100Pcs || {} };
-        const defaultPiece = prev.threadPerPiece || "";
-        const defaultCons = defaultPiece ? Number(defaultPiece) * 100 : "";
         return {
           ...prev,
           stitchingArticles: current.includes(formatted) ? current : [...current, formatted],
           consumptionPerPiece: {
             ...currentPiece,
-            [formatted]: currentPiece[formatted] !== void 0 && currentPiece[formatted] !== "" ? currentPiece[formatted] : defaultPiece
+            [formatted]: currentPiece[formatted] !== void 0 ? currentPiece[formatted] : ""
           },
           consumptionPer100Pcs: {
             ...currentCons,
-            [formatted]: currentCons[formatted] !== void 0 && currentCons[formatted] !== "" ? currentCons[formatted] : defaultCons
+            [formatted]: currentCons[formatted] !== void 0 ? currentCons[formatted] : ""
           }
         };
       });
@@ -29403,16 +29461,15 @@
               const newPerPiece = { ...formData.consumptionPerPiece || {} };
               const new100 = { ...formData.consumptionPer100Pcs || {} };
               allNames.forEach((name) => {
-                const val = newPerPiece[name] !== void 0 ? newPerPiece[name] : formData.threadPerPiece || "";
-                newPerPiece[name] = val;
-                new100[name] = Number(val) * 100;
+                if (newPerPiece[name] === void 0) {
+                  newPerPiece[name] = "";
+                }
               });
               setFormData((prev) => ({
                 ...prev,
                 stitchingArticles: allNames,
                 consumptionPerPiece: newPerPiece,
-                consumptionPer100Pcs: new100,
-                threadPerPiece: newPerPiece[allNames[0]] || ""
+                consumptionPer100Pcs: new100
               }));
             }
           },
@@ -29454,16 +29511,14 @@
                 }
                 const newPerPiece = { ...formData.consumptionPerPiece || {} };
                 const new100 = { ...formData.consumptionPer100Pcs || {} };
-                if (!newPerPiece[art.name]) {
-                  newPerPiece[art.name] = formData.threadPerPiece || "";
-                  if (newPerPiece[art.name] !== "") new100[art.name] = Number(newPerPiece[art.name]) * 100;
+                if (newPerPiece[art.name] === void 0) {
+                  newPerPiece[art.name] = "";
                 }
                 setFormData((prev) => ({
                   ...prev,
                   stitchingArticles: next,
                   consumptionPerPiece: newPerPiece,
-                  consumptionPer100Pcs: new100,
-                  threadPerPiece: newPerPiece[next[0]] || ""
+                  consumptionPer100Pcs: new100
                 }));
               }
             },
@@ -29471,32 +29526,20 @@
             /* @__PURE__ */ import_react14.default.createElement("span", null, art.name),
             /* @__PURE__ */ import_react14.default.createElement("i", { className: `ti ti-${isSelected ? "check" : "plus"} small` })
           );
-        })), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "input-group input-group-sm", style: { maxWidth: "280px" } }, /* @__PURE__ */ import_react14.default.createElement(
-          "input",
-          {
-            type: "text",
-            className: "form-control",
-            placeholder: "Add custom article (e.g. Gown)",
-            value: customArticleInput,
-            onChange: (e) => setCustomArticleInput(e.target.value),
-            onKeyDown: (e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleAddCustomArticle();
-              }
-            }
-          }
-        ), /* @__PURE__ */ import_react14.default.createElement(
+        })), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react14.default.createElement(
           "button",
           {
             type: "button",
-            className: "btn btn-outline-primary",
-            onClick: handleAddCustomArticle
+            className: "btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 fw-semibold px-3 py-1.5 rounded-3 shadow-2xs",
+            onClick: () => {
+              setNewArticleModalForm({ name: customArticleInput || "", articleType: "Kurta", icon: "\u{1F458}", description: "" });
+              setShowAddArticleModal(true);
+            }
           },
           /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-plus" }),
-          " Add"
-        )), /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, "(Add garment type if not in the list)"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex flex-column gap-2.5" }, (Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0 ? formData.stitchingArticles : ["Kurta"]).map((artName) => {
-          const val = formData.consumptionPerPiece?.[artName] !== void 0 && formData.consumptionPerPiece?.[artName] !== "" ? formData.consumptionPerPiece[artName] : formData.threadPerPiece !== void 0 && formData.threadPerPiece !== "" ? formData.threadPerPiece : formData.consumptionPer100Pcs?.[artName] ? formData.consumptionPer100Pcs[artName] / 100 : "";
+          /* @__PURE__ */ import_react14.default.createElement("span", null, "Add Article")
+        ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, "(Click to add a new garment type to Article Master)"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex flex-column gap-2.5" }, (Array.isArray(formData.stitchingArticles) && formData.stitchingArticles.length > 0 ? formData.stitchingArticles : ["Kurta"]).map((artName) => {
+          const val = formData.consumptionPerPiece?.[artName] !== void 0 && formData.consumptionPerPiece?.[artName] !== null ? String(formData.consumptionPerPiece[artName]) : "";
           return /* @__PURE__ */ import_react14.default.createElement("div", { key: artName, className: "p-3 bg-white rounded-3 border shadow-2xs", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1.5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-bold text-dark small mb-0" }, "qty (in mts) of thread required to stitch 1 ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-primary" }, artName), " article - ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-muted fw-normal" }, "<Enter 60> mts"), " ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), formData.stitchingArticles && formData.stitchingArticles.length > 1 && /* @__PURE__ */ import_react14.default.createElement(
             "button",
             {
@@ -29521,22 +29564,23 @@
           )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "input-group", style: { maxWidth: "280px" } }, /* @__PURE__ */ import_react14.default.createElement(
             "input",
             {
-              type: "number",
-              step: "any",
+              type: "text",
+              inputMode: "decimal",
               className: "form-control fw-bold fs-14",
               placeholder: "e.g. 60",
               value: val,
               onChange: (e) => {
-                const numVal = e.target.value;
+                const numVal = e.target.value.replace(/[^0-9.]/g, "");
                 setFormData((prev) => {
                   const newPerPiece = { ...prev.consumptionPerPiece || {}, [artName]: numVal };
                   const new100 = { ...prev.consumptionPer100Pcs || {} };
                   if (numVal !== "") {
                     new100[artName] = Number(numVal) * 100;
+                  } else {
+                    delete new100[artName];
                   }
                   return {
                     ...prev,
-                    threadPerPiece: artName === "Kurta" || (prev.stitchingArticles || [])[0] === artName ? numVal : prev.threadPerPiece || numVal,
                     consumptionPerPiece: newPerPiece,
                     consumptionPer100Pcs: new100
                   };
@@ -30502,7 +30546,74 @@
         }
       ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "small text-muted font-monospace" }, "Live Swatch Preview: ", threadColorForm.colorCode || "#333333"))))),
       /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-footer border-top py-3 px-4" }, /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "btn btn-theme-close rounded-3 px-4 fw-medium", onClick: () => setThreadColorModal(false) }, "Cancel"), /* @__PURE__ */ import_react14.default.createElement("button", { type: "submit", className: "btn btn-primary fw-semibold" }, "Save Thread Color"))
-    )))));
+    )))), showAddArticleModal && /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15, 23, 42, 0.6)", zIndex: 1070 } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-dialog modal-dialog-centered", style: { maxWidth: "440px" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-content shadow-lg border-0 rounded-4 bg-white overflow-hidden" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center", style: { backgroundColor: "#f8fafc" } }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-2 bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-shirt fs-5" })), /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("h6", { className: "modal-title fw-bold text-dark mb-0" }, "Add New Article"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted fs-11" }, "Register new garment type in Article Master"))), /* @__PURE__ */ import_react14.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn-close",
+        onClick: () => setShowAddArticleModal(false)
+      }
+    )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-body p-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Article Name ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control",
+        placeholder: "e.g. Gown, Kurti, Sherwani",
+        autoFocus: true,
+        value: newArticleModalForm.name,
+        onChange: (e) => setNewArticleModalForm({ ...newArticleModalForm, name: e.target.value }),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleSaveNewArticleFromModal();
+          }
+        }
+      }
+    ), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Article Type / Category"), /* @__PURE__ */ import_react14.default.createElement(
+      "select",
+      {
+        className: "form-select",
+        value: newArticleModalForm.articleType,
+        onChange: (e) => setNewArticleModalForm({ ...newArticleModalForm, articleType: e.target.value })
+      },
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Kurta" }, "Kurta"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Pant" }, "Pant"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Dupatta" }, "Dupatta"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Jacket" }, "Jacket"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Top" }, "Top"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Bottom" }, "Bottom"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Dress" }, "Dress"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Shirt" }, "Shirt"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Set" }, "Set"),
+      /* @__PURE__ */ import_react14.default.createElement("option", { value: "Other" }, "Other")
+    )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-2" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Garment Icon / Emoji"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex flex-wrap gap-2 p-2.5 rounded-3 bg-light border" }, ["\u{1F458}", "\u{1F457}", "\u{1F45A}", "\u{1F454}", "\u{1F9E5}", "\u{1F456}", "\u{1F380}", "\u{1F97B}", "\u{1F455}", "\u{1F9F5}", "\u{1FA73}", "\u{1F9E3}"].map((emoji) => /* @__PURE__ */ import_react14.default.createElement(
+      "button",
+      {
+        key: emoji,
+        type: "button",
+        className: `btn btn-sm p-1 rounded-2 border fs-5 d-flex align-items-center justify-content-center ${newArticleModalForm.icon === emoji ? "btn-primary border-primary shadow-xs" : "btn-white bg-white"}`,
+        style: { width: "38px", height: "38px" },
+        onClick: () => setNewArticleModalForm({ ...newArticleModalForm, icon: emoji })
+      },
+      emoji
+    ))))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "modal-footer border-top py-2.5 px-4 bg-light d-flex justify-content-end gap-2" }, /* @__PURE__ */ import_react14.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-white border px-3",
+        onClick: () => setShowAddArticleModal(false)
+      },
+      "Cancel"
+    ), /* @__PURE__ */ import_react14.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-primary px-3 fw-semibold d-inline-flex align-items-center gap-1.5",
+        onClick: handleSaveNewArticleFromModal
+      },
+      /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-check" }),
+      /* @__PURE__ */ import_react14.default.createElement("span", null, "Save Article")
+    ))))));
   }
 
   // frontend/src/components/Masters/ColorMasterView.jsx
@@ -31691,6 +31802,349 @@
 
   // frontend/src/components/Procurement/PurchaseOrderList.jsx
   var import_react17 = __toESM(require_react());
+
+  // frontend/src/utils/procurementUtils.js
+  function getMetersForPoFromGrn(grn, poId, poItems = []) {
+    if (!grn || !poId) return 0;
+    const targetPoId = String(poId).trim();
+    const linkedPoIds = Array.isArray(grn.linkedPOs) && grn.linkedPOs.length > 0 ? grn.linkedPOs.map(String) : grn.poId ? [String(grn.poId)] : grn.purchaseOrderId ? [String(grn.purchaseOrderId)] : [];
+    const isLinked = linkedPoIds.some(
+      (pid) => pid === targetPoId || targetPoId.includes(pid) || pid.includes(targetPoId)
+    ) || String(grn.poNumber || "").trim() === targetPoId || String(grn.againstPo || "").trim() === targetPoId;
+    if (!isLinked) return 0;
+    const grnTotalMeters = Number(grn.totalMetersEntered) || Number(grn.declaredTotalMeters) || 0;
+    const isMultiPo = Array.isArray(grn.linkedPOs) && grn.linkedPOs.length > 1;
+    if (!isMultiPo) {
+      return grnTotalMeters;
+    }
+    let attributedMeters = 0;
+    let hasExplicitAssignment = false;
+    const bales = grn.bales || [];
+    bales.forEach((b) => {
+      const isMixed = Boolean(
+        b.isMixedFabric || b.fabricItemLabel === "MIXED_FABRIC" || b.fabricName === "Mixed Fabric" || String(b.fabricItemLabel || "").toLowerCase().includes("mixed") || String(b.fabricName || "").toLowerCase().includes("mixed")
+      );
+      const bPo = String(b.poId || "").trim();
+      const bLabel = String(b.fabricItemLabel || b.fabric || b.fabricName || "").trim();
+      const bPoMatch = bLabel.match(/\[(.*?)\]/);
+      const bExtractedPo = bPoMatch ? bPoMatch[1].trim() : "";
+      const isBaleDirectForPo = bPo === targetPoId || bExtractedPo === targetPoId || bLabel.includes(targetPoId);
+      if (Array.isArray(b.pieces) && b.pieces.length > 0) {
+        let baleHadPieceAttribution = false;
+        b.pieces.forEach((p) => {
+          const pLen = typeof p === "object" && p !== null ? Number(p.length !== void 0 ? p.length : p.meters) || 0 : Number(p) || 0;
+          const pPo = typeof p === "object" && p !== null ? String(p.poId || "").trim() : "";
+          const pQuality = typeof p === "object" && p !== null ? String(p.fabricQuality || "").trim() : "";
+          const pMatch = pQuality.match(/\[(.*?)\]/);
+          const pExtractedPo = pMatch ? pMatch[1].trim() : "";
+          const isPieceForThisPo = pPo === targetPoId || pExtractedPo === targetPoId || pQuality.includes(targetPoId);
+          const isPieceForOtherPo = pPo && pPo !== targetPoId || pExtractedPo && pExtractedPo !== targetPoId;
+          if (isPieceForThisPo) {
+            attributedMeters += pLen;
+            hasExplicitAssignment = true;
+            baleHadPieceAttribution = true;
+          } else if (!isMixed && isBaleDirectForPo && !isPieceForOtherPo) {
+            attributedMeters += pLen;
+            hasExplicitAssignment = true;
+            baleHadPieceAttribution = true;
+          } else if (isMixed && !isPieceForOtherPo && Array.isArray(poItems) && poItems.length > 0) {
+            const cleanQ = pQuality.toLowerCase();
+            const matchesPo = poItems.some((it) => {
+              const itFab = String(it.fabricName || it.fabricQuality || "").toLowerCase().trim();
+              return itFab && (cleanQ.includes(itFab) || itFab.includes(cleanQ));
+            });
+            if (matchesPo) {
+              attributedMeters += pLen;
+              hasExplicitAssignment = true;
+              baleHadPieceAttribution = true;
+            }
+          }
+        });
+        if (!baleHadPieceAttribution && isBaleDirectForPo && !isMixed) {
+          attributedMeters += Number(b.totalLength) || 0;
+          hasExplicitAssignment = true;
+        }
+      } else if (isBaleDirectForPo && !isMixed) {
+        attributedMeters += Number(b.totalLength) || 0;
+        hasExplicitAssignment = true;
+      }
+    });
+    if (hasExplicitAssignment && attributedMeters > 0) {
+      return attributedMeters;
+    }
+    if (grn.poAllocations && grn.poAllocations[targetPoId] !== void 0) {
+      return Number(grn.poAllocations[targetPoId]) || 0;
+    }
+    if (Array.isArray(poItems) && poItems.length > 0) {
+      const poFabricNames = poItems.map((it) => String(it.fabricName || it.fabricQuality || "").toLowerCase().trim()).filter(Boolean);
+      let fabricMatchedMeters = 0;
+      let hasFabricMatch = false;
+      bales.forEach((b) => {
+        const bLabel = String(b.fabricItemLabel || b.fabricName || "").toLowerCase();
+        const matches = poFabricNames.some((fn) => bLabel.includes(fn));
+        if (matches) {
+          fabricMatchedMeters += Number(b.totalLength) || 0;
+          hasFabricMatch = true;
+        }
+      });
+      if (hasFabricMatch && fabricMatchedMeters > 0) {
+        return fabricMatchedMeters;
+      }
+    }
+    const count = linkedPoIds.length > 0 ? linkedPoIds.length : 1;
+    return Math.round(grnTotalMeters / count);
+  }
+  function getPoFulfillmentData(po, grns = [], allPurchaseOrders = []) {
+    if (!po) {
+      return {
+        totalOrdered: 0,
+        totalReceived: 0,
+        totalPending: 0,
+        fulfillmentPercent: 0,
+        allPoGrns: [],
+        grnBreakdowns: [],
+        itemFulfillments: []
+      };
+    }
+    const poNumbersToCheck = [
+      po.id,
+      po.poNumber,
+      po.po_number
+    ].filter(Boolean).map(String);
+    const isGrnLinkedToPo = (g) => {
+      if (!g) return false;
+      return poNumbersToCheck.some(
+        (pid) => Array.isArray(g.linkedPOs) && g.linkedPOs.map(String).includes(pid) || String(g.poId || "").trim() === pid || String(g.poNumber || "").trim() === pid || String(g.againstPo || "").trim() === pid || String(g.poRef || "").trim() === pid || String(g.purchaseOrderId || "").trim() === pid || String(g.purchaseOrderNumber || "").trim() === pid
+      );
+    };
+    const allPoGrns = (grns || []).filter(isGrnLinkedToPo);
+    const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    let totalReceived = 0;
+    allPoGrns.forEach((g) => {
+      totalReceived += getMetersForPoFromGrn(g, po.id, po.items);
+    });
+    if (totalReceived === 0 && Number(po.receivedQty) > 0) {
+      totalReceived = Number(po.receivedQty);
+    }
+    const totalPending = Math.max(0, totalOrdered - totalReceived);
+    const fulfillmentPercent = totalOrdered > 0 ? Math.min(100, Math.round(totalReceived / totalOrdered * 100)) : 0;
+    const grnBreakdowns = allPoGrns.map((g) => {
+      const totalShipmentMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+      const metersForThisPo = getMetersForPoFromGrn(g, po.id, po.items);
+      const isConsolidated = Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1;
+      const linkedPoIds = isConsolidated ? g.linkedPOs : [g.poId || po.id].filter(Boolean);
+      const consolidatedBreakdown = linkedPoIds.map((lPoId) => {
+        const matchedPo = (allPurchaseOrders || []).find((p) => String(p.id).trim() === String(lPoId).trim()) || null;
+        const poItemsList = matchedPo?.items || (String(lPoId).trim() === String(po.id).trim() ? po.items : []);
+        const lPoOrdered = poItemsList.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+        const mtrsInThisGrn = getMetersForPoFromGrn(g, lPoId, poItemsList);
+        let lPoTotalReceivedToDate = 0;
+        (grns || []).forEach((otherGrn) => {
+          lPoTotalReceivedToDate += getMetersForPoFromGrn(otherGrn, lPoId, poItemsList);
+        });
+        if (lPoTotalReceivedToDate === 0 && matchedPo && Number(matchedPo.receivedQty) > 0) {
+          lPoTotalReceivedToDate = Number(matchedPo.receivedQty);
+        }
+        const lPoPending = Math.max(0, lPoOrdered - lPoTotalReceivedToDate);
+        return {
+          poId: lPoId,
+          poNumber: matchedPo?.poNumber || lPoId,
+          vendorName: matchedPo?.vendorName || po.vendorName || "",
+          orderedMtrs: lPoOrdered,
+          receivedInThisGrn: mtrsInThisGrn,
+          totalReceivedToDate: lPoTotalReceivedToDate,
+          pendingMtrs: lPoPending,
+          isCurrentPo: String(lPoId).trim() === String(po.id).trim()
+        };
+      });
+      return {
+        grn: g,
+        grnId: g.id,
+        receivedDate: g.receivedDate || g.date || "",
+        status: g.status || "Received",
+        qcStatus: g.qcStatus || "Pending",
+        transporterName: g.transporterName || "",
+        biltyNo: g.biltyNo || "",
+        vehicleNo: g.vehicleNo || "",
+        totalShipmentMeters,
+        metersForThisPo,
+        isConsolidated,
+        linkedPoCount: linkedPoIds.length,
+        consolidatedBreakdown
+      };
+    });
+    const itemFulfillments = calculatePoFabricFulfillment(po, grns);
+    return {
+      totalOrdered,
+      totalReceived,
+      totalPending,
+      fulfillmentPercent,
+      allPoGrns,
+      grnBreakdowns,
+      itemFulfillments
+    };
+  }
+  function isPieceOrBaleMatchForItem(label, poId, item, poItems, itemIdx, targetPoId, isMultiPoGrn) {
+    if (!label && label !== 0) return false;
+    const strLabel = String(label).trim();
+    if (isMultiPoGrn) {
+      const lblPoMatch = strLabel.match(/\[(.*?)\]/);
+      const extractedPo = lblPoMatch ? lblPoMatch[1].trim() : "";
+      const assignedPo = String(poId || extractedPo || "").trim();
+      if (assignedPo && assignedPo !== targetPoId && !targetPoId.includes(assignedPo) && !assignedPo.includes(targetPoId)) {
+        return false;
+      }
+    }
+    if (poItems.length === 1) {
+      return true;
+    }
+    const cleanLabel = strLabel.replace(/\[.*?\]\s*/g, "").toLowerCase().trim();
+    const itFabric = String(item.fabricName || item.fabricQuality || "").toLowerCase().trim();
+    const itColor = String(item.colorName || item.color || "").toLowerCase().trim();
+    const itWidth = String(item.width || "").replace(/"/g, "").trim().toLowerCase();
+    if (!itFabric) return false;
+    const fabricMatches = cleanLabel.includes(itFabric) || itFabric.includes(cleanLabel);
+    if (!fabricMatches) return false;
+    const isGreigeItem = !itColor || itColor.includes("greige") || itColor.includes("no color") || itColor.includes("natural");
+    if (!isGreigeItem) {
+      if (cleanLabel.includes(itColor)) {
+        return true;
+      }
+      const otherItemsWithColors = poItems.filter((other, oIdx) => oIdx !== itemIdx && other.colorName);
+      const matchesAnotherColor = otherItemsWithColors.some(
+        (other) => cleanLabel.includes(String(other.colorName).toLowerCase())
+      );
+      if (matchesAnotherColor) {
+        return false;
+      }
+    } else {
+      const otherDyedItems = poItems.filter(
+        (other, oIdx) => oIdx !== itemIdx && other.colorName && !String(other.colorName).toLowerCase().includes("greige")
+      );
+      const matchesOtherDyed = otherDyedItems.some(
+        (other) => cleanLabel.includes(String(other.colorName).toLowerCase())
+      );
+      if (matchesOtherDyed) {
+        return false;
+      }
+    }
+    if (itWidth && cleanLabel.includes('"')) {
+      const labelWidthMatch = cleanLabel.match(/(\d+)\s*"/);
+      if (labelWidthMatch && labelWidthMatch[1] !== itWidth) {
+        const hasOtherWidthMatch = poItems.some(
+          (other, oIdx) => oIdx !== itemIdx && String(other.width).replace(/"/g, "").trim() === labelWidthMatch[1]
+        );
+        if (hasOtherWidthMatch) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  function calculatePoFabricFulfillment(po, grns = []) {
+    if (!po || !po.items || !Array.isArray(po.items) || po.items.length === 0) {
+      return [];
+    }
+    const targetPoId = String(po.id || "").trim();
+    const poGrns = (grns || []).filter(
+      (g) => g && (Array.isArray(g.linkedPOs) && g.linkedPOs.map(String).includes(targetPoId) || String(g.poId || "").trim() === targetPoId || String(g.poNumber || "").trim() === targetPoId || String(g.againstPo || "").trim() === targetPoId)
+    );
+    const totalOrdered = po.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    return po.items.map((item, idx) => {
+      const fName = item.fabricName || item.fabricQuality || `Fabric Quality ${idx + 1}`;
+      const colorName = item.colorName || item.color || "";
+      const width = item.width || "";
+      const ordered = Number(item.quantity) || 0;
+      let received = 0;
+      poGrns.forEach((g) => {
+        const gBales = g.bales || [];
+        let grnItemMeters = 0;
+        let matchedAnyPieceOrBale = false;
+        const isMultiPo = Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1;
+        const hasConfiguredBales = gBales.some(
+          (b) => Array.isArray(b.pieces) && b.pieces.length > 0 || Number(b.totalLength) > 0
+        );
+        if (hasConfiguredBales) {
+          gBales.forEach((b) => {
+            const isMixed = Boolean(
+              b.isMixedFabric || b.fabricItemLabel === "MIXED_FABRIC" || b.fabricName === "Mixed Fabric" || String(b.fabricItemLabel || "").toLowerCase().includes("mixed") || String(b.fabricName || "").toLowerCase().includes("mixed")
+            );
+            if (isMixed && Array.isArray(b.pieces) && b.pieces.length > 0) {
+              b.pieces.forEach((p) => {
+                const pLen = typeof p === "object" && p !== null ? Number(p.length !== void 0 ? p.length : p.meters) || 0 : Number(p) || 0;
+                const pQuality = typeof p === "object" && p !== null ? String(p.fabricQuality || "") : "";
+                const pPo = typeof p === "object" && p !== null ? String(p.poId || "") : b.poId || "";
+                if (isPieceOrBaleMatchForItem(pQuality, pPo, item, po.items, idx, targetPoId, isMultiPo)) {
+                  grnItemMeters += pLen;
+                  matchedAnyPieceOrBale = true;
+                }
+              });
+            } else {
+              const bLbl = String(b.fabricItemLabel || b.fabric || b.fabricName || "");
+              const bPo = String(b.poId || "").trim();
+              if (isPieceOrBaleMatchForItem(bLbl, bPo, item, po.items, idx, targetPoId, isMultiPo)) {
+                let bLen = 0;
+                if (Array.isArray(b.pieces) && b.pieces.length > 0) {
+                  bLen = b.pieces.reduce((s, p) => {
+                    const val = typeof p === "object" && p !== null ? p.length !== void 0 ? p.length : p.meters : p;
+                    return s + (Number(val) || 0);
+                  }, 0);
+                }
+                if (bLen === 0 && Number(b.totalLength) > 0) {
+                  bLen = Number(b.totalLength);
+                }
+                grnItemMeters += bLen;
+                matchedAnyPieceOrBale = true;
+              }
+            }
+          });
+          if (matchedAnyPieceOrBale) {
+            received += grnItemMeters;
+          }
+        } else {
+          const gMetersForPo = getMetersForPoFromGrn(g, targetPoId, po.items);
+          if (po.items.length === 1) {
+            received += gMetersForPo;
+          } else if (gMetersForPo > 0 && totalOrdered > 0) {
+            const gFabric = String(g.fabricName || "").toLowerCase();
+            const itLbl = fName.toLowerCase();
+            if (gFabric && (gFabric.includes(itLbl) || itLbl.includes(gFabric))) {
+              received += gMetersForPo;
+            } else {
+              received += Math.round(gMetersForPo * ordered / totalOrdered);
+            }
+          }
+        }
+      });
+      if (poGrns.length === 0 && received === 0 && Number(po.receivedQty) > 0 && totalOrdered > 0) {
+        if (po.items.length === 1) {
+          received = Number(po.receivedQty);
+        } else {
+          received = Math.round(Number(po.receivedQty) * ordered / totalOrdered);
+        }
+      }
+      const pending = Math.max(0, ordered - received);
+      const excess = Math.max(0, received - ordered);
+      const isComplete = ordered > 0 && received >= ordered;
+      const isPartial = received > 0 && received < ordered;
+      const fulfillmentPercent = ordered > 0 ? Math.min(100, Math.round(received / ordered * 100)) : 0;
+      return {
+        index: idx,
+        fabricName: fName,
+        colorName,
+        width,
+        ordered,
+        received,
+        pending,
+        excess,
+        isComplete,
+        isPartial,
+        fulfillmentPercent
+      };
+    });
+  }
+
+  // frontend/src/components/Procurement/PurchaseOrderList.jsx
   function PurchaseOrderList({
     purchaseOrders = [],
     vendors = [],
@@ -31826,7 +32280,7 @@
       const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
       const poGrns = (grns || []).filter((g) => g.linkedPOs && g.linkedPOs.includes(po.id) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
       const hasExistingGrn = poGrns.length > 0 || Number(po.receivedQty) > 0 || po.status === "Partially Received" || po.status === "Completed";
-      const receivedMeters = poGrns.reduce((sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0) || Number(po.receivedQty) || 0;
+      const receivedMeters = poGrns.reduce((sum, g) => sum + getMetersForPoFromGrn(g, po.id, po.items), 0) || Number(po.receivedQty) || 0;
       const pendingMeters = Math.max(0, totalOrdered - receivedMeters);
       return /* @__PURE__ */ import_react17.default.createElement(
         "tr",
@@ -32067,6 +32521,7 @@
     const [isEditing, setIsEditing] = (0, import_react18.useState)(isInline);
     const [activeSection, setActiveSection] = (0, import_react18.useState)(isInline ? "all" : "none");
     const [isCreatingNew, setIsCreatingNew] = (0, import_react18.useState)(isInline);
+    const [isModalEditMode, setIsModalEditMode] = (0, import_react18.useState)(isInline);
     import_react18.default.useEffect(() => {
       if (vendors && vendors.length > 0) {
         setVendorList(vendors);
@@ -32148,10 +32603,11 @@
       setFormErrors({});
       setIsCreatingNew(true);
       setIsEditing(true);
+      setIsModalEditMode(true);
       setActiveSection("all");
       setSelectedVendor(null);
     };
-    const handleSelectVendor = (vendor) => {
+    const handleSelectVendor = (vendor, editDirectly = false) => {
       setSelectedVendor(vendor);
       const standardOptions = STANDARD_VENDOR_TYPES.filter((t) => t !== "Other");
       const isStandard = standardOptions.includes(vendor.type);
@@ -32160,9 +32616,19 @@
         type: isStandard ? vendor.type : vendor.type ? "Other" : "",
         customType: isStandard ? "" : vendor.type || ""
       });
+      setFormErrors({});
       setIsCreatingNew(false);
-      setIsEditing(true);
+      setIsEditing(editDirectly);
+      setIsModalEditMode(editDirectly);
       setActiveSection("all");
+    };
+    const handleCloseModal = () => {
+      setSelectedVendor(null);
+      setIsCreatingNew(false);
+      setIsEditing(false);
+      setIsModalEditMode(false);
+      setFormErrors({});
+      if (isInline && onCloseInline) onCloseInline(null);
     };
     const capitalizeWords = (str) => {
       return str.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -32209,6 +32675,7 @@
       setSelectedVendor(null);
       setIsEditing(false);
       setIsCreatingNew(false);
+      setIsModalEditMode(false);
       if (onSaveVendor) {
         onSaveVendor(updatedVendor);
       }
@@ -32225,6 +32692,7 @@
         setSelectedVendor(null);
         setIsEditing(false);
         setIsCreatingNew(false);
+        setIsModalEditMode(false);
       }
       try {
         localStorage.setItem("raindrop_vendors_v1", JSON.stringify(updated));
@@ -32318,7 +32786,7 @@
         {
           key: v.id,
           className: `cursor-pointer ${isSelected ? "table-primary" : ""}`,
-          onClick: () => handleSelectVendor(v)
+          onClick: () => handleSelectVendor(v, false)
         },
         /* @__PURE__ */ import_react18.default.createElement("td", { className: "fw-medium text-dark" }, v.name),
         /* @__PURE__ */ import_react18.default.createElement("td", null, /* @__PURE__ */ import_react18.default.createElement("span", { className: "badge bg-light text-secondary border" }, v.type)),
@@ -32338,7 +32806,10 @@
             type: "button",
             className: "btn btn-sm btn-light text-primary p-1.5 rounded-2 me-1",
             title: "Edit Vendor",
-            onClick: () => handleSelectVendor(v)
+            onClick: (e) => {
+              e.stopPropagation();
+              handleSelectVendor(v, true);
+            }
           },
           /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit fs-5" })
         ), /* @__PURE__ */ import_react18.default.createElement(
@@ -32352,54 +32823,79 @@
           /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-trash fs-5" })
         ))
       );
-    }), filteredVendors.length === 0 && /* @__PURE__ */ import_react18.default.createElement("tr", null, /* @__PURE__ */ import_react18.default.createElement("td", { colSpan: 7, className: "text-center py-4 text-muted" }, "No vendors found matching criteria."))))))), (selectedVendor || isCreatingNew) && /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal-dialog modal-dialog-centered modal-lg" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 p-4 bg-white" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "badge bg-primary-subtle text-primary p-2 rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-building fs-5" })), /* @__PURE__ */ import_react18.default.createElement("div", null, /* @__PURE__ */ import_react18.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-18" }, isCreatingNew ? "Create New Vendor" : formData.name || "Vendor Details"))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isEditing && /* @__PURE__ */ import_react18.default.createElement(
+    }), filteredVendors.length === 0 && /* @__PURE__ */ import_react18.default.createElement("tr", null, /* @__PURE__ */ import_react18.default.createElement("td", { colSpan: 7, className: "text-center py-4 text-muted" }, "No vendors found matching criteria."))))))), (selectedVendor || isCreatingNew) && /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal-dialog modal-dialog-centered modal-lg" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 p-4 bg-white" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "badge bg-primary-subtle text-primary p-2 rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-building fs-5" })), /* @__PURE__ */ import_react18.default.createElement("div", null, /* @__PURE__ */ import_react18.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-18" }, isCreatingNew ? "Create New Vendor" : isModalEditMode ? `Edit Vendor: ${formData.name || ""}` : formData.name || "Vendor Details"))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isCreatingNew && (!isModalEditMode ? /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-outline-primary btn-sm px-3 d-flex align-items-center gap-1 rounded-3",
+        className: "btn btn-outline-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5",
         onClick: () => {
+          setIsModalEditMode(true);
           setIsEditing(true);
           setActiveSection("all");
         }
       },
-      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit fs-14" }),
-      /* @__PURE__ */ import_react18.default.createElement("span", null, "Edit All")
-    ), /* @__PURE__ */ import_react18.default.createElement(
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit" }),
+      /* @__PURE__ */ import_react18.default.createElement("span", null, "Edit")
+    ) : /* @__PURE__ */ import_react18.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-light border text-secondary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5",
+        onClick: () => {
+          if (selectedVendor) {
+            const standardOptions = STANDARD_VENDOR_TYPES.filter((t) => t !== "Other");
+            const isStandard = standardOptions.includes(selectedVendor.type);
+            setFormData({
+              ...selectedVendor,
+              type: isStandard ? selectedVendor.type : selectedVendor.type ? "Other" : "",
+              customType: isStandard ? "" : selectedVendor.type || ""
+            });
+          }
+          setFormErrors({});
+          setIsModalEditMode(false);
+          setIsEditing(false);
+        }
+      },
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-eye" }),
+      /* @__PURE__ */ import_react18.default.createElement("span", null, "View Mode")
+    )), /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
         className: "btn-close ms-2",
-        onClick: () => {
-          setSelectedVendor(null);
-          setIsCreatingNew(false);
-          setIsEditing(false);
-          if (isInline && onCloseInline) onCloseInline(null);
-        }
+        onClick: handleCloseModal
       }
-    ))), /* @__PURE__ */ import_react18.default.createElement("form", { onSubmit: handleSave }, /* @__PURE__ */ import_react18.default.createElement("div", { style: { maxHeight: "calc(80vh - 140px)", overflowY: "auto", paddingRight: "4px" } }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "1. Basic Information"), !isEditing && /* @__PURE__ */ import_react18.default.createElement(
+    ))), /* @__PURE__ */ import_react18.default.createElement("form", { onSubmit: handleSave }, /* @__PURE__ */ import_react18.default.createElement("div", { style: { maxHeight: "calc(80vh - 140px)", overflowY: "auto", paddingRight: "4px" } }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "1. Basic Information"), !isModalEditMode && /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none",
+        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold",
         onClick: () => {
+          setIsModalEditMode(true);
           setIsEditing(true);
-          setActiveSection("basic");
+          setActiveSection("all");
         }
       },
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit me-1" }),
       "Edit"
-    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Name *"), isEditing && (activeSection === "all" || activeSection === "basic") ? /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Name *"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         required: true,
-        className: `form-control form-control-sm bg-white ${formErrors.name ? "is-invalid" : ""}`,
-        value: formData.name,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: `form-control form-control-sm ${formErrors.name ? "is-invalid" : ""}`,
+        placeholder: "e.g. Sahil Textile Mill",
+        value: formData.name || "",
         onChange: (e) => handleTextChange("name", e.target.value, true)
       }
-    ), /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "fw-semibold text-dark fs-14" }, formData.name || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Type *"), isEditing && (activeSection === "all" || activeSection === "basic") ? /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(
+    ), isModalEditMode && /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word"), formErrors.name && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.name)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Type *"), /* @__PURE__ */ import_react18.default.createElement(
       "select",
       {
-        className: `form-select form-select-sm bg-white ${formErrors.type ? "is-invalid" : ""}`,
+        className: `form-select form-select-sm ${formErrors.type ? "is-invalid" : ""}`,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
         value: formData.type || "",
         onChange: (e) => {
           const val = e.target.value;
@@ -32419,158 +32915,228 @@
       "input",
       {
         type: "text",
-        className: `form-control form-control-sm bg-white ${formErrors.type ? "is-invalid" : ""}`,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: `form-control form-control-sm ${formErrors.type ? "is-invalid" : ""}`,
         placeholder: "Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)",
         value: formData.customType || "",
         onChange: (e) => handleTextChange("customType", e.target.value, true),
-        autoFocus: true
+        autoFocus: isModalEditMode
       }
-    )), formErrors.type && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.type)) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-secondary fs-13" }, formData.type || "\u2014")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Rating (1-5 \u2605)"), isEditing && (activeSection === "all" || activeSection === "basic") ? /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center gap-1 cursor-pointer text-warning fs-18" }, [1, 2, 3, 4, 5].map((star) => /* @__PURE__ */ import_react18.default.createElement(
-      "span",
+    )), formErrors.type && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.type)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Rating (1-5 \u2605)"), /* @__PURE__ */ import_react18.default.createElement(
+      "div",
       {
-        key: star,
-        onClick: () => setFormData({ ...formData, rating: star })
+        className: "d-flex align-items-center gap-1 text-warning fs-18",
+        style: {
+          cursor: isModalEditMode ? "pointer" : "default",
+          pointerEvents: isModalEditMode ? "auto" : "none"
+        }
       },
-      star <= formData.rating ? "\u2605" : "\u2606"
-    ))) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-warning fs-14" }, "\u2605".repeat(formData.rating || 5))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12 mt-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-check form-switch" }, /* @__PURE__ */ import_react18.default.createElement(
+      [1, 2, 3, 4, 5].map((star) => /* @__PURE__ */ import_react18.default.createElement(
+        "span",
+        {
+          key: star,
+          onClick: () => isModalEditMode && setFormData({ ...formData, rating: star })
+        },
+        star <= (formData.rating || 5) ? "\u2605" : "\u2606"
+      ))
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12 mt-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-check form-switch" }, /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         className: "form-check-input",
         type: "checkbox",
         id: "activeToggle",
-        disabled: !isEditing,
+        disabled: !isModalEditMode,
+        style: { cursor: isModalEditMode ? "pointer" : "default" },
         checked: formData.active,
         onChange: (e) => setFormData({ ...formData, active: e.target.checked })
       }
-    ), /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-check-label fs-12 fw-semibold", htmlFor: "activeToggle" }, "Active Vendor (Available for new POs/GRNs)"))))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "2. Contact & Address"), !isEditing && /* @__PURE__ */ import_react18.default.createElement(
+    ), /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-check-label fs-12 fw-semibold", htmlFor: "activeToggle" }, "Active Vendor (Available for new POs/GRNs)"))))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "2. Contact & Address"), !isModalEditMode && /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none",
+        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold",
         onClick: () => {
+          setIsModalEditMode(true);
           setIsEditing(true);
-          setActiveSection("contact");
+          setActiveSection("all");
         }
       },
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit me-1" }),
       "Edit"
-    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Phone Number"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Phone Number"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         maxLength: "10",
         placeholder: "e.g. 9876543210",
-        className: "form-control form-control-sm bg-white",
-        value: formData.phone,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: `form-control form-control-sm ${formErrors.phone ? "is-invalid" : ""}`,
+        value: formData.phone || "",
         onChange: (e) => handleTextChange("phone", e.target.value.replace(/\D/g, ""))
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.phone || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Contact Person"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    ), formErrors.phone && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.phone)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Contact Person"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         placeholder: "e.g. Rajesh Shah",
-        className: "form-control form-control-sm bg-white",
-        value: formData.contactPerson,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm",
+        value: formData.contactPerson || "",
         onChange: (e) => handleTextChange("contactPerson", e.target.value, true)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.contactPerson || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Email"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Email"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "email",
         placeholder: "e.g. contact@supplier.com",
-        className: "form-control form-control-sm bg-white",
-        value: formData.email,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: `form-control form-control-sm ${formErrors.email ? "is-invalid" : ""}`,
+        value: formData.email || "",
         onChange: (e) => handleTextChange("email", e.target.value)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.email || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Address"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    ), formErrors.email && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.email)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Address"), /* @__PURE__ */ import_react18.default.createElement(
       "textarea",
       {
         rows: "2",
         placeholder: "e.g. Plot No. 42, GIDC Industrial Estate",
-        className: "form-control form-control-sm bg-white fs-12",
-        value: formData.address,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm fs-12",
+        value: formData.address || "",
         onChange: (e) => handleTextChange("address", e.target.value)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-secondary fs-13" }, formData.address || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "City"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "City"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         placeholder: "e.g. Surat",
-        className: "form-control form-control-sm bg-white",
-        value: formData.city,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm",
+        value: formData.city || "",
         onChange: (e) => handleTextChange("city", e.target.value, true)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.city || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "State"), isEditing && (activeSection === "all" || activeSection === "contact") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "State"), /* @__PURE__ */ import_react18.default.createElement(
       "select",
       {
-        className: "form-select form-select-sm bg-white",
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-select form-select-sm",
         value: formData.state || "",
         onChange: (e) => handleTextChange("state", e.target.value)
       },
       /* @__PURE__ */ import_react18.default.createElement("option", { value: "" }, "Select State"),
       INDIAN_STATES2.map((st) => /* @__PURE__ */ import_react18.default.createElement("option", { key: st, value: st }, st))
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.state || "-")))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "3. GSTIN & Banking Details"), !isEditing && /* @__PURE__ */ import_react18.default.createElement(
+    )))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "mb-4 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react18.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase tracking-wider" }, "3. GSTIN & Banking Details"), !isModalEditMode && /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none",
+        className: "btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-semibold",
         onClick: () => {
+          setIsModalEditMode(true);
           setIsEditing(true);
-          setActiveSection("tax");
+          setActiveSection("all");
         }
       },
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit me-1" }),
       "Edit"
-    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "GSTIN (15 characters)"), isEditing && (activeSection === "all" || activeSection === "tax") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "GSTIN (15 characters)"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         maxLength: "15",
         placeholder: "e.g. 24AFQPA0986G1ZA",
-        className: `form-control form-control-sm bg-white font-monospace text-uppercase ${formErrors.gstin ? "is-invalid" : ""}`,
-        value: formData.gstin,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: `form-control form-control-sm font-monospace text-uppercase ${formErrors.gstin ? "is-invalid" : ""}`,
+        value: formData.gstin || "",
         onChange: (e) => handleTextChange("gstin", e.target.value.toUpperCase())
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "font-monospace fw-bold text-dark fs-13" }, formData.gstin || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Bank Name"), isEditing && (activeSection === "all" || activeSection === "tax") ? /* @__PURE__ */ import_react18.default.createElement(
+    ), formErrors.gstin && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.gstin)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Bank Name"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         placeholder: "e.g. HDFC Bank",
-        className: "form-control form-control-sm bg-white",
-        value: formData.bankName,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm",
+        value: formData.bankName || "",
         onChange: (e) => handleTextChange("bankName", e.target.value, true)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "text-dark fs-13" }, formData.bankName || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Account Number"), isEditing && (activeSection === "all" || activeSection === "tax") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Account Number"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         placeholder: "e.g. 50200012345678",
-        className: "form-control form-control-sm bg-white font-monospace",
-        value: formData.accountNumber,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm font-monospace",
+        value: formData.accountNumber || "",
         onChange: (e) => handleTextChange("accountNumber", e.target.value)
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "font-monospace text-dark fs-13" }, formData.accountNumber || "-")), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "IFSC Code"), isEditing && (activeSection === "all" || activeSection === "tax") ? /* @__PURE__ */ import_react18.default.createElement(
+    )), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "IFSC Code"), /* @__PURE__ */ import_react18.default.createElement(
       "input",
       {
         type: "text",
         maxLength: "11",
         placeholder: "e.g. HDFC0001234",
-        className: "form-control form-control-sm bg-white font-monospace text-uppercase",
-        value: formData.ifscCode,
+        disabled: !isModalEditMode,
+        style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
+        className: "form-control form-control-sm font-monospace text-uppercase",
+        value: formData.ifscCode || "",
         onChange: (e) => handleTextChange("ifscCode", e.target.value.toUpperCase())
       }
-    ) : /* @__PURE__ */ import_react18.default.createElement("div", { className: "font-monospace text-dark fs-13" }, formData.ifscCode || "-"))))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3" }, /* @__PURE__ */ import_react18.default.createElement(
+    ))))), /* @__PURE__ */ import_react18.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3" }, !isModalEditMode ? /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-light px-4 rounded-3",
+        onClick: handleCloseModal
+      },
+      "Close"
+    ), /* @__PURE__ */ import_react18.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary rounded-3 px-4 fw-semibold d-flex align-items-center gap-1.5",
+        onClick: () => {
+          setIsModalEditMode(true);
+          setIsEditing(true);
+          setActiveSection("all");
+        }
+      },
+      /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-edit me-1" }),
+      " Edit Vendor"
+    )) : /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(
       "button",
       {
         type: "button",
         className: "btn btn-light px-4 rounded-3",
         onClick: () => {
-          setSelectedVendor(null);
-          setIsCreatingNew(false);
-          setIsEditing(false);
-          if (isInline && onCloseInline) onCloseInline(null);
+          if (isCreatingNew) {
+            handleCloseModal();
+          } else {
+            if (selectedVendor) {
+              const standardOptions = STANDARD_VENDOR_TYPES.filter((t) => t !== "Other");
+              const isStandard = standardOptions.includes(selectedVendor.type);
+              setFormData({
+                ...selectedVendor,
+                type: isStandard ? selectedVendor.type : selectedVendor.type ? "Other" : "",
+                customType: isStandard ? "" : selectedVendor.type || ""
+              });
+            }
+            setFormErrors({});
+            setIsModalEditMode(false);
+            setIsEditing(false);
+          }
         }
       },
-      isEditing ? "Cancel" : "Close"
-    ), isEditing && /* @__PURE__ */ import_react18.default.createElement("button", { type: "submit", className: "btn btn-primary px-4 fw-semibold rounded-3 shadow-sm" }, /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-check me-1" }), " Save Vendor"))))))));
+      "Cancel"
+    ), /* @__PURE__ */ import_react18.default.createElement("button", { type: "submit", className: "btn btn-primary px-4 fw-semibold rounded-3 shadow-sm" }, /* @__PURE__ */ import_react18.default.createElement("i", { className: "ti ti-check me-1" }), " Save Vendor")))))))));
   }
 
   // frontend/src/components/Procurement/PurchaseOrderForm.jsx
@@ -33082,6 +33648,7 @@
   };
   function PurchaseOrderForm({
     po,
+    purchaseOrders = [],
     vendors = [],
     fabrics = [],
     colors = [],
@@ -33217,13 +33784,18 @@
       linkedGrn || allPoGrns.length > 0 || /partially|received|completed/i.test(currentStatus) || Number(po?.receivedQty) > 0 || Number(formData?.receivedQty) > 0
     );
     const isPoLocked = Boolean(hasGrnStarted || isSentOrBeyond && hasGrnStarted);
-    const totalOrderedMtrs = (formData.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
-    const totalQuantityReceived = allPoGrns.reduce(
-      (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
-      0
-    ) || Number(po?.receivedQty) || Number(formData?.receivedQty) || 0;
-    const pendingQuantityToReceive = Math.max(0, totalOrderedMtrs - totalQuantityReceived);
-    const fulfillmentPercent = totalOrderedMtrs > 0 ? Math.min(100, Math.round(totalQuantityReceived / totalOrderedMtrs * 100)) : 0;
+    const currentPoId = po?.id || formData?.id;
+    const fulfillmentData = getPoFulfillmentData(
+      { ...formData, id: currentPoId, receivedQty: po?.receivedQty || formData?.receivedQty },
+      grns,
+      purchaseOrders
+    );
+    const totalOrderedMtrs = fulfillmentData.totalOrdered || (formData.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const totalQuantityReceived = fulfillmentData.totalReceived;
+    const pendingQuantityToReceive = fulfillmentData.totalPending;
+    const fulfillmentPercent = fulfillmentData.fulfillmentPercent;
+    const grnBreakdowns = fulfillmentData.grnBreakdowns || [];
+    const itemFulfillments = fulfillmentData.itemFulfillments || [];
     const numGrnsCreated = allPoGrns.length;
     const findQcForGrn = (g) => {
       if (!g) return null;
@@ -33232,10 +33804,10 @@
       );
     };
     const quantityPendingInQC = allPoGrns.reduce((sum, g) => {
-      const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+      const gMetersThisPo = getMetersForPoFromGrn(g, currentPoId, formData.items);
       const qc = findQcForGrn(g);
       const isDone = qc && (["Passed", "Passed with Deviation", "Rejected", "Approved"].includes(qc.qcStatus) || ["Passed", "Passed with Deviation", "Rejected", "Approved"].includes(qc.status) || Boolean(qc.adminDecision));
-      return isDone ? sum : sum + gMeters;
+      return isDone ? sum : sum + gMetersThisPo;
     }, 0);
     const quantityPassedQC = Math.max(0, totalQuantityReceived - quantityPendingInQC);
     let qcCompletionStatus = "Not Started";
@@ -33266,6 +33838,7 @@
         (it) => (it.fabricType || "Process") === "Process"
       );
     }, [formData.items]);
+    const showDeliveryColumns = allPoGrns.length > 0;
     (0, import_react19.useEffect)(() => {
       if (po && po.id) {
         setFormData({
@@ -33645,13 +34218,15 @@
       /* @__PURE__ */ import_react19.default.createElement("span", null, "Print PO")
     ), allPoGrns.length > 0 && allPoGrns.map((g) => {
       const gMeters = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+      const thisPoMtrs = getMetersForPoFromGrn(g, currentPoId, formData.items);
+      const isConsolidated = Array.isArray(g.linkedPOs) && g.linkedPOs.length > 1;
       return /* @__PURE__ */ import_react19.default.createElement(
         "button",
         {
           key: g.id,
           type: "button",
-          className: "btn btn-sm btn-outline-success d-flex align-items-center gap-1.5 px-2.5 py-1.5 rounded-3 fs-12 fw-semibold",
-          title: `GRN ${g.id} (${gMeters.toLocaleString()}m). Click to view.`,
+          className: `btn btn-sm ${isConsolidated ? "btn-outline-primary" : "btn-outline-success"} d-flex align-items-center gap-1.5 px-2.5 py-1.5 rounded-3 fs-12 fw-semibold shadow-xs`,
+          title: isConsolidated ? `Consolidated Shipment (${g.linkedPOs.length} POs): ${thisPoMtrs.toLocaleString()}m received for this PO (Total GRN: ${gMeters.toLocaleString()}m). Click to view.` : `GRN ${g.id} (${gMeters.toLocaleString()}m received for this PO). Click to view.`,
           onClick: () => {
             if (onViewGRN) {
               onViewGRN(g);
@@ -33660,8 +34235,8 @@
             }
           }
         },
-        /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-check fs-14" }),
-        /* @__PURE__ */ import_react19.default.createElement("span", null, g.id, " (", gMeters.toLocaleString(), "m)")
+        /* @__PURE__ */ import_react19.default.createElement("i", { className: isConsolidated ? "ti ti-layers-intersect fs-14 text-primary" : "ti ti-check fs-14 text-success" }),
+        /* @__PURE__ */ import_react19.default.createElement("span", null, isConsolidated ? `${g.id} (${thisPoMtrs.toLocaleString()}m / ${gMeters.toLocaleString()}m)` : `${g.id} (${gMeters.toLocaleString()}m)`)
       );
     }), pendingQuantityToReceive > 0 && formData.status !== "Draft" && formData.status !== "Cancelled" && formData.status !== "Completed" ? onInwardGRN && /* @__PURE__ */ import_react19.default.createElement(
       "button",
@@ -33771,6 +34346,67 @@
         vendors.filter((v) => v.active !== false || v.id === formData.vendorId).map((v) => /* @__PURE__ */ import_react19.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "")),
         formData.vendorId && !vendors.some((v) => v.id === formData.vendorId) && /* @__PURE__ */ import_react19.default.createElement("option", { value: formData.vendorId }, formData.vendorName || formData.vendorId)
       ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "fw-semibold text-dark fs-14" }, formData.vendorName || vendors.find((v) => v.id === formData.vendorId)?.name || "\u2014")))
+    ), isExisting && /* @__PURE__ */ import_react19.default.createElement(
+      "div",
+      {
+        className: "card mb-4 shadow-none",
+        style: {
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "8px",
+          overflow: "hidden"
+        }
+      },
+      /* @__PURE__ */ import_react19.default.createElement(
+        "div",
+        {
+          className: "d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom flex-wrap gap-2",
+          style: { backgroundColor: "#f8fafc" }
+        },
+        /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react19.default.createElement(
+          "span",
+          {
+            className: "d-inline-flex align-items-center justify-content-center rounded-2 bg-primary-subtle text-primary",
+            style: { width: "28px", height: "28px" }
+          },
+          /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-truck-delivery fs-16" })
+        ), /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement(
+          "span",
+          {
+            className: "fw-bold text-secondary text-uppercase d-block",
+            style: { fontSize: "12px", letterSpacing: "0.05em" }
+          },
+          "Delivery & Shipment Tracking"
+        ), /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, "Goods Receipt Notes (GRN), Linked Consolidations & Meter Fulfillment"))),
+        /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, allPoGrns.length === 0 ? /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border px-2.5 py-1 fs-11 fw-medium" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-clock me-1" }), "Awaiting First GRN Delivery") : pendingQuantityToReceive <= 0 ? /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-12 fw-semibold" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-circle-check me-1" }), "100% Fulfilled") : /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-12 fw-semibold" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-clock me-1" }), "Partially Received (", fulfillmentPercent, "%)"))
+      ),
+      /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "row g-2 mb-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "col-6 col-md-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-2.5 rounded-2 bg-light border text-center" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted fs-11 d-block mb-0.5" }, "Total Ordered"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-15 fw-bold text-dark" }, totalOrderedMtrs.toLocaleString(), " ", /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-12 fw-normal text-muted" }, "m")))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "col-6 col-md-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-2.5 rounded-2 border text-center", style: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" } }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-success fs-11 d-block mb-0.5 fw-medium" }, "Received for this PO"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-15 fw-bold text-success" }, totalQuantityReceived.toLocaleString(), " ", /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-12 fw-normal text-success text-opacity-75" }, "m")))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "col-6 col-md-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-2.5 rounded-2 border text-center", style: { backgroundColor: pendingQuantityToReceive > 0 ? "#fff7ed" : "#f8fafc", borderColor: pendingQuantityToReceive > 0 ? "#fed7aa" : "#e2e8f0" } }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-11 d-block mb-0.5 fw-medium", style: { color: pendingQuantityToReceive > 0 ? "#c2410c" : "#64748b" } }, "Pending to Inward"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-15 fw-bold", style: { color: pendingQuantityToReceive > 0 ? "#ea580c" : "#64748b" } }, pendingQuantityToReceive.toLocaleString(), " ", /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-12 fw-normal" }, "m")))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "col-6 col-md-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-2.5 rounded-2 bg-light border text-center" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted fs-11 d-block mb-0.5" }, "Total GRN Inwards"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-15 fw-bold text-primary" }, allPoGrns.length, " ", /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-12 fw-normal text-muted" }, "Shipment", allPoGrns.length !== 1 ? "s" : ""))))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between fs-11 mb-1" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted fw-medium" }, "PO Inward Fulfillment Progress"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold text-dark" }, fulfillmentPercent, "% (", totalQuantityReceived.toLocaleString(), "m / ", totalOrderedMtrs.toLocaleString(), "m)")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "progress", style: { height: "7px", backgroundColor: "#e2e8f0", borderRadius: "4px" } }, /* @__PURE__ */ import_react19.default.createElement(
+        "div",
+        {
+          className: `progress-bar ${fulfillmentPercent >= 100 ? "bg-success" : "bg-primary"}`,
+          style: { width: `${fulfillmentPercent}%`, borderRadius: "4px", transition: "width 0.4s ease" }
+        }
+      ))), grnBreakdowns.length === 0 ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "p-3 text-center text-muted fs-12 bg-light rounded-2 border border-dashed" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-package fs-18 d-block mb-1 text-secondary opacity-50" }), "No inward deliveries have been created yet for this Purchase Order.") : /* @__PURE__ */ import_react19.default.createElement("div", { className: "table-responsive rounded-2 border", style: { borderColor: "#dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("table", { className: "table table-sm align-middle mb-0 fs-12" }, /* @__PURE__ */ import_react19.default.createElement("thead", { style: { backgroundColor: "#f8fafc", borderBottom: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("tr", { style: { color: "#475569", fontSize: "11px", fontWeight: "600", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" } }, "GRN NO."), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" } }, "RECEIVE DATE"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" } }, "SHIPMENT TYPE"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" }, className: "text-center" }, "THIS PO DELIVERED"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" }, className: "text-center" }, "SHIPMENT TOTAL"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" } }, "CONSOLIDATED / LINKED POS BREAKDOWN"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 10px" }, className: "text-center" }, "QC STATUS"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { padding: "7px 8px" }, className: "text-end" }, "ACTION"))), /* @__PURE__ */ import_react19.default.createElement("tbody", null, grnBreakdowns.map((b) => /* @__PURE__ */ import_react19.default.createElement("tr", { key: b.grnId, style: { borderBottom: "1px solid #eef2f6" } }, /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px" } }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold text-primary font-monospace" }, b.grnId)), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-dark" }, b.receivedDate || "\u2014")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px", whiteSpace: "nowrap" } }, b.isConsolidated ? /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-purple-subtle text-purple border border-purple border-opacity-25 px-2 py-0.5 fs-11 d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-layers-intersect" }), "Consolidated (", b.linkedPoCount, " POs)") : /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-0.5 fs-11" }, "Direct Delivery")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold text-success fs-13" }, b.metersForThisPo.toLocaleString(), " ", /* @__PURE__ */ import_react19.default.createElement("span", { className: "fs-10 fw-normal" }, "m"))), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px" }, className: "text-center text-muted fs-12" }, b.totalShipmentMeters.toLocaleString(), " m"), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px" } }, b.isConsolidated ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex flex-wrap gap-1.5 py-0.5" }, b.consolidatedBreakdown.map((c) => /* @__PURE__ */ import_react19.default.createElement(
+        "span",
+        {
+          key: c.poId,
+          className: `badge px-2 py-1 fs-11 border d-inline-flex align-items-center gap-1.5 ${c.isCurrentPo ? "bg-success-subtle text-success border-success border-opacity-25 fw-bold" : "bg-light text-dark border-secondary border-opacity-25"}`,
+          title: `${c.poId}: ${c.receivedInThisGrn.toLocaleString()}m in this shipment. Ordered: ${c.orderedMtrs.toLocaleString()}m, Total Received: ${c.totalReceivedToDate.toLocaleString()}m, Pending: ${c.pendingMtrs.toLocaleString()}m.`
+        },
+        /* @__PURE__ */ import_react19.default.createElement("span", null, c.poId, c.isCurrentPo ? " (This PO)" : "", ":"),
+        /* @__PURE__ */ import_react19.default.createElement("strong", { className: c.isCurrentPo ? "text-success" : "text-primary" }, c.receivedInThisGrn.toLocaleString(), "m"),
+        /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted fw-normal" }, "(", c.pendingMtrs.toLocaleString(), "m bal)")
+      ))) : /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted fs-11" }, "100% allocated to this Purchase Order")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 10px" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: `badge ${b.qcStatus === "Passed" || b.qcStatus === "Approved" ? "bg-success-subtle text-success border border-success border-opacity-25" : b.qcStatus === "Rejected" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : "bg-warning-subtle text-warning border border-warning border-opacity-25"} px-2 py-0.5 fs-11` }, b.qcStatus || "Pending")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { padding: "8px 8px" }, className: "text-end" }, /* @__PURE__ */ import_react19.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-sm btn-outline-primary py-0.5 px-2 fs-11 rounded",
+          onClick: () => {
+            if (onViewGRN) onViewGRN(b.grn);
+          }
+        },
+        "View GRN"
+      ))))))))
     ), /* @__PURE__ */ import_react19.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react19.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Fabric Line Items")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isEditing && /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
@@ -33800,8 +34436,13 @@
           title: "Add new fabric to master"
         },
         "+ New"
-      ))), showColorColumn && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "14%", minWidth: "110px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "COLOR NAME"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border fs-10 px-1 py-0 fw-normal" }, "Opt"))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "11%" : "13%", minWidth: "80px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-start" }, "WIDTH *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "12%" : "13%", minWidth: "85px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "QTY (MTRS) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "11%" : "12%", minWidth: "80px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "RATE (\u20B9) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "8%" : "9%", minWidth: "65px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "FOLD %"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "13%" : "13%", minWidth: "85px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-end" }, "AMOUNT (\u20B9)"), isEditing && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "32px", minWidth: "32px", padding: "8px 2px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }))),
-      /* @__PURE__ */ import_react19.default.createElement("tbody", null, formData.items.map((row) => {
+      ))), showColorColumn && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "14%", minWidth: "110px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "COLOR NAME"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border fs-10 px-1 py-0 fw-normal" }, "Opt"))), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "11%" : "13%", minWidth: "80px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-start" }, "WIDTH *"), showDeliveryColumns ? /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "9%" : "10%", minWidth: "75px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "ORDERED (MTRS)"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "9%" : "10%", minWidth: "75px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap", backgroundColor: "#f0fdf4", color: "#166534" }, className: "text-center" }, "RECEIVED (MTRS)"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "9%" : "10%", minWidth: "75px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap", backgroundColor: "#fff7ed", color: "#c2410c" }, className: "text-center" }, "PENDING (MTRS)")) : /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "12%" : "13%", minWidth: "85px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "QTY (MTRS) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "10%" : "11%", minWidth: "80px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "RATE (\u20B9) *"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "7%" : "8%", minWidth: "60px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "FOLD %"), /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: showColorColumn ? "11%" : "12%", minWidth: "85px", padding: "8px 6px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-end" }, "AMOUNT (\u20B9)"), showDeliveryColumns && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "8%", minWidth: "70px", padding: "8px 4px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }, "STATUS"), isEditing && /* @__PURE__ */ import_react19.default.createElement("th", { style: { width: "32px", minWidth: "32px", padding: "8px 2px", border: "1px solid #dee2e6", verticalAlign: "middle", whiteSpace: "nowrap" }, className: "text-center" }))),
+      /* @__PURE__ */ import_react19.default.createElement("tbody", null, formData.items.map((row, rowIdx) => {
+        const itemFul = (itemFulfillments || []).find((it) => it.index === rowIdx) || null;
+        const orderedMtrs = Number(row.quantity) || 0;
+        const receivedMtrs = itemFul ? itemFul.received : formData.items.length === 1 ? totalQuantityReceived : 0;
+        const pendingMtrs = Math.max(0, orderedMtrs - receivedMtrs);
+        const fulfillmentPct = orderedMtrs > 0 ? Math.min(100, Math.round(receivedMtrs / orderedMtrs * 100)) : 0;
         const currentFabric = fabrics.find(
           (f) => f.id === row.fabricId || f.qualityName && f.qualityName.toLowerCase() === (row.fabricName || "").toLowerCase()
         );
@@ -33908,7 +34549,7 @@
             value: row.width || "",
             onChange: (e) => handleItemChange(row.id, "width", e.target.value)
           }
-        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-start text-dark fs-12" }, row.width ? `${String(row.width).replace(/"/g, "")}"` : "\u2014")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "85px" }, className: "text-center" }, isEditing ? /* @__PURE__ */ import_react19.default.createElement(
+        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-start text-dark fs-12" }, row.width ? `${String(row.width).replace(/"/g, "")}"` : "\u2014")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "75px" }, className: "text-center" }, isEditing && !isPoLocked ? /* @__PURE__ */ import_react19.default.createElement(
           "input",
           {
             type: "number",
@@ -33919,7 +34560,7 @@
             value: row.quantity,
             onChange: (e) => handleItemChange(row.id, "quantity", e.target.value)
           }
-        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center fw-medium text-dark fs-12" }, Number(row.quantity || 0).toLocaleString(), " Mtrs")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "80px" }, className: "text-center" }, isEditing ? /* @__PURE__ */ import_react19.default.createElement(
+        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center fw-medium text-dark fs-12" }, orderedMtrs.toLocaleString(), " Mtrs")), showDeliveryColumns && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "75px", backgroundColor: receivedMtrs > orderedMtrs ? "#fef2f2" : "#f0fdf4" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center fw-bold fs-12", style: { color: receivedMtrs > orderedMtrs ? "#dc2626" : "#166534" } }, receivedMtrs.toLocaleString(), " m", receivedMtrs > orderedMtrs && /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-danger text-white fs-10 d-block mt-0.5", title: `Over-received by ${(receivedMtrs - orderedMtrs).toLocaleString()}m` }, "Over (+", (receivedMtrs - orderedMtrs).toLocaleString(), "m)"))), showDeliveryColumns && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "75px", backgroundColor: "#fff7ed" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center fw-bold text-danger fs-12" }, pendingMtrs.toLocaleString(), " m")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "80px" }, className: "text-center" }, isEditing ? /* @__PURE__ */ import_react19.default.createElement(
           "input",
           {
             type: "number",
@@ -33930,7 +34571,7 @@
             value: row.rate,
             onChange: (e) => handleItemChange(row.id, "rate", e.target.value)
           }
-        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center text-dark fs-12" }, "\u20B9", Number(row.rate || 0).toFixed(2))), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 4px", minWidth: "65px" }, className: "text-center" }, isEditing ? /* @__PURE__ */ import_react19.default.createElement(
+        ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center text-dark fs-12" }, "\u20B9", Number(row.rate || 0).toFixed(2))), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 4px", minWidth: "60px" }, className: "text-center" }, isEditing ? /* @__PURE__ */ import_react19.default.createElement(
           "input",
           {
             type: "number",
@@ -33944,7 +34585,7 @@
         ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-center text-dark fs-12" }, row.fold ? `${row.fold}%` : "\u2014")), /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "85px" }, className: "text-end" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "fw-bold text-dark fs-13" }, "\u20B9", (Number(row.amount) || 0).toLocaleString("en-IN", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
-        }))), isEditing && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 2px", width: "32px", minWidth: "32px" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement(
+        }))), showDeliveryColumns && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 6px", minWidth: "70px" }, className: "text-center" }, pendingMtrs <= 0 && orderedMtrs > 0 ? /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-1.5 py-0.5 fs-10 fw-semibold" }, "Fulfilled") : receivedMtrs > 0 ? /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-1.5 py-0.5 fs-10 fw-semibold" }, fulfillmentPct, "% Inwarded") : /* @__PURE__ */ import_react19.default.createElement("span", { className: "badge bg-light text-muted border px-1.5 py-0.5 fs-10" }, "Pending")), isEditing && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6", padding: "4px 2px", width: "32px", minWidth: "32px" }, className: "text-center" }, /* @__PURE__ */ import_react19.default.createElement(
           "button",
           {
             type: "button",
@@ -33959,11 +34600,11 @@
       /* @__PURE__ */ import_react19.default.createElement("tfoot", { style: { background: "#f8fafc", borderTop: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react19.default.createElement("tr", null, /* @__PURE__ */ import_react19.default.createElement(
         "td",
         {
-          colSpan: showColorColumn ? 7 : 6,
+          colSpan: showDeliveryColumns ? showColorColumn ? 9 : 8 : showColorColumn ? 7 : 6,
           className: "text-end fw-bold text-dark fs-14",
           style: { border: "1px solid #dee2e6", padding: "10px 14px" }
         },
-        "PO Total Amount:"
+        /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between flex-wrap gap-2" }, showDeliveryColumns ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-3 fs-12 fw-medium text-secondary" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "Total Ordered: ", /* @__PURE__ */ import_react19.default.createElement("strong", { className: "text-dark" }, totalOrderedMtrs.toLocaleString(), "m")), /* @__PURE__ */ import_react19.default.createElement("span", null, "Received for this PO: ", /* @__PURE__ */ import_react19.default.createElement("strong", { className: "text-success" }, totalQuantityReceived.toLocaleString(), "m")), /* @__PURE__ */ import_react19.default.createElement("span", null, "Pending to Inward: ", /* @__PURE__ */ import_react19.default.createElement("strong", { className: "text-danger" }, pendingQuantityToReceive.toLocaleString(), "m"))) : /* @__PURE__ */ import_react19.default.createElement("div", null), /* @__PURE__ */ import_react19.default.createElement("span", null, "PO Total Amount:"))
       ), /* @__PURE__ */ import_react19.default.createElement(
         "td",
         {
@@ -33975,7 +34616,7 @@
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         })
-      ), isEditing && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6" } })))
+      ), showDeliveryColumns && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6" } }), isEditing && /* @__PURE__ */ import_react19.default.createElement("td", { style: { border: "1px solid #dee2e6" } })))
     )), !showColorColumn ? /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center justify-content-between mt-1.5 text-muted fs-11 px-1" }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-info-circle text-primary" }), /* @__PURE__ */ import_react19.default.createElement("span", null, 'Color column is hidden for Greige fabric. Select "Process" in Fabric Type to add colors.')), /* @__PURE__ */ import_react19.default.createElement("span", { style: { color: "#94a3b8" } }, "GST will be added per-line based on vendor state")) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-end text-muted fs-11 mt-1.5", style: { color: "#94a3b8" } }, "GST will be added per-line based on vendor state")), /* @__PURE__ */ import_react19.default.createElement(
       "div",
       {
@@ -34431,9 +35072,9 @@
         /* @__PURE__ */ import_react21.default.createElement("td", { className: "py-3 text-center" }, /* @__PURE__ */ import_react21.default.createElement(
           "span",
           {
-            className: `badge rounded-pill px-2.5 py-1 fs-11 ${g.status === "QC Approved" || g.status === "Completed" ? "bg-success-subtle text-success border border-success border-opacity-25" : g.status === "QC Rejected" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : g.status === "Pending Admin Approval" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : "bg-primary-subtle text-primary border border-primary border-opacity-25"}`
+            className: `badge rounded-pill px-2.5 py-1 fs-11 ${g.status === "QC Approved" || g.status === "Completed" ? "bg-success-subtle text-success border border-success border-opacity-25" : g.status === "QC Rejected" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : g.status === "Pending Admin Approval" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : g.status === "Draft" || !g.status ? "bg-secondary-subtle text-secondary border border-secondary border-opacity-25" : "bg-primary-subtle text-primary border border-primary border-opacity-25"}`
           },
-          g.status || "Completed"
+          g.status || "Draft"
         )),
         /* @__PURE__ */ import_react21.default.createElement("td", { className: "pe-4 py-3 text-end text-nowrap", onClick: (e) => e.stopPropagation() }, !isRowInspectionStarted(g) ? /* @__PURE__ */ import_react21.default.createElement("div", { className: "d-inline-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react21.default.createElement(
           "button",
@@ -34556,9 +35197,15 @@
         updatedList = transporterList.map((t) => t.id === dataToSave.id ? dataToSave : t);
       }
       setTransporterList(updatedList);
-      setSelectedTransporter(dataToSave);
+      setSelectedTransporter(null);
       setIsEditing(false);
       setIsCreatingNew(false);
+      try {
+        localStorage.setItem("raindrop_transporters_v1", JSON.stringify(updatedList));
+        window.dispatchEvent(new Event("raindrop_transporters_updated"));
+        window.dispatchEvent(new Event("storage"));
+      } catch (err) {
+      }
       if (onSaveTransporter) {
         onSaveTransporter(dataToSave);
       }
@@ -34760,11 +35407,18 @@
     grns = [],
     onBack,
     onSaveGRN,
-    onSaveTransporter
+    onSaveTransporter,
+    onExitToList
   }) {
     const isExisting = Boolean(
       grn && grn.id && !grn.isNew && (grns || []).some((g) => g && g.id === grn.id)
     );
+    const isBaleMixed = (bale) => {
+      if (!bale) return false;
+      return Boolean(
+        bale.isMixedFabric || bale.fabricItemLabel === "MIXED_FABRIC" || bale.fabricName === "Mixed Fabric" || typeof bale.fabricItemLabel === "string" && bale.fabricItemLabel.toLowerCase().includes("mixed") || typeof bale.fabricName === "string" && bale.fabricName.toLowerCase().includes("mixed")
+      );
+    };
     const getPoVendorName = (po) => {
       if (!po) return "";
       if (po.vendorName && po.vendorName.trim()) return po.vendorName;
@@ -34804,25 +35458,35 @@
       let initialBales = [];
       if (grn?.bales && grn.bales.length > 0) {
         initialBales = grn.bales.map((b, idx) => {
+          const isMixed = Boolean(
+            b.isMixedFabric || b.fabricItemLabel === "MIXED_FABRIC" || b.fabricName === "Mixed Fabric" || typeof b.fabricItemLabel === "string" && b.fabricItemLabel.toLowerCase().includes("mixed") || typeof b.fabricName === "string" && b.fabricName.toLowerCase().includes("mixed")
+          );
           const rawPieces = b.pieces || [];
           const normPieces = rawPieces.map((p, pIdx) => {
             if (typeof p === "object" && p !== null) {
               return {
                 pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-                length: p.length !== void 0 && p.length !== null ? p.length : ""
+                length: p.length !== void 0 && p.length !== null ? p.length : "",
+                fabricQuality: p.fabricQuality || b.fabricItemLabel || ""
               };
             }
             return {
               pieceNo: `Pc ${pIdx + 1}`,
-              length: p !== void 0 && p !== null ? p : ""
+              length: p !== void 0 && p !== null ? p : "",
+              fabricQuality: b.fabricItemLabel || ""
             };
           });
-          const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
+          const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null && b.piecesCount !== 0 && b.piecesCount !== "0" ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
           const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+          const hasCustom = Boolean(b.hasCustomBaleNo || b.baleNo && String(b.baleNo).trim() !== "" && String(b.baleNo).trim() !== String(idx + 1));
+          const baleNoVal = hasCustom ? String(b.baleNo).trim() : "";
           return {
-            baleNo: b.baleNo !== void 0 && b.baleNo !== null ? String(b.baleNo) : "",
+            baleNo: baleNoVal,
+            hasCustomBaleNo: hasCustom,
             itemIdx: b.itemIdx !== void 0 ? Number(b.itemIdx) : 0,
-            fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || "",
+            fabricItemLabel: isMixed ? "MIXED_FABRIC" : b.fabricItemLabel || b.fabric || b.fabricName || "",
+            fabricName: isMixed ? "Mixed Fabric" : b.fabricName || b.fabricItemLabel || "",
+            isMixedFabric: isMixed,
             piecesCount,
             totalLength,
             pieces: normPieces
@@ -34833,6 +35497,7 @@
         for (let i = initialBales.length; i < targetBaleCount; i++) {
           initialBales.push({
             baleNo: "",
+            hasCustomBaleNo: false,
             itemIdx: 0,
             fabricItemLabel: "",
             piecesCount: "",
@@ -34913,10 +35578,13 @@
                   length: p !== void 0 && p !== null ? p : ""
                 };
               });
-              const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
+              const piecesCount = b.piecesCount !== void 0 && b.piecesCount !== "" && b.piecesCount !== null && b.piecesCount !== 0 && b.piecesCount !== "0" ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "";
               const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+              const hasCustom = Boolean(b.hasCustomBaleNo || b.baleNo && String(b.baleNo).trim() !== "" && String(b.baleNo).trim() !== String(idx + 1));
+              const baleNoVal = hasCustom ? String(b.baleNo).trim() : "";
               return {
-                baleNo: b.baleNo !== void 0 && b.baleNo !== null ? String(b.baleNo) : "",
+                baleNo: baleNoVal,
+                hasCustomBaleNo: hasCustom,
                 itemIdx: b.itemIdx !== void 0 ? Number(b.itemIdx) : 0,
                 fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || "",
                 piecesCount,
@@ -34929,6 +35597,7 @@
             for (let i = initialBales.length; i < targetBaleCount; i++) {
               initialBales.push({
                 baleNo: "",
+                hasCustomBaleNo: false,
                 itemIdx: 0,
                 fabricItemLabel: "",
                 piecesCount: "",
@@ -35340,6 +36009,67 @@
     });
     const poItems = allLinkedPoItems.length > 0 ? allLinkedPoItems : currentPO && currentPO.items && currentPO.items.length > 0 ? currentPO.items : [];
     const poItemLabels = poItems.map((it) => it.label || getPoItemLabel(it));
+    const poItemFulfillments = (0, import_react23.useMemo)(() => {
+      const list = [];
+      const targetPOs = linkedPOObjects && linkedPOObjects.length > 0 ? linkedPOObjects : currentPO ? [currentPO] : [];
+      targetPOs.forEach((poObj) => {
+        const pId = String(poObj.id || "").trim();
+        const items = poObj.items || [];
+        const otherGrns = (grns || []).filter((g) => g && g.id !== formData.id);
+        const itemFuls = calculatePoFabricFulfillment(poObj, otherGrns);
+        items.forEach((it, itIdx) => {
+          const ful = itemFuls.find((f) => f.index === itIdx);
+          const ordered = Number(it.quantity) || 0;
+          const prevReceived = ful ? ful.received : 0;
+          const pending = Math.max(0, ordered - prevReceived);
+          const rawLabel = getPoItemLabel(it);
+          const fullLabel = targetPOs.length > 1 ? `[${pId}] ${rawLabel}` : rawLabel;
+          let currentGrnMeters = 0;
+          (formData.bales || []).forEach((b) => {
+            const isMixed = isBaleMixed(b);
+            if (isMixed && Array.isArray(b.pieces) && b.pieces.length > 0) {
+              b.pieces.forEach((p) => {
+                const pLen = Number(typeof p === "object" && p !== null ? p.length !== void 0 ? p.length : p.meters : p) || 0;
+                const pQ = typeof p === "object" && p !== null ? p.fabricQuality || "" : "";
+                const pPo = typeof p === "object" && p !== null ? p.poId || "" : b.poId || "";
+                if (isPieceOrBaleMatchForItem(pQ, pPo, it, items, itIdx, pId, targetPOs.length > 1)) {
+                  currentGrnMeters += pLen;
+                }
+              });
+            } else {
+              const bLbl = b.fabricItemLabel || b.fabricName || "";
+              const bPo = b.poId || "";
+              if (isPieceOrBaleMatchForItem(bLbl, bPo, it, items, itIdx, pId, targetPOs.length > 1)) {
+                const bLen = Array.isArray(b.pieces) && b.pieces.length > 0 ? b.pieces.reduce((s, p) => s + (Number(typeof p === "object" ? p.length !== void 0 ? p.length : p.meters : p) || 0), 0) : Number(b.totalLength) || 0;
+                currentGrnMeters += bLen;
+              }
+            }
+          });
+          currentGrnMeters = Math.round(currentGrnMeters * 100) / 100;
+          const remainingBalance = Math.round((pending - currentGrnMeters) * 100) / 100;
+          const excess = Math.max(0, Math.round((currentGrnMeters - pending) * 100) / 100);
+          const isOver = excess > 0.01;
+          list.push({
+            poId: pId,
+            poNumber: poObj.poNumber || pId,
+            itemIndex: itIdx,
+            fabricName: it.fabricName || it.fabricQuality || "Fabric",
+            colorName: it.colorName || it.color || "",
+            width: it.width || "",
+            label: fullLabel,
+            rawLabel,
+            ordered,
+            prevReceived,
+            pending,
+            currentGrnMeters,
+            remainingBalance,
+            excess,
+            isOver
+          });
+        });
+      });
+      return list;
+    }, [linkedPOObjects, currentPO, grns, formData.id, formData.bales]);
     const masterFabricLabels = [];
     (fabrics || []).forEach((f) => {
       if (!f) return;
@@ -35456,6 +36186,7 @@
           const assignedLabel = poItemLabels.length > 0 ? poItemLabels[i % poItemLabels.length] || poItemLabels[0] : defaultFabricLabel;
           newBales.push({
             baleNo: "",
+            hasCustomBaleNo: false,
             itemIdx: i % (poItemLabels.length || 1),
             fabricItemLabel: assignedLabel,
             isMixedFabric: false,
@@ -35493,6 +36224,7 @@
         updated[baleIdx] = {
           ...updated[baleIdx],
           baleNo: val,
+          hasCustomBaleNo: Boolean(val && val.trim() !== ""),
           isSaved: false
         };
         return { ...prev, bales: updated };
@@ -35502,17 +36234,26 @@
     const handleBaleFabricChange = (baleIdx, newFabricLabel) => {
       setFormData((prev) => {
         const updated = [...prev.bales];
-        const isMixed = newFabricLabel === "MIXED_FABRIC";
+        const isMixed = newFabricLabel === "MIXED_FABRIC" || typeof newFabricLabel === "string" && newFabricLabel.toLowerCase().includes("mixed");
+        const poMatch = String(newFabricLabel || "").match(/^\[(.*?)\]/);
+        const assignedPoId = poMatch ? poMatch[1].trim() : prev.poId || "";
         const curPieces = updated[baleIdx]?.pieces || [];
-        const updatedPieces = curPieces.map((p) => ({
-          ...typeof p === "object" && p !== null ? p : { pieceNo: "Pc 1", length: p },
-          fabricQuality: isMixed ? p.fabricQuality || defaultFabricLabel : newFabricLabel
-        }));
+        const updatedPieces = curPieces.map((p, pIdx) => {
+          const pQuality = isMixed ? p.fabricQuality && p.fabricQuality !== "MIXED_FABRIC" ? p.fabricQuality : poItemLabels[pIdx % (poItemLabels.length || 1)] || poItemLabels[0] || defaultFabricLabel : newFabricLabel;
+          const pPoMatch = String(pQuality || "").match(/^\[(.*?)\]/);
+          const pPo = pPoMatch ? pPoMatch[1].trim() : assignedPoId;
+          return {
+            ...typeof p === "object" && p !== null ? p : { pieceNo: `Pc ${pIdx + 1}`, length: p },
+            fabricQuality: pQuality,
+            poId: pPo
+          };
+        });
         updated[baleIdx] = {
           ...updated[baleIdx],
-          fabricItemLabel: newFabricLabel,
+          fabricItemLabel: isMixed ? "MIXED_FABRIC" : newFabricLabel,
           fabricName: isMixed ? "Mixed Fabric" : newFabricLabel,
           isMixedFabric: isMixed,
+          poId: assignedPoId,
           pieces: updatedPieces,
           isSaved: false
         };
@@ -35525,9 +36266,12 @@
         const updated = [...prev.bales];
         const targetBale = { ...updated[baleIdx], isSaved: false };
         const updatedPieces = [...targetBale.pieces || []];
+        const pPoMatch = String(newQuality || "").match(/^\[(.*?)\]/);
+        const piecePoId = pPoMatch ? pPoMatch[1].trim() : targetBale.poId || prev.poId || "";
         updatedPieces[pieceIdx] = {
           ...typeof updatedPieces[pieceIdx] === "object" && updatedPieces[pieceIdx] !== null ? updatedPieces[pieceIdx] : { pieceNo: `Pc ${pieceIdx + 1}`, length: updatedPieces[pieceIdx] },
-          fabricQuality: newQuality
+          fabricQuality: newQuality,
+          poId: piecePoId
         };
         targetBale.pieces = updatedPieces;
         updated[baleIdx] = targetBale;
@@ -35546,14 +36290,19 @@
           if (curPieces[p]) {
             nextPieces.push(curPieces[p]);
           } else {
+            const isMixed = isBaleMixed(targetBale);
+            const assignedQuality = isMixed ? poItemLabels[p % (poItemLabels.length || 1)] || poItemLabels[0] || defaultFabricLabel : targetBale.fabricItemLabel || defaultFabricLabel;
+            const pPoMatch = String(assignedQuality || "").match(/^\[(.*?)\]/);
+            const piecePoId = pPoMatch ? pPoMatch[1].trim() : targetBale.poId || prev.poId || "";
             nextPieces.push({
               pieceNo: `Pc ${p + 1}`,
               length: "",
-              fabricQuality: targetBale.isMixedFabric ? defaultFabricLabel : targetBale.fabricItemLabel || defaultFabricLabel
+              fabricQuality: assignedQuality,
+              poId: piecePoId
             });
           }
         }
-        targetBale.piecesCount = newCount;
+        targetBale.piecesCount = newCount && newCount !== "0" && count > 0 ? String(count) : "";
         targetBale.pieces = nextPieces;
         targetBale.totalLength = nextPieces.reduce((sum, it) => sum + (Number(it.length) || 0), 0);
         targetBale.isSaved = false;
@@ -35587,7 +36336,8 @@
     const hasBaleEntries = (formData.bales || []).some((b) => (b.pieces || []).length > 0);
     const fabricBreakdown = {};
     (formData.bales || []).forEach((b) => {
-      if (b.isMixedFabric && b.pieces && b.pieces.length > 0) {
+      const isMixed = isBaleMixed(b);
+      if (isMixed && b.pieces && b.pieces.length > 0) {
         b.pieces.forEach((p) => {
           const fLabel = p.fabricQuality || defaultFabricLabel;
           const pLen = Number(p.length) || 0;
@@ -35636,6 +36386,108 @@
         onBack();
       }
     };
+    const handleSaveProgress = () => {
+      if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
+        showToast("Please select a Source document (Purchase Order).", "warning");
+        return;
+      }
+      if (receiveDateValidationMsg) {
+        showToast(receiveDateValidationMsg, "warning");
+        return;
+      }
+      const resolvedPoId = formData.poId || formData.linkedPOs && formData.linkedPOs[0] || grn?.poId || currentPO?.id || "PO-DIRECT";
+      const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
+      const firstPoItem = selectedPO?.items?.[0];
+      const fabricItem = firstPoItem ? firstPoItem.fabricName || firstPoItem.fabricQuality : formData.fabricName || (fabrics[0]?.qualityName || "Fabric");
+      const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || "Natural";
+      const colorHexVal = firstPoItem?.colorHex || formData.colorHex || "#ffffff";
+      const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
+      const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, "").trim() : formData.width || "44";
+      const foldVal = firstPoItem?.fold !== void 0 && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, "").trim() : formData.fold || formData.fabricFolding || "100";
+      const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : grn?.vendorName || vendors[0]?.name || "Direct Vendor");
+      const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || "V-DIRECT";
+      const normalizedBales = (formData.bales || []).map((b, idx) => {
+        const isMixed = isBaleMixed(b);
+        const rawPieces = b.pieces || [];
+        const normPieces = rawPieces.map((p, pIdx) => {
+          const pLen = typeof p === "object" && p !== null ? p.length !== void 0 && p.length !== null ? p.length : "" : p !== void 0 && p !== null ? p : "";
+          const pQuality = typeof p === "object" && p !== null ? p.fabricQuality || "" : "";
+          const assignedQuality = pQuality || (isMixed ? poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel : b.fabricItemLabel || defaultFabricLabel);
+          const pPoMatch = String(assignedQuality || "").match(/^[(.*?)]/);
+          const piecePoId = pPoMatch ? pPoMatch[1].trim() : typeof p === "object" && p?.poId ? p.poId : b.poId || resolvedPoId;
+          return {
+            pieceNo: typeof p === "object" && p?.pieceNo || `Pc ${pIdx + 1}`,
+            length: pLen,
+            fabricQuality: assignedQuality,
+            poId: piecePoId
+          };
+        });
+        const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+        const hasCustom = Boolean(b.hasCustomBaleNo || b.baleNo && String(b.baleNo).trim() !== "" && String(b.baleNo).trim() !== String(idx + 1));
+        const baleNoVal = hasCustom ? String(b.baleNo).trim() : "";
+        const bAssignedLabel = isMixed ? "MIXED_FABRIC" : b.fabricItemLabel || defaultFabricLabel;
+        const bPoMatch = String(bAssignedLabel || "").match(/^[(.*?)]/);
+        const balePoId = bPoMatch ? bPoMatch[1].trim() : b.poId || resolvedPoId;
+        return {
+          ...b,
+          baleNo: baleNoVal,
+          hasCustomBaleNo: hasCustom,
+          fabricItemLabel: bAssignedLabel,
+          fabricName: isMixed ? "Mixed Fabric" : b.fabricItemLabel || defaultFabricLabel,
+          isMixedFabric: isMixed,
+          poId: balePoId,
+          pieces: normPieces,
+          totalLength: bTotal,
+          piecesCount: b.piecesCount && b.piecesCount !== "0" && b.piecesCount !== 0 ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "",
+          isSaved: true
+        };
+      });
+      const liveTotalMeters = Math.round(
+        normalizedBales.reduce((sum, b) => sum + (Number(b.totalLength) || 0), 0) * 100
+      ) / 100;
+      let finalDeclaredTotal = declaredTotal;
+      if (liveTotalMeters > 0 && (finalDeclaredTotal === 2e3 || finalDeclaredTotal === 0)) {
+        finalDeclaredTotal = liveTotalMeters;
+      }
+      const payload = {
+        ...formData,
+        poId: resolvedPoId,
+        linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : resolvedPoId && resolvedPoId !== "PO-DIRECT" ? [resolvedPoId] : [],
+        vendorId: vId,
+        vendorName: vName,
+        status: "Draft",
+        isSubmittedToQC: false,
+        isQcActioned: false,
+        isHeaderSaved: true,
+        date: formData.receivedDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        fabricName: fabricItem,
+        fabricId: fabricIdVal,
+        colorName: colorVal,
+        colorHex: colorHexVal,
+        width: widthVal,
+        pannaWidth: widthVal,
+        fold: foldVal,
+        fabricFolding: foldVal,
+        declaredTotalMeters: finalDeclaredTotal > 0 ? finalDeclaredTotal : liveTotalMeters,
+        totalQty: finalDeclaredTotal > 0 ? String(finalDeclaredTotal) : liveTotalMeters > 0 ? String(liveTotalMeters) : formData.totalQty || "",
+        lrNumber: formData.lrNo || formData.lrNumber || "",
+        lrNo: formData.lrNo || formData.lrNumber || "",
+        totalMetersEntered: liveTotalMeters,
+        bales: normalizedBales
+      };
+      if (onSaveGRN) {
+        try {
+          onSaveGRN(payload, false, true);
+        } catch (err) {
+          console.warn("Error saving GRN progress:", err);
+        }
+      }
+      if (onExitToList) {
+        onExitToList();
+      } else if (onBack) {
+        onBack();
+      }
+    };
     const handleSaveHeaderOnly = () => {
       if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
         showToast("Please select a Source document (Purchase Order).", "warning");
@@ -35651,6 +36503,14 @@
       }
       if (isQcActioned) {
         showToast("Receipt details are locked because this GRN has been submitted to QC.", "warning");
+        return;
+      }
+      const curDeclared = Number(formData.declaredTotalMeters || formData.totalQty || 0);
+      if (poPendingMeters > 0 && curDeclared > poPendingMeters) {
+        showToast(
+          `Declared Total quantity (${curDeclared.toLocaleString()}m) cannot exceed total pending balance across linked POs (${poPendingMeters.toLocaleString()}m)!`,
+          "danger"
+        );
         return;
       }
       const resolvedPoId = formData.poId || formData.linkedPOs && formData.linkedPOs[0] || grn?.poId || grn?.linkedPOs && grn.linkedPOs[0] || currentPO?.id || "PO-DIRECT";
@@ -35676,6 +36536,7 @@
             const assignedLabel = poItemLabels.length > 0 ? poItemLabels[i % poItemLabels.length] || poItemLabels[0] : defaultFabricLabel;
             generated.push({
               baleNo: "",
+              hasCustomBaleNo: false,
               itemIdx: i % (poItemLabels.length || 1),
               fabricItemLabel: assignedLabel,
               isMixedFabric: false,
@@ -35757,29 +36618,39 @@
       const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || "V-DIRECT";
       const isSingle = specificBaleIdx !== null && specificBaleIdx !== void 0;
       const normalizedBales = (formData.bales || []).map((b, idx) => {
+        const isMixed = isBaleMixed(b);
         const rawPieces = b.pieces || [];
         const normPieces = rawPieces.map((p, pIdx) => {
-          if (typeof p === "object" && p !== null) {
-            return {
-              pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-              length: p.length !== void 0 && p.length !== null ? p.length : "",
-              fabricQuality: p.fabricQuality || b.fabricItemLabel || fabricItem
-            };
-          }
+          const pLen = typeof p === "object" && p !== null ? p.length !== void 0 && p.length !== null ? p.length : "" : p !== void 0 && p !== null ? p : "";
+          const pQuality = typeof p === "object" && p !== null ? p.fabricQuality || "" : "";
+          const assignedQuality = pQuality || (isMixed ? poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel : b.fabricItemLabel || fabricItem);
+          const pPoMatch = String(assignedQuality || "").match(/^\[(.*?)\]/);
+          const piecePoId = pPoMatch ? pPoMatch[1].trim() : typeof p === "object" && p?.poId ? p.poId : b.poId || resolvedPoId;
           return {
-            pieceNo: `Pc ${pIdx + 1}`,
-            length: p !== void 0 && p !== null ? p : "",
-            fabricQuality: b.fabricItemLabel || fabricItem
+            pieceNo: typeof p === "object" && p?.pieceNo || `Pc ${pIdx + 1}`,
+            length: pLen,
+            fabricQuality: assignedQuality,
+            poId: piecePoId
           };
         });
         const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
         const isTarget = isSingle ? idx === specificBaleIdx : true;
+        const hasCustom = Boolean(b.hasCustomBaleNo || b.baleNo && String(b.baleNo).trim() !== "" && String(b.baleNo).trim() !== String(idx + 1));
+        const baleNoVal = hasCustom ? String(b.baleNo).trim() : "";
+        const bAssignedLabel = isMixed ? "MIXED_FABRIC" : b.fabricItemLabel || defaultFabricLabel;
+        const bPoMatch = String(bAssignedLabel || "").match(/^\[(.*?)\]/);
+        const balePoId = bPoMatch ? bPoMatch[1].trim() : b.poId || resolvedPoId;
         return {
           ...b,
-          baleNo: b.baleNo !== void 0 && b.baleNo !== null ? String(b.baleNo) : "",
+          baleNo: baleNoVal,
+          hasCustomBaleNo: hasCustom,
+          fabricItemLabel: bAssignedLabel,
+          fabricName: isMixed ? "Mixed Fabric" : bAssignedLabel,
+          isMixedFabric: isMixed,
+          poId: balePoId,
           pieces: normPieces,
           totalLength: bTotal,
-          piecesCount: b.piecesCount !== void 0 && b.piecesCount !== "" ? String(b.piecesCount) : String(normPieces.length),
+          piecesCount: b.piecesCount && b.piecesCount !== "0" && b.piecesCount !== 0 ? String(b.piecesCount) : normPieces.length > 0 ? String(normPieces.length) : "",
           isSaved: isTarget ? true : Boolean(b.isSaved)
         };
       });
@@ -35839,10 +36710,10 @@
       }
       if (isSingle) {
         const targetBale = normalizedBales[specificBaleIdx];
-        const bNo = targetBale?.baleNo || specificBaleIdx + 1;
+        const bName = targetBale?.baleNo ? `Bale ${targetBale.baleNo}` : `Container #${specificBaleIdx + 1}`;
         const pLen = (targetBale?.pieces || []).length;
         const bTot = targetBale?.totalLength || 0;
-        showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? "" : "s"}, ${bTot}m entered)`, "success");
+        showToast(`${bName} saved successfully! (${pLen} piece${pLen === 1 ? "" : "s"}, ${bTot}m entered)`, "success");
       } else {
         const totalCount = normalizedBales.length;
         const configuredCount = normalizedBales.filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
@@ -35902,6 +36773,10 @@
       const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || "";
       const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, "").trim() : formData.width || "";
       const foldVal = firstPoItem?.fold !== void 0 && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, "").trim() : formData.fold || formData.fabricFolding || "";
+      const finalBales = (formData.bales || []).map((b, idx) => ({
+        ...b,
+        baleNo: b.baleNo && String(b.baleNo).trim() ? String(b.baleNo).trim() : ""
+      }));
       const payload = {
         ...formData,
         status: "Completed",
@@ -35922,7 +36797,8 @@
         totalQty: declaredTotal > 0 ? String(declaredTotal) : formData.totalQty || "",
         lrNumber: formData.lrNo || formData.lrNumber || "",
         lrNo: formData.lrNo || formData.lrNumber || "",
-        totalMetersEntered
+        totalMetersEntered,
+        bales: finalBales
       };
       setFormData((prev) => ({
         ...prev,
@@ -36360,7 +37236,7 @@
             className: "d-flex align-items-center justify-content-between px-4 px-md-4 py-3 border-bottom",
             style: { backgroundColor: "#f8fafc" }
           },
-          /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2 me-2" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-package text-primary fs-16" }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fw-bold text-dark fs-15 lh-1" }, "Bale ", bale.baleNo || bIdx + 1)), /* @__PURE__ */ import_react23.default.createElement(
+          /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2 me-2" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-package text-primary fs-16" }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fw-bold text-dark fs-15 lh-1" }, bale.baleNo ? `Bale ${bale.baleNo}` : `Container #${bIdx + 1}`)), bale.baleNo && /* @__PURE__ */ import_react23.default.createElement(
             "span",
             {
               className: "badge bg-white text-secondary border px-3 py-1.5 fs-11 rounded-pill fw-medium me-1",
@@ -36390,7 +37266,7 @@
               className: "btn btn-sm btn-white border px-3 py-1 fs-12 fw-semibold rounded-2 text-dark shadow-xs d-inline-flex align-items-center gap-1.5",
               style: { borderColor: "#cbd5e1" },
               onClick: () => handleEditBale(bIdx),
-              title: `Edit Bale ${bale.baleNo || bIdx + 1}`
+              title: bale.baleNo ? `Edit Bale ${bale.baleNo}` : `Edit Container #${bIdx + 1}`
             },
             /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-edit fs-14", style: { color: "#f97316" } }),
             /* @__PURE__ */ import_react23.default.createElement("span", null, "Edit")
@@ -36407,20 +37283,20 @@
         ),
         isBaleSaved ? (
           /* SAVED SUMMARY VIEW MODE (Matches Image 2 Style & Theme) */
-          /* @__PURE__ */ import_react23.default.createElement("div", { className: "px-4 px-md-4 py-3.5" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-4 fs-13 pt-1" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "100px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "BALE NO."), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 font-monospace" }, bale.baleNo || bIdx + 1)), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3", style: { minWidth: "170px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "FABRIC QUALITY"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 text-truncate", title: bale.fabricItemLabel || currentFabricLabel }, bale.isMixedFabric ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-primary fw-semibold" }, "\u{1F500} Mixed Bale") : bale.fabricItemLabel || currentFabricLabel)), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "110px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "NO. OF PIECES"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, (bale.pieces || []).length, " Piece", (bale.pieces || []).length !== 1 ? "s" : "")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3", style: { minWidth: "180px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "PIECE DETAILS"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap gap-1.5 align-items-center" }, bale.pieces && bale.pieces.length > 0 ? bale.pieces.map((p, pIdx) => {
+          /* @__PURE__ */ import_react23.default.createElement("div", { className: "px-4 px-md-4 py-3.5" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-4 fs-13 pt-1" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "100px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "BALE NO."), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 font-monospace" }, bale.baleNo ? bale.baleNo : "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3", style: { minWidth: "170px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "FABRIC QUALITY"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13 text-truncate", title: bale.fabricItemLabel || currentFabricLabel }, bale.isMixedFabric ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-primary fw-semibold" }, "\u{1F500} Mixed Bale") : bale.fabricItemLabel || currentFabricLabel)), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "110px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "NO. OF PIECES"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, bale.pieces && bale.pieces.length > 0 ? `${bale.pieces.length} Piece${bale.pieces.length !== 1 ? "s" : ""}` : "\u2014")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-6 col-md-3", style: { minWidth: "180px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "PIECE DETAILS"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap gap-1.5 align-items-center" }, bale.pieces && bale.pieces.length > 0 ? bale.pieces.map((p, pIdx) => {
             const pLen = typeof p === "object" && p !== null ? p.length : p;
             return /* @__PURE__ */ import_react23.default.createElement("span", { key: pIdx, className: "badge bg-light text-dark border px-2 py-0.5 fs-11 font-monospace fw-semibold" }, "Pc ", pIdx + 1, ": ", pLen || 0, "m");
-          }) : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-muted fs-12" }, "\u2014"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "120px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "BALE TOTAL"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-14 font-monospace" }, Number(bale.totalLength || 0).toLocaleString(), "m"))))
+          }) : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-muted fs-12" }, "\u2014"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-6 col-sm-4 col-md-2", style: { minWidth: "120px" } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-secondary fs-11 text-uppercase fw-semibold mb-1", style: { letterSpacing: "0.04em" } }, "BALE TOTAL"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-14 font-monospace" }, (Number(bale.totalLength) || 0) > 0 ? `${Number(bale.totalLength).toLocaleString()}m` : "\u2014"))))
         ) : (
           /* EDITING FORM INPUTS (Image 1) */
-          /* @__PURE__ */ import_react23.default.createElement("div", { className: "px-4 px-md-4 py-3.5" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-3 gx-4 align-items-start mb-3" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-3 col-md-2", style: { minWidth: "110px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Bale No. ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement(
+          /* @__PURE__ */ import_react23.default.createElement("div", { className: "px-4 px-md-4 py-3.5" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-3 gx-4 align-items-start mb-3" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-3 col-md-2", style: { minWidth: "110px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Bale No."), /* @__PURE__ */ import_react23.default.createElement(
             "input",
             {
               type: "text",
-              placeholder: "e.g. 1",
+              placeholder: `e.g. ${bIdx + 1}`,
               className: "form-control bg-white text-center fs-13 fw-semibold",
               style: { height: "40px", borderColor: "#cbd5e1", borderRadius: "8px" },
-              value: bale.baleNo || "",
+              value: bale.hasCustomBaleNo ? bale.baleNo || "" : bale.baleNo && bale.baleNo !== String(bIdx + 1) ? bale.baleNo : "",
               disabled: isQcActioned,
               onChange: (e) => handleBaleNoChange(bIdx, e.target.value)
             }
@@ -36429,11 +37305,11 @@
             {
               className: "form-select bg-white fs-13 px-3",
               style: { height: "40px", borderColor: "#cbd5e1", borderRadius: "8px" },
-              value: bale.isMixedFabric ? "MIXED_FABRIC" : bale.fabricItemLabel || poItemLabels[0] || defaultFabricLabel,
+              value: isBaleMixed(bale) ? "MIXED_FABRIC" : bale.fabricItemLabel || poItemLabels[0] || defaultFabricLabel,
               disabled: isQcActioned,
               onChange: (e) => handleBaleFabricChange(bIdx, e.target.value)
             },
-            poItemLabels.length > 1 && /* @__PURE__ */ import_react23.default.createElement("option", { value: "MIXED_FABRIC", className: "fw-bold text-primary" }, "\u{1F500} Mixed Bale (Multiple Fabric Qualities)"),
+            /* @__PURE__ */ import_react23.default.createElement("option", { value: "MIXED_FABRIC", className: "fw-bold text-primary" }, "\u{1F500} Mixed Bale (Multiple Fabric Qualities)"),
             poItemLabels.length > 0 ? poItemLabels.map((lbl, oIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `po-${oIdx}`, value: lbl }, lbl)) : masterFabricLabels.map((lbl, fIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `mf-${fIdx}`, value: lbl }, lbl))
           )), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-3 col-md-3", style: { minWidth: "120px", maxWidth: "170px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "No. of Pieces ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement(
             "input",
@@ -36443,7 +37319,7 @@
               placeholder: "e.g. 1",
               className: "form-control bg-white text-center fs-13 fw-semibold",
               style: { height: "40px", borderColor: "#cbd5e1", borderRadius: "8px" },
-              value: bale.piecesCount || (bale.pieces && bale.pieces.length ? bale.pieces.length : ""),
+              value: bale.piecesCount && bale.piecesCount !== "0" && bale.piecesCount !== 0 ? bale.piecesCount : bale.pieces && bale.pieces.length > 0 ? bale.pieces.length : "",
               disabled: isQcActioned,
               onChange: (e) => handleSetPieceCount(bIdx, e.target.value)
             }
@@ -36453,7 +37329,7 @@
               className: "rounded-3 p-3.5 my-3",
               style: { backgroundColor: "#f8fafc", border: "1px solid #eef2f6" }
             },
-            /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2.5" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-12 fw-semibold text-dark text-uppercase", style: { letterSpacing: "0.04em" } }, "Piece-Wise Length (Meters)"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-11 text-muted fw-medium" }, (bale.pieces || []).length, " Piece", (bale.pieces || []).length !== 1 ? "s" : "", " configured ", bale.isMixedFabric ? "(Mixed Qualities Enabled)" : "")),
+            /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2.5" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-12 fw-semibold text-dark text-uppercase", style: { letterSpacing: "0.04em" } }, "Piece-Wise Length (Meters)"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-11 text-muted fw-medium" }, (bale.pieces || []).length > 0 ? `${(bale.pieces || []).length} Piece${(bale.pieces || []).length !== 1 ? "s" : ""} configured ${isBaleMixed(bale) ? "(Mixed Qualities Enabled)" : ""}` : "")),
             !bale.pieces || bale.pieces.length === 0 ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "py-3 px-3 text-center text-muted fs-12 bg-white rounded-2 border border-dashed" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-info-circle me-1.5 text-primary" }), "Enter number of pieces above to generate piece length inputs.") : /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-end gap-3 pt-1" }, bale.pieces.map((piece, pIdx) => {
               const len = piece.length !== void 0 ? piece.length : piece;
               const pFabric = piece.fabricQuality || poItemLabels[0] || masterFabricLabels[0] || defaultFabricLabel;
@@ -36462,19 +37338,25 @@
                 {
                   key: pIdx,
                   className: "bg-white p-2.5 rounded-2 border shadow-none",
-                  style: { width: bale.isMixedFabric ? "210px" : "115px", borderColor: "#e2e8f0" }
+                  style: { width: isBaleMixed(bale) ? "280px" : "115px", minWidth: isBaleMixed(bale) ? "260px" : "115px", borderColor: "#e2e8f0" }
                 },
-                /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1" }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "d-block fs-11 fw-semibold text-secondary text-center mb-0" }, "Pc ", pIdx + 1, " (m)"), bale.isMixedFabric && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-1.5 py-0.5 fs-10 rounded" }, "Quality")),
-                bale.isMixedFabric && /* @__PURE__ */ import_react23.default.createElement(
+                /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1" }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "d-block fs-11 fw-semibold text-secondary text-center mb-0" }, "Pc ", pIdx + 1, " (m)"), isBaleMixed(bale) && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-purple-subtle text-purple border px-1.5 py-0.5 fs-10 rounded fw-semibold" }, "Quality")),
+                isBaleMixed(bale) && /* @__PURE__ */ import_react23.default.createElement(
                   "select",
                   {
-                    className: "form-select form-select-sm bg-white fs-11 px-2 mb-1.5",
-                    style: { height: "30px", borderColor: "#cbd5e1", borderRadius: "6px" },
+                    className: "form-select bg-white fs-12 px-2 py-1 mb-1.5",
+                    style: {
+                      minHeight: "36px",
+                      height: "36px",
+                      borderColor: "#cbd5e1",
+                      borderRadius: "6px",
+                      lineHeight: "1.4"
+                    },
                     value: pFabric,
                     disabled: isQcActioned,
                     onChange: (e) => handlePieceFabricChange(bIdx, pIdx, e.target.value)
                   },
-                  poItemLabels.length > 0 ? poItemLabels.map((lbl, oIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `p-po-${oIdx}`, value: lbl }, lbl)) : masterFabricLabels.map((lbl, fIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `p-mf-${fIdx}`, value: lbl }, lbl))
+                  poItemLabels.length > 0 ? poItemLabels.map((lbl, oIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `p-po-${oIdx}`, value: lbl, title: lbl }, lbl)) : masterFabricLabels.map((lbl, fIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `p-mf-${fIdx}`, value: lbl, title: lbl }, lbl))
                 ),
                 /* @__PURE__ */ import_react23.default.createElement(
                   "input",
@@ -36484,7 +37366,12 @@
                     min: "0",
                     placeholder: "0.00",
                     className: "form-control bg-white text-center fw-semibold fs-13 px-1",
-                    style: { height: "36px", borderColor: "#cbd5e1", borderRadius: "6px" },
+                    style: {
+                      height: "36px",
+                      borderColor: "#cbd5e1",
+                      backgroundColor: "#ffffff",
+                      borderRadius: "6px"
+                    },
                     value: len === 0 ? "0" : len || "",
                     disabled: isQcActioned,
                     onChange: (e) => handlePieceMeterChange(bIdx, pIdx, e.target.value)
@@ -36492,7 +37379,33 @@
                 )
               );
             }))
-          ), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top text-secondary fs-12 gap-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2 text-truncate" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold" }, (bale.pieces || []).length, " Piece", (bale.pieces || []).length !== 1 ? "s" : ""), bale.isMixedFabric ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-purple-subtle text-purple border px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, "Mixed Bale (Multiple Fabric Qualities)") : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-secondary text-truncate" }, "Assigned: ", /* @__PURE__ */ import_react23.default.createElement("strong", { className: "text-dark" }, bale.fabricItemLabel || currentFabricLabel))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-secondary fs-12 fw-medium" }, "Bale Total:"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-14 fw-bold text-dark font-monospace px-2.5 py-0.5 rounded bg-light border" }, (bale.totalLength || 0).toFixed(2).replace(/\.00$/, ""), " m"), !isQcActioned && !isPoAlreadyCompleted && /* @__PURE__ */ import_react23.default.createElement(
+          ), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top text-secondary fs-12 gap-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-2 text-truncate" }, (bale.pieces || []).length > 0 && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold" }, (bale.pieces || []).length, " Piece", (bale.pieces || []).length !== 1 ? "s" : ""), isBaleMixed(bale) ? /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-1.5" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-purple-subtle text-purple border px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, "\u{1F500} Mixed Bale"), (() => {
+            const bFabMap = {};
+            (bale.pieces || []).forEach((p, pIdx) => {
+              const q = p.fabricQuality || (poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel);
+              const len = Number(typeof p === "object" ? p.length : p) || 0;
+              if (!bFabMap[q]) bFabMap[q] = 0;
+              bFabMap[q] += len;
+            });
+            return Object.entries(bFabMap).map(([fName, mtrs], mIdx) => /* @__PURE__ */ import_react23.default.createElement(
+              "span",
+              {
+                key: mIdx,
+                className: "badge bg-light text-dark border px-2 py-1 rounded-pill fs-11 shadow-xs"
+              },
+              /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-secondary" }, fName, ":"),
+              " ",
+              /* @__PURE__ */ import_react23.default.createElement(
+                "strong",
+                {
+                  className: "text-primary",
+                  style: { fontFamily: "monospace" }
+                },
+                Number(mtrs).toFixed(2).replace(/\.00$/, ""),
+                "m"
+              )
+            ));
+          })()) : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-secondary text-truncate" }, "Assigned: ", /* @__PURE__ */ import_react23.default.createElement("strong", { className: "text-dark" }, bale.fabricItemLabel || currentFabricLabel))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-secondary fs-12 fw-medium" }, "Bale Total:"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-14 fw-bold text-dark font-monospace px-2.5 py-0.5 rounded bg-light border" }, (Number(bale.totalLength) || 0) > 0 ? `${(Number(bale.totalLength) || 0).toFixed(2).replace(/\.00$/, "")} m` : "\u2014"), !isQcActioned && !isPoAlreadyCompleted && /* @__PURE__ */ import_react23.default.createElement(
             "button",
             {
               type: "button",
@@ -36504,7 +37417,7 @@
                 transition: "all 0.2s ease-in-out"
               },
               onClick: () => handleSaveSingleBale(bIdx),
-              title: `Save Bale ${bale.baleNo || bIdx + 1}`
+              title: bale.baleNo ? `Save Bale ${bale.baleNo}` : `Save Container #${bIdx + 1}`
             },
             /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-device-floppy", style: { fontSize: "15px" } }),
             /* @__PURE__ */ import_react23.default.createElement("span", null, "Save")
@@ -36581,7 +37494,7 @@
           height: "42px",
           backgroundColor: "#ffffff"
         },
-        onClick: handleSaveHeaderOnly,
+        onClick: handleSaveProgress,
         title: "Save draft progress and finish entering bales later"
       },
       /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-device-floppy fs-15", style: { color: "#5b47fb" } }),
@@ -37289,6 +38202,12 @@
         const matchedGrn = grns.find(
           (g) => g && (g.id === qc.grnRef || qc.grnRef && g.id.includes(qc.grnRef.replace("GRN-", "")))
         );
+        const isExplicitlySentToQC = Boolean(
+          matchedGrn && (matchedGrn.isSubmittedToQC === true || ["Submitted to QC", "QC In Progress", "QC Approved", "QC Passed", "QC Rejected", "Pending Admin Approval"].includes(matchedGrn.status)) && matchedGrn.status !== "Draft" && matchedGrn.status !== "Bale Entry in Progress"
+        );
+        if (!isExplicitlySentToQC) {
+          return;
+        }
         const againstRef = qc.againstRef || (matchedGrn?.linkedPOs && matchedGrn.linkedPOs.length > 0 ? matchedGrn.linkedPOs[0] : matchedGrn?.poId || "");
         const linkedPO = purchaseOrders.find(
           (p) => p && (p.id === againstRef || matchedGrn?.linkedPOs && matchedGrn.linkedPOs.includes(p.id))
@@ -37744,7 +38663,11 @@
     const [toastNotification, setToastNotification] = (0, import_react26.useState)(null);
     const [selectedBaleFilter, setSelectedBaleFilter] = (0, import_react26.useState)("all");
     const [selectedPieceKey, setSelectedPieceKey] = (0, import_react26.useState)("");
-    const [inspectionScope, setInspectionScope] = (0, import_react26.useState)("all");
+    const [inspectionScope, setInspectionScope] = (0, import_react26.useState)(() => {
+      if (qc?.inspectionScope === "Piece-Level" || qc?.inspectionScope === "piece") return "piece";
+      if (qc?.inspectionScope === "Bale-Level" || qc?.inspectionScope === "bale") return "bale";
+      return "all";
+    });
     const showToast = (message, type = "success") => {
       setToastNotification({ message, type });
       setTimeout(() => {
@@ -37864,6 +38787,63 @@
           [field]: val
         }
       }));
+    };
+    const handleBatchCheckAll = (shouldCheck) => {
+      const expW = formData.actualWidth || formData.expectedWidth || "44";
+      const expF = formData.actualFold || formData.expectedFold || "100";
+      setPieceInspections((prev) => {
+        const updated = { ...prev };
+        displayedPieces.forEach((pc) => {
+          const cur = updated[pc.key] || {};
+          updated[pc.key] = {
+            ...cur,
+            checked: shouldCheck,
+            actualWidth: shouldCheck && !cur.actualWidth ? expW : cur.actualWidth || "",
+            actualFold: shouldCheck && !cur.actualFold ? expF : cur.actualFold || "",
+            status: cur.status || "OK"
+          };
+        });
+        return updated;
+      });
+      showToast(shouldCheck ? `Checked all ${displayedPieces.length} pieces.` : "Unchecked all pieces.", "info");
+    };
+    const handleBatchFillExpected = () => {
+      const expW = formData.actualWidth || formData.expectedWidth || "44";
+      const expF = formData.actualFold || formData.expectedFold || "100";
+      setPieceInspections((prev) => {
+        const updated = { ...prev };
+        displayedPieces.forEach((pc) => {
+          const cur = updated[pc.key] || {};
+          updated[pc.key] = {
+            ...cur,
+            checked: true,
+            actualWidth: expW,
+            actualFold: expF,
+            status: cur.status || "OK"
+          };
+        });
+        return updated;
+      });
+      showToast(`Filled expected Width (${expW}") and Fold (${expF}%) for all listed pieces.`, "success");
+    };
+    const handleBatchMarkStatus = (newStatus = "OK") => {
+      const expW = formData.actualWidth || formData.expectedWidth || "44";
+      const expF = formData.actualFold || formData.expectedFold || "100";
+      setPieceInspections((prev) => {
+        const updated = { ...prev };
+        displayedPieces.forEach((pc) => {
+          const cur = updated[pc.key] || {};
+          updated[pc.key] = {
+            ...cur,
+            checked: true,
+            actualWidth: cur.actualWidth || expW,
+            actualFold: cur.actualFold || expF,
+            status: newStatus
+          };
+        });
+        return updated;
+      });
+      showToast(`Marked listed pieces as ${newStatus}.`, "success");
     };
     const handlePiecePhotoUpload = (key, e) => {
       const files = Array.from(e.target.files);
@@ -38243,63 +39223,40 @@
       {
         className: "form-select form-select-sm bg-white fs-12 border rounded-2",
         value: selectedBaleFilter,
-        onChange: (e) => {
-          setSelectedBaleFilter(e.target.value);
-          setSelectedPieceKey("");
-        }
+        onChange: (e) => handleBaleFilterChange(e.target.value)
       },
       /* @__PURE__ */ import_react26.default.createElement("option", { value: "all" }, "All Bales (", uniqueBaleNumbers.length, " Bales \xB7 ", grnPieces.length, " Pieces)"),
       uniqueBaleNumbers.map((bNo) => {
-        const count = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).length;
-        const meters = grnPieces.filter((p) => String(p.baleNo) === String(bNo)).reduce((s, p) => s + (Number(p.meters) || 0), 0);
-        return /* @__PURE__ */ import_react26.default.createElement("option", { key: bNo, value: bNo }, "Bale #", bNo, " \u2014 ", count, " pieces (", meters, "m)");
+        const bPieces = grnPieces.filter((p) => String(p.baleNo) === String(bNo));
+        const count = bPieces.length;
+        const meters = bPieces.reduce((s, p) => s + (Number(p.meters) || 0), 0);
+        const inspCount = bPieces.filter((p) => pieceInspections[p.key]?.checked).length;
+        return /* @__PURE__ */ import_react26.default.createElement("option", { key: bNo, value: bNo }, "Bale #", bNo, " \u2014 ", count, " pieces (", meters, "m)", inspCount > 0 ? ` [${inspCount}/${count} inspected]` : "");
       })
     )), /* @__PURE__ */ import_react26.default.createElement("div", { className: "col-12 col-sm-5" }, /* @__PURE__ */ import_react26.default.createElement("label", { className: "form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-eye fs-13 text-primary" }), /* @__PURE__ */ import_react26.default.createElement("span", null, "Inspect Specific Piece Dropdown:")), /* @__PURE__ */ import_react26.default.createElement(
       "select",
       {
         className: "form-select form-select-sm bg-white fs-12 border rounded-2",
         value: selectedPieceKey,
-        onChange: (e) => {
-          const key = e.target.value;
-          setSelectedPieceKey(key);
-          if (key) {
-            const targetPiece = grnPieces.find((p) => p.key === key);
-            if (targetPiece) {
-              setSelectedBaleFilter(String(targetPiece.baleNo));
-              setPieceInspections((prev) => ({
-                ...prev,
-                [key]: {
-                  ...prev[key] || {
-                    actualWidth: "",
-                    actualFold: "",
-                    status: "OK",
-                    notes: "",
-                    photos: []
-                  },
-                  checked: true
-                }
-              }));
-            }
-          }
-        }
+        onChange: (e) => handlePieceSelectChange(e.target.value)
       },
-      /* @__PURE__ */ import_react26.default.createElement("option", { value: "" }, "-- All Pieces in Selected Bale --"),
+      /* @__PURE__ */ import_react26.default.createElement("option", { value: "" }, selectedBaleFilter === "all" ? "-- All Pieces in All Bales --" : `-- All Pieces in Bale #${selectedBaleFilter} --`),
       (selectedBaleFilter === "all" ? grnPieces : grnPieces.filter((p) => String(p.baleNo) === String(selectedBaleFilter))).map((pc) => {
-        const st = pieceInspections[pc.key]?.status || "OK";
         const isInspected = Boolean(pieceInspections[pc.key]?.checked);
-        return /* @__PURE__ */ import_react26.default.createElement("option", { key: pc.key, value: pc.key }, "Bale ", pc.baleNo, " \xB7 Piece ", pc.pieceIdx + 1, " (", pc.meters, "m) \u2014 [", isInspected ? st : "Unchecked", "]");
+        const st = isInspected ? pieceInspections[pc.key]?.status || "OK" : "Unchecked";
+        return /* @__PURE__ */ import_react26.default.createElement("option", { key: pc.key, value: pc.key }, "Bale ", pc.baleNo, " \xB7 Piece ", pc.pieceIdx + 1, " (", pc.meters, "m) \u2014 [", st, "]");
       })
     )), /* @__PURE__ */ import_react26.default.createElement("div", { className: "col-12 col-sm-3" }, /* @__PURE__ */ import_react26.default.createElement("label", { className: "form-label fs-11 fw-bold text-dark text-uppercase mb-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-layers-subtract fs-13 text-primary" }), /* @__PURE__ */ import_react26.default.createElement("span", null, "Inspection Level:")), /* @__PURE__ */ import_react26.default.createElement(
       "select",
       {
         className: "form-select form-select-sm bg-white fs-12 border rounded-2",
         value: inspectionScope,
-        onChange: (e) => setInspectionScope(e.target.value)
+        onChange: (e) => handleInspectionScopeChange(e.target.value)
       },
       /* @__PURE__ */ import_react26.default.createElement("option", { value: "all" }, "Full Shipment Inspection"),
       /* @__PURE__ */ import_react26.default.createElement("option", { value: "bale" }, "Bale-Level Focus"),
       /* @__PURE__ */ import_react26.default.createElement("option", { value: "piece" }, "Piece-Level Detailed")
-    ))), selectedPieceKey && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center justify-content-between mt-2 pt-2 border-top" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "fs-12 text-secondary" }, "Showing selected piece: ", /* @__PURE__ */ import_react26.default.createElement("strong", null, selectedPieceKey)), /* @__PURE__ */ import_react26.default.createElement(
+    ))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between mt-2 pt-2 border-top gap-2" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "badge bg-white text-secondary border fs-11" }, inspectionScope === "piece" ? "\u{1F52C} Piece-Level Detailed Mode" : inspectionScope === "bale" ? "\u{1F4E6} Bale-Level Focus Mode" : "\u{1F310} Full Shipment Inspection"), /* @__PURE__ */ import_react26.default.createElement("span", { className: "fs-12 text-muted" }, inspectionScope === "piece" ? "All individual pieces expanded with independent width/fold checks." : inspectionScope === "bale" ? `Focusing inspection on Bale #${selectedBaleFilter === "all" ? "All" : selectedBaleFilter}.` : "Shipment-wide inspection. Top fields apply to all pieces.")), (selectedPieceKey || selectedBaleFilter !== "all") && /* @__PURE__ */ import_react26.default.createElement(
       "button",
       {
         type: "button",
@@ -38310,7 +39267,65 @@
           setSelectedBaleFilter("all");
         }
       },
-      "Clear Filter (Show All)"
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-x me-1" }),
+      " Reset Filters (Show All)"
+    )), selectedPieceKey && (() => {
+      const targetPiece = grnPieces.find((p) => p.key === selectedPieceKey);
+      if (!targetPiece) return null;
+      const pStatus = pieceInspections[selectedPieceKey]?.status || "OK";
+      return /* @__PURE__ */ import_react26.default.createElement("div", { className: "mt-2 p-2 bg-white rounded border d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "fs-12 text-secondary" }, "Showing piece:"), /* @__PURE__ */ import_react26.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-12 fw-semibold" }, "Bale ", targetPiece.baleNo, " \u2014 Piece ", targetPiece.pieceIdx + 1, " (", targetPiece.meters, "m)"), /* @__PURE__ */ import_react26.default.createElement("span", { className: `badge fs-11 ${pStatus === "OK" ? "bg-success-subtle text-success border border-success-subtle" : pStatus === "Reject" ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning border border-warning-subtle"}` }, pStatus)), /* @__PURE__ */ import_react26.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-secondary btn-sm py-0 px-2 fs-11",
+          onClick: () => setSelectedPieceKey("")
+        },
+        "Show All Pieces"
+      ));
+    })()), grnPieces.length > 0 && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 bg-light rounded-2 border mb-3" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "fs-12 fw-semibold text-dark" }, displayedPieces.length, " ", displayedPieces.length === 1 ? "Piece" : "Pieces", " Listed"), inspectedList.length > 0 && /* @__PURE__ */ import_react26.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11" }, inspectedList.length, " Inspected")), /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-1" }, /* @__PURE__ */ import_react26.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-secondary btn-sm fs-11 py-1 px-2",
+        onClick: () => handleBatchCheckAll(true),
+        title: "Check all listed pieces"
+      },
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-checks me-1 text-primary" }),
+      " Check All"
+    ), /* @__PURE__ */ import_react26.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-primary btn-sm fs-11 py-1 px-2",
+        onClick: handleBatchFillExpected,
+        title: "Auto-fill expected Width and Fold for all listed pieces"
+      },
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-bolt me-1" }),
+      " Auto-Fill Expected (",
+      formData.expectedWidth,
+      '" / ',
+      formData.expectedFold,
+      "%)"
+    ), /* @__PURE__ */ import_react26.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-success btn-sm fs-11 py-1 px-2",
+        onClick: () => handleBatchMarkStatus("OK"),
+        title: "Mark checked pieces as OK"
+      },
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-check me-1" }),
+      " Mark OK"
+    ), /* @__PURE__ */ import_react26.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-light btn-sm fs-11 py-1 px-2 text-muted border",
+        onClick: () => handleBatchCheckAll(false),
+        title: "Uncheck and collapse all pieces"
+      },
+      /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-x me-1" }),
+      " Uncheck All"
     ))), grnPieces.length === 0 ? /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-center py-3 text-muted fs-13 border rounded-3 bg-light" }, "No bale/piece breakdown recorded for this GRN. Use overall inspection fields above.") : /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-column gap-2" }, displayedPieces.length === 0 ? /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-center py-3 text-muted fs-13 border rounded-3 bg-light" }, "No pieces match the selected dropdown filter.") : displayedPieces.map((pc) => {
       const pieceData = pieceInspections[pc.key] || {
         checked: false,
@@ -38339,11 +39354,16 @@
             id: `chk-${pc.key}`,
             checked: isChecked,
             onChange: (e) => {
+              const isNowChecked = e.target.checked;
+              const expW = formData.actualWidth || formData.expectedWidth || "44";
+              const expF = formData.actualFold || formData.expectedFold || "100";
               setPieceInspections({
                 ...pieceInspections,
                 [pc.key]: {
                   ...pieceData,
-                  checked: e.target.checked
+                  actualWidth: isNowChecked && !pieceData.actualWidth ? expW : pieceData.actualWidth,
+                  actualFold: isNowChecked && !pieceData.actualFold ? expF : pieceData.actualFold,
+                  checked: isNowChecked
                 }
               });
             }
@@ -38351,16 +39371,11 @@
         ), /* @__PURE__ */ import_react26.default.createElement(
           "label",
           {
-            className: "form-check-label fw-bold text-dark fs-13 cursor-pointer user-select-none",
+            className: "form-check-label fw-bold text-dark fs-13 cursor-pointer user-select-none d-flex align-items-center gap-2",
             htmlFor: `chk-${pc.key}`
           },
-          "Bale ",
-          pc.baleNo,
-          " \u2014 Piece ",
-          pc.pieceIdx + 1,
-          " (",
-          pc.meters,
-          "m)"
+          /* @__PURE__ */ import_react26.default.createElement("span", null, "Bale ", pc.baleNo, " \u2014 Piece ", pc.pieceIdx + 1, " (", pc.meters, "m)"),
+          isChecked && /* @__PURE__ */ import_react26.default.createElement("span", { className: `badge fs-10 ${pieceData.status === "OK" ? "bg-success-subtle text-success border border-success-subtle" : pieceData.status === "Reject" ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning border border-warning-subtle"}` }, pieceData.status)
         )),
         isChecked && /* @__PURE__ */ import_react26.default.createElement("div", { className: "mt-3 pt-3 border-top bg-white p-3 rounded-2 border" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "row g-3 mb-2" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "col-12 col-sm-6 col-md-3" }, /* @__PURE__ */ import_react26.default.createElement("label", { className: "form-label fs-11 fw-semibold text-secondary mb-1 d-block" }, "Actual width", /* @__PURE__ */ import_react26.default.createElement("span", { className: "badge bg-light text-primary border ms-1 fs-10" }, "Expected: ", formData.expectedWidth, '"')), /* @__PURE__ */ import_react26.default.createElement(
           "input",
@@ -40383,6 +41398,7 @@
     return n * l;
   }
   function ThreadMasterView() {
+    const [activeTab, setActiveTab] = (0, import_react32.useState)("qualities");
     const [qualities, setQualities] = (0, import_react32.useState)(() => loadLS(LS_QUALITIES, DEFAULT_QUALITIES));
     const [qualityInput, setQualityInput] = (0, import_react32.useState)("");
     const [editingQualityId, setEditingQualityId] = (0, import_react32.useState)(null);
@@ -40548,7 +41564,46 @@
       setBrands(updated);
       saveLS(LS_BRANDS, updated);
     };
-    return /* @__PURE__ */ import_react32.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4" }, /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("nav", { "aria-label": "breadcrumb" }, /* @__PURE__ */ import_react32.default.createElement("ol", { className: "breadcrumb mb-1 text-muted fs-12" }, /* @__PURE__ */ import_react32.default.createElement("li", { className: "breadcrumb-item" }, "Masters"), /* @__PURE__ */ import_react32.default.createElement("li", { className: "breadcrumb-item active text-primary fw-medium" }, "Thread Master"))), /* @__PURE__ */ import_react32.default.createElement("h2", { className: "fw-bold text-dark mb-1 fs-24" }, "Thread Master"), /* @__PURE__ */ import_react32.default.createElement("p", { className: "text-secondary mb-0 fs-13" }, "Manage Thread Qualities, Box Sizes, and Brand Rates"))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "row g-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12 col-lg-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white h-100" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-primary-subtle text-primary p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-list fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Quality Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Manually add list of qualities"))), /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-12" }, qualities.length, " entries")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-2 mb-3" }, /* @__PURE__ */ import_react32.default.createElement(
+    return /* @__PURE__ */ import_react32.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4" }, /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("nav", { "aria-label": "breadcrumb" }, /* @__PURE__ */ import_react32.default.createElement("ol", { className: "breadcrumb mb-1 text-muted fs-12" }, /* @__PURE__ */ import_react32.default.createElement("li", { className: "breadcrumb-item" }, "Masters"), /* @__PURE__ */ import_react32.default.createElement("li", { className: "breadcrumb-item active text-primary fw-medium" }, "Thread Master"))), /* @__PURE__ */ import_react32.default.createElement("h2", { className: "fw-bold text-dark mb-1 fs-24" }, "Thread Master"), /* @__PURE__ */ import_react32.default.createElement("p", { className: "text-secondary mb-0 fs-13" }, "Manage Thread Qualities, Box Sizes, and Brand Rates"))), /* @__PURE__ */ import_react32.default.createElement(
+      "div",
+      {
+        className: "d-flex align-items-center mb-4",
+        style: {
+          gap: "4px",
+          borderBottom: "1px solid #DED3C6",
+          flexWrap: "wrap"
+        }
+      },
+      [
+        { id: "qualities", label: "Thread Qualities" },
+        { id: "box_sizes", label: "Sizes (Series)" },
+        { id: "brands", label: "Brands & Rates" }
+      ].map((tab) => {
+        const isActive = activeTab === tab.id;
+        return /* @__PURE__ */ import_react32.default.createElement(
+          "button",
+          {
+            key: tab.id,
+            type: "button",
+            onClick: () => setActiveTab(tab.id),
+            style: {
+              background: "none",
+              border: "none",
+              padding: "9px 18px",
+              fontSize: "14.5px",
+              fontWeight: isActive ? 600 : 500,
+              color: isActive ? "#263A54" : "#5B6B84",
+              borderBottom: isActive ? "2px solid #8E6A2F" : "2px solid transparent",
+              marginBottom: "-1px",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              outline: "none"
+            }
+          },
+          tab.label
+        );
+      })
+    ), activeTab === "qualities" && /* @__PURE__ */ import_react32.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12 col-lg-8 col-xl-6" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-primary-subtle text-primary p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-list fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Quality Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Manually add list of qualities"))), /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-12" }, qualities.length, " entries")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-2 mb-3" }, /* @__PURE__ */ import_react32.default.createElement(
       "input",
       {
         type: "text",
@@ -40565,17 +41620,18 @@
       "button",
       {
         type: "button",
-        className: "btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 flex-shrink-0",
+        className: "btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 flex-shrink-0 d-flex align-items-center gap-1",
         style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
         onClick: handleAddQuality,
         title: "Add Quality"
       },
-      /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-plus fs-14" })
-    )), /* @__PURE__ */ import_react32.default.createElement("div", { style: { maxHeight: "360px", overflowY: "auto" } }, qualities.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-center text-muted py-4 fs-13" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-list-check fs-24 d-block mb-2 text-muted opacity-50" }), "No thread qualities added yet.") : /* @__PURE__ */ import_react32.default.createElement("ul", { className: "list-unstyled mb-0" }, qualities.map((q, idx) => /* @__PURE__ */ import_react32.default.createElement(
+      /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-plus fs-14" }),
+      /* @__PURE__ */ import_react32.default.createElement("span", null, "Add")
+    )), /* @__PURE__ */ import_react32.default.createElement("div", { style: { maxHeight: "420px", overflowY: "auto" } }, qualities.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-center text-muted py-5 fs-13" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-list-check fs-28 d-block mb-2 text-muted opacity-50" }), "No thread qualities added yet.") : /* @__PURE__ */ import_react32.default.createElement("ul", { className: "list-unstyled mb-0" }, qualities.map((q, idx) => /* @__PURE__ */ import_react32.default.createElement(
       "li",
       {
         key: q.id,
-        className: "d-flex align-items-center justify-content-between py-2 border-bottom",
+        className: "d-flex align-items-center justify-content-between py-2.5 border-bottom",
         style: { borderColor: "#f1f5f9" }
       },
       editingQualityId === q.id ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-2 flex-grow-1 me-2" }, /* @__PURE__ */ import_react32.default.createElement(
@@ -40594,29 +41650,29 @@
           autoFocus: true,
           style: { borderColor: "#6366f1" }
         }
-      ), /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-success rounded-2 px-2", onClick: () => handleSaveQualityEdit(q.id), title: "Save" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-check fs-13" })), /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-light rounded-2 px-2", onClick: () => setEditingQualityId(null), title: "Cancel" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-x fs-13" }))) : /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-1.5" }, idx + 1), /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-dark fs-13 fw-medium" }, q.name)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-1" }, /* @__PURE__ */ import_react32.default.createElement(
+      ), /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-success rounded-2 px-2", onClick: () => handleSaveQualityEdit(q.id), title: "Save" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-check fs-13" })), /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-light rounded-2 px-2", onClick: () => setEditingQualityId(null), title: "Cancel" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-x fs-13" }))) : /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-1" }, idx + 1), /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-dark fs-13 fw-semibold" }, q.name)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-1" }, /* @__PURE__ */ import_react32.default.createElement(
         "button",
         {
           type: "button",
-          className: "btn btn-sm btn-light text-primary p-1 rounded-2",
+          className: "btn btn-sm btn-light text-primary p-1.5 rounded-2",
           title: "Edit",
           onClick: () => {
             setEditingQualityId(q.id);
             setEditingQualityName(q.name);
           }
         },
-        /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-edit fs-13" })
+        /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-edit fs-14" })
       ), /* @__PURE__ */ import_react32.default.createElement(
         "button",
         {
           type: "button",
-          className: "btn btn-sm btn-light text-danger p-1 rounded-2",
+          className: "btn btn-sm btn-light text-danger p-1.5 rounded-2",
           title: "Delete",
           onClick: () => handleDeleteQuality(q.id)
         },
-        /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-trash fs-13" })
+        /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-trash fs-14" })
       )))
-    ))))))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12 col-lg-8" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white h-100" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-success-subtle text-success p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-box fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Box Size Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Total = No. of Reels \xD7 Reel Length (auto-calculated)"))), /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-12" }, boxSizes.length, " sizes")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react32.default.createElement("table", { className: "table table-bordered align-middle mb-0 fs-13", style: { border: "1px solid #dee2e6", borderCollapse: "collapse" } }, /* @__PURE__ */ import_react32.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: 600 } }, /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "SIZE NAME"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "BOX / CONE"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "NO. OF REELS"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "REEL LENGTH (MTS)"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6", background: "#f0fdf4" } }, "TOTAL THREAD (MTS) \u26A1"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { width: "70px", padding: "8px 6px", border: "1px solid #dee2e6" } }))), /* @__PURE__ */ import_react32.default.createElement("tbody", null, boxSizes.map((bs) => /* @__PURE__ */ import_react32.default.createElement("tr", { key: bs.id, style: { borderBottom: "1px solid #dee2e6" } }, editingBsId === bs.id ? /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "6px 8px", border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement(
+    )))))))), activeTab === "box_sizes" && /* @__PURE__ */ import_react32.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-success-subtle text-success p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-box fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Box Size Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Total = No. of Reels \xD7 Reel Length (auto-calculated)"))), /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-12" }, boxSizes.length, " sizes")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react32.default.createElement("table", { className: "table table-bordered align-middle mb-0 fs-13", style: { border: "1px solid #dee2e6", borderCollapse: "collapse" } }, /* @__PURE__ */ import_react32.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: 600 } }, /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "SIZE NAME"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "BOX / CONE"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "NO. OF REELS"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "REEL LENGTH (MTS)"), /* @__PURE__ */ import_react32.default.createElement("th", { className: "text-center", style: { padding: "8px 10px", border: "1px solid #dee2e6", background: "#f0fdf4" } }, "TOTAL THREAD (MTS) \u26A1"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { width: "80px", padding: "8px 6px", border: "1px solid #dee2e6" } }))), /* @__PURE__ */ import_react32.default.createElement("tbody", null, boxSizes.map((bs) => /* @__PURE__ */ import_react32.default.createElement("tr", { key: bs.id, style: { borderBottom: "1px solid #dee2e6" } }, editingBsId === bs.id ? /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "6px 8px", border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement(
       "input",
       {
         type: "text",
@@ -40706,7 +41762,7 @@
         title: "Add Box Size"
       },
       /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-plus fs-12" })
-    ))), boxSizes.length === 0 && editingBsId !== null && /* @__PURE__ */ import_react32.default.createElement("tr", null, /* @__PURE__ */ import_react32.default.createElement("td", { colSpan: 6, className: "text-center text-muted py-3 fs-13" }, "No box sizes added yet. Use the row above to add.")))))))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-warning-subtle text-warning p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-tag fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Brand Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Brand Name (Mandatory), Vendor (optional, multiple), Thread Rates per box size (optional)"))), /* @__PURE__ */ import_react32.default.createElement(
+    ))), boxSizes.length === 0 && editingBsId !== null && /* @__PURE__ */ import_react32.default.createElement("tr", null, /* @__PURE__ */ import_react32.default.createElement("td", { colSpan: 6, className: "text-center text-muted py-3 fs-13" }, "No box sizes added yet. Use the row above to add."))))))))), activeTab === "brands" && /* @__PURE__ */ import_react32.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 bg-white" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-warning-subtle text-warning p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-tag fs-15" })), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h6", { className: "fw-bold text-dark mb-0 fs-15" }, "Thread Brand Master"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11" }, "Brand Name (Mandatory), Vendor (optional, multiple), Thread Rates per box size (optional)"))), /* @__PURE__ */ import_react32.default.createElement(
       "button",
       {
         type: "button",
@@ -41196,6 +42252,17 @@
       let updatedQCs = [...qualityChecks || []];
       grns.forEach((g) => {
         if (!g || !g.id) return;
+        const isExplicitlySent = Boolean(
+          g.isSubmittedToQC === true || ["Submitted to QC", "QC In Progress", "QC Approved", "QC Passed", "QC Rejected", "Pending Admin Approval"].includes(g.status)
+        ) && g.status !== "Draft" && g.status !== "Bale Entry in Progress";
+        if (!isExplicitlySent) {
+          const matchingPendingQCs = updatedQCs.filter((q) => q && (q.grnRef === g.id || g.id && q.id && q.id.startsWith(`QC-${g.id.replace("GRN-", "")}`)));
+          if (matchingPendingQCs.length > 0) {
+            updatedQCs = updatedQCs.filter((q) => !matchingPendingQCs.includes(q));
+            hasUpdates = true;
+          }
+          return;
+        }
         const linkedPO = g.linkedPOs && g.linkedPOs.length > 0 ? purchaseOrders.find((p) => g.linkedPOs.includes(p.id)) : purchaseOrders.find((p) => p.id === g.poId);
         const poItems = linkedPO?.items || [];
         const baleFabrics = Array.from(new Set((g.bales || []).map((b) => b.fabricItemLabel).filter(Boolean)));
@@ -41426,7 +42493,7 @@
       setActiveTab("grn");
       if (onNavigate) onNavigate("/goods-inward");
     };
-    const handleSaveGRN = (grnData, isCompleted = true) => {
+    const handleSaveGRN = (grnData, isCompleted = true, shouldExitToList = false) => {
       const isEdit = grns.some((g) => g.id === grnData.id);
       const now = Date.now();
       const liveM = (grnData.bales || []).reduce((sum, b) => {
@@ -41456,6 +42523,9 @@
       }
       setGrns(updated);
       api.saveGRN(enrichedGRN).catch((e) => console.warn("GRN save sync error:", e));
+      if (!isCompleted || enrichedGRN.status === "Draft" || enrichedGRN.status === "Bale Entry in Progress" || !enrichedGRN.isSubmittedToQC) {
+        setQualityChecks((prev) => (prev || []).filter((q) => q && q.grnRef !== enrichedGRN.id && (!q.id || !q.id.startsWith(`QC-${enrichedGRN.id.replace("GRN-", "")}`))));
+      }
       const targetLinkedPoIds = enrichedGRN.linkedPOs && enrichedGRN.linkedPOs.length > 0 ? enrichedGRN.linkedPOs : enrichedGRN.poId ? [enrichedGRN.poId] : [];
       if (targetLinkedPoIds.length > 0) {
         targetLinkedPoIds.forEach((linkedPoId) => {
@@ -41465,21 +42535,7 @@
             const allGrnsForPo = updated.filter((g) => g && (g.linkedPOs && g.linkedPOs.includes(linkedPoId) || g.poId === linkedPoId));
             let totalReceivedForPo = 0;
             allGrnsForPo.forEach((g) => {
-              let poMetersInGrn = 0;
-              (g.bales || []).forEach((b) => {
-                const bPo = b.poId || (b.fabricItemLabel && b.fabricItemLabel.includes(linkedPoId) ? linkedPoId : null);
-                if (bPo === linkedPoId) {
-                  poMetersInGrn += Number(b.totalLength) || 0;
-                } else if (!bPo && (!g.linkedPOs || g.linkedPOs.length <= 1)) {
-                  poMetersInGrn += Number(b.totalLength) || 0;
-                }
-              });
-              if (poMetersInGrn === 0) {
-                const grnTotal = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
-                const count = g.linkedPOs && g.linkedPOs.length > 0 ? g.linkedPOs.length : 1;
-                poMetersInGrn = Math.round(grnTotal / count);
-              }
-              totalReceivedForPo += poMetersInGrn;
+              totalReceivedForPo += getMetersForPoFromGrn(g, linkedPoId, targetPo.items);
             });
             let newPoStatus = targetPo.status;
             if (totalReceivedForPo >= poOrderedMeters && poOrderedMeters > 0) {
@@ -41657,11 +42713,14 @@
         setActiveGrnView("detail");
         return;
       }
-      if (!isCompleted) {
+      if (!isCompleted && !shouldExitToList) {
         setSelectedGRN(enrichedGRN);
         return;
       }
+      setSelectedGRN(null);
       setActiveGrnView("list");
+      setActiveTab("grn");
+      if (onNavigate) onNavigate("/goods-inward");
     };
     const handleSaveQC = (qcData) => {
       const isEdit = qualityChecks.some((q) => q.id === qcData.id);
@@ -42059,6 +43118,7 @@
       PurchaseOrderForm,
       {
         po: selectedPO,
+        purchaseOrders,
         vendors,
         fabrics,
         orders: salesOrders,
@@ -42274,17 +43334,19 @@
         qualityChecks,
         grns,
         onBack: () => {
-          const existsInGrns = selectedGRN && (grns || []).some((g) => g && g.id === selectedGRN.id);
-          if (existsInGrns) {
-            setActiveGrnView("detail");
-          } else {
-            setSelectedGRN(null);
-            setActiveGrnView("list");
-          }
+          setSelectedGRN(null);
+          setActiveGrnView("list");
+          setActiveTab("grn");
+          if (onNavigate) onNavigate("/goods-inward");
         },
-        onSaveGRN: (grnData, isCompleted) => {
-          handleSaveGRN(grnData, isCompleted);
-          setSelectedGRN(grnData);
+        onExitToList: () => {
+          setSelectedGRN(null);
+          setActiveGrnView("list");
+          setActiveTab("grn");
+          if (onNavigate) onNavigate("/goods-inward");
+        },
+        onSaveGRN: (grnData, isCompleted, shouldExitToList = false) => {
+          handleSaveGRN(grnData, isCompleted, shouldExitToList);
         },
         onSaveTransporter: (t) => {
           setTransporters((prev) => {

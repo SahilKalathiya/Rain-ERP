@@ -70,6 +70,9 @@ function calcTotal(noOfReels, reelLength) {
 // ============================================================
 export default function ThreadMasterView() {
 
+  // --- State: Active Sub-tab ('qualities' | 'box_sizes' | 'brands') ---
+  const [activeTab, setActiveTab] = useState('qualities');
+
   // --- State: Thread Quality ---
   const [qualities, setQualities] = useState(() => loadLS(LS_QUALITIES, DEFAULT_QUALITIES));
   const [qualityInput, setQualityInput] = useState('');
@@ -279,424 +282,474 @@ export default function ThreadMasterView() {
         </div>
       </div>
 
-      <div className="row g-4">
+      {/* SUBTABS NAVIGATION (Exact styling matching Order Masters / Image 2) */}
+      <div
+        className="d-flex align-items-center mb-4"
+        style={{
+          gap: '4px',
+          borderBottom: '1px solid #DED3C6',
+          flexWrap: 'wrap',
+        }}
+      >
+        {[
+          { id: 'qualities', label: 'Thread Qualities' },
+          { id: 'box_sizes', label: 'Sizes (Series)' },
+          { id: 'brands', label: 'Brands & Rates' },
+        ].map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '9px 18px',
+                fontSize: '14.5px',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? '#263A54' : '#5B6B84',
+                borderBottom: isActive ? '2px solid #8E6A2F' : '2px solid transparent',
+                marginBottom: '-1px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                outline: 'none',
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* ===================================================
-            SECTION 1: THREAD QUALITY MASTER
-        =================================================== */}
-        <div className="col-12 col-lg-4">
-          <div className="card border-0 shadow-sm rounded-4 bg-white h-100">
-            <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
-              <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-primary-subtle text-primary p-2 rounded-3">
-                  <i className="ti ti-list fs-15"></i>
+      {/* ===================================================
+          TAB 1: THREAD QUALITY MASTER
+      =================================================== */}
+      {activeTab === 'qualities' && (
+        <div className="row">
+          <div className="col-12 col-lg-8 col-xl-6">
+            <div className="card border-0 shadow-sm rounded-4 bg-white">
+              <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-primary-subtle text-primary p-2 rounded-3">
+                    <i className="ti ti-list fs-15"></i>
+                  </span>
+                  <div>
+                    <h6 className="fw-bold text-dark mb-0 fs-15">Thread Quality Master</h6>
+                    <div className="text-muted fs-11">Manually add list of qualities</div>
+                  </div>
+                </div>
+                <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
+                  {qualities.length} entries
                 </span>
-                <div>
-                  <h6 className="fw-bold text-dark mb-0 fs-15">Thread Quality Master</h6>
-                  <div className="text-muted fs-11">Manually add list of qualities</div>
+              </div>
+
+              <div className="card-body px-4 py-3">
+                {/* Add new quality */}
+                <div className="d-flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    className="form-control form-control-sm fs-13"
+                    placeholder="e.g. 2 Ply Poly, Embroidery Viscose..."
+                    value={qualityInput}
+                    onChange={e => setQualityInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddQuality(); }}
+                    style={{ borderColor: '#cbd5e1' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 flex-shrink-0 d-flex align-items-center gap-1"
+                    style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                    onClick={handleAddQuality}
+                    title="Add Quality"
+                  >
+                    <i className="ti ti-plus fs-14"></i>
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {/* List */}
+                <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                  {qualities.length === 0 ? (
+                    <div className="text-center text-muted py-5 fs-13">
+                      <i className="ti ti-list-check fs-28 d-block mb-2 text-muted opacity-50"></i>
+                      No thread qualities added yet.
+                    </div>
+                  ) : (
+                    <ul className="list-unstyled mb-0">
+                      {qualities.map((q, idx) => (
+                        <li
+                          key={q.id}
+                          className="d-flex align-items-center justify-content-between py-2.5 border-bottom"
+                          style={{ borderColor: '#f1f5f9' }}
+                        >
+                          {editingQualityId === q.id ? (
+                            <div className="d-flex gap-2 flex-grow-1 me-2">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm fs-13"
+                                value={editingQualityName}
+                                onChange={e => setEditingQualityName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveQualityEdit(q.id); if (e.key === 'Escape') { setEditingQualityId(null); } }}
+                                autoFocus
+                                style={{ borderColor: '#6366f1' }}
+                              />
+                              <button className="btn btn-sm btn-success rounded-2 px-2" onClick={() => handleSaveQualityEdit(q.id)} title="Save">
+                                <i className="ti ti-check fs-13"></i>
+                              </button>
+                              <button className="btn btn-sm btn-light rounded-2 px-2" onClick={() => setEditingQualityId(null)} title="Cancel">
+                                <i className="ti ti-x fs-13"></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-1">{idx + 1}</span>
+                                <span className="text-dark fs-13 fw-semibold">{q.name}</span>
+                              </div>
+                              <div className="d-flex gap-1">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-light text-primary p-1.5 rounded-2"
+                                  title="Edit"
+                                  onClick={() => { setEditingQualityId(q.id); setEditingQualityName(q.name); }}
+                                >
+                                  <i className="ti ti-edit fs-14"></i>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-light text-danger p-1.5 rounded-2"
+                                  title="Delete"
+                                  onClick={() => handleDeleteQuality(q.id)}
+                                >
+                                  <i className="ti ti-trash fs-14"></i>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
-              <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
-                {qualities.length} entries
-              </span>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="card-body px-4 py-3">
-              {/* Add new quality */}
-              <div className="d-flex gap-2 mb-3">
-                <input
-                  type="text"
-                  className="form-control form-control-sm fs-13"
-                  placeholder="e.g. 2 Ply Poly, Embroidery Viscose..."
-                  value={qualityInput}
-                  onChange={e => setQualityInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddQuality(); }}
-                  style={{ borderColor: '#cbd5e1' }}
-                />
+      {/* ===================================================
+          TAB 2: THREAD BOX SIZE MASTER (Sizes (Series))
+      =================================================== */}
+      {activeTab === 'box_sizes' && (
+        <div className="row">
+          <div className="col-12">
+            <div className="card border-0 shadow-sm rounded-4 bg-white">
+              <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-success-subtle text-success p-2 rounded-3">
+                    <i className="ti ti-box fs-15"></i>
+                  </span>
+                  <div>
+                    <h6 className="fw-bold text-dark mb-0 fs-15">Thread Box Size Master</h6>
+                    <div className="text-muted fs-11">Total = No. of Reels × Reel Length (auto-calculated)</div>
+                  </div>
+                </div>
+                <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
+                  {boxSizes.length} sizes
+                </span>
+              </div>
+
+              <div className="card-body px-4 py-3">
+                <div className="table-responsive">
+                  <table className="table table-bordered align-middle mb-0 fs-13" style={{ border: '1px solid #dee2e6', borderCollapse: 'collapse' }}>
+                    <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
+                      <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: 600 }}>
+                        <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>SIZE NAME</th>
+                        <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>BOX / CONE</th>
+                        <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>NO. OF REELS</th>
+                        <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>REEL LENGTH (MTS)</th>
+                        <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>TOTAL THREAD (MTS) ⚡</th>
+                        <th style={{ width: '80px', padding: '8px 6px', border: '1px solid #dee2e6' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {boxSizes.map(bs => (
+                        <tr key={bs.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                          {editingBsId === bs.id ? (
+                            <>
+                              <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm fs-12"
+                                  value={bsForm.sizeName}
+                                  onChange={e => handleBsChange('sizeName', e.target.value)}
+                                  style={{ borderColor: '#6366f1', height: '30px' }}
+                                />
+                              </td>
+                              <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                                <select
+                                  className="form-select form-select-sm fs-12"
+                                  value={bsForm.type}
+                                  onChange={e => handleBsChange('type', e.target.value)}
+                                  style={{ borderColor: '#6366f1', height: '30px' }}
+                                >
+                                  <option value="Box">Box</option>
+                                  <option value="Cone">Cone</option>
+                                </select>
+                              </td>
+                              <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                                <input
+                                  type="number"
+                                  className="form-control form-control-sm fs-12 text-center no-spinner"
+                                  value={bsForm.noOfReels}
+                                  onChange={e => handleBsChange('noOfReels', e.target.value)}
+                                  style={{ borderColor: '#6366f1', height: '30px' }}
+                                />
+                              </td>
+                              <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                                <input
+                                  type="number"
+                                  className="form-control form-control-sm fs-12 text-center no-spinner"
+                                  value={bsForm.reelLengthMts}
+                                  onChange={e => handleBsChange('reelLengthMts', e.target.value)}
+                                  style={{ borderColor: '#6366f1', height: '30px' }}
+                                />
+                              </td>
+                              <td className="text-center" style={{ padding: '6px 8px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
+                                <span className="fw-bold text-success fs-13">
+                                  {(Number(bsForm.noOfReels) || 0) * (Number(bsForm.reelLengthMts) || 0)} mts
+                                </span>
+                              </td>
+                              <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
+                                <div className="d-flex gap-1 justify-content-center">
+                                  <button className="btn btn-sm btn-success p-1 rounded-2" onClick={handleSaveBsEdit} title="Save">
+                                    <i className="ti ti-check fs-12"></i>
+                                  </button>
+                                  <button className="btn btn-sm btn-light p-1 rounded-2" onClick={() => { setEditingBsId(null); setBsForm({ sizeName: '', type: 'Box', noOfReels: '', reelLengthMts: '' }); }} title="Cancel">
+                                    <i className="ti ti-x fs-12"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
+                                <span className="fw-semibold text-dark fs-13">{bs.sizeName}</span>
+                              </td>
+                              <td style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
+                                <span className={`badge fs-11 fw-medium px-2 py-1 ${bs.type === 'Box' ? 'bg-primary-subtle text-primary border border-primary border-opacity-25' : 'bg-warning-subtle text-warning border border-warning border-opacity-25'}`}>
+                                  {bs.type}
+                                </span>
+                              </td>
+                              <td className="text-center fw-medium text-dark fs-13" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
+                                {bs.noOfReels}
+                              </td>
+                              <td className="text-center text-dark fs-13" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
+                                {Number(bs.reelLengthMts).toLocaleString()} mts
+                              </td>
+                              <td className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
+                                <span className="fw-bold text-success fs-13">{Number(bs.totalThread).toLocaleString()} mts</span>
+                              </td>
+                              <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
+                                <div className="d-flex gap-1 justify-content-center">
+                                  <button className="btn btn-sm btn-light text-primary p-1 rounded-2" onClick={() => handleEditBs(bs)} title="Edit">
+                                    <i className="ti ti-edit fs-13"></i>
+                                  </button>
+                                  <button className="btn btn-sm btn-light text-danger p-1 rounded-2" onClick={() => handleDeleteBs(bs.id)} title="Delete">
+                                    <i className="ti ti-trash fs-13"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+
+                      {/* Add New Row (inline) */}
+                      {editingBsId === null && (
+                        <tr style={{ background: '#fafbfc' }}>
+                          <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm fs-12"
+                              placeholder="e.g. Size 5"
+                              value={bsForm.sizeName}
+                              onChange={e => handleBsChange('sizeName', e.target.value)}
+                              style={{ borderColor: '#cbd5e1', height: '30px' }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                            <select
+                              className="form-select form-select-sm fs-12"
+                              value={bsForm.type}
+                              onChange={e => handleBsChange('type', e.target.value)}
+                              style={{ borderColor: '#cbd5e1', height: '30px' }}
+                            >
+                              <option value="Box">Box</option>
+                              <option value="Cone">Cone</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                            <input
+                              type="number"
+                              className="form-control form-control-sm fs-12 text-center no-spinner"
+                              placeholder="15"
+                              value={bsForm.noOfReels}
+                              onChange={e => handleBsChange('noOfReels', e.target.value)}
+                              style={{ borderColor: '#cbd5e1', height: '30px' }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
+                            <input
+                              type="number"
+                              className="form-control form-control-sm fs-12 text-center no-spinner"
+                              placeholder="400"
+                              value={bsForm.reelLengthMts}
+                              onChange={e => handleBsChange('reelLengthMts', e.target.value)}
+                              style={{ borderColor: '#cbd5e1', height: '30px' }}
+                            />
+                          </td>
+                          <td className="text-center" style={{ padding: '6px 8px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
+                            {bsForm.noOfReels && bsForm.reelLengthMts ? (
+                              <span className="fw-bold text-success fs-13">
+                                {calcTotal(bsForm.noOfReels, bsForm.reelLengthMts).toLocaleString()} mts
+                              </span>
+                            ) : (
+                              <span className="text-muted fs-12">—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary rounded-2 px-2"
+                              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb', height: '28px' }}
+                              onClick={handleAddBoxSize}
+                              title="Add Box Size"
+                            >
+                              <i className="ti ti-plus fs-12"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+
+                      {boxSizes.length === 0 && editingBsId !== null && (
+                        <tr>
+                          <td colSpan={6} className="text-center text-muted py-3 fs-13">
+                            No box sizes added yet. Use the row above to add.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================
+          TAB 3: THREAD BRAND MASTER (Brands & Rates)
+      =================================================== */}
+      {activeTab === 'brands' && (
+        <div className="row">
+          <div className="col-12">
+            <div className="card border-0 shadow-sm rounded-4 bg-white">
+              <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-warning-subtle text-warning p-2 rounded-3">
+                    <i className="ti ti-tag fs-15"></i>
+                  </span>
+                  <div>
+                    <h6 className="fw-bold text-dark mb-0 fs-15">Thread Brand Master</h6>
+                    <div className="text-muted fs-11">Brand Name (Mandatory), Vendor (optional, multiple), Thread Rates per box size (optional)</div>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 flex-shrink-0"
+                  className="btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 d-flex align-items-center gap-1"
                   style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                  onClick={handleAddQuality}
-                  title="Add Quality"
+                  onClick={openNewBrand}
                 >
                   <i className="ti ti-plus fs-14"></i>
+                  <span>New Brand</span>
                 </button>
               </div>
 
-              {/* List */}
-              <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                {qualities.length === 0 ? (
-                  <div className="text-center text-muted py-4 fs-13">
-                    <i className="ti ti-list-check fs-24 d-block mb-2 text-muted opacity-50"></i>
-                    No thread qualities added yet.
+              <div className="card-body px-4 py-3">
+                {brands.length === 0 ? (
+                  <div className="text-center text-muted py-5 fs-13">
+                    <i className="ti ti-tag fs-30 d-block mb-2 opacity-40"></i>
+                    No brands added yet. Click "+ New Brand" to add.
                   </div>
                 ) : (
-                  <ul className="list-unstyled mb-0">
-                    {qualities.map((q, idx) => (
-                      <li
-                        key={q.id}
-                        className="d-flex align-items-center justify-content-between py-2 border-bottom"
-                        style={{ borderColor: '#f1f5f9' }}
-                      >
-                        {editingQualityId === q.id ? (
-                          <div className="d-flex gap-2 flex-grow-1 me-2">
-                            <input
-                              type="text"
-                              className="form-control form-control-sm fs-13"
-                              value={editingQualityName}
-                              onChange={e => setEditingQualityName(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') handleSaveQualityEdit(q.id); if (e.key === 'Escape') { setEditingQualityId(null); } }}
-                              autoFocus
-                              style={{ borderColor: '#6366f1' }}
-                            />
-                            <button className="btn btn-sm btn-success rounded-2 px-2" onClick={() => handleSaveQualityEdit(q.id)} title="Save">
-                              <i className="ti ti-check fs-13"></i>
-                            </button>
-                            <button className="btn btn-sm btn-light rounded-2 px-2" onClick={() => setEditingQualityId(null)} title="Cancel">
-                              <i className="ti ti-x fs-13"></i>
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="d-flex align-items-center gap-2">
-                              <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-1.5">{idx + 1}</span>
-                              <span className="text-dark fs-13 fw-medium">{q.name}</span>
-                            </div>
-                            <div className="d-flex gap-1">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-light text-primary p-1 rounded-2"
-                                title="Edit"
-                                onClick={() => { setEditingQualityId(q.id); setEditingQualityName(q.name); }}
-                              >
-                                <i className="ti ti-edit fs-13"></i>
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-light text-danger p-1 rounded-2"
-                                title="Delete"
-                                onClick={() => handleDeleteQuality(q.id)}
-                              >
-                                <i className="ti ti-trash fs-13"></i>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="table-responsive">
+                    <table className="table table-bordered align-middle mb-0 fs-13" style={{ border: '1px solid #dee2e6' }}>
+                      <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
+                        <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: 600 }}>
+                          <th style={{ padding: '8px 10px', border: '1px solid #dee2e6', minWidth: '120px' }}>BRAND NAME</th>
+                          <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>VENDOR(S)</th>
+                          {boxSizes.map(bs => (
+                            <th key={bs.id} className="text-center" style={{ padding: '8px 8px', border: '1px solid #dee2e6', minWidth: '110px', background: '#fffbeb' }}>
+                              <div>{bs.type === 'Box' ? '📦' : '🧵'} {bs.sizeName}</div>
+                              <div className="fw-normal text-muted fs-10">{Number(bs.totalThread).toLocaleString()} mts</div>
+                            </th>
+                          ))}
+                          <th style={{ width: '80px', padding: '8px 6px', border: '1px solid #dee2e6' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {brands.map(brand => (
+                          <tr key={brand.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                            <td style={{ padding: '10px 12px', border: '1px solid #dee2e6' }}>
+                              <div className="fw-bold text-dark fs-14">{brand.brandName}</div>
+                              <div className="text-muted fs-11 font-monospace">{brand.id}</div>
+                            </td>
+                            <td style={{ padding: '10px 12px', border: '1px solid #dee2e6' }}>
+                              {brand.vendors && brand.vendors.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-1">
+                                  {brand.vendors.filter(Boolean).map((v, i) => (
+                                    <span key={i} className="badge bg-light text-secondary border fs-11 fw-normal px-2 py-1">{v}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted fs-12">— None —</span>
+                              )}
+                            </td>
+                            {boxSizes.map(bs => {
+                              const rateEntry = (brand.rates || []).find(r => r.boxSizeId === bs.id);
+                              return (
+                                <td key={bs.id} className="text-center" style={{ padding: '10px 8px', border: '1px solid #dee2e6', background: '#fffbeb' }}>
+                                  {rateEntry && rateEntry.rate ? (
+                                    <span className="fw-semibold text-dark fs-13">₹{rateEntry.rate}</span>
+                                  ) : (
+                                    <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-1">—</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td style={{ padding: '8px 6px', border: '1px solid #dee2e6' }}>
+                              <div className="d-flex gap-1 justify-content-center">
+                                <button className="btn btn-sm btn-light text-primary p-1 rounded-2" onClick={() => openEditBrand(brand)} title="Edit Brand">
+                                  <i className="ti ti-edit fs-13"></i>
+                                </button>
+                                <button className="btn btn-sm btn-light text-danger p-1 rounded-2" onClick={() => handleDeleteBrand(brand.id)} title="Delete Brand">
+                                  <i className="ti ti-trash fs-13"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-
-        {/* ===================================================
-            SECTION 2: THREAD BOX SIZE MASTER
-        =================================================== */}
-        <div className="col-12 col-lg-8">
-          <div className="card border-0 shadow-sm rounded-4 bg-white h-100">
-            <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
-              <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-success-subtle text-success p-2 rounded-3">
-                  <i className="ti ti-box fs-15"></i>
-                </span>
-                <div>
-                  <h6 className="fw-bold text-dark mb-0 fs-15">Thread Box Size Master</h6>
-                  <div className="text-muted fs-11">Total = No. of Reels × Reel Length (auto-calculated)</div>
-                </div>
-              </div>
-              <span className="badge bg-light text-secondary border px-2 py-1 fs-12">
-                {boxSizes.length} sizes
-              </span>
-            </div>
-
-            <div className="card-body px-4 py-3">
-              <div className="table-responsive">
-                <table className="table table-bordered align-middle mb-0 fs-13" style={{ border: '1px solid #dee2e6', borderCollapse: 'collapse' }}>
-                  <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
-                    <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: 600 }}>
-                      <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>SIZE NAME</th>
-                      <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>BOX / CONE</th>
-                      <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>NO. OF REELS</th>
-                      <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>REEL LENGTH (MTS)</th>
-                      <th className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>TOTAL THREAD (MTS) ⚡</th>
-                      <th style={{ width: '70px', padding: '8px 6px', border: '1px solid #dee2e6' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {boxSizes.map(bs => (
-                      <tr key={bs.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                        {editingBsId === bs.id ? (
-                          <>
-                            <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                              <input
-                                type="text"
-                                className="form-control form-control-sm fs-12"
-                                value={bsForm.sizeName}
-                                onChange={e => handleBsChange('sizeName', e.target.value)}
-                                style={{ borderColor: '#6366f1', height: '30px' }}
-                              />
-                            </td>
-                            <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                              <select
-                                className="form-select form-select-sm fs-12"
-                                value={bsForm.type}
-                                onChange={e => handleBsChange('type', e.target.value)}
-                                style={{ borderColor: '#6366f1', height: '30px' }}
-                              >
-                                <option value="Box">Box</option>
-                                <option value="Cone">Cone</option>
-                              </select>
-                            </td>
-                            <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                              <input
-                                type="number"
-                                className="form-control form-control-sm fs-12 text-center no-spinner"
-                                value={bsForm.noOfReels}
-                                onChange={e => handleBsChange('noOfReels', e.target.value)}
-                                style={{ borderColor: '#6366f1', height: '30px' }}
-                              />
-                            </td>
-                            <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                              <input
-                                type="number"
-                                className="form-control form-control-sm fs-12 text-center no-spinner"
-                                value={bsForm.reelLengthMts}
-                                onChange={e => handleBsChange('reelLengthMts', e.target.value)}
-                                style={{ borderColor: '#6366f1', height: '30px' }}
-                              />
-                            </td>
-                            <td className="text-center" style={{ padding: '6px 8px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
-                              <span className="fw-bold text-success fs-13">
-                                {(Number(bsForm.noOfReels) || 0) * (Number(bsForm.reelLengthMts) || 0)} mts
-                              </span>
-                            </td>
-                            <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
-                              <div className="d-flex gap-1 justify-content-center">
-                                <button className="btn btn-sm btn-success p-1 rounded-2" onClick={handleSaveBsEdit} title="Save">
-                                  <i className="ti ti-check fs-12"></i>
-                                </button>
-                                <button className="btn btn-sm btn-light p-1 rounded-2" onClick={() => { setEditingBsId(null); setBsForm({ sizeName: '', type: 'Box', noOfReels: '', reelLengthMts: '' }); }} title="Cancel">
-                                  <i className="ti ti-x fs-12"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
-                              <span className="fw-semibold text-dark fs-13">{bs.sizeName}</span>
-                            </td>
-                            <td style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
-                              <span className={`badge fs-11 fw-medium px-2 py-1 ${bs.type === 'Box' ? 'bg-primary-subtle text-primary border border-primary border-opacity-25' : 'bg-warning-subtle text-warning border border-warning border-opacity-25'}`}>
-                                {bs.type}
-                              </span>
-                            </td>
-                            <td className="text-center fw-medium text-dark fs-13" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
-                              {bs.noOfReels}
-                            </td>
-                            <td className="text-center text-dark fs-13" style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>
-                              {Number(bs.reelLengthMts).toLocaleString()} mts
-                            </td>
-                            <td className="text-center" style={{ padding: '8px 10px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
-                              <span className="fw-bold text-success fs-13">{Number(bs.totalThread).toLocaleString()} mts</span>
-                            </td>
-                            <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
-                              <div className="d-flex gap-1 justify-content-center">
-                                <button className="btn btn-sm btn-light text-primary p-1 rounded-2" onClick={() => handleEditBs(bs)} title="Edit">
-                                  <i className="ti ti-edit fs-13"></i>
-                                </button>
-                                <button className="btn btn-sm btn-light text-danger p-1 rounded-2" onClick={() => handleDeleteBs(bs.id)} title="Delete">
-                                  <i className="ti ti-trash fs-13"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
-
-                    {/* Add New Row (inline) */}
-                    {editingBsId === null && (
-                      <tr style={{ background: '#fafbfc' }}>
-                        <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm fs-12"
-                            placeholder="e.g. Size 5"
-                            value={bsForm.sizeName}
-                            onChange={e => handleBsChange('sizeName', e.target.value)}
-                            style={{ borderColor: '#cbd5e1', height: '30px' }}
-                          />
-                        </td>
-                        <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                          <select
-                            className="form-select form-select-sm fs-12"
-                            value={bsForm.type}
-                            onChange={e => handleBsChange('type', e.target.value)}
-                            style={{ borderColor: '#cbd5e1', height: '30px' }}
-                          >
-                            <option value="Box">Box</option>
-                            <option value="Cone">Cone</option>
-                          </select>
-                        </td>
-                        <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                          <input
-                            type="number"
-                            className="form-control form-control-sm fs-12 text-center no-spinner"
-                            placeholder="15"
-                            value={bsForm.noOfReels}
-                            onChange={e => handleBsChange('noOfReels', e.target.value)}
-                            style={{ borderColor: '#cbd5e1', height: '30px' }}
-                          />
-                        </td>
-                        <td style={{ padding: '6px 8px', border: '1px solid #dee2e6' }}>
-                          <input
-                            type="number"
-                            className="form-control form-control-sm fs-12 text-center no-spinner"
-                            placeholder="400"
-                            value={bsForm.reelLengthMts}
-                            onChange={e => handleBsChange('reelLengthMts', e.target.value)}
-                            style={{ borderColor: '#cbd5e1', height: '30px' }}
-                          />
-                        </td>
-                        <td className="text-center" style={{ padding: '6px 8px', border: '1px solid #dee2e6', background: '#f0fdf4' }}>
-                          {bsForm.noOfReels && bsForm.reelLengthMts ? (
-                            <span className="fw-bold text-success fs-13">
-                              {calcTotal(bsForm.noOfReels, bsForm.reelLengthMts).toLocaleString()} mts
-                            </span>
-                          ) : (
-                            <span className="text-muted fs-12">—</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '6px 4px', border: '1px solid #dee2e6' }}>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary rounded-2 px-2"
-                            style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb', height: '28px' }}
-                            onClick={handleAddBoxSize}
-                            title="Add Box Size"
-                          >
-                            <i className="ti ti-plus fs-12"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-
-                    {boxSizes.length === 0 && editingBsId !== null && (
-                      <tr>
-                        <td colSpan={6} className="text-center text-muted py-3 fs-13">
-                          No box sizes added yet. Use the row above to add.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ===================================================
-            SECTION 3: THREAD BRAND MASTER
-        =================================================== */}
-        <div className="col-12">
-          <div className="card border-0 shadow-sm rounded-4 bg-white">
-            <div className="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
-              <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-warning-subtle text-warning p-2 rounded-3">
-                  <i className="ti ti-tag fs-15"></i>
-                </span>
-                <div>
-                  <h6 className="fw-bold text-dark mb-0 fs-15">Thread Brand Master</h6>
-                  <div className="text-muted fs-11">Brand Name (Mandatory), Vendor (optional, multiple), Thread Rates per box size (optional)</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm px-3 fw-semibold fs-13 rounded-3 d-flex align-items-center gap-1"
-                style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                onClick={openNewBrand}
-              >
-                <i className="ti ti-plus fs-14"></i>
-                <span>New Brand</span>
-              </button>
-            </div>
-
-            <div className="card-body px-4 py-3">
-              {brands.length === 0 ? (
-                <div className="text-center text-muted py-5 fs-13">
-                  <i className="ti ti-tag fs-30 d-block mb-2 opacity-40"></i>
-                  No brands added yet. Click "+ New Brand" to add.
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-bordered align-middle mb-0 fs-13" style={{ border: '1px solid #dee2e6' }}>
-                    <thead style={{ background: '#f8fafc', borderBottom: '2px solid #dee2e6' }}>
-                      <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: 600 }}>
-                        <th style={{ padding: '8px 10px', border: '1px solid #dee2e6', minWidth: '120px' }}>BRAND NAME</th>
-                        <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>VENDOR(S)</th>
-                        {boxSizes.map(bs => (
-                          <th key={bs.id} className="text-center" style={{ padding: '8px 8px', border: '1px solid #dee2e6', minWidth: '110px', background: '#fffbeb' }}>
-                            <div>{bs.type === 'Box' ? '📦' : '🧵'} {bs.sizeName}</div>
-                            <div className="fw-normal text-muted fs-10">{Number(bs.totalThread).toLocaleString()} mts</div>
-                          </th>
-                        ))}
-                        <th style={{ width: '80px', padding: '8px 6px', border: '1px solid #dee2e6' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brands.map(brand => (
-                        <tr key={brand.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                          <td style={{ padding: '10px 12px', border: '1px solid #dee2e6' }}>
-                            <div className="fw-bold text-dark fs-14">{brand.brandName}</div>
-                            <div className="text-muted fs-11 font-monospace">{brand.id}</div>
-                          </td>
-                          <td style={{ padding: '10px 12px', border: '1px solid #dee2e6' }}>
-                            {brand.vendors && brand.vendors.length > 0 ? (
-                              <div className="d-flex flex-wrap gap-1">
-                                {brand.vendors.filter(Boolean).map((v, i) => (
-                                  <span key={i} className="badge bg-light text-secondary border fs-11 fw-normal px-2 py-1">{v}</span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted fs-12">— None —</span>
-                            )}
-                          </td>
-                          {boxSizes.map(bs => {
-                            const rateEntry = (brand.rates || []).find(r => r.boxSizeId === bs.id);
-                            return (
-                              <td key={bs.id} className="text-center" style={{ padding: '10px 8px', border: '1px solid #dee2e6', background: '#fffbeb' }}>
-                                {rateEntry && rateEntry.rate ? (
-                                  <span className="fw-semibold text-dark fs-13">₹{rateEntry.rate}</span>
-                                ) : (
-                                  <span className="badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-1">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td style={{ padding: '8px 6px', border: '1px solid #dee2e6' }}>
-                            <div className="d-flex gap-1 justify-content-center">
-                              <button className="btn btn-sm btn-light text-primary p-1 rounded-2" onClick={() => openEditBrand(brand)} title="Edit Brand">
-                                <i className="ti ti-edit fs-13"></i>
-                              </button>
-                              <button className="btn btn-sm btn-light text-danger p-1 rounded-2" onClick={() => handleDeleteBrand(brand.id)} title="Delete Brand">
-                                <i className="ti ti-trash fs-13"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* =====================================================
           BRAND MODAL: Create / Edit Brand

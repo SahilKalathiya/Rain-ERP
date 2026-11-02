@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import TransporterMasterView from './TransporterMasterView';
+import { calculatePoFabricFulfillment, isPieceOrBaleMatchForItem } from '../../utils/procurementUtils';
 
 /**
  * GRNForm - Goods Receipt Note (GRN) Module
@@ -34,7 +35,8 @@ export default function GRNForm({
   grns = [],
   onBack,
   onSaveGRN,
-  onSaveTransporter
+  onSaveTransporter,
+  onExitToList
 }) {
   const isExisting = Boolean(
     grn &&
@@ -42,6 +44,17 @@ export default function GRNForm({
     !grn.isNew &&
     (grns || []).some((g) => g && g.id === grn.id)
   );
+
+  const isBaleMixed = (bale) => {
+    if (!bale) return false;
+    return Boolean(
+      bale.isMixedFabric ||
+      bale.fabricItemLabel === 'MIXED_FABRIC' ||
+      bale.fabricName === 'Mixed Fabric' ||
+      (typeof bale.fabricItemLabel === 'string' && bale.fabricItemLabel.toLowerCase().includes('mixed')) ||
+      (typeof bale.fabricName === 'string' && bale.fabricName.toLowerCase().includes('mixed'))
+    );
+  };
 
   const getPoVendorName = (po) => {
     if (!po) return '';
@@ -94,29 +107,43 @@ const cleanDate = (d) => {
     let initialBales = [];
     if (grn?.bales && grn.bales.length > 0) {
       initialBales = grn.bales.map((b, idx) => {
+        const isMixed = Boolean(
+          b.isMixedFabric ||
+          b.fabricItemLabel === 'MIXED_FABRIC' ||
+          b.fabricName === 'Mixed Fabric' ||
+          (typeof b.fabricItemLabel === 'string' && b.fabricItemLabel.toLowerCase().includes('mixed')) ||
+          (typeof b.fabricName === 'string' && b.fabricName.toLowerCase().includes('mixed'))
+        );
         const rawPieces = b.pieces || [];
         const normPieces = rawPieces.map((p, pIdx) => {
           if (typeof p === 'object' && p !== null) {
             return {
               pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-              length: p.length !== undefined && p.length !== null ? p.length : ''
+              length: p.length !== undefined && p.length !== null ? p.length : '',
+              fabricQuality: p.fabricQuality || b.fabricItemLabel || ''
             };
           }
           return {
             pieceNo: `Pc ${pIdx + 1}`,
-            length: p !== undefined && p !== null ? p : ''
+            length: p !== undefined && p !== null ? p : '',
+            fabricQuality: b.fabricItemLabel || ''
           };
         });
 
-        const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
+        const piecesCount = (b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null && b.piecesCount !== 0 && b.piecesCount !== '0')
           ? String(b.piecesCount)
           : (normPieces.length > 0 ? String(normPieces.length) : '');
         const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+        const hasCustom = Boolean(b.hasCustomBaleNo || (b.baleNo && String(b.baleNo).trim() !== '' && String(b.baleNo).trim() !== String(idx + 1)));
+        const baleNoVal = hasCustom ? String(b.baleNo).trim() : '';
 
         return {
-          baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
+          baleNo: baleNoVal,
+          hasCustomBaleNo: hasCustom,
           itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
-          fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
+          fabricItemLabel: isMixed ? 'MIXED_FABRIC' : (b.fabricItemLabel || b.fabric || b.fabricName || ''),
+          fabricName: isMixed ? 'Mixed Fabric' : (b.fabricName || b.fabricItemLabel || ''),
+          isMixedFabric: isMixed,
           piecesCount,
           totalLength,
           pieces: normPieces
@@ -129,6 +156,7 @@ const cleanDate = (d) => {
       for (let i = initialBales.length; i < targetBaleCount; i++) {
         initialBales.push({
           baleNo: '',
+          hasCustomBaleNo: false,
           itemIdx: 0,
           fabricItemLabel: '',
           piecesCount: '',
@@ -226,13 +254,16 @@ const cleanDate = (d) => {
               };
             });
 
-            const piecesCount = b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null
+            const piecesCount = (b.piecesCount !== undefined && b.piecesCount !== '' && b.piecesCount !== null && b.piecesCount !== 0 && b.piecesCount !== '0')
               ? String(b.piecesCount)
               : (normPieces.length > 0 ? String(normPieces.length) : '');
             const totalLength = Number(b.totalLength) || normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+            const hasCustom = Boolean(b.hasCustomBaleNo || (b.baleNo && String(b.baleNo).trim() !== '' && String(b.baleNo).trim() !== String(idx + 1)));
+            const baleNoVal = hasCustom ? String(b.baleNo).trim() : '';
 
             return {
-              baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
+              baleNo: baleNoVal,
+              hasCustomBaleNo: hasCustom,
               itemIdx: b.itemIdx !== undefined ? Number(b.itemIdx) : 0,
               fabricItemLabel: b.fabricItemLabel || b.fabric || b.fabricName || '',
               piecesCount,
@@ -247,6 +278,7 @@ const cleanDate = (d) => {
           for (let i = initialBales.length; i < targetBaleCount; i++) {
             initialBales.push({
               baleNo: '',
+              hasCustomBaleNo: false,
               itemIdx: 0,
               fabricItemLabel: '',
               piecesCount: '',
@@ -754,6 +786,84 @@ const cleanDate = (d) => {
 
   const poItemLabels = poItems.map((it) => it.label || getPoItemLabel(it));
 
+  // Live computed fulfillment & pending metrics for every fabric line item across all linked POs
+  const poItemFulfillments = useMemo(() => {
+    const list = [];
+    const targetPOs = (linkedPOObjects && linkedPOObjects.length > 0)
+      ? linkedPOObjects
+      : (currentPO ? [currentPO] : []);
+
+    targetPOs.forEach((poObj) => {
+      const pId = String(poObj.id || '').trim();
+      const items = poObj.items || [];
+
+      // Calculate previous received meters for each item from other GRNs (excluding this current GRN)
+      const otherGrns = (grns || []).filter((g) => g && g.id !== formData.id);
+      const itemFuls = calculatePoFabricFulfillment(poObj, otherGrns);
+
+      items.forEach((it, itIdx) => {
+        const ful = itemFuls.find((f) => f.index === itIdx);
+        const ordered = Number(it.quantity) || 0;
+        const prevReceived = ful ? ful.received : 0;
+        const pending = Math.max(0, ordered - prevReceived);
+
+        // Standard labels used in dropdowns
+        const rawLabel = getPoItemLabel(it);
+        const fullLabel = targetPOs.length > 1 ? `[${pId}] ${rawLabel}` : rawLabel;
+
+        // Calculate how many meters are currently entered in THIS GRN for this specific item
+        let currentGrnMeters = 0;
+        (formData.bales || []).forEach((b) => {
+          const isMixed = isBaleMixed(b);
+          if (isMixed && Array.isArray(b.pieces) && b.pieces.length > 0) {
+            b.pieces.forEach((p) => {
+              const pLen = Number(typeof p === 'object' && p !== null ? (p.length !== undefined ? p.length : p.meters) : p) || 0;
+              const pQ = typeof p === 'object' && p !== null ? (p.fabricQuality || '') : '';
+              const pPo = typeof p === 'object' && p !== null ? (p.poId || '') : (b.poId || '');
+              if (isPieceOrBaleMatchForItem(pQ, pPo, it, items, itIdx, pId, targetPOs.length > 1)) {
+                currentGrnMeters += pLen;
+              }
+            });
+          } else {
+            const bLbl = b.fabricItemLabel || b.fabricName || '';
+            const bPo = b.poId || '';
+            if (isPieceOrBaleMatchForItem(bLbl, bPo, it, items, itIdx, pId, targetPOs.length > 1)) {
+              const bLen = (Array.isArray(b.pieces) && b.pieces.length > 0)
+                ? b.pieces.reduce((s, p) => s + (Number(typeof p === 'object' ? (p.length !== undefined ? p.length : p.meters) : p) || 0), 0)
+                : (Number(b.totalLength) || 0);
+              currentGrnMeters += bLen;
+            }
+          }
+        });
+
+        currentGrnMeters = Math.round(currentGrnMeters * 100) / 100;
+        const remainingBalance = Math.round((pending - currentGrnMeters) * 100) / 100;
+        const excess = Math.max(0, Math.round((currentGrnMeters - pending) * 100) / 100);
+        const isOver = excess > 0.01;
+
+        list.push({
+          poId: pId,
+          poNumber: poObj.poNumber || pId,
+          itemIndex: itIdx,
+          fabricName: it.fabricName || it.fabricQuality || 'Fabric',
+          colorName: it.colorName || it.color || '',
+          width: it.width || '',
+          label: fullLabel,
+          rawLabel,
+          ordered,
+          prevReceived,
+          pending,
+          currentGrnMeters,
+          remainingBalance,
+          excess,
+          isOver
+        });
+      });
+    });
+
+    return list;
+  }, [linkedPOObjects, currentPO, grns, formData.id, formData.bales]);
+
   // Build master fabric options (Cotton, Rayon, Silk, Georgette, etc.)
   const masterFabricLabels = [];
   (fabrics || []).forEach((f) => {
@@ -892,6 +1002,7 @@ const cleanDate = (d) => {
         const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
         newBales.push({
           baleNo: '',
+          hasCustomBaleNo: false,
           itemIdx: i % (poItemLabels.length || 1),
           fabricItemLabel: assignedLabel,
           isMixedFabric: false,
@@ -934,6 +1045,7 @@ const cleanDate = (d) => {
       updated[baleIdx] = {
         ...updated[baleIdx],
         baleNo: val,
+        hasCustomBaleNo: Boolean(val && val.trim() !== ''),
         isSaved: false
       };
       return { ...prev, bales: updated };
@@ -945,18 +1057,31 @@ const cleanDate = (d) => {
   const handleBaleFabricChange = (baleIdx, newFabricLabel) => {
     setFormData((prev) => {
       const updated = [...prev.bales];
-      const isMixed = newFabricLabel === 'MIXED_FABRIC';
+      const isMixed = newFabricLabel === 'MIXED_FABRIC' || (typeof newFabricLabel === 'string' && newFabricLabel.toLowerCase().includes('mixed'));
+      const poMatch = String(newFabricLabel || '').match(/^\[(.*?)\]/);
+      const assignedPoId = poMatch ? poMatch[1].trim() : (prev.poId || '');
+
       const curPieces = updated[baleIdx]?.pieces || [];
-      const updatedPieces = curPieces.map((p) => ({
-        ...(typeof p === 'object' && p !== null ? p : { pieceNo: 'Pc 1', length: p }),
-        fabricQuality: isMixed ? (p.fabricQuality || defaultFabricLabel) : newFabricLabel
-      }));
+      const updatedPieces = curPieces.map((p, pIdx) => {
+        const pQuality = isMixed
+          ? (p.fabricQuality && p.fabricQuality !== 'MIXED_FABRIC' ? p.fabricQuality : (poItemLabels[pIdx % (poItemLabels.length || 1)] || poItemLabels[0] || defaultFabricLabel))
+          : newFabricLabel;
+        const pPoMatch = String(pQuality || '').match(/^\[(.*?)\]/);
+        const pPo = pPoMatch ? pPoMatch[1].trim() : assignedPoId;
+
+        return {
+          ...(typeof p === 'object' && p !== null ? p : { pieceNo: `Pc ${pIdx + 1}`, length: p }),
+          fabricQuality: pQuality,
+          poId: pPo
+        };
+      });
 
       updated[baleIdx] = {
         ...updated[baleIdx],
-        fabricItemLabel: newFabricLabel,
+        fabricItemLabel: isMixed ? 'MIXED_FABRIC' : newFabricLabel,
         fabricName: isMixed ? 'Mixed Fabric' : newFabricLabel,
         isMixedFabric: isMixed,
+        poId: assignedPoId,
         pieces: updatedPieces,
         isSaved: false
       };
@@ -971,11 +1096,15 @@ const cleanDate = (d) => {
       const updated = [...prev.bales];
       const targetBale = { ...updated[baleIdx], isSaved: false };
       const updatedPieces = [...(targetBale.pieces || [])];
+      const pPoMatch = String(newQuality || '').match(/^\[(.*?)\]/);
+      const piecePoId = pPoMatch ? pPoMatch[1].trim() : (targetBale.poId || prev.poId || '');
+
       updatedPieces[pieceIdx] = {
         ...(typeof updatedPieces[pieceIdx] === 'object' && updatedPieces[pieceIdx] !== null
           ? updatedPieces[pieceIdx]
           : { pieceNo: `Pc ${pieceIdx + 1}`, length: updatedPieces[pieceIdx] }),
-        fabricQuality: newQuality
+        fabricQuality: newQuality,
+        poId: piecePoId
       };
       targetBale.pieces = updatedPieces;
       updated[baleIdx] = targetBale;
@@ -998,15 +1127,22 @@ const cleanDate = (d) => {
         if (curPieces[p]) {
           nextPieces.push(curPieces[p]);
         } else {
+          const isMixed = isBaleMixed(targetBale);
+          const assignedQuality = isMixed
+            ? (poItemLabels[p % (poItemLabels.length || 1)] || poItemLabels[0] || defaultFabricLabel)
+            : (targetBale.fabricItemLabel || defaultFabricLabel);
+          const pPoMatch = String(assignedQuality || '').match(/^\[(.*?)\]/);
+          const piecePoId = pPoMatch ? pPoMatch[1].trim() : (targetBale.poId || prev.poId || '');
           nextPieces.push({
             pieceNo: `Pc ${p + 1}`,
             length: '',
-            fabricQuality: targetBale.isMixedFabric ? defaultFabricLabel : (targetBale.fabricItemLabel || defaultFabricLabel)
+            fabricQuality: assignedQuality,
+            poId: piecePoId
           });
         }
       }
 
-      targetBale.piecesCount = newCount;
+      targetBale.piecesCount = (newCount && newCount !== '0' && count > 0) ? String(count) : '';
       targetBale.pieces = nextPieces;
       targetBale.totalLength = nextPieces.reduce((sum, it) => sum + (Number(it.length) || 0), 0);
       targetBale.isSaved = false;
@@ -1053,7 +1189,8 @@ const cleanDate = (d) => {
   // Live fabric breakdown across all bales (supports mixed bales and multi-PO items)
   const fabricBreakdown = {};
   (formData.bales || []).forEach((b) => {
-    if (b.isMixedFabric && b.pieces && b.pieces.length > 0) {
+    const isMixed = isBaleMixed(b);
+    if (isMixed && b.pieces && b.pieces.length > 0) {
       b.pieces.forEach((p) => {
         const fLabel = p.fabricQuality || defaultFabricLabel;
         const pLen = Number(p.length) || 0;
@@ -1105,6 +1242,121 @@ const cleanDate = (d) => {
     }
   };
 
+  // Save Progress (Finish Later) - Saves all current progress as DRAFT and exits back to GRN List without sending to QC
+  const handleSaveProgress = () => {
+    if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
+      showToast('Please select a Source document (Purchase Order).', 'warning');
+      return;
+    }
+    if (receiveDateValidationMsg) {
+      showToast(receiveDateValidationMsg, 'warning');
+      return;
+    }
+
+    const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || currentPO?.id || 'PO-DIRECT';
+    const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
+    const firstPoItem = selectedPO?.items?.[0];
+    const fabricItem = firstPoItem
+      ? firstPoItem.fabricName || firstPoItem.fabricQuality
+      : (formData.fabricName || (fabrics[0]?.qualityName || 'Fabric'));
+    const colorVal = firstPoItem?.colorName || firstPoItem?.color || formData.colorName || 'Natural';
+    const colorHexVal = firstPoItem?.colorHex || formData.colorHex || '#ffffff';
+    const fabricIdVal = firstPoItem?.fabricId || formData.fabricId || '';
+    const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : (formData.width || '44');
+    const foldVal = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : (formData.fold || formData.fabricFolding || '100');
+    const vName = formData.vendorName || (selectedPO ? getPoVendorName(selectedPO) : (grn?.vendorName || vendors[0]?.name || 'Direct Vendor'));
+    const vId = formData.vendorId || selectedPO?.vendorId || grn?.vendorId || vendors[0]?.id || 'V-DIRECT';
+
+    const normalizedBales = (formData.bales || []).map((b, idx) => {
+      const isMixed = isBaleMixed(b);
+      const rawPieces = b.pieces || [];
+      const normPieces = rawPieces.map((p, pIdx) => {
+        const pLen = typeof p === 'object' && p !== null ? (p.length !== undefined && p.length !== null ? p.length : '') : (p !== undefined && p !== null ? p : '');
+        const pQuality = typeof p === 'object' && p !== null ? (p.fabricQuality || '') : '';
+        const assignedQuality = pQuality || (isMixed ? (poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel) : (b.fabricItemLabel || defaultFabricLabel));
+        const pPoMatch = String(assignedQuality || '').match(/^[(.*?)]/);
+        const piecePoId = pPoMatch ? pPoMatch[1].trim() : (typeof p === 'object' && p?.poId ? p.poId : (b.poId || resolvedPoId));
+
+        return {
+          pieceNo: (typeof p === 'object' && p?.pieceNo) || `Pc ${pIdx + 1}`,
+          length: pLen,
+          fabricQuality: assignedQuality,
+          poId: piecePoId
+        };
+      });
+      const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
+      const hasCustom = Boolean(b.hasCustomBaleNo || (b.baleNo && String(b.baleNo).trim() !== '' && String(b.baleNo).trim() !== String(idx + 1)));
+      const baleNoVal = hasCustom ? String(b.baleNo).trim() : '';
+      const bAssignedLabel = isMixed ? 'MIXED_FABRIC' : (b.fabricItemLabel || defaultFabricLabel);
+      const bPoMatch = String(bAssignedLabel || '').match(/^[(.*?)]/);
+      const balePoId = bPoMatch ? bPoMatch[1].trim() : (b.poId || resolvedPoId);
+
+      return {
+        ...b,
+        baleNo: baleNoVal,
+        hasCustomBaleNo: hasCustom,
+        fabricItemLabel: bAssignedLabel,
+        fabricName: isMixed ? 'Mixed Fabric' : (b.fabricItemLabel || defaultFabricLabel),
+        isMixedFabric: isMixed,
+        poId: balePoId,
+        pieces: normPieces,
+        totalLength: bTotal,
+        piecesCount: (b.piecesCount && b.piecesCount !== '0' && b.piecesCount !== 0) ? String(b.piecesCount) : (normPieces.length > 0 ? String(normPieces.length) : ''),
+        isSaved: true
+      };
+    });
+
+    const liveTotalMeters = Math.round(
+      normalizedBales.reduce((sum, b) => sum + (Number(b.totalLength) || 0), 0) * 100
+    ) / 100;
+
+    let finalDeclaredTotal = declaredTotal;
+    if (liveTotalMeters > 0 && (finalDeclaredTotal === 2000 || finalDeclaredTotal === 0)) {
+      finalDeclaredTotal = liveTotalMeters;
+    }
+
+    const payload = {
+      ...formData,
+      poId: resolvedPoId,
+      linkedPOs: formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : (resolvedPoId && resolvedPoId !== 'PO-DIRECT' ? [resolvedPoId] : []),
+      vendorId: vId,
+      vendorName: vName,
+      status: 'Draft',
+      isSubmittedToQC: false,
+      isQcActioned: false,
+      isHeaderSaved: true,
+      date: formData.receivedDate || new Date().toISOString().split('T')[0],
+      fabricName: fabricItem,
+      fabricId: fabricIdVal,
+      colorName: colorVal,
+      colorHex: colorHexVal,
+      width: widthVal,
+      pannaWidth: widthVal,
+      fold: foldVal,
+      fabricFolding: foldVal,
+      declaredTotalMeters: finalDeclaredTotal > 0 ? finalDeclaredTotal : liveTotalMeters,
+      totalQty: finalDeclaredTotal > 0 ? String(finalDeclaredTotal) : (liveTotalMeters > 0 ? String(liveTotalMeters) : (formData.totalQty || '')),
+      lrNumber: formData.lrNo || formData.lrNumber || '',
+      lrNo: formData.lrNo || formData.lrNumber || '',
+      totalMetersEntered: liveTotalMeters,
+      bales: normalizedBales
+    };
+
+    if (onSaveGRN) {
+      try {
+        onSaveGRN(payload, false, true);
+      } catch (err) {
+        console.warn('Error saving GRN progress:', err);
+      }
+    }
+
+    if (onExitToList) {
+      onExitToList();
+    } else if (onBack) {
+      onBack();
+    }
+  };
+
   // Point 36: Save This Section (Receipt Details)
   const handleSaveHeaderOnly = () => {
     if (!formData.poId && (!formData.linkedPOs || formData.linkedPOs.length === 0)) {
@@ -1122,6 +1374,15 @@ const cleanDate = (d) => {
     }
     if (isQcActioned) {
       showToast('Receipt details are locked because this GRN has been submitted to QC.', 'warning');
+      return;
+    }
+
+    const curDeclared = Number(formData.declaredTotalMeters || formData.totalQty || 0);
+    if (poPendingMeters > 0 && curDeclared > poPendingMeters) {
+      showToast(
+        `Declared Total quantity (${curDeclared.toLocaleString()}m) cannot exceed total pending balance across linked POs (${poPendingMeters.toLocaleString()}m)!`,
+        'danger'
+      );
       return;
     }
 
@@ -1153,6 +1414,7 @@ const cleanDate = (d) => {
           const assignedLabel = (poItemLabels.length > 0 ? (poItemLabels[i % poItemLabels.length] || poItemLabels[0]) : defaultFabricLabel);
           generated.push({
             baleNo: '',
+            hasCustomBaleNo: false,
             itemIdx: i % (poItemLabels.length || 1),
             fabricItemLabel: assignedLabel,
             isMixedFabric: false,
@@ -1230,6 +1492,9 @@ const cleanDate = (d) => {
       showToast('Bale entries are locked because this GRN has been submitted to QC.', 'warning');
       return;
     }
+
+    // Over-inwarding allowed as per user workflow
+
     const resolvedPoId = formData.poId || (formData.linkedPOs && formData.linkedPOs[0]) || grn?.poId || (grn?.linkedPOs && grn.linkedPOs[0]) || currentPO?.id || 'PO-DIRECT';
 
     const selectedPO = purchaseOrders.find((p) => p.id === resolvedPoId) || currentPO;
@@ -1249,29 +1514,41 @@ const cleanDate = (d) => {
     const isSingle = specificBaleIdx !== null && specificBaleIdx !== undefined;
 
     const normalizedBales = (formData.bales || []).map((b, idx) => {
+      const isMixed = isBaleMixed(b);
       const rawPieces = b.pieces || [];
       const normPieces = rawPieces.map((p, pIdx) => {
-        if (typeof p === 'object' && p !== null) {
-          return {
-            pieceNo: p.pieceNo || `Pc ${pIdx + 1}`,
-            length: p.length !== undefined && p.length !== null ? p.length : '',
-            fabricQuality: p.fabricQuality || b.fabricItemLabel || fabricItem
-          };
-        }
+        const pLen = typeof p === 'object' && p !== null ? (p.length !== undefined && p.length !== null ? p.length : '') : (p !== undefined && p !== null ? p : '');
+        const pQuality = typeof p === 'object' && p !== null ? (p.fabricQuality || '') : '';
+        const assignedQuality = pQuality || (isMixed ? (poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel) : (b.fabricItemLabel || fabricItem));
+        const pPoMatch = String(assignedQuality || '').match(/^\[(.*?)\]/);
+        const piecePoId = pPoMatch ? pPoMatch[1].trim() : (typeof p === 'object' && p?.poId ? p.poId : (b.poId || resolvedPoId));
+
         return {
-          pieceNo: `Pc ${pIdx + 1}`,
-          length: p !== undefined && p !== null ? p : '',
-          fabricQuality: b.fabricItemLabel || fabricItem
+          pieceNo: (typeof p === 'object' && p?.pieceNo) || `Pc ${pIdx + 1}`,
+          length: pLen,
+          fabricQuality: assignedQuality,
+          poId: piecePoId
         };
       });
       const bTotal = normPieces.reduce((s, p) => s + (Number(p.length) || 0), 0);
       const isTarget = isSingle ? (idx === specificBaleIdx) : true;
+      const hasCustom = Boolean(b.hasCustomBaleNo || (b.baleNo && String(b.baleNo).trim() !== '' && String(b.baleNo).trim() !== String(idx + 1)));
+      const baleNoVal = hasCustom ? String(b.baleNo).trim() : '';
+      const bAssignedLabel = isMixed ? 'MIXED_FABRIC' : (b.fabricItemLabel || defaultFabricLabel);
+      const bPoMatch = String(bAssignedLabel || '').match(/^\[(.*?)\]/);
+      const balePoId = bPoMatch ? bPoMatch[1].trim() : (b.poId || resolvedPoId);
+
       return {
         ...b,
-        baleNo: (b.baleNo !== undefined && b.baleNo !== null) ? String(b.baleNo) : '',
+        baleNo: baleNoVal,
+        hasCustomBaleNo: hasCustom,
+        fabricItemLabel: bAssignedLabel,
+        fabricName: isMixed ? 'Mixed Fabric' : bAssignedLabel,
+        isMixedFabric: isMixed,
+        poId: balePoId,
         pieces: normPieces,
         totalLength: bTotal,
-        piecesCount: b.piecesCount !== undefined && b.piecesCount !== '' ? String(b.piecesCount) : String(normPieces.length),
+        piecesCount: (b.piecesCount && b.piecesCount !== '0' && b.piecesCount !== 0) ? String(b.piecesCount) : (normPieces.length > 0 ? String(normPieces.length) : ''),
         isSaved: isTarget ? true : Boolean(b.isSaved)
       };
     });
@@ -1338,10 +1615,10 @@ const cleanDate = (d) => {
 
     if (isSingle) {
       const targetBale = normalizedBales[specificBaleIdx];
-      const bNo = targetBale?.baleNo || (specificBaleIdx + 1);
+      const bName = targetBale?.baleNo ? `Bale ${targetBale.baleNo}` : `Container #${specificBaleIdx + 1}`;
       const pLen = (targetBale?.pieces || []).length;
       const bTot = targetBale?.totalLength || 0;
-      showToast(`Bale ${bNo} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
+      showToast(`${bName} saved successfully! (${pLen} piece${pLen === 1 ? '' : 's'}, ${bTot}m entered)`, 'success');
     } else {
       const totalCount = normalizedBales.length;
       const configuredCount = normalizedBales.filter((b) => (b.pieces || []).length > 0 && Number(b.totalLength) > 0).length;
@@ -1384,6 +1661,8 @@ const cleanDate = (d) => {
       return;
     }
 
+    // Over-inwarding allowed as per user workflow
+
     // STRICT VALIDATION: Entered piece length total MUST match declared quantity exactly!
     if (Math.abs(totalMetersEntered - declaredTotal) >= 0.01) {
       const diff = Math.round((declaredTotal - totalMetersEntered) * 100) / 100;
@@ -1412,6 +1691,11 @@ const cleanDate = (d) => {
     const widthVal = firstPoItem?.width ? String(firstPoItem.width).replace(/"/g, '').trim() : (formData.width || '');
     const foldVal = firstPoItem?.fold !== undefined && firstPoItem?.fold !== null ? String(firstPoItem.fold).replace(/%/g, '').trim() : (formData.fold || formData.fabricFolding || '');
 
+    const finalBales = (formData.bales || []).map((b, idx) => ({
+      ...b,
+      baleNo: (b.baleNo && String(b.baleNo).trim()) ? String(b.baleNo).trim() : ''
+    }));
+
     const payload = {
       ...formData,
       status: 'Completed',
@@ -1431,7 +1715,8 @@ const cleanDate = (d) => {
       totalQty: declaredTotal > 0 ? String(declaredTotal) : (formData.totalQty || ''),
       lrNumber: formData.lrNo || formData.lrNumber || '',
       lrNo: formData.lrNo || formData.lrNumber || '',
-      totalMetersEntered
+      totalMetersEntered,
+      bales: finalBales
     };
 
     setFormData((prev) => ({
@@ -2339,15 +2624,17 @@ const cleanDate = (d) => {
                       <div className="d-flex align-items-center gap-2 me-2">
                         <i className="ti ti-package text-primary fs-16"></i>
                         <span className="fw-bold text-dark fs-15 lh-1">
-                          Bale {bale.baleNo || bIdx + 1}
+                          {bale.baleNo ? `Bale ${bale.baleNo}` : `Container #${bIdx + 1}`}
                         </span>
                       </div>
-                      <span
-                        className="badge bg-white text-secondary border px-3 py-1.5 fs-11 rounded-pill fw-medium me-1"
-                        style={{ display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        Container #{bIdx + 1}
-                      </span>
+                      {bale.baleNo && (
+                        <span
+                          className="badge bg-white text-secondary border px-3 py-1.5 fs-11 rounded-pill fw-medium me-1"
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          Container #{bIdx + 1}
+                        </span>
+                      )}
                       {isBaleSaved ? (
                         <span
                           className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold d-inline-flex align-items-center gap-1"
@@ -2376,7 +2663,7 @@ const cleanDate = (d) => {
                           className="btn btn-sm btn-white border px-3 py-1 fs-12 fw-semibold rounded-2 text-dark shadow-xs d-inline-flex align-items-center gap-1.5"
                           style={{ borderColor: '#cbd5e1' }}
                           onClick={() => handleEditBale(bIdx)}
-                          title={`Edit Bale ${bale.baleNo || bIdx + 1}`}
+                          title={bale.baleNo ? `Edit Bale ${bale.baleNo}` : `Edit Container #${bIdx + 1}`}
                         >
                           <i className="ti ti-edit fs-14" style={{ color: '#f97316' }}></i>
                           <span>Edit</span>
@@ -2406,7 +2693,7 @@ const cleanDate = (d) => {
                             BALE NO.
                           </div>
                           <div className="fw-bold text-dark fs-13 font-monospace">
-                            {bale.baleNo || bIdx + 1}
+                            {bale.baleNo ? bale.baleNo : '—'}
                           </div>
                         </div>
 
@@ -2430,7 +2717,7 @@ const cleanDate = (d) => {
                             NO. OF PIECES
                           </div>
                           <div className="fw-bold text-dark fs-13">
-                            {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
+                            {(bale.pieces && bale.pieces.length > 0) ? `${bale.pieces.length} Piece${bale.pieces.length !== 1 ? 's' : ''}` : '—'}
                           </div>
                         </div>
 
@@ -2461,7 +2748,7 @@ const cleanDate = (d) => {
                             BALE TOTAL
                           </div>
                           <div className="fw-bold text-dark fs-14 font-monospace">
-                            {Number(bale.totalLength || 0).toLocaleString()}m
+                            {(Number(bale.totalLength) || 0) > 0 ? `${Number(bale.totalLength).toLocaleString()}m` : '—'}
                           </div>
                         </div>
                       </div>
@@ -2474,14 +2761,18 @@ const cleanDate = (d) => {
                       {/* Bale No */}
                       <div className="col-12 col-sm-3 col-md-2" style={{ minWidth: '110px' }}>
                         <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
-                          Bale No. <span className="text-danger">*</span>
+                          Bale No.
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. 1"
+                          placeholder={`e.g. ${bIdx + 1}`}
                           className="form-control bg-white text-center fs-13 fw-semibold"
                           style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                          value={bale.baleNo || ''}
+                          value={
+                            bale.hasCustomBaleNo
+                              ? (bale.baleNo || '')
+                              : (bale.baleNo && bale.baleNo !== String(bIdx + 1) ? bale.baleNo : '')
+                          }
                           disabled={isQcActioned}
                           onChange={(e) => handleBaleNoChange(bIdx, e.target.value)}
                         />
@@ -2495,15 +2786,13 @@ const cleanDate = (d) => {
                         <select
                           className="form-select bg-white fs-13 px-3"
                           style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                          value={bale.isMixedFabric ? 'MIXED_FABRIC' : (bale.fabricItemLabel || poItemLabels[0] || defaultFabricLabel)}
+                          value={isBaleMixed(bale) ? 'MIXED_FABRIC' : (bale.fabricItemLabel || poItemLabels[0] || defaultFabricLabel)}
                           disabled={isQcActioned}
                           onChange={(e) => handleBaleFabricChange(bIdx, e.target.value)}
                         >
-                          {poItemLabels.length > 1 && (
-                            <option value="MIXED_FABRIC" className="fw-bold text-primary">
-                              🔀 Mixed Bale (Multiple Fabric Qualities)
-                            </option>
-                          )}
+                          <option value="MIXED_FABRIC" className="fw-bold text-primary">
+                            🔀 Mixed Bale (Multiple Fabric Qualities)
+                          </option>
                           {poItemLabels.length > 0 ? (
                             poItemLabels.map((lbl, oIdx) => (
                               <option key={`po-${oIdx}`} value={lbl}>
@@ -2531,7 +2820,11 @@ const cleanDate = (d) => {
                           placeholder="e.g. 1"
                           className="form-control bg-white text-center fs-13 fw-semibold"
                           style={{ height: '40px', borderColor: '#cbd5e1', borderRadius: '8px' }}
-                          value={bale.piecesCount || (bale.pieces && bale.pieces.length ? bale.pieces.length : '')}
+                          value={
+                            (bale.piecesCount && bale.piecesCount !== '0' && bale.piecesCount !== 0)
+                              ? bale.piecesCount
+                              : (bale.pieces && bale.pieces.length > 0 ? bale.pieces.length : '')
+                          }
                           disabled={isQcActioned}
                           onChange={(e) => handleSetPieceCount(bIdx, e.target.value)}
                         />
@@ -2548,7 +2841,9 @@ const cleanDate = (d) => {
                           Piece-Wise Length (Meters)
                         </span>
                         <span className="fs-11 text-muted fw-medium">
-                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''} configured {bale.isMixedFabric ? '(Mixed Qualities Enabled)' : ''}
+                          {(bale.pieces || []).length > 0
+                            ? `${(bale.pieces || []).length} Piece${(bale.pieces || []).length !== 1 ? 's' : ''} configured ${isBaleMixed(bale) ? '(Mixed Qualities Enabled)' : ''}`
+                            : ''}
                         </span>
                       </div>
 
@@ -2566,33 +2861,41 @@ const cleanDate = (d) => {
                               <div
                                 key={pIdx}
                                 className="bg-white p-2.5 rounded-2 border shadow-none"
-                                style={{ width: bale.isMixedFabric ? '210px' : '115px', borderColor: '#e2e8f0' }}
+                                style={{ width: isBaleMixed(bale) ? '280px' : '115px', minWidth: isBaleMixed(bale) ? '260px' : '115px', borderColor: '#e2e8f0' }}
                               >
                                 <div className="d-flex align-items-center justify-content-between mb-1">
                                   <label className="d-block fs-11 fw-semibold text-secondary text-center mb-0">
                                     Pc {pIdx + 1} (m)
                                   </label>
-                                  {bale.isMixedFabric && (
-                                    <span className="badge bg-light text-secondary border px-1.5 py-0.5 fs-10 rounded">
+                                  {isBaleMixed(bale) && (
+                                    <span className="badge bg-purple-subtle text-purple border px-1.5 py-0.5 fs-10 rounded fw-semibold">
                                       Quality
                                     </span>
                                   )}
                                 </div>
-                                {bale.isMixedFabric && (
+                                {isBaleMixed(bale) && (
                                   <select
-                                    className="form-select form-select-sm bg-white fs-11 px-2 mb-1.5"
-                                    style={{ height: '30px', borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                    className="form-select bg-white fs-12 px-2 py-1 mb-1.5"
+                                    style={{
+                                      minHeight: '36px',
+                                      height: '36px',
+                                      borderColor: '#cbd5e1',
+                                      borderRadius: '6px',
+                                      lineHeight: '1.4'
+                                    }}
                                     value={pFabric}
                                     disabled={isQcActioned}
                                     onChange={(e) => handlePieceFabricChange(bIdx, pIdx, e.target.value)}
                                   >
                                     {poItemLabels.length > 0 ? (
                                       poItemLabels.map((lbl, oIdx) => (
-                                        <option key={`p-po-${oIdx}`} value={lbl}>{lbl}</option>
+                                        <option key={`p-po-${oIdx}`} value={lbl} title={lbl}>
+                                          {lbl}
+                                        </option>
                                       ))
                                     ) : (
                                       masterFabricLabels.map((lbl, fIdx) => (
-                                        <option key={`p-mf-${fIdx}`} value={lbl}>{lbl}</option>
+                                        <option key={`p-mf-${fIdx}`} value={lbl} title={lbl}>{lbl}</option>
                                       ))
                                     )}
                                   </select>
@@ -2603,7 +2906,12 @@ const cleanDate = (d) => {
                                   min="0"
                                   placeholder="0.00"
                                   className="form-control bg-white text-center fw-semibold fs-13 px-1"
-                                  style={{ height: '36px', borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                  style={{
+                                    height: '36px',
+                                    borderColor: '#cbd5e1',
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '6px'
+                                  }}
                                   value={len === 0 ? '0' : (len || '')}
                                   disabled={isQcActioned}
                                   onChange={(e) => handlePieceMeterChange(bIdx, pIdx, e.target.value)}
@@ -2617,14 +2925,41 @@ const cleanDate = (d) => {
 
                     {/* Bale Summary Footer */}
                     <div className="d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top text-secondary fs-12 gap-2">
-                      <div className="d-flex align-items-center gap-2 text-truncate">
-                        <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold">
-                          {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
-                        </span>
-                        {bale.isMixedFabric ? (
-                          <span className="badge bg-purple-subtle text-purple border px-2.5 py-1 rounded-pill fs-11 fw-semibold">
-                            Mixed Bale (Multiple Fabric Qualities)
+                      <div className="d-flex flex-wrap align-items-center gap-2 text-truncate">
+                        {(bale.pieces || []).length > 0 && (
+                          <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fw-semibold">
+                            {(bale.pieces || []).length} Piece{(bale.pieces || []).length !== 1 ? 's' : ''}
                           </span>
+                        )}
+                        {isBaleMixed(bale) ? (
+                          <div className="d-flex flex-wrap align-items-center gap-1.5">
+                            <span className="badge bg-purple-subtle text-purple border px-2.5 py-1 rounded-pill fs-11 fw-semibold">
+                              🔀 Mixed Bale
+                            </span>
+                            {(() => {
+                              const bFabMap = {};
+                              (bale.pieces || []).forEach((p, pIdx) => {
+                                const q = p.fabricQuality || (poItemLabels[pIdx % (poItemLabels.length || 1)] || defaultFabricLabel);
+                                const len = Number(typeof p === 'object' ? p.length : p) || 0;
+                                if (!bFabMap[q]) bFabMap[q] = 0;
+                                bFabMap[q] += len;
+                              });
+                              return Object.entries(bFabMap).map(([fName, mtrs], mIdx) => (
+                                <span
+                                  key={mIdx}
+                                  className="badge bg-light text-dark border px-2 py-1 rounded-pill fs-11 shadow-xs"
+                                >
+                                  <span className="text-secondary">{fName}:</span>{' '}
+                                  <strong
+                                    className="text-primary"
+                                    style={{ fontFamily: 'monospace' }}
+                                  >
+                                    {Number(mtrs).toFixed(2).replace(/\.00$/, '')}m
+                                  </strong>
+                                </span>
+                              ));
+                            })()}
+                          </div>
                         ) : (
                           <span className="text-secondary text-truncate">
                             Assigned: <strong className="text-dark">{bale.fabricItemLabel || currentFabricLabel}</strong>
@@ -2634,7 +2969,7 @@ const cleanDate = (d) => {
                       <div className="d-flex align-items-center gap-2">
                         <span className="text-secondary fs-12 fw-medium">Bale Total:</span>
                         <span className="fs-14 fw-bold text-dark font-monospace px-2.5 py-0.5 rounded bg-light border">
-                          {(bale.totalLength || 0).toFixed(2).replace(/\.00$/, '')} m
+                          {(Number(bale.totalLength) || 0) > 0 ? `${(Number(bale.totalLength) || 0).toFixed(2).replace(/\.00$/, '')} m` : '—'}
                         </span>
                         {/* Save button moved to bale footer */}
                         {!isQcActioned && !isPoAlreadyCompleted && (
@@ -2648,7 +2983,7 @@ const cleanDate = (d) => {
                               transition: 'all 0.2s ease-in-out'
                             }}
                             onClick={() => handleSaveSingleBale(bIdx)}
-                            title={`Save Bale ${bale.baleNo || bIdx + 1}`}
+                            title={bale.baleNo ? `Save Bale ${bale.baleNo}` : `Save Container #${bIdx + 1}`}
                           >
                             <i className="ti ti-device-floppy" style={{ fontSize: '15px' }}></i>
                             <span>Save</span>
@@ -2786,7 +3121,7 @@ const cleanDate = (d) => {
               height: '42px',
               backgroundColor: '#ffffff'
             }}
-            onClick={handleSaveHeaderOnly}
+            onClick={handleSaveProgress}
             title="Save draft progress and finish entering bales later"
           >
             <i className="ti ti-device-floppy fs-15" style={{ color: '#5b47fb' }}></i>
