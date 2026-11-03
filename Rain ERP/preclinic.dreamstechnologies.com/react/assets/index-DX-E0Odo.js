@@ -17275,7 +17275,7 @@
     const [tempLengthVal, setTempLengthVal] = (0, import_react5.useState)("");
     const [showToast, setShowToast] = (0, import_react5.useState)(false);
     const [toastMessage, setToastMessage] = (0, import_react5.useState)("");
-    const getCustomerPcs = useCallback((artName, colName) => {
+    const getCustomerPcs = (0, import_react5.useCallback)((artName, colName) => {
       let sum = 0;
       if (Array.isArray(order?.customerOrders)) {
         order.customerOrders.forEach((cust) => {
@@ -20285,33 +20285,18 @@
                     })
                   ))
                 ),
-                /* @__PURE__ */ import_react5.default.createElement("td", { style: { padding: "8px 12px", borderBottom: "1px solid #f1f5f9" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5", style: { minWidth: "110px" } }, /* @__PURE__ */ import_react5.default.createElement(
+                /* @__PURE__ */ import_react5.default.createElement("td", { style: { padding: "10px 14px", borderBottom: "1px solid #f1f5f9" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2", style: { whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement(
                   "span",
                   {
                     className: "d-inline-block rounded-circle flex-shrink-0",
                     style: {
-                      width: "10px",
-                      height: "10px",
+                      width: "11px",
+                      height: "11px",
                       backgroundColor: row.colorHex || "#333333",
                       border: "1px solid rgba(0,0,0,0.1)"
                     }
                   }
-                ), availableColorsList.length > 1 ? /* @__PURE__ */ import_react5.default.createElement(
-                  "select",
-                  {
-                    className: "form-select form-select-sm py-0 ps-1 pe-4 fw-medium text-dark border bg-white",
-                    style: {
-                      fontSize: "12px",
-                      height: "28px",
-                      borderRadius: "5px",
-                      borderColor: "#e2e8f0",
-                      cursor: "pointer"
-                    },
-                    value: row.colorName,
-                    onChange: (e) => handleUpdateRowColor(row.key, row.originalIndex, e.target.value)
-                  },
-                  availableColorsList.map((c) => /* @__PURE__ */ import_react5.default.createElement("option", { key: c.name, value: c.name }, c.name))
-                ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.colorName))),
+                ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.colorName))),
                 isFirstRow && /* @__PURE__ */ import_react5.default.createElement(
                   "td",
                   {
