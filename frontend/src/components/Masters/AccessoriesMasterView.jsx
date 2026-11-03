@@ -2885,55 +2885,33 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                   </fieldset>
                 </div>
 
-                {/* Modal Footer with Clean Theme Buttons */}
-                <div className="modal-footer border-top py-3 px-4 d-flex justify-content-end gap-2 bg-light">
-                  {!isModalEditMode ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-theme-close rounded-3 px-4 fw-medium"
-                        onClick={() => {
+                {/* Modal Footer with Clean Theme Buttons (Visible only during edit/creation mode) */}
+                {isModalEditMode && (
+                  <div className="modal-footer border-top py-3 px-4 d-flex justify-content-end gap-2 bg-light">
+                    <button
+                      type="button"
+                      className="btn btn-theme-close rounded-3 px-4 fw-medium"
+                      onClick={() => {
+                        if (isCreatingNew) {
                           setIsEditing(false);
                           setIsModalEditMode(false);
-                        }}
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary rounded-3 px-4 fw-semibold"
-                        onClick={() => setIsModalEditMode(true)}
-                      >
-                        <i className="ti ti-edit me-1"></i> Edit Accessory
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-theme-close rounded-3 px-4 fw-medium"
-                        onClick={() => {
-                          if (isCreatingNew) {
-                            setIsEditing(false);
-                            setIsModalEditMode(false);
-                          } else {
-                            setIsModalEditMode(false);
-                          }
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="btn btn-primary rounded-3 px-4 fw-semibold"
-                        disabled={isNameDuplicate}
-                        title={isNameDuplicate ? 'Duplicate accessory names are not allowed' : ''}
-                      >
-                        <i className="ti ti-check me-1"></i> Save Accessory
-                      </button>
-                    </>
-                  )}
-                </div>
+                        } else {
+                          setIsModalEditMode(false);
+                        }
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary rounded-3 px-4 fw-semibold"
+                      disabled={isNameDuplicate}
+                      title={isNameDuplicate ? 'Duplicate accessory names are not allowed' : ''}
+                    >
+                      <i className="ti ti-check me-1"></i> Save Accessory
+                    </button>
+                  </div>
+                )}
               </form>
             </div>
           </div>

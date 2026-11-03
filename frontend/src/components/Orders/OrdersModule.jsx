@@ -9,11 +9,17 @@ import ProcurementModal from './ProcurementModal';
 export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNavigate, onNavigateToProcurement }) {
   const [orders, setOrders] = useState(() => getStoredData('erp_sales_orders_v1', initialSalesOrders));
   const [procurementModal, setProcurementModal] = useState({ isOpen: false });
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const [selectedOrder, setSelectedOrder] = useState(() => {
     const routeToCheck = currentRoute || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const editMatch = routeToCheck.match(/\/orders\/edit\/([^/]+)/);
+    if (editMatch && editMatch[1]) {
+      const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
+      return stored.find((o) => o.id === editMatch[1]) || null;
+    }
     const match = routeToCheck.match(/\/orders\/([^/]+)/);
-    if (match && match[1] && match[1] !== 'new') {
+    if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit') {
       const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
       return stored.find((o) => o.id === match[1]) || stored.find((o) => o.id === 'RD-2610-0002') || stored[0] || null;
     }
@@ -22,9 +28,10 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
 
   const [viewMode, setViewMode] = useState(() => {
     const routeToCheck = currentRoute || (typeof window !== 'undefined' ? window.location.pathname : '');
+    if (routeToCheck.includes('/orders/edit/')) return 'create';
     if (routeToCheck.includes('/new') || routeToCheck.includes('/create')) return 'create';
     const match = routeToCheck.match(/\/orders\/([^/]+)/);
-    if (match && match[1] && match[1] !== 'new') return 'detail';
+    if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit') return 'detail';
     return 'list';
   });
 
@@ -47,12 +54,20 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
   // Sync state whenever currentRoute prop changes (e.g. from Dashboard or Sidebar)
   useEffect(() => {
     if (currentRoute) {
-      if (currentRoute.includes('/new') || currentRoute.includes('/create')) {
+      const editMatch = currentRoute.match(/\/orders\/edit\/([^/]+)/);
+      if (editMatch && editMatch[1]) {
+        const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
+        const found = stored.find((o) => o.id === editMatch[1]);
+        if (found) {
+          setSelectedOrder(found);
+        }
+        setViewMode('create');
+      } else if (currentRoute === '/orders/new' || currentRoute === '/orders/create') {
         setSelectedOrder(null);
         setViewMode('create');
       } else {
         const match = currentRoute.match(/\/orders\/([^/]+)/);
-        if (match && match[1] && match[1] !== 'new') {
+        if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit') {
           const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
           const found = stored.find((o) => o.id === match[1]) || stored[0];
           if (found) {
@@ -109,14 +124,25 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
     setSelectedOrder(order);
     setViewMode('create');
     if (onNavigate) {
-      onNavigate('/orders/new');
+      onNavigate(`/orders/edit/${order.id}`, order);
     } else if (typeof window !== 'undefined' && window.history?.pushState) {
-      window.history.pushState(null, '', '/react/orders/new');
+      window.history.pushState(null, '', `/react/orders/edit/${order.id}`);
     }
   };
 
   const handleSaveOrder = (newOrder, action, shouldScroll = false) => {
-    const updated = [newOrder, ...orders.filter((o) => o.id !== newOrder.id)];
+    const isDraftAction = action === 'Draft';
+    const isAlreadyConfirmed = (newOrder?.status === 'Confirmed' || newOrder?.stage === 'Confirmed') && !isDraftAction;
+    const finalStatus = isDraftAction ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    const finalStage = isDraftAction ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    const finalOrder = {
+      ...newOrder,
+      status: finalStatus,
+      stage: finalStage,
+      hasProceededToNextStep: !isDraftAction
+    };
+
+    const updated = [finalOrder, ...orders.filter((o) => o.id !== finalOrder.id)];
     setOrders(updated);
     setStoredData('erp_sales_orders_v1', updated);
 
@@ -125,19 +151,45 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
       window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updated }));
     }
 
+    if (isDraftAction) {
+      // Save as Draft: Return to Orders List view instead of navigating to Next Step (OrderDetailView)
+      setSelectedOrder(null);
+      setViewMode('list');
+      setToast({
+        show: true,
+        message: `Sales Order #${finalOrder.id} saved as Draft successfully!`,
+        type: 'info'
+      });
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, show: false }));
+      }, 4000);
+
+      if (typeof window !== 'undefined') {
+        if (shouldScroll) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        if (onNavigate) {
+          onNavigate('/orders');
+        } else if (window.history?.pushState) {
+          window.history.pushState(null, '', '/react/orders');
+        }
+      }
+      return;
+    }
+
     if (action === 'Create PO' && onNavigateToProcurement) {
-      onNavigateToProcurement('/procurement-pos', newOrder);
+      onNavigateToProcurement('/procurement-pos', finalOrder);
     } else {
-      setSelectedOrder(newOrder);
+      setSelectedOrder(finalOrder);
       setViewMode('detail');
       if (typeof window !== 'undefined') {
         if (shouldScroll) {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         if (onNavigate) {
-          onNavigate(`/orders/${newOrder.id}`);
+          onNavigate(`/orders/${finalOrder.id}`);
         } else if (window.history?.pushState) {
-          window.history.pushState(null, '', `/react/orders/${newOrder.id}`);
+          window.history.pushState(null, '', `/react/orders/${finalOrder.id}`);
         }
       }
     }
@@ -244,6 +296,13 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
           }}
           onEditSection={(section) => {
             setViewMode('create');
+            if (selectedOrder) {
+              if (onNavigate) {
+                onNavigate(`/orders/edit/${selectedOrder.id}`, selectedOrder);
+              } else if (typeof window !== 'undefined' && window.history?.pushState) {
+                window.history.pushState(null, '', `/react/orders/edit/${selectedOrder.id}`);
+              }
+            }
           }}
           onTriggerProcurement={handleTriggerProcurement}
           onNavigateToProcurement={onNavigateToProcurement}
@@ -273,6 +332,24 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
             }
           }}
         />
+      )}
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 1080 }}>
+          <div className="toast show align-items-center text-white bg-dark border-0 shadow-lg rounded-3">
+            <div className="d-flex">
+              <div className="toast-body d-flex align-items-center gap-2 py-2.5 px-3 fs-13">
+                <i className="ti ti-circle-check text-success fs-5"></i>
+                <span>{toast.message}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white me-2 m-auto"
+                onClick={() => setToast({ show: false, message: '', type: 'success' })}
+              ></button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

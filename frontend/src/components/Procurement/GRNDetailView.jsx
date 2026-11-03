@@ -1120,9 +1120,6 @@ export default function GRNDetailView({
                       />
                     </div>
 
-                    {/* Empty spacer */}
-                    <div className="col-12 col-sm-6"></div>
-
                     {/* 9. Weight (kg) */}
                     <div className="col-12 col-sm-6">
                       <label className="form-label fs-11 fw-medium text-dark mb-1">Weight (kg)</label>
@@ -1136,20 +1133,7 @@ export default function GRNDetailView({
                       />
                     </div>
 
-                    {/* 10. Fabric folding (cms) */}
-                    <div className="col-12 col-sm-6">
-                      <label className="form-label fs-11 fw-medium text-dark mb-1">Fabric folding (cms)</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm fs-12 rounded-3 bg-white"
-                        style={{ borderColor: '#d1d5db', minHeight: '34px' }}
-                        value={editHeaderForm.foldingCms}
-                        onChange={(e) => setEditHeaderForm({ ...editHeaderForm, foldingCms: e.target.value })}
-                        placeholder=""
-                      />
-                    </div>
-
-                    {/* 11. Total quantity (m) */}
+                    {/* 10. Total quantity (m) */}
                     <div className="col-12 col-sm-6">
                       <label className="form-label fs-11 fw-medium text-dark mb-1">Total quantity (m)</label>
                       <input

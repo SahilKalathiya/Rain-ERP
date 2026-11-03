@@ -146,7 +146,7 @@ export default function QualityCheckForm({
   const [toastNotification, setToastNotification] = useState(null);
 
   // Dropdown states for Bale / Piece-level inspection (Requirement 24)
-  const [selectedBaleFilter, setSelectedBaleFilter] = useState('all');
+  const [selectedBaleFilter, setSelectedBaleFilter] = useState('');
   const [selectedPieceKey, setSelectedPieceKey] = useState('');
   const [inspectionScope, setInspectionScope] = useState(() => {
     if (qc?.inspectionScope === 'Piece-Level' || qc?.inspectionScope === 'piece') return 'piece';
@@ -262,6 +262,9 @@ export default function QualityCheckForm({
 
   // Filtered pieces based on dropdown option (Requirement 24)
   const displayedPieces = grnPieces.filter((pc) => {
+    if (!selectedBaleFilter && !selectedPieceKey) {
+      return false;
+    }
     if (selectedBaleFilter !== 'all' && String(pc.baleNo) !== String(selectedBaleFilter)) {
       return false;
     }
@@ -997,6 +1000,7 @@ export default function QualityCheckForm({
                       value={selectedPieceKey ? 'piece:' + selectedPieceKey : selectedBaleFilter}
                       onChange={(e) => handleBaleFilterChange(e.target.value)}
                     >
+                      <option value="">-- Select Bale --</option>
                       <option value="all">
                         All Bales ({uniqueBaleNumbers.length} {uniqueBaleNumbers.length === 1 ? 'Bale' : 'Bales'} &middot; {grnPieces.length} {grnPieces.length === 1 ? 'Piece' : 'Pieces'})
                       </option>
@@ -1033,8 +1037,15 @@ export default function QualityCheckForm({
                       className="form-select form-select-sm bg-white fs-12 border rounded-2"
                       value={selectedPieceKey}
                       onChange={(e) => handlePieceSelectChange(e.target.value)}
+                      disabled={!selectedBaleFilter}
                     >
-                      <option value="">{selectedBaleFilter === 'all' ? '-- All Pieces in All Bales --' : `-- All Pieces in Bale #${selectedBaleFilter} --`}</option>
+                      <option value="">
+                        {!selectedBaleFilter
+                          ? '-- Select Bale first --'
+                          : selectedBaleFilter === 'all'
+                          ? '-- All Pieces in All Bales --'
+                          : `-- All Pieces in Bale #${selectedBaleFilter} --`}
+                      </option>
                       {(selectedBaleFilter === 'all' ? grnPieces : grnPieces.filter((p) => String(p.baleNo) === String(selectedBaleFilter))).map((pc) => {
                         const isInspected = Boolean(pieceInspections[pc.key]?.checked);
                         const st = isInspected ? (pieceInspections[pc.key]?.status || 'OK') : 'Unchecked';
@@ -1072,14 +1083,16 @@ export default function QualityCheckForm({
                       {inspectionScope === 'piece' ? '🔬 Piece-Level Detailed Mode' : (inspectionScope === 'bale' ? '📦 Bale-Level Focus Mode' : '🌐 Full Shipment Inspection')}
                     </span>
                     <span className="fs-12 text-muted">
-                      {inspectionScope === 'piece'
+                      {!selectedBaleFilter && !selectedPieceKey
+                        ? 'Select a bale from the dropdown above to load and inspect pieces.'
+                        : inspectionScope === 'piece'
                         ? 'All individual pieces expanded with independent width/fold checks.'
                         : (inspectionScope === 'bale'
                           ? `Focusing inspection on Bale #${selectedBaleFilter === 'all' ? 'All' : selectedBaleFilter}.`
                           : 'Shipment-wide inspection. Top fields apply to all pieces.')}
                     </span>
                   </div>
-                  {(selectedPieceKey || selectedBaleFilter !== 'all') && (
+                  {(selectedPieceKey || (selectedBaleFilter && selectedBaleFilter !== 'all')) && (
                     <button
                       type="button"
                       className="btn btn-link btn-sm p-0 text-decoration-none fs-12 fw-semibold"
@@ -1128,7 +1141,7 @@ export default function QualityCheckForm({
             )}
 
             {/* Quick Action Toolbar for displayed pieces */}
-            {grnPieces.length > 0 && (
+            {grnPieces.length > 0 && (selectedBaleFilter || selectedPieceKey) && (
               <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 bg-light rounded-2 border mb-3">
                 <div className="d-flex align-items-center gap-2">
                   <span className="fs-12 fw-semibold text-dark">
@@ -1172,6 +1185,12 @@ export default function QualityCheckForm({
             {grnPieces.length === 0 ? (
               <div className="text-center py-3 text-muted fs-13 border rounded-3 bg-light">
                 No bale/piece breakdown recorded for this GRN. Use overall inspection fields above.
+              </div>
+            ) : !selectedBaleFilter && !selectedPieceKey ? (
+              <div className="text-center py-4 text-muted fs-13 border rounded-3 bg-light d-flex flex-column align-items-center justify-content-center gap-1">
+                <i className="ti ti-box fs-24 text-secondary mb-1"></i>
+                <span className="fw-semibold text-dark">Please select a bale from the dropdown above</span>
+                <span className="text-secondary fs-12">Choose "All Bales" or a specific Bale # to display and inspect pieces</span>
               </div>
             ) : (
               <div className="d-flex flex-column gap-2">

@@ -123,9 +123,11 @@ export default function AddColorModal({
   isModalEditMode: propIsEditMode,
   onToggleEditMode
 }) {
+  const isExistingColor = Boolean(initialColor && (initialColor.id || (initialColor.name && String(initialColor.name).trim() !== '')));
+
   const [isEditMode, setIsEditMode] = useState(() => {
     if (propIsEditMode !== undefined) return propIsEditMode;
-    return initialColor ? false : true;
+    return isExistingColor ? false : true;
   });
 
   useEffect(() => {
@@ -409,7 +411,7 @@ export default function AddColorModal({
           <div className="modal-header border-0 pb-0 pt-4 px-4 d-flex align-items-center justify-content-between">
             <div>
               <h5 className="modal-title fw-bold text-dark fs-18 mb-0">
-                {initialColor ? (isEditMode ? 'Edit Color' : 'Color Details') : 'Add New Color'}
+                {isExistingColor ? (isEditMode ? 'Edit Color' : 'Color Details') : 'Add New Color'}
               </h5>
               {initialColor?.id && (
                 <span className="badge bg-light text-secondary border font-monospace mt-1" style={{ fontSize: '11px' }}>
@@ -419,7 +421,7 @@ export default function AddColorModal({
             </div>
 
             <div className="d-flex align-items-center gap-2">
-              {initialColor && (
+              {isExistingColor && (
                 !isEditMode ? (
                   <button
                     type="button"
@@ -847,7 +849,7 @@ export default function AddColorModal({
                   }}
                   onClick={handleSave}
                 >
-                  {initialColor ? 'Save Changes' : 'Create'}
+                  {isExistingColor ? 'Save Changes' : 'Create Color'}
                 </button>
               </div>
             )}

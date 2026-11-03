@@ -1107,6 +1107,20 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     return orderCustomers.reduce((acc, c) => acc + getCustomerTotalPieces(c), 0);
   }, [orderCustomers]);
 
+  // Colors list available for assigning to fabrics
+  const allAvailableColors = useMemo(() => {
+    const list = [];
+    orderCustomers.forEach(c => {
+      (c.selectedColors || []).forEach(col => {
+        if (!list.includes(col)) list.push(col);
+      });
+    });
+    masterColors.forEach(c => {
+      if (c.name && !list.includes(c.name)) list.push(c.name);
+    });
+    return list;
+  }, [orderCustomers, masterColors]);
+
   // =========================================================================
   // SECTION 12.5 FABRIC CONSUMPTION FORMULA (STRICT SPECIFICATION)
   // Rule 1: Greige length per piece = Avg. (dyed) Length * (1 + Shrinkage%) * (1 + Buffer%);
@@ -1157,10 +1171,16 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           }
         });
 
-        const colorsToIterate = usedColors.size > 0 ? Array.from(usedColors) : ['Standard'];
+        const specificColor = fr.color || fr.colorName;
+        const colorsToIterate = (specificColor && specificColor !== 'All Colours' && specificColor !== 'All')
+          ? [specificColor]
+          : (usedColors.size > 0 ? Array.from(usedColors) : ['Standard']);
 
         colorsToIterate.forEach(colName => {
           const pcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
+          // Skip if 0 pieces ordered for this color
+          if (pcs <= 0 && usedColors.size > 0) return;
+
           const colorObj = masterColors.find(c => c.name === colName) || { hex: '#94a3b8' };
           const widthVal = fr.width || art.width || '';
 
@@ -1349,6 +1369,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       };
     });
 
+    const isDraft = status === 'Draft';
+    const isAlreadyConfirmed = (editingOrder?.status === 'Confirmed' || editingOrder?.stage === 'Confirmed') && !isDraft;
+    const finalStatus = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    const finalStage = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    const hasProceededToNextStep = !isDraft;
+
     const payload = {
       ...(editingOrder || {}),
       id: orderInfo.orderId,
@@ -1356,8 +1382,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       orderDate: orderInfo.orderDate,
       expectedDelivery: orderInfo.expectedDelivery || '',
       priority: orderInfo.priority || 'Normal',
-      status: status || (editingOrder?.status === 'Draft' && status !== 'Saved' ? 'Draft' : 'Saved'),
-      stage: (status === 'Draft' || (editingOrder?.status === 'Draft' && status !== 'Saved')) ? 'Draft' : 'Confirmed',
+      status: finalStatus,
+      stage: finalStage,
+      hasProceededToNextStep: hasProceededToNextStep,
       totalGarments: grandTotalOrderPieces || 0,
       totalFabricGreige: parseFloat(totalGreigeFabric) || 0,
       totalFabricDyed: parseFloat(totalDyedFabric) || 0,
@@ -1377,7 +1404,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             return {
               ...f,
               fabricQuality: fMatch?.qualityName || fMatch?.quality || fMatch?.name || f.fabricQuality || '',
-              role: autoCapitalizeWords(f.role || '')
+              role: autoCapitalizeWords(f.role || ''),
+              color: f.color || '',
+              colorName: f.color || ''
             };
           }),
           avgGarmentLength: avgLen,
@@ -1443,7 +1472,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             <span className="p-2 rounded-3 text-white d-inline-flex align-items-center justify-content-center" style={{ backgroundColor: '#2e37a4', width: '36px', height: '36px' }}>
               <i className={editingOrder ? "ti ti-edit fs-5" : "ti ti-file-plus fs-5"}></i>
             </span>
-            <span>{editingOrder ? (editingOrder.status === 'Draft' ? 'Edit Draft Sales Order' : 'Edit Sales Order') : 'New Sales Order'}</span>
+            <span>{editingOrder ? (editingOrder.status === 'Draft' && !editingOrder.hasProceededToNextStep ? 'Edit Draft Sales Order' : 'Edit Sales Order') : 'New Sales Order'}</span>
             {editingOrder && (
               <span className="badge font-monospace px-2.5 py-1 rounded-2 ms-1 fs-12 fw-normal" style={{ backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
                 {editingOrder.id} &bull; {editingOrder.status || 'Draft'}
@@ -1746,7 +1775,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                         onBlur={(e) => updateFabricField(art.id, fi, 'role', autoCapitalizeWords((e.target.value || '').trim()))}
                       />
                     </div>
-                    <div className="col-12 col-md-8">
+                    <div className="col-12 col-md-5">
                       <label className="form-label small text-muted mb-1">Fabric Quality</label>
                       <div className="input-group input-group-sm">
                         <select
@@ -1776,6 +1805,19 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           <span>New Fabric</span>
                         </button>
                       </div>
+                    </div>
+                    <div className="col-12 col-md-3">
+                      <label className="form-label small text-muted mb-1">Colour</label>
+                      <select
+                        className="form-select form-select-sm bg-white"
+                        value={fr.color || ''}
+                        onChange={(e) => updateFabricField(art.id, fi, 'color', e.target.value)}
+                      >
+                        <option value="">All Colours</option>
+                        {allAvailableColors.map((col) => (
+                          <option key={col} value={col}>{col}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="col-12 col-md-1 text-end pb-1">
                       <button
@@ -1996,7 +2038,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                             }}
                           >
                             <i className="ti ti-plus fs-6"></i>
-                            <span>+ Add Colour</span>
+                            <span>Add Colour</span>
                           </button>
                         </div>
 
@@ -2784,11 +2826,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
               type="button"
               className="btn text-white rounded-3 px-4 py-2 fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5"
               style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4' }}
-              onClick={() => handleFinalSave('Saved')}
+              onClick={() => handleFinalSave('Proceed')}
             >
               <i className="ti ti-check"></i>
-              <span>{editingOrder ? 'Save & Proceed to Next Step' : 'Save Order'}</span>
-              {editingOrder && <i className="ti ti-arrow-right"></i>}
+              <span>Save &amp; Proceed to Next Step</span>
+              <i className="ti ti-arrow-right"></i>
             </button>
           </div>
         </div>
@@ -2874,6 +2916,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       {showNewColorModal && (
         <AddColorModal
           colors={masterColors}
+          isModalEditMode={true}
           initialColor={(() => {
             const activeCustTab = customerColorTab[activeCustomerIndexForNewColor] || 'allSeason';
             const quarterTag = (activeCustTab === 'allSeason') ? 'All Season' : activeCustTab;

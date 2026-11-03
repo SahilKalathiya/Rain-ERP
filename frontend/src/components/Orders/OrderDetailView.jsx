@@ -30,6 +30,10 @@ export default function OrderDetailView({
   const [confirmed, setConfirmed] = useState(
     order?.stage === 'Confirmed' || order?.status === 'Confirmed'
   );
+
+  useEffect(() => {
+    setConfirmed(order?.stage === 'Confirmed' || order?.status === 'Confirmed');
+  }, [order?.id, order?.status, order?.stage]);
   const [photoType, setPhotoType] = useState('Reference');
   const [photoCaption, setPhotoCaption] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
@@ -39,6 +43,51 @@ export default function OrderDetailView({
   const [tempLengthVal, setTempLengthVal] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Helper to calculate total pieces ordered by customers for a specific (Article, Color)
+  const getCustomerPcs = useCallback((artName, colName) => {
+    let sum = 0;
+    if (Array.isArray(order?.customerOrders)) {
+      order.customerOrders.forEach(cust => {
+        Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
+          const kLow = key.toLowerCase();
+          const aLow = (artName || '').toLowerCase();
+          const cLow = (colName || '').toLowerCase();
+          if (kLow.includes(aLow) && (cLow === '' || kLow.includes(cLow))) {
+            if (Array.isArray(cfg?.seriesConfigs)) {
+              cfg.seriesConfigs.forEach(sc => {
+                Object.values(sc.sizeQtys || {}).forEach(q => {
+                  sum += parseInt(q, 10) || 0;
+                });
+              });
+            } else if (cfg?.sizeQtys) {
+              Object.values(cfg.sizeQtys || {}).forEach(q => {
+                sum += parseInt(q, 10) || 0;
+              });
+            }
+          }
+        });
+      });
+    }
+    return sum;
+  }, [order]);
+
+  // All colors present in this order
+  const availableColorsList = useMemo(() => {
+    const set = new Set();
+    if (Array.isArray(order?.customerOrders)) {
+      order.customerOrders.forEach(c => {
+        (c.selectedColors || []).forEach(col => set.add(col));
+      });
+    }
+    if (Array.isArray(order?.colors)) {
+      order.colors.forEach(col => set.add(col));
+    }
+    if (set.size === 0) {
+      set.add('Standard');
+    }
+    return Array.from(set);
+  }, [order]);
 
   // Master Accessories Dynamic State (Sourced from Accessories Master)
   const [masterAccessories, setMasterAccessories] = useState(() => getStoredAccessoriesMaster());
@@ -260,6 +309,15 @@ export default function OrderDetailView({
     return 10;
   };
 
+  const matchesCategory = (itemCat, tabCat) => {
+    if (!tabCat || tabCat === 'All') return true;
+    if (!itemCat) return false;
+    if (itemCat === tabCat) return true;
+    const normItem = String(itemCat).toLowerCase().replace(/s$/, '');
+    const normTab = String(tabCat).toLowerCase().replace(/s$/, '');
+    return normItem === normTab;
+  };
+
   const CATEGORY_METADATA = {
     'Buttons': { name: 'Buttons', icon: 'ti ti-circle-dot', iconColor: '#475569', bgColor: '#f1f5f9', poBtnText: 'Button PO', poBtnColor: '#2563eb', defaultUnit: 'PCS' },
     'Lace': { name: 'Lace', icon: 'ti ti-cut', iconColor: '#2563eb', bgColor: '#eff6ff', poBtnText: 'Lace PO', poBtnColor: '#9333ea', defaultUnit: 'METER' },
@@ -293,13 +351,13 @@ export default function OrderDetailView({
 
     const allCatNames = [...defaultOrder];
     masterAccessories.forEach(m => {
-      if (m.category && !allCatNames.includes(m.category)) {
+      if (m.category && !allCatNames.some(existing => matchesCategory(m.category, existing))) {
         allCatNames.push(m.category);
       }
     });
 
     return allCatNames.map(catName => {
-      const meta = CATEGORY_METADATA[catName] || {
+      const meta = CATEGORY_METADATA[catName] || Object.entries(CATEGORY_METADATA).find(([k]) => matchesCategory(k, catName))?.[1] || {
         name: catName,
         icon: 'ti ti-tag',
         iconColor: '#2e37a4',
@@ -309,7 +367,7 @@ export default function OrderDetailView({
         defaultUnit: 'PCS'
       };
 
-      const inCat = masterAccessories.filter(m => (m.category || '').toLowerCase() === catName.toLowerCase());
+      const inCat = masterAccessories.filter(m => matchesCategory(m.category, catName));
       const varieties = [];
 
       inCat.forEach(m => {
@@ -324,8 +382,8 @@ export default function OrderDetailView({
                 hasSizes: sizes.length > 0,
                 sizes: sizes,
                 colors: colors,
-                defaultSize: v.size || '',
-                defaultColor: v.color || '',
+                defaultSize: '',
+                defaultColor: '',
                 defaultPlacement: '',
                 defaultReqPerPc: '',
                 type: v.type || m.source || '',
@@ -349,8 +407,8 @@ export default function OrderDetailView({
               hasSizes: parsedSizes.length > 0,
               sizes: parsedSizes,
               colors: parsedColors,
-              defaultSize: m.size || '',
-              defaultColor: m.color || '',
+              defaultSize: '',
+              defaultColor: '',
               defaultPlacement: '',
               defaultReqPerPc: '',
               type: m.subType || m.source || '',
@@ -362,20 +420,20 @@ export default function OrderDetailView({
         // 3. Base accessory name (Matching Image 3: "+ Coconut", "+ Coconut Button", "+ MOP", "+ Metal 2 hole", "+ Mould", "+ Pignose", "+ Plastic")
         if (m.name && m.name.toLowerCase() !== catName.toLowerCase()) {
           if (!varieties.some(x => x.name.toLowerCase() === m.name.toLowerCase())) {
-            const parsedSizes = m.buttonSizes
-              ? m.buttonSizes.split(',').map(s => s.trim()).filter(Boolean)
-              : (m.sizes || (m.laceSize ? [m.laceSize] : (m.size ? [m.size] : [])));
-            const parsedColors = m.buttonColors
-              ? m.buttonColors.split(',').map(s => s.trim()).filter(Boolean)
-              : (m.colors || (m.color ? [m.color] : []));
+            const parsedSizes = (m.buttonSizesList && m.buttonSizesList.length > 0)
+              ? m.buttonSizesList
+              : (m.buttonSizes ? m.buttonSizes.split(',').map(s => s.trim()).filter(Boolean) : (m.variants?.length ? m.variants : (m.sizes || (m.laceSizesList?.length ? m.laceSizesList : (m.laceSize ? [m.laceSize] : (m.size ? [m.size] : []))))));
+            const parsedColors = (m.buttonColorsList && m.buttonColorsList.length > 0)
+              ? m.buttonColorsList
+              : (m.buttonColors ? m.buttonColors.split(',').map(s => s.trim()).filter(Boolean) : (m.colors?.length ? m.colors : (m.color ? [m.color] : [])));
             varieties.push({
               name: m.name,
               baseName: m.name,
               hasSizes: parsedSizes.length > 0,
               sizes: parsedSizes,
               colors: parsedColors,
-              defaultSize: m.size || '',
-              defaultColor: m.color || '',
+              defaultSize: '',
+              defaultColor: '',
               defaultPlacement: '',
               defaultReqPerPc: '',
               type: m.subType || m.source || '',
@@ -594,7 +652,7 @@ export default function OrderDetailView({
   }, [order]);
 
   const activeCategoryObj = useMemo(() => {
-    return ACCESSORY_CATEGORIES.find(c => c.id === activeCategory) || ACCESSORY_CATEGORIES[0];
+    return ACCESSORY_CATEGORIES.find(c => matchesCategory(c.id, activeCategory)) || ACCESSORY_CATEGORIES[0];
   }, [ACCESSORY_CATEGORIES, activeCategory]);
 
 
@@ -913,17 +971,17 @@ export default function OrderDetailView({
   };
 
   const handleAddMultipleAccessories = (catId, varName, count = 1) => {
-    const catObj = ACCESSORY_CATEGORIES.find(c => c.id === catId);
+    const catObj = ACCESSORY_CATEGORIES.find(c => matchesCategory(c.id, catId));
     const varObj = catObj?.varieties?.find(v => v.name.toLowerCase() === (varName || '').toLowerCase()) || catObj?.varieties?.[0];
     const resolvedVarName = varName || varObj?.name || 'Coconut';
-    const existingForVar = addedAccessories.filter(a => a.category === catId && a.varietyName === resolvedVarName);
+    const existingForVar = addedAccessories.filter(a => matchesCategory(a.category, catId) && a.varietyName === resolvedVarName);
     const startNum = existingForVar.length + 1;
 
     const targetArticle = selectedBomArticle || orderArticles[0]?.name || 'Kurta';
     const resolvedSizes = (varObj?.sizes && varObj.sizes.length > 0) ? varObj.sizes : [];
     const resolvedColors = (varObj?.colors && varObj.colors.length > 0) ? varObj.colors : [];
-    const initialSize = varObj?.defaultSize || '';
-    const initialColor = varObj?.defaultColor || '';
+    const initialSize = '';
+    const initialColor = '';
 
     const newItems = [];
     const newEditingIds = {};
@@ -1072,9 +1130,10 @@ export default function OrderDetailView({
 
   const handleSaveFullOrder = (status) => {
     const isDraft = status === 'Draft';
-    const newStatus = isDraft ? 'Draft' : 'Confirmed';
-    const newStage = isDraft ? 'Draft' : 'Confirmed';
-    setConfirmed(!isDraft);
+    const isAlreadyConfirmed = (confirmed || order?.status === 'Confirmed' || order?.stage === 'Confirmed') && !isDraft;
+    const newStatus = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    const newStage = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
+    setConfirmed(newStatus === 'Confirmed');
 
     let userName = 'Saksham Garg';
     let userRole = 'Merchandiser';
@@ -1105,6 +1164,7 @@ export default function OrderDetailView({
       ...order,
       status: newStatus,
       stage: newStage,
+      hasProceededToNextStep: !isDraft,
       accessories: addedAccessories,
       fabricConsumptions: consumptionRows,
       articleSourcing,
@@ -1136,7 +1196,8 @@ export default function OrderDetailView({
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
-      }, 1500);
+        if (onBack) onBack();
+      }, 600);
     }
   };
 
@@ -1555,14 +1616,21 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="Front.." value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
+                          <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
                         ) : (
                           <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
                         )}
                       </td>
                       <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                          item.colors && item.colors.length > 0 ? (
+                            <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
+                              <option value="">Select Color</option>
+                              {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                          )
                         ) : (
                           <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
                         )}
@@ -1699,14 +1767,21 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="Front.." value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
+                          <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
                         ) : (
                           <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
                         )}
                       </td>
                       <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                          item.colors && item.colors.length > 0 ? (
+                            <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
+                              <option value="">Select Color</option>
+                              {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                          )
                         ) : (
                           <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
                         )}
@@ -1857,14 +1932,21 @@ export default function OrderDetailView({
                     </td>
                     <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <input type="text" className="form-control form-control-sm" placeholder="Front.." value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
+                        <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
                       ) : (
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
                       )}
                     </td>
                     <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                        item.colors && item.colors.length > 0 ? (
+                          <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
+                            <option value="">Select Color</option>
+                            {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                        )
                       ) : (
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
                       )}
@@ -2087,9 +2169,15 @@ export default function OrderDetailView({
 
     const isMockSample = !order || (!order.id && !order.styleName && (!order.articles || order.articles.length === 0));
 
-    // If order already has saved fabricConsumptions, initialize from them
+    // If order already has saved fabricConsumptions, initialize from them (excluding 0 pcs rows)
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
-      return order.fabricConsumptions.map((fc, idx) => {
+      return order.fabricConsumptions
+        .filter(fc => {
+          const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
+          const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
+          return isNaN(parsedPcs) || parsedPcs > 0;
+        })
+        .map((fc, idx) => {
         const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
         const artIdx = fc.articleIndex !== undefined
           ? fc.articleIndex
@@ -2253,9 +2341,14 @@ export default function OrderDetailView({
 
         // Dupatta might only have 1 color in sample
         const artColors = artName.toLowerCase().includes('dupatta') ? [colors[0] || 'Standard'] : colors;
+        const fabricColor = artFab.color || artFab.colorName;
+        const colorsForThisFab = (fabricColor && fabricColor !== 'All Colours' && fabricColor !== 'All')
+          ? [fabricColor]
+          : artColors;
 
-        artColors.forEach((col, cIdx) => {
+        colorsForThisFab.forEach((col, cIdx) => {
           const custPcs = getCustomerPcs(artName, col);
+          if (custPcs <= 0 && colorsForThisFab.length > 0) return;
           const pcsVal = custPcs > 0 ? custPcs : 0;
 
           rows.push({
@@ -2343,31 +2436,30 @@ export default function OrderDetailView({
       if (name && !seen.has(name.toLowerCase())) {
         seen.add(name.toLowerCase());
 
-        // 1. Try to compute from fabricConsumptions
-        let computedPcs = 0;
-        if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
-          const matchingFc = order.fabricConsumptions.filter(
-            fc => (fc.articleName || fc.article || '').toLowerCase().trim() === name.toLowerCase()
-          );
-          if (matchingFc.length > 0) {
-            computedPcs = matchingFc.reduce((acc, fc) => acc + (parseInt(fc.pcs || fc.pieces, 10) || 0), 0);
-          }
+        let finalPieces = 0;
+
+        // 1. Authoritative: check item.totalPieces from order.articles
+        const rawPieces = parseInt(item.totalPieces, 10);
+        if (!isNaN(rawPieces) && rawPieces > 0) {
+          finalPieces = rawPieces;
         }
 
-        // 2. Try to compute from customerOrders sizeConfigs
-        if (computedPcs <= 0 && Array.isArray(order?.customerOrders)) {
+        // 2. Compute from customerOrders sizeConfigs
+        if (finalPieces <= 0 && Array.isArray(order?.customerOrders)) {
           order.customerOrders.forEach(cust => {
             Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
-              if (key.toLowerCase().includes(name.toLowerCase()) || (item.id && key.startsWith(`${item.id}_`))) {
+              const matchesArt = (item.id && key.startsWith(`${item.id}_`)) ||
+                                 (name && key.toLowerCase().includes(name.toLowerCase()));
+              if (matchesArt && cfg) {
                 if (Array.isArray(cfg?.seriesConfigs)) {
                   cfg.seriesConfigs.forEach(sc => {
                     Object.values(sc.sizeQtys || {}).forEach(q => {
-                      computedPcs += parseInt(q, 10) || 0;
+                      finalPieces += parseInt(q, 10) || 0;
                     });
                   });
                 } else if (cfg?.sizeQtys) {
                   Object.values(cfg.sizeQtys || {}).forEach(q => {
-                    computedPcs += parseInt(q, 10) || 0;
+                    finalPieces += parseInt(q, 10) || 0;
                   });
                 }
               }
@@ -2375,21 +2467,27 @@ export default function OrderDetailView({
           });
         }
 
-        // 3. Fallback: check item.totalPieces vs totalOrderGarments
-        let finalPieces = computedPcs;
-        const rawPieces = parseInt(item.totalPieces, 10) || 0;
-        const artCount = rawArticles.length || 1;
-
-        if (finalPieces <= 0) {
-          if (rawPieces > 0 && (rawPieces !== totalOrderGarments || artCount === 1)) {
-            finalPieces = rawPieces;
-          } else if (totalOrderGarments > 0 && artCount > 1) {
-            finalPieces = Math.round(totalOrderGarments / artCount);
-          } else if (rawPieces > 0) {
-            finalPieces = rawPieces;
-          } else {
-            finalPieces = totalOrderGarments > 0 ? Math.round(totalOrderGarments / (artCount || 1)) : 0;
+        // 3. Compute from fabricConsumptions GROUPED BY COLOR (never sum across multiple fabrics!)
+        if (finalPieces <= 0 && Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
+          const matchingFc = order.fabricConsumptions.filter(
+            fc => (fc.articleName || fc.article || '').toLowerCase().trim() === name.toLowerCase()
+          );
+          if (matchingFc.length > 0) {
+            const colorMap = new Map();
+            matchingFc.forEach(fc => {
+              const cKey = (fc.colorName || 'standard').toLowerCase().trim();
+              if (!colorMap.has(cKey)) {
+                colorMap.set(cKey, parseInt(fc.pcs || fc.pieces, 10) || 0);
+              }
+            });
+            finalPieces = Array.from(colorMap.values()).reduce((sum, p) => sum + p, 0);
           }
+        }
+
+        // 4. Fallback: divide totalOrderGarments equally among articles
+        if (finalPieces <= 0) {
+          const artCount = rawArticles.length || 1;
+          finalPieces = totalOrderGarments > 0 ? Math.round(totalOrderGarments / artCount) : 0;
         }
 
         list.push({
@@ -2683,15 +2781,19 @@ export default function OrderDetailView({
           rows: []
         });
       }
-      map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
+      if ((parseInt(row.pcs, 10) || 0) > 0) {
+        map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
+      }
     });
-    return Array.from(map.values());
+    return Array.from(map.values()).filter(g => g.rows.length > 0);
   }, [consumptionRows, articleSourcing, masterFabricsList]);
 
   // Group subtotals for bottom summary rows matching Image 4
   const fabricSummaryRows = useMemo(() => {
     const map = new Map();
     consumptionRows.forEach(r => {
+      const pcs = parseInt(r.pcs, 10) || 0;
+      if (pcs <= 0) return; // Exclude 0 pcs rows from summary totals
       const fabName = r.fabricQuality || 'Fabric';
       const width = r.width && r.width !== '—' ? r.width : '';
       const key = `${fabName}_${width}`;
@@ -2702,7 +2804,6 @@ export default function OrderDetailView({
       const masterShrink = getFabricMasterShrinkage(fabName);
       const shrink = isDyed ? 0 : masterShrink;
       const dyed = parseFloat(r.dyedRate) || 0;
-      const pcs = parseInt(r.pcs, 10) || 0;
       const greigePerPc = dyed > 0 ? (isDyed ? dyed : dyed * (1 + shrink / 100)) : 0;
       const totalDyed = dyed > 0 ? dyed * pcs : 0;
       const totalGreige = greigePerPc > 0 ? greigePerPc * pcs : 0;
@@ -2846,7 +2947,8 @@ export default function OrderDetailView({
     const updatedOrder = {
       ...order,
       status: 'Confirmed',
-      stage: 'Confirmed'
+      stage: 'Confirmed',
+      hasProceededToNextStep: true
     };
     const saved = getStoredData('erp_sales_orders_v1', []);
     const updated = [updatedOrder, ...saved.filter(o => o.id !== updatedOrder.id)];
@@ -2920,6 +3022,48 @@ export default function OrderDetailView({
     return map;
   }, [consumptionRows]);
 
+  const handleDeleteConsumptionRow = (rowKey, origIndex) => {
+    setConsumptionRows(prev => {
+      const updated = prev.filter((r, idx) => r.key !== rowKey && idx !== origIndex);
+      try {
+        const saved = getStoredData('erp_sales_orders_v1', []);
+        const updatedOrder = { ...order, fabricConsumptions: updated };
+        const newOrders = [updatedOrder, ...saved.filter(o => o.id !== updatedOrder.id)];
+        setStoredData('erp_sales_orders_v1', newOrders);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
+        }
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleUpdateRowColor = (rowKey, origIndex, newColorName) => {
+    setConsumptionRows(prev => {
+      const updated = prev.map((r, idx) => {
+        if (r.key !== rowKey && idx !== origIndex) return r;
+        const newPcs = getCustomerPcs(r.articleName, newColorName);
+        return {
+          ...r,
+          colorName: newColorName,
+          pcs: newPcs
+        };
+      });
+      try {
+        const saved = getStoredData('erp_sales_orders_v1', []);
+        const updatedOrder = { ...order, fabricConsumptions: updated };
+        const newOrders = [updatedOrder, ...saved.filter(o => o.id !== updatedOrder.id)];
+        setStoredData('erp_sales_orders_v1', newOrders);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
+        }
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   const toggleRowLock = (rIdx) => {
     setConsumptionRows(prev => {
       const updated = [...prev];
@@ -2984,11 +3128,17 @@ export default function OrderDetailView({
                 {autoCapitalizeWords(order.styleName || 'Kurta')}
               </h3>
               <span
-                className="badge border bg-light text-secondary rounded-2 px-2.5 py-1 fw-medium d-inline-flex align-items-center gap-1.5"
-                style={{ fontSize: '12px', borderColor: '#e2e8f0' }}
+                className={`badge border rounded-2 px-2.5 py-1 fw-medium d-inline-flex align-items-center gap-1.5 ${
+                  confirmed
+                    ? 'bg-success-subtle text-success border-success-subtle'
+                    : (order.status === 'Draft' && !order.hasProceededToNextStep)
+                    ? 'bg-light text-secondary border-secondary-subtle'
+                    : 'bg-warning-subtle text-warning border-warning-subtle'
+                }`}
+                style={{ fontSize: '12px' }}
               >
-                <i className={confirmed ? 'ti ti-check text-success' : 'ti ti-file-text text-muted'} style={{ fontSize: '13px', lineHeight: 1 }}></i>
-                {confirmed ? 'Confirmed' : (order.status || 'Draft')}
+                <i className={confirmed ? 'ti ti-check text-success' : (order.status === 'Draft' && !order.hasProceededToNextStep) ? 'ti ti-file-text text-muted' : 'ti ti-clock text-warning'} style={{ fontSize: '13px', lineHeight: 1 }}></i>
+                {confirmed ? 'Confirmed' : (order.status || 'Pending Confirmation')}
               </span>
             </div>
             <div className="d-flex align-items-center gap-3 text-muted small mt-1">
@@ -3004,7 +3154,7 @@ export default function OrderDetailView({
 
         {/* Header Right Action Buttons & Menu */}
         <div className="d-flex align-items-center gap-2">
-          {onEditSection && (
+          {onEditSection && !confirmed && (
             <button
               type="button"
               className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fw-semibold shadow-xs"
@@ -3012,7 +3162,7 @@ export default function OrderDetailView({
               title="Edit order details, styles, and customer quantities"
             >
               <i className="ti ti-edit fs-14"></i>
-              <span>{order?.status === 'Draft' ? 'Edit Draft Order' : 'Edit Order'}</span>
+              <span>{order?.status === 'Draft' && !order?.hasProceededToNextStep ? 'Edit Draft Order' : 'Edit Order'}</span>
             </button>
           )}
 
@@ -3028,14 +3178,14 @@ export default function OrderDetailView({
               <i className="ti ti-dots-vertical" style={{ fontSize: '20px', lineHeight: 1 }}></i>
             </button>
             <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
-              {onEditSection && (
+              {onEditSection && !confirmed && (
                 <li>
                   <button
                     type="button"
                     className="dropdown-item py-2 d-flex align-items-center gap-2"
                     onClick={() => onEditSection('all')}
                   >
-                    <i className="ti ti-edit text-primary" style={{ fontSize: '16px', lineHeight: 1 }}></i> Edit Order
+                    <i className="ti ti-edit text-primary" style={{ fontSize: '16px', lineHeight: 1 }}></i> {order?.status === 'Draft' && !order?.hasProceededToNextStep ? 'Edit Draft Order' : 'Edit Order'}
                   </button>
                 </li>
               )}
@@ -3064,7 +3214,7 @@ export default function OrderDetailView({
       </div>
 
       {/* Draft Order Notice Banner */}
-      {order?.status === 'Draft' && (
+      {order?.status === 'Draft' && !order?.hasProceededToNextStep && (
         <div className="alert border-0 shadow-xs rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
           <div className="d-flex align-items-center gap-2.5">
             <div className="p-2 rounded-3 text-warning bg-white shadow-xs d-flex align-items-center justify-content-center" style={{ width: '38px', height: '38px' }}>
@@ -3848,6 +3998,7 @@ export default function OrderDetailView({
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Pcs</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Dyed</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Greige</th>
+                <th style={{ width: '40px', padding: '12px 6px', textAlign: 'center' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -4086,20 +4237,39 @@ export default function OrderDetailView({
                       )}
 
                       {/* COLOUR (Per row) */}
-                      <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
-                        <div className="d-flex align-items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div className="d-flex align-items-center gap-1.5" style={{ minWidth: '110px' }}>
                           <span
                             className="d-inline-block rounded-circle flex-shrink-0"
                             style={{
-                              width: '11px',
-                              height: '11px',
+                              width: '10px',
+                              height: '10px',
                               backgroundColor: row.colorHex || '#333333',
                               border: '1px solid rgba(0,0,0,0.1)'
                             }}
                           />
-                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
-                            {row.colorName}
-                          </span>
+                          {availableColorsList.length > 1 ? (
+                            <select
+                              className="form-select form-select-sm py-0 ps-1 pe-4 fw-medium text-dark border bg-white"
+                              style={{
+                                fontSize: '12px',
+                                height: '28px',
+                                borderRadius: '5px',
+                                borderColor: '#e2e8f0',
+                                cursor: 'pointer'
+                              }}
+                              value={row.colorName}
+                              onChange={(e) => handleUpdateRowColor(row.key, row.originalIndex, e.target.value)}
+                            >
+                              {availableColorsList.map(c => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
+                              {row.colorName}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -4224,6 +4394,25 @@ export default function OrderDetailView({
                       >
                         {totalGreige !== null && totalGreige > 0 ? totalGreige.toFixed(2) : '—'}
                       </td>
+
+                      {/* ACTION (Delete row) */}
+                      <td
+                        style={{
+                          padding: '8px 6px',
+                          textAlign: 'center',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-icon p-1 text-danger border-0 bg-transparent rounded"
+                          style={{ width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          onClick={() => handleDeleteConsumptionRow(row.key, row.originalIndex)}
+                          title="Remove this fabric colour row"
+                        >
+                          <i className="ti ti-trash" style={{ fontSize: '15px' }}></i>
+                        </button>
+                      </td>
                     </tr>
                   );
                 });
@@ -4277,8 +4466,51 @@ export default function OrderDetailView({
                   >
                     {fs.hasValues && fs.totalGreige > 0 ? fs.totalGreige.toFixed(2) : '—'}
                   </td>
+                  <td style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}></td>
                 </tr>
               ))}
+
+              {/* GRAND TOTAL ROW */}
+              {fabricSummaryRows.length > 0 && (
+                <tr
+                  style={{
+                    borderTop: '2px solid #94a3b8',
+                    backgroundColor: '#f1f5f9',
+                    fontWeight: 700
+                  }}
+                >
+                  <td
+                    colSpan={7}
+                    className="text-uppercase text-dark ps-3 py-2.5 fw-bold"
+                    style={{ fontSize: '12px', letterSpacing: '0.05em' }}
+                  >
+                    <span>Total Garment Pieces</span>
+                  </td>
+                  <td
+                    className="text-center text-dark py-2.5 fw-bold"
+                    style={{ fontSize: '13.5px', fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {order?.totalPcs || order?.orderQuantity || fabricSummaryRows.reduce((sum, fs) => sum + (parseInt(fs.pcs, 10) || 0), 0)} pcs
+                  </td>
+                  <td
+                    className="text-center py-2.5 fw-bold"
+                    style={{ fontSize: '13px', color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0) > 0
+                      ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0).toFixed(2)
+                      : '—'}
+                  </td>
+                  <td
+                    className="text-center py-2.5 fw-bold"
+                    style={{ fontSize: '13px', color: '#0284c7', fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0) > 0
+                      ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0).toFixed(2)
+                      : '—'}
+                  </td>
+                  <td style={{ backgroundColor: '#f1f5f9' }}></td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -4560,8 +4792,8 @@ export default function OrderDetailView({
           }}
         >
           {ACCESSORY_CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.id;
-            const categoryItems = addedAccessories.filter(item => item.category === cat.id);
+            const isActive = matchesCategory(activeCategory, cat.id);
+            const categoryItems = addedAccessories.filter(item => matchesCategory(item.category, cat.id));
 
             return (
               <button
@@ -4595,7 +4827,7 @@ export default function OrderDetailView({
                   <i className={cat.icon} style={{ fontSize: '14px' }}></i>
                 </div>
                 <span style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '100%' }}>
-                  {cat.name} ({categoryItems.length})
+                  {cat.name} ({cat.varieties?.length || 0})
                 </span>
               </button>
             );
@@ -4753,7 +4985,7 @@ export default function OrderDetailView({
 
         {/* 5. Configured Accessories List or Empty State */}
         {(() => {
-          const categoryItems = addedAccessories.filter(item => item.category === (activeCategoryObj?.id || activeCategory));
+          const categoryItems = addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)));
 
           if (categoryItems.length === 0) {
             return (
@@ -4791,7 +5023,7 @@ export default function OrderDetailView({
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                     }}
                   >
-                    {/* Header with Title and Save / Edit / Trash buttons (Matching Image 3) */}
+                    {/* Header with Title */}
                     <div className="d-flex align-items-center justify-content-between flex-wrap" style={{ gap: '12px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
                       <div className="d-flex align-items-center gap-2">
                         <span className="fw-bold text-dark" style={{ fontSize: '16px' }}>
@@ -4804,46 +5036,13 @@ export default function OrderDetailView({
                           #{item.configIndex || item.instanceNum || 1}
                         </span>
                         <span className="fw-bold" style={{ fontSize: '13.5px', color: '#7c3aed' }}>
-                          {item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].includes(item.category) ? 'Meter' : 'Pcs')}
+                          {item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? 'Meter' : 'Pcs')}
                         </span>
                         {item.varietyName && item.varietyName.toLowerCase() !== (item.category || '').toLowerCase() && (
                           <span className="text-muted fw-normal" style={{ fontSize: '12.5px' }}>
                             · {item.varietyName}
                           </span>
                         )}
-                      </div>
-
-                      <div className="d-flex align-items-center" style={{ gap: '8px' }}>
-                        {isEditing ? (
-                          <button
-                            type="button"
-                            className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
-                            style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontSize: '12.5px' }}
-                            onClick={() => handleSaveItem(item)}
-                          >
-                            <i className="ti ti-device-floppy" style={{ fontSize: '15px' }}></i>
-                            <span>Save</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-sm rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs transition-all"
-                            style={{ color: '#7c3aed', borderColor: '#c4b5fd', backgroundColor: '#ffffff', fontSize: '12.5px' }}
-                            onClick={() => setEditingAccessoryIds(prev => ({ ...prev, [item.id]: true }))}
-                            title="Edit Accessory"
-                          >
-                            <i className="ti ti-edit" style={{ fontSize: '14px' }}></i>
-                            <span>Edit</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-link text-muted p-1"
-                          onClick={() => handleDeleteItem(item.id)}
-                          title="Delete accessory"
-                        >
-                          <i className="ti ti-trash" style={{ fontSize: '16px' }}></i>
-                        </button>
                       </div>
                     </div>
 
@@ -4881,25 +5080,46 @@ export default function OrderDetailView({
                     <div>
                       {renderCategoryCardTable(activeCategoryObj, item, selectedArticles, isEditing)}
                     </div>
+
+                    {/* Card Bottom Actions: Edit/Save & Delete (Moved to bottom of card per request) */}
+                    <div className="d-flex align-items-center justify-content-end gap-2 mt-3 pt-2.5" style={{ borderTop: '1px solid #f1f5f9' }}>
+                      {isEditing ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
+                          style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontSize: '12.5px' }}
+                          onClick={() => handleSaveItem(item)}
+                        >
+                          <i className="ti ti-device-floppy" style={{ fontSize: '15px' }}></i>
+                          <span>Save</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-sm rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs transition-all"
+                          style={{ color: '#7c3aed', borderColor: '#c4b5fd', backgroundColor: '#ffffff', fontSize: '12.5px' }}
+                          onClick={() => setEditingAccessoryIds(prev => ({ ...prev, [item.id]: true }))}
+                          title="Edit Accessory"
+                        >
+                          <i className="ti ti-edit" style={{ fontSize: '14px' }}></i>
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-link text-muted p-1"
+                        onClick={() => handleDeleteItem(item.id)}
+                        title="Delete accessory"
+                      >
+                        <i className="ti ti-trash" style={{ fontSize: '16px' }}></i>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           );
         })()}
-
-        {/* Bottom Save Button for Accessories BOM */}
-        <div className="d-flex justify-content-end align-items-center" style={{ gap: '12px', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
-          <button
-            type="button"
-            className="btn text-white rounded-3 px-4 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
-            style={{ backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '13.5px' }}
-            onClick={handleSaveAllBOM}
-          >
-            <i className="ti ti-device-floppy" style={{ fontSize: '18px' }}></i>
-            <span>Save Accessories BOM</span>
-          </button>
-        </div>
       </div>
 
 
@@ -4953,22 +5173,7 @@ export default function OrderDetailView({
           <span>Cancel</span>
         </button>
 
-        {confirmed && (
-          <button
-            type="button"
-            className="btn rounded-3 px-4 py-2.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs transition-all"
-            style={{
-              backgroundColor: '#f8fafc',
-              border: '1.5px solid #2e37a4',
-              color: '#2e37a4',
-              fontSize: '13.5px'
-            }}
-            onClick={onBack}
-          >
-            <i className="ti ti-arrow-left" style={{ fontSize: '15px' }}></i>
-            <span>Back to Orders List</span>
-          </button>
-        )}
+
       </div>
 
       {/* =========================================================================

@@ -82,6 +82,7 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
             <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="All">All Statuses</option>
               <option value="Draft">Draft</option>
+              <option value="Pending Confirmation">Pending Confirmation</option>
               <option value="Confirmed">Confirmed</option>
               <option value="In Production">In Production</option>
               <option value="Completed">Completed</option>
@@ -121,68 +122,99 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((ord) => (
-                <tr key={ord.id} style={{ cursor: 'pointer' }} onClick={() => onViewOrder(ord)}>
-                  <td className="px-3 fw-bold text-primary font-monospace">{ord.id}</td>
-                  <td className="px-3">
-                    <div className="fw-semibold text-dark">{autoCapitalizeWords(ord.styleName || '—')}</div>
-                    <div className="text-muted small">{ord.sizeSeriesName || 'Alphabetic Series'}</div>
-                  </td>
-                  <td className="px-3 text-muted">{ord.orderDate}</td>
-                  <td className="px-3 text-dark fw-medium">{ord.expectedDelivery || '—'}</td>
-                  <td className="px-3">
-                    <span className="badge bg-primary-subtle text-primary px-2 py-1 fs-7">
-                      {ord.totalGarments || 0} pcs
-                    </span>
-                  </td>
-                  <td className="px-3 font-monospace">{ord.totalFabricGreige ? `${ord.totalFabricGreige} m` : '—'}</td>
-                  <td className="px-3 text-center">
-                    <span
-                      className={`badge ${
-                        ord.priority === 'Urgent'
-                          ? 'bg-danger text-white'
-                          : ord.priority === 'High'
-                          ? 'bg-warning-subtle text-warning border border-warning'
-                          : 'bg-light text-secondary border'
-                      } px-2 py-1 rounded-pill`}
-                    >
-                      {ord.priority}
-                    </span>
-                  </td>
-                  <td className="px-3 text-center">
-                    <span
-                      className={`badge px-2.5 py-1 rounded-pill fw-medium ${
-                        ord.status === 'Draft'
-                          ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
-                          : ord.status === 'In Production'
-                          ? 'bg-info-subtle text-info border border-info-subtle'
-                          : ord.status === 'Completed'
-                          ? 'bg-primary-subtle text-primary border border-primary-subtle'
-                          : 'bg-success-subtle text-success border border-success-subtle'
-                      }`}
-                      style={{ fontSize: '12px' }}
-                    >
-                      {ord.status || 'Confirmed'}
-                    </span>
-                  </td>
-                  <td className="px-3 text-end" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      className="btn btn-sm btn-light text-primary me-1"
-                      title="View Details"
-                      onClick={() => onViewOrder(ord)}
-                    >
-                      <i className="ti ti-eye"></i>
-                    </button>
-                    <button
-                      className="btn btn-sm btn-light text-secondary"
-                      title="Edit Sections"
-                      onClick={() => onEditOrder(ord)}
-                    >
-                      <i className="ti ti-edit"></i>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredOrders.map((ord) => {
+                const isDraft = ord.status === 'Draft' && !ord.hasProceededToNextStep;
+                const isPending = ord.status === 'Pending Confirmation' || (ord.hasProceededToNextStep && ord.status !== 'Confirmed' && ord.status !== 'In Production' && ord.status !== 'Completed');
+                const isConfirmed = ord.status === 'Confirmed' || ord.stage === 'Confirmed';
+                return (
+                  <tr
+                    key={ord.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      if (isDraft) {
+                        onEditOrder(ord);
+                      } else {
+                        onViewOrder(ord);
+                      }
+                    }}
+                  >
+                    <td className="px-3 fw-bold text-primary font-monospace">{ord.id}</td>
+                    <td className="px-3">
+                      <div className="fw-semibold text-dark">{autoCapitalizeWords(ord.styleName || '—')}</div>
+                      <div className="text-muted small">{ord.sizeSeriesName || 'Alphabetic Series'}</div>
+                    </td>
+                    <td className="px-3 text-muted">{ord.orderDate}</td>
+                    <td className="px-3 text-dark fw-medium">{ord.expectedDelivery || '—'}</td>
+                    <td className="px-3">
+                      <span className="badge bg-primary-subtle text-primary px-2 py-1 fs-7">
+                        {ord.totalGarments || 0} pcs
+                      </span>
+                    </td>
+                    <td className="px-3 font-monospace">{ord.totalFabricGreige ? `${ord.totalFabricGreige} m` : '—'}</td>
+                    <td className="px-3 text-center">
+                      <span
+                        className={`badge ${
+                          ord.priority === 'Urgent'
+                            ? 'bg-danger text-white'
+                            : ord.priority === 'High'
+                            ? 'bg-warning-subtle text-warning border border-warning'
+                            : 'bg-light text-secondary border'
+                        } px-2 py-1 rounded-pill`}
+                      >
+                        {ord.priority}
+                      </span>
+                    </td>
+                    <td className="px-3 text-center">
+                      <span
+                        className={`badge px-2.5 py-1 rounded-pill fw-medium ${
+                          isDraft
+                            ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                            : isPending
+                            ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                            : ord.status === 'In Production'
+                            ? 'bg-info-subtle text-info border border-info-subtle'
+                            : ord.status === 'Completed'
+                            ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                            : 'bg-success-subtle text-success border border-success-subtle'
+                        }`}
+                        style={{ fontSize: '12px' }}
+                      >
+                        {isDraft && <i className="ti ti-file me-1 fs-11"></i>}
+                        {isPending && <i className="ti ti-clock me-1 fs-11"></i>}
+                        {isConfirmed && <i className="ti ti-check me-1 fs-11"></i>}
+                        {ord.status || 'Confirmed'}
+                      </span>
+                    </td>
+                    <td className="px-3 text-end" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="btn btn-sm btn-light text-primary me-1"
+                        title="View Details"
+                        onClick={() => onViewOrder(ord)}
+                      >
+                        <i className="ti ti-eye"></i>
+                      </button>
+                      {!isConfirmed && ord.status !== 'In Production' && ord.status !== 'Completed' ? (
+                        <button
+                          className="btn btn-sm btn-light text-primary fw-medium"
+                          title={isDraft ? "Edit Draft Order (Continue Editing)" : "Edit Order Configuration"}
+                          onClick={() => onEditOrder(ord)}
+                        >
+                          <i className="ti ti-edit"></i>
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-sm btn-light text-muted opacity-50"
+                          title="Non-editable (Order is Confirmed)"
+                          disabled
+                          style={{ cursor: 'not-allowed' }}
+                        >
+                          <i className="ti ti-lock"></i>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
 
               {filteredOrders.length === 0 && (
                 <tr>
