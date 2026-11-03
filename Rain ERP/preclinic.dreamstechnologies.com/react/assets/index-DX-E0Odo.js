@@ -15354,8 +15354,8 @@
         onChange: (e) => setSearchQuery(e.target.value)
       }
     ))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react3.default.createElement("select", { className: "form-select", value: statusFilter, onChange: (e) => setStatusFilter(e.target.value) }, /* @__PURE__ */ import_react3.default.createElement("option", { value: "All" }, "All Statuses"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Draft" }, "Draft"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Pending Confirmation" }, "Pending Confirmation"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Confirmed" }, "Confirmed"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "In Production" }, "In Production"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Completed" }, "Completed"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "col-md-3" }, /* @__PURE__ */ import_react3.default.createElement("select", { className: "form-select", value: priorityFilter, onChange: (e) => setPriorityFilter(e.target.value) }, /* @__PURE__ */ import_react3.default.createElement("option", { value: "All" }, "All Priorities"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Normal" }, "Normal Priority"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "High" }, "High Priority"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "Urgent" }, "Urgent"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "col-md-1 text-end" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "badge bg-light text-secondary border p-2 rounded-3" }, filteredOrders.length, " Orders")))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react3.default.createElement("table", { className: "table table-hover align-middle mb-0" }, /* @__PURE__ */ import_react3.default.createElement("thead", { className: "bg-light" }, /* @__PURE__ */ import_react3.default.createElement("tr", null, /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "ORDER ID"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "STYLE NAME"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "ORDER DATE"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "EXPECTED DELIVERY"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "TOTAL PCS"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold" }, "FABRIC GREIGE"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold text-center" }, "PRIORITY"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold text-center" }, "STATUS"), /* @__PURE__ */ import_react3.default.createElement("th", { className: "py-3 px-3 text-muted small fw-bold text-end" }, "ACTIONS"))), /* @__PURE__ */ import_react3.default.createElement("tbody", null, filteredOrders.map((ord) => {
-      const isDraft = ord.status === "Draft" && !ord.hasProceededToNextStep;
-      const isPending = ord.status === "Pending Confirmation" || ord.hasProceededToNextStep && ord.status !== "Confirmed" && ord.status !== "In Production" && ord.status !== "Completed";
+      const isInitialDraft = ord.status === "Draft" && !ord.hasProceededToNextStep;
+      const isPending = ord.status === "Pending Confirmation";
       const isConfirmed = ord.status === "Confirmed" || ord.stage === "Confirmed";
       return /* @__PURE__ */ import_react3.default.createElement(
         "tr",
@@ -15363,7 +15363,7 @@
           key: ord.id,
           style: { cursor: "pointer" },
           onClick: () => {
-            if (isDraft) {
+            if (isInitialDraft) {
               onEditOrder(ord);
             } else {
               onViewOrder(ord);
@@ -15386,10 +15386,10 @@
         /* @__PURE__ */ import_react3.default.createElement("td", { className: "px-3 text-center" }, /* @__PURE__ */ import_react3.default.createElement(
           "span",
           {
-            className: `badge px-2.5 py-1 rounded-pill fw-medium ${isDraft ? "bg-secondary-subtle text-secondary border border-secondary-subtle" : isPending ? "bg-warning-subtle text-warning border border-warning-subtle" : ord.status === "In Production" ? "bg-info-subtle text-info border border-info-subtle" : ord.status === "Completed" ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-success-subtle text-success border border-success-subtle"}`,
+            className: `badge px-2.5 py-1 rounded-pill fw-medium ${ord.status === "Draft" ? "bg-secondary-subtle text-secondary border border-secondary-subtle" : isPending ? "bg-warning-subtle text-warning border border-warning-subtle" : ord.status === "In Production" ? "bg-info-subtle text-info border border-info-subtle" : ord.status === "Completed" ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-success-subtle text-success border border-success-subtle"}`,
             style: { fontSize: "12px" }
           },
-          isDraft && /* @__PURE__ */ import_react3.default.createElement("i", { className: "ti ti-file me-1 fs-11" }),
+          ord.status === "Draft" && /* @__PURE__ */ import_react3.default.createElement("i", { className: "ti ti-file me-1 fs-11" }),
           isPending && /* @__PURE__ */ import_react3.default.createElement("i", { className: "ti ti-clock me-1 fs-11" }),
           isConfirmed && /* @__PURE__ */ import_react3.default.createElement("i", { className: "ti ti-check me-1 fs-11" }),
           ord.status || "Confirmed"
@@ -15406,8 +15406,14 @@
           "button",
           {
             className: "btn btn-sm btn-light text-primary fw-medium",
-            title: isDraft ? "Edit Draft Order (Continue Editing)" : "Edit Order Configuration",
-            onClick: () => onEditOrder(ord)
+            title: isInitialDraft ? "Edit Draft Order (Continue Editing)" : "Edit Order Configuration",
+            onClick: () => {
+              if (isInitialDraft) {
+                onEditOrder(ord);
+              } else {
+                onViewOrder(ord);
+              }
+            }
           },
           /* @__PURE__ */ import_react3.default.createElement("i", { className: "ti ti-edit" })
         ) : /* @__PURE__ */ import_react3.default.createElement(
@@ -18286,10 +18292,10 @@
     };
     const handleSaveFullOrder = (status) => {
       const isDraft = status === "Draft";
-      const isAlreadyConfirmed = (confirmed || order?.status === "Confirmed" || order?.stage === "Confirmed") && !isDraft;
-      const newStatus = isDraft ? "Draft" : isAlreadyConfirmed ? "Confirmed" : "Pending Confirmation";
-      const newStage = isDraft ? "Draft" : isAlreadyConfirmed ? "Confirmed" : "Pending Confirmation";
-      setConfirmed(newStatus === "Confirmed");
+      const isAdvanced = ["In Production", "Completed"].includes(order?.status);
+      const newStatus = isDraft ? "Draft" : isAdvanced ? order.status : "Confirmed";
+      const newStage = isDraft ? "Draft" : isAdvanced ? order.stage || order.status : "Confirmed";
+      setConfirmed(newStatus === "Confirmed" || isAdvanced);
       let userName = "Saksham Garg";
       let userRole = "Merchandiser";
       try {
@@ -18302,7 +18308,7 @@
       } catch (e) {
       }
       const nowIso = (/* @__PURE__ */ new Date()).toISOString();
-      const historyText = isDraft ? `Order saved as draft (${userName} (${userRole}))` : `Order saved (${userName} (${userRole}))`;
+      const historyText = isDraft ? `Order saved as draft (${userName} (${userRole}))` : `Order saved & confirmed (${userName} (${userRole}))`;
       const newHistoryEntry = {
         date: nowIso,
         dateFormatted: formatDateWithTime(nowIso),
@@ -18314,7 +18320,8 @@
         ...order,
         status: newStatus,
         stage: newStage,
-        hasProceededToNextStep: !isDraft,
+        hasProceededToNextStep: true,
+        draftStep: isDraft ? "detail" : null,
         accessories: addedAccessories,
         fabricConsumptions: consumptionRows,
         articleSourcing,
@@ -18338,7 +18345,7 @@
           if (onBack) onBack();
         }, 600);
       } else {
-        setToastMessage(`Order #${updatedOrder.id || ""} saved successfully!`);
+        setToastMessage(`Order #${updatedOrder.id || ""} saved & confirmed successfully!`);
         setShowToast(true);
         setTimeout(() => {
           setShowToast(false);
@@ -27388,6 +27395,15 @@
     };
     const handleEditOrder = (order) => {
       setSelectedOrder(order);
+      if (order?.hasProceededToNextStep && order?.status === "Draft") {
+        setViewMode("detail");
+        if (onNavigate) {
+          onNavigate(`/orders/${order.id}`, order);
+        } else if (typeof window !== "undefined" && window.history?.pushState) {
+          window.history.pushState(null, "", `/react/orders/${order.id}`);
+        }
+        return;
+      }
       setViewMode("create");
       if (onNavigate) {
         onNavigate(`/orders/edit/${order.id}`, order);
@@ -38061,6 +38077,7 @@
     transporters = [],
     purchaseOrders = [],
     qualityChecks = [],
+    allGRNs = [],
     onBack,
     onEditHeader,
     onEditBales,
@@ -38101,11 +38118,56 @@
     if (!grn) {
       return /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-package-off fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "GRN Record Not Found"), /* @__PURE__ */ import_react24.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The selected Goods Receipt Note could not be loaded."), /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to GRN Register")));
     }
-    const linkedPoId = grn.linkedPOs?.[0] || grn.poId;
-    const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId || grn.linkedPOs && grn.linkedPOs.includes(p.id));
-    const linkedPoIds = grn?.linkedPOs && grn.linkedPOs.length > 0 ? grn.linkedPOs : grn?.poId && grn.poId !== "PO-DIRECT" ? [grn.poId] : [];
+    const resolvedAllGrns = (0, import_react24.useMemo)(() => {
+      if (allGRNs && allGRNs.length > 0) return allGRNs;
+      try {
+        const stored = localStorage.getItem("raindrop_grns_v1");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+      }
+      return [];
+    }, [allGRNs]);
+    const resolvedQualityChecks = (0, import_react24.useMemo)(() => {
+      if (qualityChecks && qualityChecks.length > 0) return qualityChecks;
+      try {
+        const stored = localStorage.getItem("raindrop_qc_v1");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+      }
+      return [];
+    }, [qualityChecks]);
+    const linkedPoIds = (0, import_react24.useMemo)(() => {
+      const ids = [];
+      if (grn?.linkedPOs && Array.isArray(grn.linkedPOs) && grn.linkedPOs.length > 0) {
+        grn.linkedPOs.forEach((p) => {
+          if (p && p !== "PO-DIRECT" && !ids.includes(String(p).trim())) ids.push(String(p).trim());
+        });
+      }
+      if (grn?.poId && grn.poId !== "PO-DIRECT" && !ids.includes(String(grn.poId).trim())) {
+        ids.push(String(grn.poId).trim());
+      }
+      if (grn?.againstPo && grn.againstPo !== "PO-DIRECT" && !ids.includes(String(grn.againstPo).trim())) {
+        ids.push(String(grn.againstPo).trim());
+      }
+      if (grn?.poNumber && grn.poNumber !== "PO-DIRECT" && !ids.includes(String(grn.poNumber).trim())) {
+        ids.push(String(grn.poNumber).trim());
+      }
+      if (grn?.purchaseOrderId && !ids.includes(String(grn.purchaseOrderId).trim())) {
+        ids.push(String(grn.purchaseOrderId).trim());
+      }
+      return ids;
+    }, [grn]);
+    const linkedPoId = linkedPoIds[0] || grn.poId || grn.againstPo || grn.poNumber || "";
+    const linkedPO = (0, import_react24.useMemo)(() => {
+      return purchaseOrders.find((p) => {
+        if (!p) return false;
+        const pId = String(p.id || "").trim();
+        const pNum = String(p.poNumber || "").trim();
+        return linkedPoIds.includes(pId) || pNum && linkedPoIds.includes(pNum) || pId === String(linkedPoId).trim() || pNum && pNum === String(linkedPoId).trim();
+      });
+    }, [purchaseOrders, linkedPoIds, linkedPoId]);
     const linkedPOObjects = (0, import_react24.useMemo)(() => {
-      return linkedPoIds.map((id) => purchaseOrders.find((p) => p && String(p.id).trim() === String(id).trim())).filter(Boolean);
+      return linkedPoIds.map((id) => purchaseOrders.find((p) => p && (String(p.id).trim() === String(id).trim() || String(p.poNumber || "").trim() === String(id).trim()))).filter(Boolean);
     }, [linkedPoIds, purchaseOrders]);
     const totalGrnDeliveredMeters = Number(grn?.totalMetersEntered) || Number(grn?.declaredTotalMeters) || Number(grn?.totalQty) || 0;
     const fifoAllocations = (0, import_react24.useMemo)(() => {
@@ -38230,9 +38292,48 @@
       }
       return Number(linkedPO?.totalQuantity || linkedPO?.quantity || 0);
     }, [linkedPO]);
-    const targetTrackingMeters = poOrderedTotal > 0 ? poOrderedTotal : declaredTotalQty > 0 ? declaredTotalQty : totalMeters;
-    const pendingTrackingMeters = Math.max(0, targetTrackingMeters - totalMeters);
-    const trackingPct = targetTrackingMeters > 0 ? Math.min(100, Math.round(totalMeters / targetTrackingMeters * 100)) : totalMeters > 0 ? 100 : 0;
+    const otherGrnsForPo = (0, import_react24.useMemo)(() => {
+      if (!linkedPoIds || linkedPoIds.length === 0) return [];
+      return (resolvedAllGrns || []).filter((g) => {
+        if (!g || String(g.id) === String(grn.id)) return false;
+        const gPoIds = g.linkedPOs && g.linkedPOs.length > 0 ? g.linkedPOs.map(String) : [String(g.poId || g.againstPo || g.poNumber || "")].filter(Boolean);
+        return gPoIds.some((pid) => linkedPoIds.includes(pid));
+      });
+    }, [resolvedAllGrns, grn.id, linkedPoIds]);
+    const priorReceivedMeters = (0, import_react24.useMemo)(() => {
+      let sum = 0;
+      if (otherGrnsForPo.length > 0) {
+        otherGrnsForPo.forEach((g) => {
+          let gM = 0;
+          if (g.poAllocations && typeof g.poAllocations === "object") {
+            linkedPoIds.forEach((pId) => {
+              if (g.poAllocations[pId] !== void 0) {
+                gM += Number(g.poAllocations[pId]) || 0;
+              }
+            });
+          }
+          if (gM <= 0) {
+            gM = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || Number(String(g.totalQty || "").replace(/[^0-9.]/g, "")) || 0;
+          }
+          sum += gM;
+        });
+      }
+      const poRec = Number(linkedPO?.receivedQty || 0);
+      if (sum === 0 && poRec > 0) {
+        if (isDraftGRN) {
+          sum = poRec;
+        } else if (poRec > totalMeters) {
+          sum = poRec - totalMeters;
+        } else {
+          sum = poRec;
+        }
+      }
+      return sum;
+    }, [otherGrnsForPo, linkedPoIds, linkedPO, totalMeters, isDraftGRN]);
+    const cumulativeReceivedMeters = priorReceivedMeters + totalMeters;
+    const targetTrackingMeters = poOrderedTotal > 0 ? poOrderedTotal : declaredTotalQty > 0 ? declaredTotalQty : cumulativeReceivedMeters;
+    const pendingTrackingMeters = Math.max(0, targetTrackingMeters - cumulativeReceivedMeters);
+    const trackingPct = targetTrackingMeters > 0 ? Math.min(100, Math.round(cumulativeReceivedMeters / targetTrackingMeters * 100)) : cumulativeReceivedMeters > 0 ? 100 : 0;
     const qcAwaitingInspectionMeters = (0, import_react24.useMemo)(() => {
       let approved = 0;
       let rejected = 0;
@@ -38253,6 +38354,38 @@
         isPartiallyDone: approved > 0 || rejected > 0
       };
     }, [qcRecs, totalMeters]);
+    const priorQcApprovedMeters = (0, import_react24.useMemo)(() => {
+      let approved = 0;
+      const otherGrnIds = otherGrnsForPo.map((g) => String(g.id));
+      (resolvedQualityChecks || qualityChecks || []).forEach((q) => {
+        if (!q) return;
+        const qGrnRef = String(q.grnRef || q.grnId || "");
+        const isOtherGrn = otherGrnIds.includes(qGrnRef);
+        const isSamePo = q.againstRef && linkedPoIds.includes(String(q.againstRef)) || q.againstPo && linkedPoIds.includes(String(q.againstPo)) || q.poId && linkedPoIds.includes(String(q.poId));
+        if (isOtherGrn || isSamePo && qGrnRef !== String(grn.id)) {
+          if (["Approved", "QC Approved", "Passed", "OK"].includes(q.qcStatus)) {
+            approved += Number(q.passedQty || q.totalReceivedMeters || q.receivedQty || 0);
+          }
+        }
+      });
+      if (approved === 0 && otherGrnsForPo.length > 0) {
+        otherGrnsForPo.forEach((g) => {
+          if (["QC Approved", "QC Passed", "Completed"].includes(g.status) || g.isQcActioned) {
+            approved += Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+          }
+        });
+      }
+      if (approved === 0 && priorReceivedMeters > 0) {
+        if (["Partially Received", "Completed"].includes(linkedPO?.status) || linkedPO?.receivedQty) {
+          approved = priorReceivedMeters;
+        }
+      }
+      return approved;
+    }, [otherGrnsForPo, resolvedQualityChecks, qualityChecks, linkedPoIds, grn.id, priorReceivedMeters, linkedPO]);
+    const totalPoQcApproved = priorQcApprovedMeters + qcAwaitingInspectionMeters.approvedMeters;
+    const currentGrnApprovedMeters = qcAwaitingInspectionMeters.approvedMeters;
+    const totalPoReceivedApprovedMeters = priorQcApprovedMeters + currentGrnApprovedMeters;
+    const approvedPct = targetTrackingMeters > 0 ? Math.min(100, Math.round(totalPoReceivedApprovedMeters / targetTrackingMeters * 100)) : totalPoReceivedApprovedMeters > 0 ? 100 : 0;
     const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
     const expectedFold = mainQC?.expectedFold || grn.foldingCms || linkedPO?.items?.[0]?.fold || "100";
     const poItems = linkedPO?.items || [];
@@ -38534,10 +38667,10 @@
         /* @__PURE__ */ import_react24.default.createElement("i", { className: `ti ${qcAwaitingInspectionMeters.isAllApproved ? "ti-check" : "ti-clock"} me-1` }),
         qcAwaitingInspectionMeters.isAllApproved ? "QC Approved (100%)" : qcAwaitingInspectionMeters.isPartiallyDone ? "QC In Progress" : "QC Pending"
       )),
-      /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-2 text-center mb-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, "Total Ordered"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark fs-14" }, (targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString(), " m"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement(
+      /* @__PURE__ */ import_react24.default.createElement("div", { className: "row g-2 text-center mb-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, "Total Ordered"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark fs-14" }, (targetTrackingMeters > 0 ? targetTrackingMeters : cumulativeReceivedMeters).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, "PO Total"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement(
         "div",
         {
-          className: "p-2.5 rounded bg-white border",
+          className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center",
           style: {
             borderColor: isDraftGRN ? "#c7d2fe" : "#bbf7d0",
             backgroundColor: isDraftGRN ? "#f5f3ff" : "#f0fdf4"
@@ -38550,7 +38683,7 @@
             style: { color: isDraftGRN ? "#4f46e5" : "#15803d" }
           },
           isDraftGRN && /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-pencil fs-12" }),
-          /* @__PURE__ */ import_react24.default.createElement("span", null, isDraftGRN ? "Draft Inward Qty" : "Received (Inward)")
+          /* @__PURE__ */ import_react24.default.createElement("span", null, isDraftGRN ? "Draft Inward Qty" : priorReceivedMeters > 0 ? "This GRN Inward" : "Received (Inward)")
         ),
         /* @__PURE__ */ import_react24.default.createElement(
           "div",
@@ -38561,22 +38694,87 @@
           totalMeters.toLocaleString(),
           " m"
         ),
-        isDraftGRN && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, "Unsubmitted Draft")
-      )), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, "Pending to Inward"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-secondary fs-14" }, (pendingTrackingMeters > 0 ? pendingTrackingMeters : 0).toLocaleString(), " m"), isDraftGRN && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, "After Submission"))), !isDraftGRN && /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border", style: { borderColor: "#fde68a", backgroundColor: "#fffdf0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-warning-emphasis fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-clock text-warning" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "QC Pending")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-warning-emphasis fs-14" }, qcAwaitingInspectionMeters.pendingMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border", style: { borderColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? "#bbf7d0" : "#e2e8f0", backgroundColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? "#f0fdf4" : "#ffffff" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "fs-11 fw-semibold mb-1", style: { color: qcAwaitingInspectionMeters.approvedMeters > 0 ? "#15803d" : "#64748b" } }, "QC Approved"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold fs-14", style: { color: qcAwaitingInspectionMeters.approvedMeters > 0 ? "#15803d" : "#64748b" } }, qcAwaitingInspectionMeters.approvedMeters.toLocaleString(), " m")))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, isDraftGRN ? "Total GRN Inwards" : "Containers"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark fs-14" }, bales.length || grn.totalBales || 1, " Container(s)"), isDraftGRN && /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, "Bales Entered")))),
-      isDraftGRN ? /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between fs-12 mb-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Draft Inward Allocation Progress:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fw-bold text-dark" }, trackingPct, "% (", totalMeters.toLocaleString(), "m in draft / ", (targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString(), "m ordered)")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "progress rounded-pill overflow-hidden", style: { height: "7px", backgroundColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement(
+        /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, isDraftGRN ? "Unsubmitted Draft" : priorReceivedMeters > 0 ? "Current Delivery" : "Total Inward")
+      )), priorReceivedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement(
+        "div",
+        {
+          className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center",
+          style: {
+            borderColor: currentGrnApprovedMeters > 0 ? "#93c5fd" : "#e2e8f0",
+            backgroundColor: currentGrnApprovedMeters > 0 ? "#eff6ff" : "#f8fafc"
+          }
+        },
+        /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-primary fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-stack-2 fs-12" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "Total PO Received")),
+        /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-primary fs-14" }, totalPoReceivedApprovedMeters.toLocaleString(), " m"),
+        /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, currentGrnApprovedMeters > 0 ? `${priorQcApprovedMeters.toLocaleString()}m prior + ${currentGrnApprovedMeters.toLocaleString()}m this` : `${priorQcApprovedMeters.toLocaleString()}m prior approved (This GRN pending QC)`)
+      )), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, "Pending to Inward"), /* @__PURE__ */ import_react24.default.createElement("div", { className: `fw-bold fs-14 ${pendingTrackingMeters === 0 ? "text-success" : "text-danger"}` }, (pendingTrackingMeters > 0 ? pendingTrackingMeters : 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, pendingTrackingMeters === 0 ? "PO Fully Received" : isDraftGRN ? "After Submission" : "Remaining PO Balance"))), !isDraftGRN && /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center", style: { borderColor: "#fde68a", backgroundColor: "#fffdf0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-warning-emphasis fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-clock text-warning" }), /* @__PURE__ */ import_react24.default.createElement("span", null, "QC Pending")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-warning-emphasis fs-14" }, qcAwaitingInspectionMeters.pendingMeters.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, "This GRN to Inspect"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement(
+        "div",
+        {
+          className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center",
+          style: {
+            borderColor: currentGrnApprovedMeters > 0 ? "#bbf7d0" : "#e2e8f0",
+            backgroundColor: currentGrnApprovedMeters > 0 ? "#f0fdf4" : "#ffffff"
+          }
+        },
+        /* @__PURE__ */ import_react24.default.createElement(
+          "div",
+          {
+            className: "fs-11 fw-semibold mb-1",
+            style: { color: currentGrnApprovedMeters > 0 ? "#15803d" : "#64748b" }
+          },
+          "This GRN Approved"
+        ),
+        /* @__PURE__ */ import_react24.default.createElement(
+          "div",
+          {
+            className: "fw-bold fs-14",
+            style: { color: currentGrnApprovedMeters > 0 ? "#15803d" : "#64748b" }
+          },
+          currentGrnApprovedMeters.toLocaleString(),
+          " m"
+        ),
+        /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, currentGrnApprovedMeters > 0 ? "QC Passed" : qcAwaitingInspectionMeters.isPartiallyDone ? "Partial Approved" : "Awaiting QC")
+      ))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "col-6 col-sm-4 col-md" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-secondary fs-11 fw-semibold mb-1" }, isDraftGRN ? "Total GRN Inwards" : "Containers"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "fw-bold text-dark fs-14" }, bales.length || grn.totalBales || 1, " Container(s)"), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted", style: { fontSize: "10px" } }, isDraftGRN ? "Bales Entered" : `${totalPiecesCount || bales.length} Pieces`)))),
+      isDraftGRN ? /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between fs-12 mb-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Draft Inward Allocation Progress:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fw-bold text-dark" }, trackingPct, "% (", cumulativeReceivedMeters.toLocaleString(), "m in draft & prior / ", (targetTrackingMeters > 0 ? targetTrackingMeters : cumulativeReceivedMeters).toLocaleString(), "m ordered)")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "progress rounded-pill overflow-hidden", style: { height: "7px", backgroundColor: "#e2e8f0" } }, priorReceivedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement(
         "div",
         {
           className: "progress-bar",
           role: "progressbar",
-          style: { width: `${Math.min(100, trackingPct)}%`, backgroundColor: "#5b47fb" }
+          style: {
+            width: `${Math.min(100, Math.round(priorReceivedMeters / targetTrackingMeters * 100))}%`,
+            backgroundColor: "#3b82f6"
+          },
+          title: `Prior received: ${priorReceivedMeters.toLocaleString()}m`
         }
-      ))) : /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between fs-12 mb-1.5 gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Inward Delivery:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fw-bold text-success" }, trackingPct, "% Received (", totalMeters.toLocaleString(), "m / ", (targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString(), "m)")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Quality Inspection:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: `fw-bold ${qcAwaitingInspectionMeters.isAllApproved ? "text-success" : "text-warning-emphasis"}` }, /* @__PURE__ */ import_react24.default.createElement("i", { className: `ti ${qcAwaitingInspectionMeters.isAllApproved ? "ti-circle-check text-success" : "ti-clock text-warning"} me-1` }), qcAwaitingInspectionMeters.isAllApproved ? "100% QC Approved" : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m to inspect)`))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "progress rounded-pill overflow-hidden", style: { height: "7px", backgroundColor: "#e2e8f0" } }, qcAwaitingInspectionMeters.approvedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement(
+      ), /* @__PURE__ */ import_react24.default.createElement(
+        "div",
+        {
+          className: "progress-bar",
+          role: "progressbar",
+          style: {
+            width: `${Math.min(100 - (priorReceivedMeters > 0 ? Math.round(priorReceivedMeters / targetTrackingMeters * 100) : 0), Math.round(totalMeters / targetTrackingMeters * 100))}%`,
+            backgroundColor: "#5b47fb"
+          },
+          title: `This draft GRN: ${totalMeters.toLocaleString()}m`
+        }
+      )), priorReceivedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between text-muted fs-11 mt-1" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "Prior Received: ", priorReceivedMeters.toLocaleString(), "m"), /* @__PURE__ */ import_react24.default.createElement("span", null, "This Draft: +", totalMeters.toLocaleString(), "m"), /* @__PURE__ */ import_react24.default.createElement("span", null, "Pending Balance: ", pendingTrackingMeters.toLocaleString(), "m"))) : /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between fs-12 mb-1.5 gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Inward Delivery:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fw-bold text-success" }, approvedPct, "% Received (", totalPoReceivedApprovedMeters.toLocaleString(), "m / ", (targetTrackingMeters > 0 ? targetTrackingMeters : totalPoReceivedApprovedMeters).toLocaleString(), "m)"), priorReceivedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border fs-10 px-1.5 py-0.5 rounded" }, currentGrnApprovedMeters > 0 ? `+${currentGrnApprovedMeters.toLocaleString()}m this GRN &bull; ${priorQcApprovedMeters.toLocaleString()}m prior` : `${priorQcApprovedMeters.toLocaleString()}m prior approved (+${totalMeters.toLocaleString()}m in QC)`)), /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-secondary fw-semibold" }, "Quality Inspection:"), /* @__PURE__ */ import_react24.default.createElement("span", { className: `fw-bold ${qcAwaitingInspectionMeters.isAllApproved ? "text-success" : "text-warning-emphasis"}` }, /* @__PURE__ */ import_react24.default.createElement("i", { className: `ti ${qcAwaitingInspectionMeters.isAllApproved ? "ti-circle-check text-success" : "ti-clock text-warning"} me-1` }), qcAwaitingInspectionMeters.isAllApproved ? "100% QC Approved (This GRN)" : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m this GRN)`), priorQcApprovedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-muted fs-11" }, "(", priorQcApprovedMeters.toLocaleString(), "m approved previously)"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "progress rounded-pill overflow-hidden", style: { height: "7px", backgroundColor: "#e2e8f0" } }, priorQcApprovedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement(
         "div",
         {
           className: "progress-bar bg-success",
           role: "progressbar",
-          style: { width: `${Math.round(qcAwaitingInspectionMeters.approvedMeters / targetTrackingMeters * 100)}%` },
-          title: `QC Approved: ${qcAwaitingInspectionMeters.approvedMeters}m`
+          style: { width: `${Math.round(priorQcApprovedMeters / targetTrackingMeters * 100)}%` },
+          title: `Prior QC Approved: ${priorQcApprovedMeters.toLocaleString()}m`
+        }
+      ), currentGrnApprovedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement(
+        "div",
+        {
+          className: "progress-bar",
+          role: "progressbar",
+          style: {
+            width: `${Math.round(currentGrnApprovedMeters / targetTrackingMeters * 100)}%`,
+            backgroundColor: "#16a34a"
+          },
+          title: `This GRN QC Approved: ${currentGrnApprovedMeters.toLocaleString()}m`
         }
       ), qcAwaitingInspectionMeters.pendingMeters > 0 && /* @__PURE__ */ import_react24.default.createElement(
         "div",
@@ -38584,9 +38782,15 @@
           className: "progress-bar bg-warning",
           role: "progressbar",
           style: { width: `${Math.round(qcAwaitingInspectionMeters.pendingMeters / targetTrackingMeters * 100)}%` },
-          title: `QC Pending: ${qcAwaitingInspectionMeters.pendingMeters}m`
+          title: `QC Pending: ${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m`
         }
-      )))
+      )), priorReceivedMeters > 0 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center justify-content-between text-muted fs-11 mt-1" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-inline-block rounded-circle", style: { width: "7px", height: "7px", backgroundColor: "#10b981" } }), "Prior Shipments: ", priorQcApprovedMeters.toLocaleString(), "m (QC Approved)"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement(
+        "span",
+        {
+          className: "d-inline-block rounded-circle",
+          style: { width: "7px", height: "7px", backgroundColor: currentGrnApprovedMeters > 0 ? "#10b981" : "#f59e0b" }
+        }
+      ), "This GRN: ", totalMeters.toLocaleString(), "m (", currentGrnApprovedMeters > 0 ? "QC Approved" : "QC Pending", ")"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-inline-block rounded-circle", style: { width: "7px", height: "7px", backgroundColor: "#cbd5e1" } }), "Remaining PO Balance: ", pendingTrackingMeters.toLocaleString(), "m")))
     ), fifoAllocations && fifoAllocations.length > 1 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-layers-intersect text-primary me-1.5" }), "Consolidated Multi-PO Delivery & FIFO Allocation"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, fifoAllocations.length, " POs Linked"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-clock-check me-1" }), " FIFO Rule Active")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-12 mt-1" }, "\u0AB8\u0ACC\u0AA5\u0AC0 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0AAC\u0AA8\u0AC7\u0AB2\u0ABE (Oldest) PO \u0AAE\u0ABE\u0A82\u0AA5\u0AC0 \u0AAE\u0ABE\u0AB2 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0A95\u0A9F \u0AA5\u0AB6\u0AC7. \u0AAA\u0ACD\u0AB0\u0AA5\u0AAE PO 100% \u0AAA\u0AC2\u0AB0\u0ACD\u0AA3 \u0AA5\u0AAF\u0ABE \u0AAA\u0A9B\u0AC0 \u0A9C \u0AAC\u0ABE\u0A95\u0AC0\u0AA8\u0ACB \u0AAE\u0ABE\u0AB2 \u0AAA\u0A9B\u0AC0\u0AA8\u0ABE PO \u0AAE\u0ABE\u0A82 \u0AAB\u0ABE\u0AB3\u0AB5\u0AB5\u0ABE\u0AAE\u0ABE\u0A82 \u0A86\u0AB5\u0ACD\u0AAF\u0ACB \u0A9B\u0AC7.")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-11 text-muted d-block text-uppercase fw-semibold" }, "Delivered in this GRN"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-16 fw-bold text-success" }, "+", totalGrnDeliveredMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react24.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13 text-nowrap" }, /* @__PURE__ */ import_react24.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("th", { className: "ps-4 py-3" }, "Priority & PO ID"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3" }, "Order Date"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Previously Received"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end bg-success-subtle text-success fw-bold" }, "Allocated in this GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "pe-4 py-3 text-center" }, "Fulfillment Status"))), /* @__PURE__ */ import_react24.default.createElement("tbody", null, fifoAllocations.map((alloc) => /* @__PURE__ */ import_react24.default.createElement("tr", { key: alloc.poId, className: alloc.isComplete ? "bg-light bg-opacity-50" : "" }, /* @__PURE__ */ import_react24.default.createElement("td", { className: "ps-4 py-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement(
       "span",
       {
@@ -39019,7 +39223,7 @@
       (qc) => qc.qcStatus === "Pending" || !qc.qcStatus
     ).length;
     const adminCount = expandedQcRecords.filter(
-      (qc) => (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval") && !qc.adminDecision
+      (qc) => (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval" || qc.qcStatus === "Pending Admin Approval") && !qc.adminDecision
     ).length;
     const completedCount = expandedQcRecords.filter(
       (qc) => qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK" || Boolean(qc.adminDecision)
@@ -39067,7 +39271,7 @@
       if (activeTabFilter === "pending") {
         matchesTab = qc.qcStatus === "Pending" || !qc.qcStatus;
       } else if (activeTabFilter === "admin") {
-        matchesTab = (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval") && !qc.adminDecision;
+        matchesTab = (qc.qcStatus === "Send for Admin Approval" || qc.qcStatus === "Admin Approval" || qc.qcStatus === "Pending Admin Approval") && !qc.adminDecision;
       } else if (activeTabFilter === "completed") {
         matchesTab = qc.qcStatus === "OK" || qc.qcStatus === "Approved" || qc.qcStatus === "Reject" || qc.qcStatus === "Rejected" || qc.qcStatus === "Partial OK" || Boolean(qc.adminDecision);
       } else if (activeTabFilter === "damaged") {
@@ -39209,7 +39413,7 @@
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-medium text-dark" }, d.fabricName)),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-secondary" }, d.width ? `${String(d.width).replace(/"/g, "")}"` : '42"', " \xB7 ", d.color || "Raw / Greige")),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-medium text-dark" }, Number(d.qty).toLocaleString(), "m")),
-        /* @__PURE__ */ import_react25.default.createElement("td", null, d.status === "OK" || d.status === "Approved" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "OK") : d.status === "Partial OK" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Partial OK") : d.status === "Send for Admin Approval" || d.status === "Admin Approval" ? qc.adminDecision ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, "Approved by Admin") : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Admin Approval") : d.status === "Reject" || d.status === "Rejected" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Rejected") : isPending && !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "Incomplete Bales")) : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge px-3 py-1 fs-11 rounded-pill", style: { backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" } }, "Pending")),
+        /* @__PURE__ */ import_react25.default.createElement("td", null, d.status === "OK" || d.status === "Approved" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "OK") : d.status === "Partial OK" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Partial OK") : d.status === "Send for Admin Approval" || d.status === "Admin Approval" || d.status === "Pending Admin Approval" ? qc.adminDecision ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, "Approved by Admin") : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Admin Approval") : d.status === "Reject" || d.status === "Rejected" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Rejected") : isPending && !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "Incomplete Bales")) : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge px-3 py-1 fs-11 rounded-pill", style: { backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" } }, "Pending")),
         /* @__PURE__ */ import_react25.default.createElement("td", { className: "text-center", onClick: (e) => e.stopPropagation() }, isPending ? !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement(
           "button",
           {
@@ -39354,6 +39558,23 @@
       if (qc?.inspectionScope === "Bale-Level" || qc?.inspectionScope === "bale") return "bale";
       return "all";
     });
+    const [isCameraActive, setIsCameraActive] = (0, import_react26.useState)(false);
+    const [cameraTargetKey, setCameraTargetKey] = (0, import_react26.useState)("shipment");
+    const [cameraError, setCameraError] = (0, import_react26.useState)(null);
+    const videoRef = import_react26.default.useRef(null);
+    const cameraStreamRef = import_react26.default.useRef(null);
+    import_react26.default.useEffect(() => {
+      return () => {
+        if (cameraStreamRef.current) {
+          cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        }
+      };
+    }, []);
+    import_react26.default.useEffect(() => {
+      if (isCameraActive && videoRef.current && cameraStreamRef.current) {
+        videoRef.current.srcObject = cameraStreamRef.current;
+      }
+    }, [isCameraActive]);
     const showToast = (message, type = "success") => {
       setToastNotification({ message, type });
       setTimeout(() => {
@@ -39595,65 +39816,144 @@
       });
       showToast(`Marked listed pieces as ${newStatus}.`, "success");
     };
-    const handlePiecePhotoUpload = (key, e) => {
-      const files = Array.from(e.target.files);
-      const newPhotos = files.map((f) => ({
-        name: f.name,
-        url: URL.createObjectURL(f),
-        time: (/* @__PURE__ */ new Date()).toLocaleTimeString()
-      }));
-      setPieceInspections((prev) => {
-        const cur = prev[key] || { photos: [] };
-        return {
-          ...prev,
-          [key]: {
-            ...cur,
-            photos: [...cur.photos || [], ...newPhotos]
-          }
-        };
-      });
-    };
-    const handlePieceSimulateCamera = (key) => {
-      const mockCameraPhoto = {
-        name: `Piece_Capture_${Date.now()}.jpg`,
-        url: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500",
-        time: (/* @__PURE__ */ new Date()).toLocaleTimeString()
-      };
-      setPieceInspections((prev) => {
-        const cur = prev[key] || { photos: [] };
-        return {
-          ...prev,
-          [key]: {
-            ...cur,
-            photos: [...cur.photos || [], mockCameraPhoto]
-          }
-        };
-      });
-      showToast("Piece snapshot captured and attached!", "success");
-    };
     const handlePhotoUpload = (e) => {
-      const files = Array.from(e.target.files);
-      const newPhotos = files.map((f) => ({
-        name: f.name,
-        url: URL.createObjectURL(f),
-        time: (/* @__PURE__ */ new Date()).toLocaleTimeString()
-      }));
-      setFormData((prev) => ({
-        ...prev,
-        photos: [...prev.photos, ...newPhotos]
-      }));
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      files.forEach((f) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const newPhoto = {
+            name: f.name,
+            url: ev.target.result,
+            time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          };
+          setFormData((prev) => ({
+            ...prev,
+            photos: [...prev.photos, newPhoto]
+          }));
+        };
+        reader.readAsDataURL(f);
+      });
+      e.target.value = "";
+      showToast(`${files.length} photo(s) attached`, "success");
     };
-    const handleSimulateCamera = () => {
-      const mockCameraPhoto = {
-        name: `Camera_Capture_${Date.now()}.jpg`,
-        url: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500",
-        time: (/* @__PURE__ */ new Date()).toLocaleTimeString()
-      };
+    const handlePiecePhotoUpload = (key, e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      files.forEach((f) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const newPhoto = {
+            name: f.name,
+            url: ev.target.result,
+            time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          };
+          setPieceInspections((prev) => {
+            const cur = prev[key] || { photos: [] };
+            return {
+              ...prev,
+              [key]: {
+                ...cur,
+                photos: [...cur.photos || [], newPhoto]
+              }
+            };
+          });
+        };
+        reader.readAsDataURL(f);
+      });
+      e.target.value = "";
+      showToast(`${files.length} piece photo(s) attached`, "success");
+    };
+    const handleRemoveShipmentPhoto = (idxToRemove) => {
       setFormData((prev) => ({
         ...prev,
-        photos: [...prev.photos, mockCameraPhoto]
+        photos: prev.photos.filter((_, idx) => idx !== idxToRemove)
       }));
-      showToast("Camera snapshot captured and attached to QC record!", "success");
+      showToast("Photo removed", "info");
+    };
+    const handleRemovePiecePhoto = (pieceKey, idxToRemove) => {
+      setPieceInspections((prev) => {
+        const cur = prev[pieceKey] || { photos: [] };
+        return {
+          ...prev,
+          [pieceKey]: {
+            ...cur,
+            photos: (cur.photos || []).filter((_, idx) => idx !== idxToRemove)
+          }
+        };
+      });
+      showToast("Piece photo removed", "info");
+    };
+    const handleOpenCamera = (targetKey = "shipment") => {
+      setCameraTargetKey(targetKey);
+      setIsCameraActive(true);
+      setCameraError(null);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError("Webcam is not supported by your browser or environment. Please choose a file instead.");
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "environment"
+        }
+      }).then((stream) => {
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }).catch((err) => {
+        console.warn("Camera error:", err);
+        setCameraError(
+          err.name === "NotAllowedError" || err.name === "PermissionDeniedError" ? "Camera permission was denied. Please allow camera permissions in your browser bar, or choose an image file." : err.name === "NotFoundError" || err.name === "DevicesNotFoundError" ? "No camera/webcam was detected on this laptop/device. Please upload an image file instead." : "Unable to start camera. Please verify device permissions or upload an image file."
+        );
+      });
+    };
+    const handleCloseCamera = () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        cameraStreamRef.current = null;
+      }
+      setIsCameraActive(false);
+      setCameraError(null);
+    };
+    const handleCapturePhoto = () => {
+      if (!videoRef.current) return;
+      const video = videoRef.current;
+      if (!video.videoWidth || !video.videoHeight) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+      const nowStr = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      const newPhoto = {
+        name: `Camera_Capture_${nowStr.slice(0, 19)}.jpg`,
+        url: dataUrl,
+        time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      };
+      if (cameraTargetKey === "shipment") {
+        setFormData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, newPhoto]
+        }));
+        showToast("Camera photo attached to QC record!", "success");
+      } else {
+        setPieceInspections((prev) => {
+          const cur = prev[cameraTargetKey] || { photos: [] };
+          return {
+            ...prev,
+            [cameraTargetKey]: {
+              ...cur,
+              photos: [...cur.photos || [], newPhoto]
+            }
+          };
+        });
+        showToast("Piece camera snapshot captured and attached!", "success");
+      }
+      handleCloseCamera();
     };
     const inspectedList = Object.entries(pieceInspections).filter(([_, d]) => d.checked).map(([k, d]) => {
       const pcObj = grnPieces.find((p) => p.key === k);
@@ -39742,8 +40042,12 @@
         finalGoodQty = 0;
         finalHeldBackQty = totalReceivedMeters;
       }
+      const piecePhotos = Object.values(pieceInspections || {}).flatMap((p) => p?.photos || []);
+      const allCombinedPhotos = [...formData.photos || [], ...piecePhotos];
+      const uniquePhotos = Array.from(new Map(allCombinedPhotos.map((p) => [p.url || p.name, p])).values());
       const payload = {
         ...formData,
+        photos: uniquePhotos,
         inspectorName: (formData.inspectorName || "").replace(/(?:^|\s)\S/g, (c) => c.toUpperCase()).trim(),
         qcStatus: finalStatus,
         hasDiscrepancy: hasAnyMismatch,
@@ -39940,7 +40244,8 @@
         type: "button",
         className: "btn btn-sm text-white fs-12 d-flex align-items-center gap-1 shadow-2xs",
         style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
-        onClick: handleSimulateCamera
+        onClick: () => handleOpenCamera("shipment"),
+        title: "Open Camera to capture photo"
       },
       /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-camera" }),
       " Open Camera"
@@ -39948,16 +40253,40 @@
       "div",
       {
         key: idx,
-        className: "position-relative border rounded-2 p-1 bg-white",
-        style: { width: "80px" }
+        className: "position-relative border rounded-2 p-1 bg-white shadow-xs",
+        style: { width: "85px" }
       },
+      /* @__PURE__ */ import_react26.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm",
+          style: {
+            top: "-6px",
+            right: "-6px",
+            width: "20px",
+            height: "20px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            lineHeight: 1,
+            zIndex: 3,
+            cursor: "pointer"
+          },
+          onClick: (e) => {
+            e.stopPropagation();
+            handleRemoveShipmentPhoto(idx);
+          },
+          title: "Cancel / Remove Photo"
+        },
+        "\xD7"
+      ),
       /* @__PURE__ */ import_react26.default.createElement(
         "img",
         {
           src: ph.url,
           alt: ph.name,
           className: "rounded-1 w-100",
-          style: { height: "60px", objectFit: "cover" }
+          style: { height: "65px", objectFit: "cover" }
         }
       ),
       /* @__PURE__ */ import_react26.default.createElement(
@@ -40160,7 +40489,7 @@
             type: "button",
             className: "btn btn-primary btn-sm px-2 fs-11 d-flex align-items-center gap-1 text-white shadow-sm",
             style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
-            onClick: () => handlePieceSimulateCamera(pc.key),
+            onClick: () => handleOpenCamera(pc.key),
             title: "Capture Camera Photo"
           },
           /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-camera" }),
@@ -40174,13 +40503,36 @@
             value: pieceData.notes || "",
             onChange: (e) => updatePieceField(pc.key, "notes", e.target.value)
           }
-        )), pieceData.photos && pieceData.photos.length > 0 && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap gap-2 pt-1" }, pieceData.photos.map((ph, phIdx) => /* @__PURE__ */ import_react26.default.createElement("div", { key: phIdx, className: "border rounded-2 p-1 bg-white", style: { width: "70px" } }, /* @__PURE__ */ import_react26.default.createElement(
+        )), pieceData.photos && pieceData.photos.length > 0 && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap gap-2 pt-1" }, pieceData.photos.map((ph, phIdx) => /* @__PURE__ */ import_react26.default.createElement("div", { key: phIdx, className: "position-relative border rounded-2 p-1 bg-white shadow-xs", style: { width: "75px" } }, /* @__PURE__ */ import_react26.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm",
+            style: {
+              top: "-6px",
+              right: "-6px",
+              width: "18px",
+              height: "18px",
+              fontSize: "11px",
+              fontWeight: "bold",
+              lineHeight: 1,
+              zIndex: 3,
+              cursor: "pointer"
+            },
+            onClick: (e) => {
+              e.stopPropagation();
+              handleRemovePiecePhoto(pc.key, phIdx);
+            },
+            title: "Cancel / Remove Photo"
+          },
+          "\xD7"
+        ), /* @__PURE__ */ import_react26.default.createElement(
           "img",
           {
             src: ph.url,
             alt: ph.name,
             className: "rounded-1 w-100",
-            style: { height: "50px", objectFit: "cover" }
+            style: { height: "52px", objectFit: "cover" }
           }
         ), /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)))))
       );
@@ -40336,6 +40688,73 @@
         },
         "Back to GRN"
       ))))
+    ), isCameraActive && /* @__PURE__ */ import_react26.default.createElement(
+      "div",
+      {
+        className: "modal show d-block",
+        style: { backgroundColor: "rgba(15, 23, 42, 0.75)", zIndex: 1060 },
+        tabIndex: "-1"
+      },
+      /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-dialog modal-dialog-centered modal-lg" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-header border-bottom px-4 py-3 bg-light" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "p-1.5 rounded-circle bg-primary-subtle text-primary" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-camera fs-18" })), /* @__PURE__ */ import_react26.default.createElement("div", null, /* @__PURE__ */ import_react26.default.createElement("h5", { className: "modal-title fw-bold text-dark fs-16 mb-0" }, "Capture Photo via Camera"), /* @__PURE__ */ import_react26.default.createElement("span", { className: "text-muted fs-11" }, cameraTargetKey === "shipment" ? "Whole Shipment Inspection Photo" : "Piece-Level Inspection Photo"))), /* @__PURE__ */ import_react26.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn-close",
+          onClick: handleCloseCamera,
+          "aria-label": "Close"
+        }
+      )), /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-body p-4 text-center" }, cameraError ? /* @__PURE__ */ import_react26.default.createElement("div", { className: "p-4 bg-light rounded-3 border text-start" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-start gap-2.5 mb-3 text-warning-emphasis" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-alert-triangle fs-22 flex-shrink-0 mt-0.5 text-warning" }), /* @__PURE__ */ import_react26.default.createElement("div", null, /* @__PURE__ */ import_react26.default.createElement("h6", { className: "fw-bold mb-1 text-dark" }, "Camera Access Not Available"), /* @__PURE__ */ import_react26.default.createElement("p", { className: "fs-13 text-secondary mb-0" }, cameraError))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "border-top pt-3 text-center" }, /* @__PURE__ */ import_react26.default.createElement("label", { className: "btn btn-primary btn-sm px-4 py-2 fs-13 rounded-3 text-white shadow-sm cursor-pointer" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-upload me-1" }), " Choose File from Computer", /* @__PURE__ */ import_react26.default.createElement(
+        "input",
+        {
+          type: "file",
+          multiple: true,
+          accept: "image/*",
+          className: "d-none",
+          onChange: (e) => {
+            if (cameraTargetKey === "shipment") {
+              handlePhotoUpload(e);
+            } else {
+              handlePiecePhotoUpload(cameraTargetKey, e);
+            }
+            handleCloseCamera();
+          }
+        }
+      )))) : /* @__PURE__ */ import_react26.default.createElement("div", { className: "position-relative bg-dark rounded-3 overflow-hidden d-inline-block w-100 shadow-inner", style: { minHeight: "340px" } }, /* @__PURE__ */ import_react26.default.createElement(
+        "video",
+        {
+          ref: videoRef,
+          autoPlay: true,
+          playsInline: true,
+          muted: true,
+          className: "w-100 rounded-3",
+          style: { maxHeight: "420px", objectFit: "contain", background: "#000" }
+        }
+      ), /* @__PURE__ */ import_react26.default.createElement(
+        "div",
+        {
+          className: "position-absolute bottom-0 start-0 end-0 p-2 text-center text-white-50 fs-11",
+          style: { background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)" }
+        },
+        "Point camera at the fabric or defect area, then click \u201CCapture Photo\u201D"
+      ))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-footer border-top px-4 py-3 bg-light d-flex justify-content-between" }, /* @__PURE__ */ import_react26.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-white border px-3 py-2 fs-13 text-secondary rounded-3",
+          onClick: handleCloseCamera
+        },
+        "Cancel"
+      ), !cameraError && /* @__PURE__ */ import_react26.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-primary px-4 py-2 fs-13 rounded-3 text-white fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm",
+          style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
+          onClick: handleCapturePhoto
+        },
+        /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-camera fs-16" }),
+        /* @__PURE__ */ import_react26.default.createElement("span", null, "Capture Photo")
+      ))))
     ), toastNotification && /* @__PURE__ */ import_react26.default.createElement(
       "div",
       {
@@ -40381,6 +40800,7 @@
     onViewResolveDamaged,
     onViewStockPool
   }) {
+    const [selectedPhotoModal, setSelectedPhotoModal] = (0, import_react27.useState)(null);
     if (!qc) {
       return /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-shield-off fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Quality Check Not Found"), /* @__PURE__ */ import_react27.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The selected inspection record could not be loaded."), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center justify-content-center gap-2" }, onBackToQC && /* @__PURE__ */ import_react27.default.createElement("button", { type: "button", className: "btn btn-primary px-3.5 py-2 rounded-3 fs-13", onClick: onBackToQC }, "Back to QC Register"), onBackToGRN && /* @__PURE__ */ import_react27.default.createElement(
         "button",
@@ -40427,6 +40847,13 @@
     const relevantStock = stockEntries.filter(
       (s) => s.grnId === grnId || s.qcId === qc.id || damagedItem && s.damagedItemId === damagedItem.id || itemToResolve && s.damagedItemId === itemToResolve.id
     );
+    const allViewPhotos = (0, import_react27.useMemo)(() => {
+      const list = [
+        ...qc?.photos || [],
+        ...Object.values(qc?.pieceInspections || {}).flatMap((p) => p?.photos || [])
+      ];
+      return Array.from(new Map(list.filter(Boolean).map((p) => [p.url || p.name, p])).values());
+    }, [qc]);
     return /* @__PURE__ */ import_react27.default.createElement("div", { className: "container-fluid p-0" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center gap-2 mb-2" }, /* @__PURE__ */ import_react27.default.createElement(
       "button",
       {
@@ -40452,16 +40879,26 @@
         style: { marginLeft: "14px", verticalAlign: "middle" }
       },
       qc.qcStatus || "OK"
-    )), /* @__PURE__ */ import_react27.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, grnId, " \xB7 ", poId, " \xB7 Checked by ", /* @__PURE__ */ import_react27.default.createElement("strong", null, qc.inspectorName || "Inspector"), " on ", qc.decidedAt || "2026-10-07")))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Inspection result"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "row g-4 fs-13 mb-3" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "EXPECTED WIDTH"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, expectedWidth)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "WIDTH FOUND"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, widthFound)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "EXPECTED FOLD"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, expectedFold)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "FOLD FOUND"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, foldFound)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-4" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "RECEIVED QUANTITY"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, receivedQty, "m"))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "pt-2 border-top border-light" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1.5" }, "Attached photo"), qc.photos && qc.photos.length > 0 ? /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, qc.photos.map((ph, idx) => /* @__PURE__ */ import_react27.default.createElement(
-      "img",
+    )), /* @__PURE__ */ import_react27.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, grnId, " \xB7 ", poId, " \xB7 Checked by ", /* @__PURE__ */ import_react27.default.createElement("strong", null, qc.inspectorName || "Inspector"), " on ", qc.decidedAt || "2026-10-07")))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Inspection result"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "row g-4 fs-13 mb-3" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "EXPECTED WIDTH"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, expectedWidth)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "WIDTH FOUND"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, widthFound)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "EXPECTED FOLD"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, expectedFold)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "FOLD FOUND"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, foldFound)), /* @__PURE__ */ import_react27.default.createElement("div", { className: "col-6 col-sm-4 col-md-4" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "RECEIVED QUANTITY"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "fw-bold text-dark" }, receivedQty, "m"))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "pt-2 border-top border-light" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold" }, "Attached Photos / Evidence"), allViewPhotos.length > 0 && /* @__PURE__ */ import_react27.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2 py-0.5 fs-11 rounded-pill" }, allViewPhotos.length, " Photo", allViewPhotos.length !== 1 ? "s" : "")), allViewPhotos.length > 0 ? /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, allViewPhotos.map((ph, idx) => /* @__PURE__ */ import_react27.default.createElement(
+      "div",
       {
         key: idx,
-        src: ph.url,
-        alt: ph.name,
-        className: "rounded-2 border",
-        style: { width: "70px", height: "70px", objectFit: "cover" }
-      }
-    ))) : /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-secondary fs-12" }, "No photo attached"))), (damagedItem || Number(qc.heldBackQty) > 0 || Number(qc.defectQty) > 0 || qc.issuePieces && qc.issuePieces.length > 0) && /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-2 fs-16" }, "Damaged / defective pieces"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "fs-13 text-secondary" }, /* @__PURE__ */ import_react27.default.createElement("strong", null, damagedItem?.defectivePieces || qc.issuePieces?.length || 1, " piece(s) / ", damagedItem?.quantity || qc.heldBackQty || qc.defectQty || 100, "m"), " ", "flagged \u2014", " ", /* @__PURE__ */ import_react27.default.createElement(
+        className: "card border rounded-2 p-1 bg-white shadow-2xs position-relative",
+        style: { width: "80px", cursor: "pointer" },
+        onClick: () => setSelectedPhotoModal(ph),
+        title: "Click to view full photo"
+      },
+      /* @__PURE__ */ import_react27.default.createElement(
+        "img",
+        {
+          src: ph.url,
+          alt: ph.name,
+          className: "rounded-1 w-100",
+          style: { height: "65px", objectFit: "cover" }
+        }
+      ),
+      /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)
+    ))) : /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-secondary fs-12" }, "No photo attached during inspection"))), (damagedItem || Number(qc.heldBackQty) > 0 || Number(qc.defectQty) > 0 || qc.issuePieces && qc.issuePieces.length > 0) && /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-2 fs-16" }, "Damaged / defective pieces"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "fs-13 text-secondary" }, /* @__PURE__ */ import_react27.default.createElement("strong", null, damagedItem?.defectivePieces || qc.issuePieces?.length || 1, " piece(s) / ", damagedItem?.quantity || qc.heldBackQty || qc.defectQty || 100, "m"), " ", "flagged \u2014", " ", /* @__PURE__ */ import_react27.default.createElement(
       "span",
       {
         className: `badge px-2.5 py-1 fs-11 rounded-pill ${effectiveStatus === "Reversed (treated as good)" ? "bg-success-subtle text-success border border-success border-opacity-25" : effectiveStatus === "Write Off (scrap)" ? "bg-danger-subtle text-danger border border-danger border-opacity-25" : effectiveStatus === "Return to Vendor" ? "bg-warning-subtle text-warning border border-warning border-opacity-25" : "bg-warning-subtle text-warning border border-warning border-opacity-25"}`
@@ -40597,21 +41034,77 @@
         onClick: onBackToGRN
       },
       "Back to GRN"
-    )));
+    )), selectedPhotoModal && /* @__PURE__ */ import_react27.default.createElement(
+      "div",
+      {
+        className: "modal show d-block",
+        style: { backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1070 },
+        tabIndex: "-1",
+        onClick: () => setSelectedPhotoModal(null)
+      },
+      /* @__PURE__ */ import_react27.default.createElement(
+        "div",
+        {
+          className: "modal-dialog modal-dialog-centered modal-lg",
+          onClick: (e) => e.stopPropagation()
+        },
+        /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-header border-bottom px-4 py-3 bg-light" }, /* @__PURE__ */ import_react27.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-14 mb-0 text-truncate" }, selectedPhotoModal.name), /* @__PURE__ */ import_react27.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn-close",
+            onClick: () => setSelectedPhotoModal(null),
+            "aria-label": "Close"
+          }
+        )), /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-body p-2 text-center bg-dark" }, /* @__PURE__ */ import_react27.default.createElement(
+          "img",
+          {
+            src: selectedPhotoModal.url,
+            alt: selectedPhotoModal.name,
+            className: "img-fluid rounded-2",
+            style: { maxHeight: "70vh", objectFit: "contain" }
+          }
+        )), /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between" }, /* @__PURE__ */ import_react27.default.createElement("span", { className: "text-muted fs-12" }, selectedPhotoModal.time || ""), /* @__PURE__ */ import_react27.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
+            onClick: () => setSelectedPhotoModal(null)
+          },
+          "Close"
+        )))
+      )
+    ));
   }
 
   // frontend/src/components/Procurement/DamagedItemDetailView.jsx
   var import_react28 = __toESM(require_react());
   function DamagedItemDetailView({
     damagedItem,
+    qualityChecks = [],
     onBack,
     onResolveDecision
   }) {
     const [resolutionNote, setResolutionNote] = (0, import_react28.useState)("");
     const [isModifyingDecision, setIsModifyingDecision] = (0, import_react28.useState)(false);
+    const [selectedPhotoModal, setSelectedPhotoModal] = (0, import_react28.useState)(null);
     if (!damagedItem) {
       return /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-alert-circle fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Damaged Item Details Not Found"), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The flagged item record could not be loaded."), /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to Quality Check")));
     }
+    const linkedQc = (qualityChecks || []).find((q) => q && (q.id === damagedItem.sourceQcRef || q.id === damagedItem.id)) || (() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem("raindrop_qc_v1") || "[]");
+        return stored.find((q) => q && (q.id === damagedItem.sourceQcRef || q.id === damagedItem.id || q.grnRef === damagedItem.grnRef));
+      } catch (e) {
+        return null;
+      }
+    })();
+    const allAttachedPhotos = [
+      ...damagedItem.photos || [],
+      ...linkedQc?.photos || [],
+      ...Object.values(linkedQc?.pieceInspections || {}).flatMap((p) => p?.photos || [])
+    ];
+    const uniquePhotos = Array.from(new Map(allAttachedPhotos.filter(Boolean).map((p) => [p.url || p.name, p])).values());
     const currentStatus = damagedItem.status || damagedItem.adminDecision || "Pending Admin Review";
     const isCurrentlyInStock = currentStatus === "Reversed (treated as good)" || currentStatus === "Approve" || currentStatus === "Approved" || currentStatus === "Approve \u2014 Add to Stock Pool" || currentStatus.toLowerCase().includes("stock pool") || currentStatus.toLowerCase().includes("good") || currentStatus.toLowerCase().includes("approve");
     const qty = Number(damagedItem.quantity) || Number(damagedItem.defectiveQty) || 100;
@@ -40640,7 +41133,27 @@
       },
       /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-arrow-left" }),
       /* @__PURE__ */ import_react28.default.createElement("span", null, "Back to Quality Check")
-    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("h2", { className: "fw-bold text-dark mb-1 fs-24" }, "Damaged item details"), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, grnRef, " \xB7 ", fabricName)))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "row g-4 fs-13" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-6 col-sm-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "DEFECTIVE PIECES"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, piecesCount, " piece(s)")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-6 col-sm-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "DEFECTIVE QUANTITY"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, qty, "m")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-12 col-sm-6" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "REASON"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, damagedItem.reason || "Flagged during piece-level QC \u2014 Bale 1, Piece 1 \u2014 Send for Admin Approval")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "REPORTED"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-secondary" }, dateStr, " by ", damagedItem.reportedBy || "Saksham Garg")))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Admin resolution"), /* @__PURE__ */ import_react28.default.createElement(
+    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("h2", { className: "fw-bold text-dark mb-1 fs-24" }, "Damaged item details"), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-0" }, grnRef, " \xB7 ", fabricName)))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "row g-4 fs-13" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-6 col-sm-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "DEFECTIVE PIECES"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, piecesCount, " piece(s)")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-6 col-sm-3" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "DEFECTIVE QUANTITY"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, qty, "m")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-12 col-sm-6" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "REASON"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fw-bold text-dark" }, damagedItem.reason || "Flagged during piece-level QC \u2014 Bale 1, Piece 1 \u2014 Send for Admin Approval")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-11 text-uppercase fw-semibold mb-1" }, "REPORTED"), /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-secondary" }, dateStr, " by ", damagedItem.reportedBy || "Saksham Garg")))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "p-1.5 rounded-circle bg-primary-subtle text-primary" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-photo fs-16" })), /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Defect Evidence & Attached Photos")), uniquePhotos.length > 0 && /* @__PURE__ */ import_react28.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, uniquePhotos.length, " Photo", uniquePhotos.length !== 1 ? "s" : "", " Attached")), uniquePhotos.length > 0 ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "row g-3" }, uniquePhotos.map((ph, idx) => /* @__PURE__ */ import_react28.default.createElement("div", { key: idx, className: "col-6 col-sm-4 col-md-3 col-lg-2" }, /* @__PURE__ */ import_react28.default.createElement(
+      "div",
+      {
+        className: "card border rounded-3 p-1.5 h-100 bg-light position-relative shadow-2xs hover-shadow transition-all",
+        style: { cursor: "pointer", transition: "transform 0.15s ease" },
+        onClick: () => setSelectedPhotoModal(ph),
+        title: "Click to view full photo",
+        onMouseEnter: (e) => e.currentTarget.style.transform = "translateY(-2px)",
+        onMouseLeave: (e) => e.currentTarget.style.transform = "translateY(0)"
+      },
+      /* @__PURE__ */ import_react28.default.createElement(
+        "img",
+        {
+          src: ph.url,
+          alt: ph.name,
+          className: "w-100 rounded-2",
+          style: { height: "110px", objectFit: "cover" }
+        }
+      ),
+      /* @__PURE__ */ import_react28.default.createElement("div", { className: "pt-1.5 px-1" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-truncate fw-semibold text-dark fs-11", title: ph.name }, ph.name), ph.time && /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-10" }, ph.time))
+    )))) : /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-center py-4 bg-light rounded-3 border text-muted fs-13" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-photo-off fs-24 mb-1 d-block text-secondary" }), "No defect photos were attached during inspection.")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Admin resolution"), /* @__PURE__ */ import_react28.default.createElement(
       "div",
       {
         className: `p-3 rounded-3 mb-3 d-flex align-items-center gap-2 fs-13 fw-semibold ${isCurrentlyInStock ? "bg-success-subtle text-success border border-success border-opacity-50" : "bg-light text-secondary border"}`
@@ -40748,7 +41261,47 @@
         style: { width: "26px", height: "26px", backgroundColor: "#e11d48" }
       },
       (damagedItem.reportedBy || "S")[0].toUpperCase()
-    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fs-12 text-secondary" }, "Reported by: ", /* @__PURE__ */ import_react28.default.createElement("strong", { className: "text-dark" }, damagedItem.reportedBy || "Saksham Garg (Merchandiser)")))))))));
+    ), /* @__PURE__ */ import_react28.default.createElement("div", { className: "fs-12 text-secondary" }, "Reported by: ", /* @__PURE__ */ import_react28.default.createElement("strong", { className: "text-dark" }, damagedItem.reportedBy || "Saksham Garg (Merchandiser)")))))))), selectedPhotoModal && /* @__PURE__ */ import_react28.default.createElement(
+      "div",
+      {
+        className: "modal show d-block",
+        style: { backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1070 },
+        tabIndex: "-1",
+        onClick: () => setSelectedPhotoModal(null)
+      },
+      /* @__PURE__ */ import_react28.default.createElement(
+        "div",
+        {
+          className: "modal-dialog modal-dialog-centered modal-lg",
+          onClick: (e) => e.stopPropagation()
+        },
+        /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-header border-bottom px-4 py-3 bg-light" }, /* @__PURE__ */ import_react28.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-14 mb-0 text-truncate" }, selectedPhotoModal.name), /* @__PURE__ */ import_react28.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn-close",
+            onClick: () => setSelectedPhotoModal(null),
+            "aria-label": "Close"
+          }
+        )), /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-body p-2 text-center bg-dark" }, /* @__PURE__ */ import_react28.default.createElement(
+          "img",
+          {
+            src: selectedPhotoModal.url,
+            alt: selectedPhotoModal.name,
+            className: "img-fluid rounded-2",
+            style: { maxHeight: "70vh", objectFit: "contain" }
+          }
+        )), /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "text-muted fs-12" }, selectedPhotoModal.time || ""), /* @__PURE__ */ import_react28.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
+            onClick: () => setSelectedPhotoModal(null)
+          },
+          "Close"
+        )))
+      )
+    ));
   }
 
   // frontend/src/components/Procurement/StockPoolView.jsx
@@ -44159,6 +44712,11 @@
       if (heldBackMeters > 0 || isWholeRejected || isSentToAdmin) {
         const rejQty = heldBackMeters > 0 ? heldBackMeters : Number(linkedGrn?.declaredTotalMeters) || 100;
         const pieceLabel = hasDefectivePieces ? qcData.issuePieces.map((p) => `Bale ${p.baleNo} - Piece ${p.pieceNo} (${p.status})`).join(", ") : isWholeRejected ? "Whole Shipment Rejected" : isSentToAdmin ? "Whole Shipment to Admin" : "Defect Qty Held Back";
+        const allQcPhotos = [
+          ...qcData.photos || [],
+          ...Object.values(qcData.pieceInspections || {}).flatMap((p) => p?.photos || [])
+        ];
+        const uniqueQcPhotos = Array.from(new Map(allQcPhotos.map((p) => [p.url || p.name, p])).values());
         const newRej = {
           id: `REJ-${String(Math.floor(1e3 + Math.random() * 9e3))}`,
           sourceQcRef: qcData.id,
@@ -44173,6 +44731,7 @@
           dateFlagged: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB"),
           status: isWholeRejected ? "In Pool" : "Pending Admin Review",
           heldBackPieces: qcData.issuePieces || [],
+          photos: uniqueQcPhotos,
           actionDetails: null
         };
         setRejectedStock((prev) => [newRej, ...prev]);
@@ -44464,6 +45023,7 @@
         transporters,
         purchaseOrders,
         qualityChecks,
+        allGRNs: grns,
         onBack: () => {
           setSelectedGRN(null);
           setActiveGrnView("list");
@@ -44679,6 +45239,7 @@
       DamagedItemDetailView,
       {
         damagedItem: selectedDamagedItem,
+        qualityChecks,
         onBack: () => setActiveQcView("detail"),
         onResolveDecision: handleDamagedResolve
       }

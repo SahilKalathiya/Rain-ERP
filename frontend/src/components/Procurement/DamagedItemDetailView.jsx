@@ -11,11 +11,13 @@ import React, { useState } from 'react';
  */
 export default function DamagedItemDetailView({
   damagedItem,
+  qualityChecks = [],
   onBack,
   onResolveDecision
 }) {
   const [resolutionNote, setResolutionNote] = useState('');
   const [isModifyingDecision, setIsModifyingDecision] = useState(false);
+  const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
 
   if (!damagedItem) {
     return (
@@ -31,6 +33,22 @@ export default function DamagedItemDetailView({
       </div>
     );
   }
+
+  // Find linked QC to ensure any attached inspection photos are visible to Admin
+  const linkedQc = (qualityChecks || []).find((q) => q && (q.id === damagedItem.sourceQcRef || q.id === damagedItem.id)) ||
+    (() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('raindrop_qc_v1') || '[]');
+        return stored.find((q) => q && (q.id === damagedItem.sourceQcRef || q.id === damagedItem.id || q.grnRef === damagedItem.grnRef));
+      } catch (e) { return null; }
+    })();
+
+  const allAttachedPhotos = [
+    ...(damagedItem.photos || []),
+    ...(linkedQc?.photos || []),
+    ...Object.values(linkedQc?.pieceInspections || {}).flatMap((p) => p?.photos || [])
+  ];
+  const uniquePhotos = Array.from(new Map(allAttachedPhotos.filter(Boolean).map((p) => [p.url || p.name, p])).values());
 
   const currentStatus = damagedItem.status || damagedItem.adminDecision || 'Pending Admin Review';
   const isCurrentlyInStock =
@@ -114,6 +132,58 @@ export default function DamagedItemDetailView({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Attached Photos / Defect Evidence Card (For Admin Review) */}
+      <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <div className="d-flex align-items-center gap-2">
+            <span className="p-1.5 rounded-circle bg-primary-subtle text-primary">
+              <i className="ti ti-photo fs-16"></i>
+            </span>
+            <h5 className="fw-bold text-dark mb-0 fs-16">Defect Evidence &amp; Attached Photos</h5>
+          </div>
+          {uniquePhotos.length > 0 && (
+            <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
+              {uniquePhotos.length} Photo{uniquePhotos.length !== 1 ? 's' : ''} Attached
+            </span>
+          )}
+        </div>
+
+        {uniquePhotos.length > 0 ? (
+          <div className="row g-3">
+            {uniquePhotos.map((ph, idx) => (
+              <div key={idx} className="col-6 col-sm-4 col-md-3 col-lg-2">
+                <div
+                  className="card border rounded-3 p-1.5 h-100 bg-light position-relative shadow-2xs hover-shadow transition-all"
+                  style={{ cursor: 'pointer', transition: 'transform 0.15s ease' }}
+                  onClick={() => setSelectedPhotoModal(ph)}
+                  title="Click to view full photo"
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                  <img
+                    src={ph.url}
+                    alt={ph.name}
+                    className="w-100 rounded-2"
+                    style={{ height: '110px', objectFit: 'cover' }}
+                  />
+                  <div className="pt-1.5 px-1">
+                    <div className="text-truncate fw-semibold text-dark fs-11" title={ph.name}>
+                      {ph.name}
+                    </div>
+                    {ph.time && <div className="text-muted fs-10">{ph.time}</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 bg-light rounded-3 border text-muted fs-13">
+            <i className="ti ti-photo-off fs-24 mb-1 d-block text-secondary"></i>
+            No defect photos were attached during inspection.
+          </div>
+        )}
       </div>
 
       {/* Admin Resolution Card (Matches Screenshot 5) */}
@@ -352,6 +422,53 @@ export default function DamagedItemDetailView({
           </div>
         </div>
       </div>
+
+      {/* FULL PHOTO PREVIEW MODAL */}
+      {selectedPhotoModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', zIndex: 1070 }}
+          tabIndex="-1"
+          onClick={() => setSelectedPhotoModal(null)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white">
+              <div className="modal-header border-bottom px-4 py-3 bg-light">
+                <h6 className="modal-title fw-bold text-dark fs-14 mb-0 text-truncate">
+                  {selectedPhotoModal.name}
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setSelectedPhotoModal(null)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body p-2 text-center bg-dark">
+                <img
+                  src={selectedPhotoModal.url}
+                  alt={selectedPhotoModal.name}
+                  className="img-fluid rounded-2"
+                  style={{ maxHeight: '70vh', objectFit: 'contain' }}
+                />
+              </div>
+              <div className="modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between">
+                <span className="text-muted fs-12">{selectedPhotoModal.time || ''}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm px-3 rounded-2 fs-12"
+                  onClick={() => setSelectedPhotoModal(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

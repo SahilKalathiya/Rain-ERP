@@ -13,6 +13,7 @@ export default function GRNDetailView({
   transporters = [],
   purchaseOrders = [],
   qualityChecks = [],
+  allGRNs = [],
   onBack,
   onEditHeader,
   onEditBales,
@@ -69,18 +70,67 @@ export default function GRNDetailView({
     );
   }
 
-  // Find linked PO
-  const linkedPoId = grn.linkedPOs?.[0] || grn.poId;
-  const linkedPO = purchaseOrders.find((p) => p.id === linkedPoId || (grn.linkedPOs && grn.linkedPOs.includes(p.id)));
+  // Safe fallback to localStorage for allGRNs & qualityChecks if props are empty
+  const resolvedAllGrns = useMemo(() => {
+    if (allGRNs && allGRNs.length > 0) return allGRNs;
+    try {
+      const stored = localStorage.getItem('raindrop_grns_v1');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return [];
+  }, [allGRNs]);
 
-  // Requirement 57: FIFO Allocation calculation for consolidated shipments
-  const linkedPoIds = (grn?.linkedPOs && grn.linkedPOs.length > 0)
-    ? grn.linkedPOs
-    : (grn?.poId && grn.poId !== 'PO-DIRECT' ? [grn.poId] : []);
+  const resolvedQualityChecks = useMemo(() => {
+    if (qualityChecks && qualityChecks.length > 0) return qualityChecks;
+    try {
+      const stored = localStorage.getItem('raindrop_qc_v1');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return [];
+  }, [qualityChecks]);
+
+  // Requirement 57: Extract clean linked PO IDs from all possible GRN fields
+  const linkedPoIds = useMemo(() => {
+    const ids = [];
+    if (grn?.linkedPOs && Array.isArray(grn.linkedPOs) && grn.linkedPOs.length > 0) {
+      grn.linkedPOs.forEach((p) => {
+        if (p && p !== 'PO-DIRECT' && !ids.includes(String(p).trim())) ids.push(String(p).trim());
+      });
+    }
+    if (grn?.poId && grn.poId !== 'PO-DIRECT' && !ids.includes(String(grn.poId).trim())) {
+      ids.push(String(grn.poId).trim());
+    }
+    if (grn?.againstPo && grn.againstPo !== 'PO-DIRECT' && !ids.includes(String(grn.againstPo).trim())) {
+      ids.push(String(grn.againstPo).trim());
+    }
+    if (grn?.poNumber && grn.poNumber !== 'PO-DIRECT' && !ids.includes(String(grn.poNumber).trim())) {
+      ids.push(String(grn.poNumber).trim());
+    }
+    if (grn?.purchaseOrderId && !ids.includes(String(grn.purchaseOrderId).trim())) {
+      ids.push(String(grn.purchaseOrderId).trim());
+    }
+    return ids;
+  }, [grn]);
+
+  const linkedPoId = linkedPoIds[0] || grn.poId || grn.againstPo || grn.poNumber || '';
+
+  const linkedPO = useMemo(() => {
+    return purchaseOrders.find((p) => {
+      if (!p) return false;
+      const pId = String(p.id || '').trim();
+      const pNum = String(p.poNumber || '').trim();
+      return (
+        linkedPoIds.includes(pId) ||
+        (pNum && linkedPoIds.includes(pNum)) ||
+        pId === String(linkedPoId).trim() ||
+        (pNum && pNum === String(linkedPoId).trim())
+      );
+    });
+  }, [purchaseOrders, linkedPoIds, linkedPoId]);
 
   const linkedPOObjects = useMemo(() => {
     return linkedPoIds
-      .map((id) => purchaseOrders.find((p) => p && String(p.id).trim() === String(id).trim()))
+      .map((id) => purchaseOrders.find((p) => p && (String(p.id).trim() === String(id).trim() || String(p.poNumber || '').trim() === String(id).trim())))
       .filter(Boolean);
   }, [linkedPoIds, purchaseOrders]);
 
@@ -266,11 +316,62 @@ export default function GRNDetailView({
     return Number(linkedPO?.totalQuantity || linkedPO?.quantity || 0);
   }, [linkedPO]);
 
-  const targetTrackingMeters = poOrderedTotal > 0 ? poOrderedTotal : (declaredTotalQty > 0 ? declaredTotalQty : totalMeters);
-  const pendingTrackingMeters = Math.max(0, targetTrackingMeters - totalMeters);
-  const trackingPct = targetTrackingMeters > 0 ? Math.min(100, Math.round((totalMeters / targetTrackingMeters) * 100)) : (totalMeters > 0 ? 100 : 0);
+  // Find all other GRNs linked to this PO (excluding this current GRN)
+  const otherGrnsForPo = useMemo(() => {
+    if (!linkedPoIds || linkedPoIds.length === 0) return [];
+    return (resolvedAllGrns || []).filter((g) => {
+      if (!g || String(g.id) === String(grn.id)) return false;
+      const gPoIds = (g.linkedPOs && g.linkedPOs.length > 0)
+        ? g.linkedPOs.map(String)
+        : [String(g.poId || g.againstPo || g.poNumber || '')].filter(Boolean);
+      return gPoIds.some((pid) => linkedPoIds.includes(pid));
+    });
+  }, [resolvedAllGrns, grn.id, linkedPoIds]);
 
-  // Calculate QC totals (Approved, Rejected, Pending)
+  // Meters received in prior shipments for this PO
+  const priorReceivedMeters = useMemo(() => {
+    let sum = 0;
+    if (otherGrnsForPo.length > 0) {
+      otherGrnsForPo.forEach((g) => {
+        let gM = 0;
+        if (g.poAllocations && typeof g.poAllocations === 'object') {
+          linkedPoIds.forEach((pId) => {
+            if (g.poAllocations[pId] !== undefined) {
+              gM += Number(g.poAllocations[pId]) || 0;
+            }
+          });
+        }
+        if (gM <= 0) {
+          gM = Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || Number(String(g.totalQty || '').replace(/[^0-9.]/g, '')) || 0;
+        }
+        sum += gM;
+      });
+    }
+
+    // Fallback: Check if linkedPO has receivedQty
+    const poRec = Number(linkedPO?.receivedQty || 0);
+    if (sum === 0 && poRec > 0) {
+      if (isDraftGRN) {
+        sum = poRec;
+      } else if (poRec > totalMeters) {
+        sum = poRec - totalMeters;
+      } else {
+        sum = poRec;
+      }
+    }
+    return sum;
+  }, [otherGrnsForPo, linkedPoIds, linkedPO, totalMeters, isDraftGRN]);
+
+  // Total cumulative meters received across all GRNs for this PO to date
+  const cumulativeReceivedMeters = priorReceivedMeters + totalMeters;
+
+  const targetTrackingMeters = poOrderedTotal > 0 ? poOrderedTotal : (declaredTotalQty > 0 ? declaredTotalQty : cumulativeReceivedMeters);
+  const pendingTrackingMeters = Math.max(0, targetTrackingMeters - cumulativeReceivedMeters);
+  const trackingPct = targetTrackingMeters > 0
+    ? Math.min(100, Math.round((cumulativeReceivedMeters / targetTrackingMeters) * 100))
+    : (cumulativeReceivedMeters > 0 ? 100 : 0);
+
+  // Calculate QC totals for THIS GRN (Approved, Rejected, Pending)
   const qcAwaitingInspectionMeters = useMemo(() => {
     let approved = 0;
     let rejected = 0;
@@ -291,6 +392,56 @@ export default function GRNDetailView({
       isPartiallyDone: approved > 0 || rejected > 0
     };
   }, [qcRecs, totalMeters]);
+
+  // QC Approved meters from prior completed GRNs for this PO
+  const priorQcApprovedMeters = useMemo(() => {
+    let approved = 0;
+    const otherGrnIds = otherGrnsForPo.map((g) => String(g.id));
+
+    (resolvedQualityChecks || qualityChecks || []).forEach((q) => {
+      if (!q) return;
+      const qGrnRef = String(q.grnRef || q.grnId || '');
+      const isOtherGrn = otherGrnIds.includes(qGrnRef);
+      const isSamePo = (q.againstRef && linkedPoIds.includes(String(q.againstRef))) ||
+        (q.againstPo && linkedPoIds.includes(String(q.againstPo))) ||
+        (q.poId && linkedPoIds.includes(String(q.poId)));
+
+      if (isOtherGrn || (isSamePo && qGrnRef !== String(grn.id))) {
+        if (['Approved', 'QC Approved', 'Passed', 'OK'].includes(q.qcStatus)) {
+          approved += Number(q.passedQty || q.totalReceivedMeters || q.receivedQty || 0);
+        }
+      }
+    });
+
+    if (approved === 0 && otherGrnsForPo.length > 0) {
+      otherGrnsForPo.forEach((g) => {
+        if (['QC Approved', 'QC Passed', 'Completed'].includes(g.status) || g.isQcActioned) {
+          approved += Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0;
+        }
+      });
+    }
+
+    if (approved === 0 && priorReceivedMeters > 0) {
+      if (['Partially Received', 'Completed'].includes(linkedPO?.status) || linkedPO?.receivedQty) {
+        approved = priorReceivedMeters;
+      }
+    }
+
+    return approved;
+  }, [otherGrnsForPo, resolvedQualityChecks, qualityChecks, linkedPoIds, grn.id, priorReceivedMeters, linkedPO]);
+
+  const totalPoQcApproved = priorQcApprovedMeters + qcAwaitingInspectionMeters.approvedMeters;
+
+  // Current GRN QC Approved meters
+  const currentGrnApprovedMeters = qcAwaitingInspectionMeters.approvedMeters;
+
+  // Total PO Received: Only counts material that has actually been QC Approved / accepted into PO inventory
+  const totalPoReceivedApprovedMeters = priorQcApprovedMeters + currentGrnApprovedMeters;
+
+  // Percentage of PO that is officially QC approved and accepted
+  const approvedPct = targetTrackingMeters > 0
+    ? Math.min(100, Math.round((totalPoReceivedApprovedMeters / targetTrackingMeters) * 100))
+    : (totalPoReceivedApprovedMeters > 0 ? 100 : 0);
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
@@ -704,16 +855,17 @@ export default function GRNDetailView({
         {/* Summary Stat Cards Grid */}
         <div className="row g-2 text-center mb-3">
           <div className="col-6 col-sm-4 col-md">
-            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+            <div className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center" style={{ borderColor: '#e2e8f0' }}>
               <div className="text-secondary fs-11 fw-semibold mb-1">Total Ordered</div>
               <div className="fw-bold text-dark fs-14">
-                {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()} m
+                {(targetTrackingMeters > 0 ? targetTrackingMeters : cumulativeReceivedMeters).toLocaleString()} m
               </div>
+              <div className="text-muted" style={{ fontSize: '10px' }}>PO Total</div>
             </div>
           </div>
           <div className="col-6 col-sm-4 col-md">
             <div
-              className="p-2.5 rounded bg-white border"
+              className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center"
               style={{
                 borderColor: isDraftGRN ? '#c7d2fe' : '#bbf7d0',
                 backgroundColor: isDraftGRN ? '#f5f3ff' : '#f0fdf4'
@@ -724,7 +876,7 @@ export default function GRNDetailView({
                 style={{ color: isDraftGRN ? '#4f46e5' : '#15803d' }}
               >
                 {isDraftGRN && <i className="ti ti-pencil fs-12"></i>}
-                <span>{isDraftGRN ? 'Draft Inward Qty' : 'Received (Inward)'}</span>
+                <span>{isDraftGRN ? 'Draft Inward Qty' : (priorReceivedMeters > 0 ? 'This GRN Inward' : 'Received (Inward)')}</span>
               </div>
               <div
                 className="fw-bold fs-14"
@@ -732,26 +884,50 @@ export default function GRNDetailView({
               >
                 {totalMeters.toLocaleString()} m
               </div>
-              {isDraftGRN && (
-                <div className="text-muted" style={{ fontSize: '10px' }}>Unsubmitted Draft</div>
-              )}
+              <div className="text-muted" style={{ fontSize: '10px' }}>
+                {isDraftGRN ? 'Unsubmitted Draft' : (priorReceivedMeters > 0 ? 'Current Delivery' : 'Total Inward')}
+              </div>
             </div>
           </div>
+          {priorReceivedMeters > 0 && (
+            <div className="col-6 col-sm-4 col-md">
+              <div
+                className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center"
+                style={{
+                  borderColor: currentGrnApprovedMeters > 0 ? '#93c5fd' : '#e2e8f0',
+                  backgroundColor: currentGrnApprovedMeters > 0 ? '#eff6ff' : '#f8fafc'
+                }}
+              >
+                <div className="text-primary fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1">
+                  <i className="ti ti-stack-2 fs-12"></i>
+                  <span>Total PO Received</span>
+                </div>
+                <div className="fw-bold text-primary fs-14">
+                  {totalPoReceivedApprovedMeters.toLocaleString()} m
+                </div>
+                <div className="text-muted" style={{ fontSize: '10px' }}>
+                  {currentGrnApprovedMeters > 0
+                    ? `${priorQcApprovedMeters.toLocaleString()}m prior + ${currentGrnApprovedMeters.toLocaleString()}m this`
+                    : `${priorQcApprovedMeters.toLocaleString()}m prior approved (This GRN pending QC)`}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="col-6 col-sm-4 col-md">
-            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+            <div className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center" style={{ borderColor: '#e2e8f0' }}>
               <div className="text-secondary fs-11 fw-semibold mb-1">Pending to Inward</div>
-              <div className="fw-bold text-secondary fs-14">
+              <div className={`fw-bold fs-14 ${pendingTrackingMeters === 0 ? 'text-success' : 'text-danger'}`}>
                 {(pendingTrackingMeters > 0 ? pendingTrackingMeters : 0).toLocaleString()} m
               </div>
-              {isDraftGRN && (
-                <div className="text-muted" style={{ fontSize: '10px' }}>After Submission</div>
-              )}
+              <div className="text-muted" style={{ fontSize: '10px' }}>
+                {pendingTrackingMeters === 0 ? 'PO Fully Received' : (isDraftGRN ? 'After Submission' : 'Remaining PO Balance')}
+              </div>
             </div>
           </div>
           {!isDraftGRN && (
             <>
               <div className="col-6 col-sm-4 col-md">
-                <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#fde68a', backgroundColor: '#fffdf0' }}>
+                <div className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center" style={{ borderColor: '#fde68a', backgroundColor: '#fffdf0' }}>
                   <div className="text-warning-emphasis fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1">
                     <i className="ti ti-clock text-warning"></i>
                     <span>QC Pending</span>
@@ -759,31 +935,49 @@ export default function GRNDetailView({
                   <div className="fw-bold text-warning-emphasis fs-14">
                     {qcAwaitingInspectionMeters.pendingMeters.toLocaleString()} m
                   </div>
+                  <div className="text-muted" style={{ fontSize: '10px' }}>This GRN to Inspect</div>
                 </div>
               </div>
               <div className="col-6 col-sm-4 col-md">
-                <div className="p-2.5 rounded bg-white border" style={{ borderColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#bbf7d0' : '#e2e8f0', backgroundColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#f0fdf4' : '#ffffff' }}>
-                  <div className="fs-11 fw-semibold mb-1" style={{ color: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#15803d' : '#64748b' }}>
-                    QC Approved
+                <div
+                  className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center"
+                  style={{
+                    borderColor: currentGrnApprovedMeters > 0 ? '#bbf7d0' : '#e2e8f0',
+                    backgroundColor: currentGrnApprovedMeters > 0 ? '#f0fdf4' : '#ffffff'
+                  }}
+                >
+                  <div
+                    className="fs-11 fw-semibold mb-1"
+                    style={{ color: currentGrnApprovedMeters > 0 ? '#15803d' : '#64748b' }}
+                  >
+                    This GRN Approved
                   </div>
-                  <div className="fw-bold fs-14" style={{ color: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#15803d' : '#64748b' }}>
-                    {qcAwaitingInspectionMeters.approvedMeters.toLocaleString()} m
+                  <div
+                    className="fw-bold fs-14"
+                    style={{ color: currentGrnApprovedMeters > 0 ? '#15803d' : '#64748b' }}
+                  >
+                    {currentGrnApprovedMeters.toLocaleString()} m
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '10px' }}>
+                    {currentGrnApprovedMeters > 0
+                      ? 'QC Passed'
+                      : (qcAwaitingInspectionMeters.isPartiallyDone ? 'Partial Approved' : 'Awaiting QC')}
                   </div>
                 </div>
               </div>
             </>
           )}
           <div className="col-6 col-sm-4 col-md">
-            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+            <div className="p-2.5 rounded bg-white border h-100 d-flex flex-column justify-content-center" style={{ borderColor: '#e2e8f0' }}>
               <div className="text-secondary fs-11 fw-semibold mb-1">
                 {isDraftGRN ? 'Total GRN Inwards' : 'Containers'}
               </div>
               <div className="fw-bold text-dark fs-14">
                 {bales.length || grn.totalBales || 1} Container(s)
               </div>
-              {isDraftGRN && (
-                <div className="text-muted" style={{ fontSize: '10px' }}>Bales Entered</div>
-              )}
+              <div className="text-muted" style={{ fontSize: '10px' }}>
+                {isDraftGRN ? 'Bales Entered' : `${totalPiecesCount || bales.length} Pieces`}
+              </div>
             </div>
           </div>
         </div>
@@ -793,15 +987,39 @@ export default function GRNDetailView({
           <div>
             <div className="d-flex align-items-center justify-content-between fs-12 mb-1.5">
               <span className="text-secondary fw-semibold">Draft Inward Allocation Progress:</span>
-              <span className="fw-bold text-dark">{trackingPct}% ({totalMeters.toLocaleString()}m in draft / {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()}m ordered)</span>
+              <span className="fw-bold text-dark">
+                {trackingPct}% ({cumulativeReceivedMeters.toLocaleString()}m in draft &amp; prior / {(targetTrackingMeters > 0 ? targetTrackingMeters : cumulativeReceivedMeters).toLocaleString()}m ordered)
+              </span>
             </div>
             <div className="progress rounded-pill overflow-hidden" style={{ height: '7px', backgroundColor: '#e2e8f0' }}>
+              {priorReceivedMeters > 0 && (
+                <div
+                  className="progress-bar"
+                  role="progressbar"
+                  style={{
+                    width: `${Math.min(100, Math.round((priorReceivedMeters / targetTrackingMeters) * 100))}%`,
+                    backgroundColor: '#3b82f6'
+                  }}
+                  title={`Prior received: ${priorReceivedMeters.toLocaleString()}m`}
+                ></div>
+              )}
               <div
                 className="progress-bar"
                 role="progressbar"
-                style={{ width: `${Math.min(100, trackingPct)}%`, backgroundColor: '#5b47fb' }}
+                style={{
+                  width: `${Math.min(100 - (priorReceivedMeters > 0 ? Math.round((priorReceivedMeters / targetTrackingMeters) * 100) : 0), Math.round((totalMeters / targetTrackingMeters) * 100))}%`,
+                  backgroundColor: '#5b47fb'
+                }}
+                title={`This draft GRN: ${totalMeters.toLocaleString()}m`}
               ></div>
             </div>
+            {priorReceivedMeters > 0 && (
+              <div className="d-flex align-items-center justify-content-between text-muted fs-11 mt-1">
+                <span>Prior Received: {priorReceivedMeters.toLocaleString()}m</span>
+                <span>This Draft: +{totalMeters.toLocaleString()}m</span>
+                <span>Pending Balance: {pendingTrackingMeters.toLocaleString()}m</span>
+              </div>
+            )}
           </div>
         ) : (
           <div>
@@ -809,26 +1027,49 @@ export default function GRNDetailView({
               <div className="d-flex align-items-center gap-1.5">
                 <span className="text-secondary fw-semibold">Inward Delivery:</span>
                 <span className="fw-bold text-success">
-                  {trackingPct}% Received ({totalMeters.toLocaleString()}m / {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()}m)
+                  {approvedPct}% Received ({totalPoReceivedApprovedMeters.toLocaleString()}m / {(targetTrackingMeters > 0 ? targetTrackingMeters : totalPoReceivedApprovedMeters).toLocaleString()}m)
                 </span>
+                {priorReceivedMeters > 0 && (
+                  <span className="badge bg-light text-secondary border fs-10 px-1.5 py-0.5 rounded">
+                    {currentGrnApprovedMeters > 0
+                      ? `+${currentGrnApprovedMeters.toLocaleString()}m this GRN &bull; ${priorQcApprovedMeters.toLocaleString()}m prior`
+                      : `${priorQcApprovedMeters.toLocaleString()}m prior approved (+${totalMeters.toLocaleString()}m in QC)`}
+                  </span>
+                )}
               </div>
               <div className="d-flex align-items-center gap-1.5">
                 <span className="text-secondary fw-semibold">Quality Inspection:</span>
                 <span className={`fw-bold ${qcAwaitingInspectionMeters.isAllApproved ? 'text-success' : 'text-warning-emphasis'}`}>
                   <i className={`ti ${qcAwaitingInspectionMeters.isAllApproved ? 'ti-circle-check text-success' : 'ti-clock text-warning'} me-1`}></i>
                   {qcAwaitingInspectionMeters.isAllApproved
-                    ? '100% QC Approved'
-                    : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m to inspect)`}
+                    ? '100% QC Approved (This GRN)'
+                    : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m this GRN)`}
                 </span>
+                {priorQcApprovedMeters > 0 && (
+                  <span className="text-muted fs-11">
+                    ({priorQcApprovedMeters.toLocaleString()}m approved previously)
+                  </span>
+                )}
               </div>
             </div>
             <div className="progress rounded-pill overflow-hidden" style={{ height: '7px', backgroundColor: '#e2e8f0' }}>
-              {qcAwaitingInspectionMeters.approvedMeters > 0 && (
+              {priorQcApprovedMeters > 0 && (
                 <div
                   className="progress-bar bg-success"
                   role="progressbar"
-                  style={{ width: `${Math.round((qcAwaitingInspectionMeters.approvedMeters / targetTrackingMeters) * 100)}%` }}
-                  title={`QC Approved: ${qcAwaitingInspectionMeters.approvedMeters}m`}
+                  style={{ width: `${Math.round((priorQcApprovedMeters / targetTrackingMeters) * 100)}%` }}
+                  title={`Prior QC Approved: ${priorQcApprovedMeters.toLocaleString()}m`}
+                ></div>
+              )}
+              {currentGrnApprovedMeters > 0 && (
+                <div
+                  className="progress-bar"
+                  role="progressbar"
+                  style={{
+                    width: `${Math.round((currentGrnApprovedMeters / targetTrackingMeters) * 100)}%`,
+                    backgroundColor: '#16a34a'
+                  }}
+                  title={`This GRN QC Approved: ${currentGrnApprovedMeters.toLocaleString()}m`}
                 ></div>
               )}
               {qcAwaitingInspectionMeters.pendingMeters > 0 && (
@@ -836,10 +1077,29 @@ export default function GRNDetailView({
                   className="progress-bar bg-warning"
                   role="progressbar"
                   style={{ width: `${Math.round((qcAwaitingInspectionMeters.pendingMeters / targetTrackingMeters) * 100)}%` }}
-                  title={`QC Pending: ${qcAwaitingInspectionMeters.pendingMeters}m`}
+                  title={`QC Pending: ${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m`}
                 ></div>
               )}
             </div>
+            {priorReceivedMeters > 0 && (
+              <div className="d-flex align-items-center justify-content-between text-muted fs-11 mt-1">
+                <span className="d-flex align-items-center gap-1">
+                  <span className="d-inline-block rounded-circle" style={{ width: '7px', height: '7px', backgroundColor: '#10b981' }}></span>
+                  Prior Shipments: {priorQcApprovedMeters.toLocaleString()}m (QC Approved)
+                </span>
+                <span className="d-flex align-items-center gap-1">
+                  <span
+                    className="d-inline-block rounded-circle"
+                    style={{ width: '7px', height: '7px', backgroundColor: currentGrnApprovedMeters > 0 ? '#10b981' : '#f59e0b' }}
+                  ></span>
+                  This GRN: {totalMeters.toLocaleString()}m ({currentGrnApprovedMeters > 0 ? 'QC Approved' : 'QC Pending'})
+                </span>
+                <span className="d-flex align-items-center gap-1">
+                  <span className="d-inline-block rounded-circle" style={{ width: '7px', height: '7px', backgroundColor: '#cbd5e1' }}></span>
+                  Remaining PO Balance: {pendingTrackingMeters.toLocaleString()}m
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

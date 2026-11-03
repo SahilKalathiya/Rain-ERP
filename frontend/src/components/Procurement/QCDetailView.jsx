@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 
 /**
  * QCDetailView - Quality Check Item Read-Only / Details View
@@ -17,6 +17,7 @@ export default function QCDetailView({
   onViewResolveDamaged,
   onViewStockPool
 }) {
+  const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
   if (!qc) {
     return (
       <div className="card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4">
@@ -85,6 +86,14 @@ export default function QCDetailView({
   const relevantStock = stockEntries.filter(
     (s) => s.grnId === grnId || s.qcId === qc.id || (damagedItem && s.damagedItemId === damagedItem.id) || (itemToResolve && s.damagedItemId === itemToResolve.id)
   );
+
+  const allViewPhotos = useMemo(() => {
+    const list = [
+      ...(qc?.photos || []),
+      ...Object.values(qc?.pieceInspections || {}).flatMap((p) => p?.photos || [])
+    ];
+    return Array.from(new Map(list.filter(Boolean).map((p) => [p.url || p.name, p])).values());
+  }, [qc]);
 
   return (
     <div className="container-fluid p-0">
@@ -167,21 +176,38 @@ export default function QCDetailView({
 
         {/* Attached Photos */}
         <div className="pt-2 border-top border-light">
-          <div className="text-muted fs-11 text-uppercase fw-semibold mb-1.5">Attached photo</div>
-          {qc.photos && qc.photos.length > 0 ? (
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <div className="text-muted fs-11 text-uppercase fw-semibold">Attached Photos / Evidence</div>
+            {allViewPhotos.length > 0 && (
+              <span className="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2 py-0.5 fs-11 rounded-pill">
+                {allViewPhotos.length} Photo{allViewPhotos.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          {allViewPhotos.length > 0 ? (
             <div className="d-flex flex-wrap gap-2">
-              {qc.photos.map((ph, idx) => (
-                <img
+              {allViewPhotos.map((ph, idx) => (
+                <div
                   key={idx}
-                  src={ph.url}
-                  alt={ph.name}
-                  className="rounded-2 border"
-                  style={{ width: '70px', height: '70px', objectFit: 'cover' }}
-                />
+                  className="card border rounded-2 p-1 bg-white shadow-2xs position-relative"
+                  style={{ width: '80px', cursor: 'pointer' }}
+                  onClick={() => setSelectedPhotoModal(ph)}
+                  title="Click to view full photo"
+                >
+                  <img
+                    src={ph.url}
+                    alt={ph.name}
+                    className="rounded-1 w-100"
+                    style={{ height: '65px', objectFit: 'cover' }}
+                  />
+                  <div className="text-truncate fs-10 text-muted mt-1 text-center" title={ph.name}>
+                    {ph.name}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            <div className="text-secondary fs-12">No photo attached</div>
+            <div className="text-secondary fs-12">No photo attached during inspection</div>
           )}
         </div>
       </div>
@@ -464,6 +490,53 @@ export default function QCDetailView({
           </button>
         )}
       </div>
+
+      {/* FULL PHOTO PREVIEW MODAL */}
+      {selectedPhotoModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', zIndex: 1070 }}
+          tabIndex="-1"
+          onClick={() => setSelectedPhotoModal(null)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white">
+              <div className="modal-header border-bottom px-4 py-3 bg-light">
+                <h6 className="modal-title fw-bold text-dark fs-14 mb-0 text-truncate">
+                  {selectedPhotoModal.name}
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setSelectedPhotoModal(null)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body p-2 text-center bg-dark">
+                <img
+                  src={selectedPhotoModal.url}
+                  alt={selectedPhotoModal.name}
+                  className="img-fluid rounded-2"
+                  style={{ maxHeight: '70vh', objectFit: 'contain' }}
+                />
+              </div>
+              <div className="modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between">
+                <span className="text-muted fs-12">{selectedPhotoModal.time || ''}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm px-3 rounded-2 fs-12"
+                  onClick={() => setSelectedPhotoModal(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

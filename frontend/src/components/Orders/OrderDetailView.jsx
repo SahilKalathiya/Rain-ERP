@@ -109,7 +109,7 @@ export default function OrderDetailView({
     try {
       const s = getStoredData('raindrop_fabrics_v1', null);
       if (Array.isArray(s)) return s;
-    } catch (e) {}
+    } catch (e) { }
     return procurementFabrics || [];
   });
 
@@ -121,7 +121,7 @@ export default function OrderDetailView({
       try {
         const s = getStoredData('raindrop_fabrics_v1', null);
         if (Array.isArray(s)) setMasterFabricsList(s);
-      } catch (e) {}
+      } catch (e) { }
     };
     const handleCloseWidthDropdown = () => setActiveWidthDropdown(null);
 
@@ -149,7 +149,7 @@ export default function OrderDetailView({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return initialVendors;
   });
 
@@ -162,7 +162,7 @@ export default function OrderDetailView({
           return parsed.filter(p => p.orderId === order?.id || p.order_id === order?.id || p.orderNumber === order?.orderNumber);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
 
@@ -183,7 +183,7 @@ export default function OrderDetailView({
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return allocated;
   });
 
@@ -275,7 +275,7 @@ export default function OrderDetailView({
       if (Array.isArray(stored) && stored.length > 0) {
         allFabrics = [...allFabrics, ...stored];
       }
-    } catch (e) {}
+    } catch (e) { }
     if (Array.isArray(procurementFabrics) && procurementFabrics.length > 0) {
       allFabrics = [...allFabrics, ...procurementFabrics];
     }
@@ -1189,10 +1189,10 @@ export default function OrderDetailView({
 
   const handleSaveFullOrder = (status) => {
     const isDraft = status === 'Draft';
-    const isAlreadyConfirmed = (confirmed || order?.status === 'Confirmed' || order?.stage === 'Confirmed') && !isDraft;
-    const newStatus = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
-    const newStage = isDraft ? 'Draft' : (isAlreadyConfirmed ? 'Confirmed' : 'Pending Confirmation');
-    setConfirmed(newStatus === 'Confirmed');
+    const isAdvanced = ['In Production', 'Completed'].includes(order?.status);
+    const newStatus = isDraft ? 'Draft' : (isAdvanced ? order.status : 'Confirmed');
+    const newStage = isDraft ? 'Draft' : (isAdvanced ? (order.stage || order.status) : 'Confirmed');
+    setConfirmed(newStatus === 'Confirmed' || isAdvanced);
 
     let userName = 'Saksham Garg';
     let userRole = 'Merchandiser';
@@ -1203,12 +1203,12 @@ export default function OrderDetailView({
         if (u.name) userName = u.name;
         if (u.role) userRole = u.role.split(' ')[0] || 'Merchandiser';
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const nowIso = new Date().toISOString();
     const historyText = isDraft
       ? `Order saved as draft (${userName} (${userRole}))`
-      : `Order saved (${userName} (${userRole}))`;
+      : `Order saved & confirmed (${userName} (${userRole}))`;
 
     const newHistoryEntry = {
       date: nowIso,
@@ -1223,7 +1223,8 @@ export default function OrderDetailView({
       ...order,
       status: newStatus,
       stage: newStage,
-      hasProceededToNextStep: !isDraft,
+      hasProceededToNextStep: true,
+      draftStep: isDraft ? 'detail' : null,
       accessories: addedAccessories,
       fabricConsumptions: consumptionRows,
       articleSourcing,
@@ -1251,7 +1252,7 @@ export default function OrderDetailView({
         if (onBack) onBack();
       }, 600);
     } else {
-      setToastMessage(`Order #${updatedOrder.id || ''} saved successfully!`);
+      setToastMessage(`Order #${updatedOrder.id || ''} saved & confirmed successfully!`);
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
@@ -2064,33 +2065,33 @@ export default function OrderDetailView({
                         <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.reqPerPc || '0'}</span>
                       )}
                     </td>
-                      <td style={{ minWidth: '80px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <div className="d-flex flex-column align-items-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={defaultBuf || 100}
-                              step="0.5"
-                              className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
-                              placeholder={String(defaultBuf)}
-                              onKeyDown={(e) => {
-                                if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                  e.preventDefault();
-                                }
-                              }}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
-                              style={inputStyle}
-                            />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
-                          </div>
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {bufferVal}%
-                          </span>
-                        )}
-                      </td>
+                    <td style={{ minWidth: '80px', padding: '6px 8px' }}>
+                      {isEditing ? (
+                        <div className="d-flex flex-column align-items-center">
+                          <input
+                            type="number"
+                            min="0"
+                            max={defaultBuf || 100}
+                            step="0.5"
+                            className="form-control form-control-sm text-center"
+                            value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
+                            placeholder={String(defaultBuf)}
+                            onKeyDown={(e) => {
+                              if (['-', '+', 'e', 'E'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
+                            style={inputStyle}
+                          />
+                          <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
+                        </div>
+                      ) : (
+                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                          {bufferVal}%
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
                       <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
                         {totalVal} PCS
@@ -2121,7 +2122,7 @@ export default function OrderDetailView({
       if (Array.isArray(stored) && stored.length > 0) {
         allFabrics = [...allFabrics, ...stored];
       }
-    } catch (e) {}
+    } catch (e) { }
     if (Array.isArray(procurementFabrics) && procurementFabrics.length > 0) {
       allFabrics = [...allFabrics, ...procurementFabrics];
     }
@@ -2148,8 +2149,8 @@ export default function OrderDetailView({
             const raw = found.defaultShrinkage !== undefined && found.defaultShrinkage !== null && found.defaultShrinkage !== ''
               ? found.defaultShrinkage
               : (found.shrinkage !== undefined && found.shrinkage !== null && found.shrinkage !== ''
-                  ? found.shrinkage
-                  : found.shrinkagePercent);
+                ? found.shrinkage
+                : found.shrinkagePercent);
             if (raw !== undefined && raw !== null && raw !== '') {
               const parsed = parseFloat(String(raw).replace('%', ''));
               if (!isNaN(parsed) && parsed >= 0) return parsed;
@@ -2164,8 +2165,8 @@ export default function OrderDetailView({
       const raw = matched.defaultShrinkage !== undefined && matched.defaultShrinkage !== null && matched.defaultShrinkage !== ''
         ? matched.defaultShrinkage
         : (matched.shrinkage !== undefined && matched.shrinkage !== null && matched.shrinkage !== ''
-            ? matched.shrinkage
-            : (matched.shrinkage_percent !== undefined ? matched.shrinkage_percent : matched.shrinkPct));
+          ? matched.shrinkage
+          : (matched.shrinkage_percent !== undefined ? matched.shrinkage_percent : matched.shrinkPct));
       if (raw !== undefined && raw !== null && raw !== '') {
         const parsed = parseFloat(String(raw).replace('%', ''));
         if (!isNaN(parsed) && parsed >= 0) return parsed;
@@ -2237,79 +2238,79 @@ export default function OrderDetailView({
           return isNaN(parsedPcs) || parsedPcs > 0;
         })
         .map((fc, idx) => {
-        const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
-        const artIdx = fc.articleIndex !== undefined
-          ? fc.articleIndex
-          : (order?.articles ? order.articles.findIndex(a => a.name === artName) : idx);
-        const art = (order?.articles && order.articles[artIdx]) || {};
-        const artFab = (art.fabrics || []).find(f => (f.fabricQuality || f.fabricName || '').toLowerCase() === (fc.fabricQuality || '').toLowerCase()) || art.fabrics?.[0] || {};
-        const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || '';
-        
-        // Priority for starting width: do NOT default to 44" unless user selected or explicitly specified
-        let initialWidth = '';
-        if (fc._userSelectedWidth) {
-          initialWidth = resolveWidth(fc.width);
-        } else if (resolveWidth(artFab.width)) {
-          initialWidth = resolveWidth(artFab.width);
-        } else if (resolveWidth(fc.width) && resolveWidth(fc.width) !== '44"' && resolveWidth(fc.width) !== '47"') {
-          initialWidth = resolveWidth(fc.width);
-        }
+          const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
+          const artIdx = fc.articleIndex !== undefined
+            ? fc.articleIndex
+            : (order?.articles ? order.articles.findIndex(a => a.name === artName) : idx);
+          const art = (order?.articles && order.articles[artIdx]) || {};
+          const artFab = (art.fabrics || []).find(f => (f.fabricQuality || f.fabricName || '').toLowerCase() === (fc.fabricQuality || '').toLowerCase()) || art.fabrics?.[0] || {};
+          const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || '';
 
-        const masterShrink = getFabricMasterShrinkage(fabQuality);
-        const shrink = masterShrink;
-        const buf = parseFloat(fc.maxBuffer || fc.bufferPercent || fc.bufferPct || artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
+          // Priority for starting width: do NOT default to 44" unless user selected or explicitly specified
+          let initialWidth = '';
+          if (fc._userSelectedWidth) {
+            initialWidth = resolveWidth(fc.width);
+          } else if (resolveWidth(artFab.width)) {
+            initialWidth = resolveWidth(artFab.width);
+          } else if (resolveWidth(fc.width) && resolveWidth(fc.width) !== '44"' && resolveWidth(fc.width) !== '47"') {
+            initialWidth = resolveWidth(fc.width);
+          }
 
-        const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
-        const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
-        const finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          const masterShrink = getFabricMasterShrinkage(fabQuality);
+          const shrink = masterShrink;
+          const buf = parseFloat(fc.maxBuffer || fc.bufferPercent || fc.bufferPct || artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
 
-        // Dyed Rate: do NOT pre-fill dummy 1.5, 2.5, 3.0 unless explicitly edited by user
-        let rawDyed = '';
-        if (fc._userEditedDyed) {
-          rawDyed = fc.dyedRate;
-        } else if (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '' &&
-                   fc.dyedRate !== 1.5 && fc.dyedRate !== '1.5' &&
-                   fc.dyedRate !== 2.5 && fc.dyedRate !== '2.5' &&
-                   fc.dyedRate !== 2.0 && fc.dyedRate !== '2.0' &&
-                   fc.dyedRate !== 3.0 && fc.dyedRate !== '3.0' &&
-                   fc.dyedRate !== 2.25 && fc.dyedRate !== '2.25') {
-          rawDyed = fc.dyedRate;
-        } else if (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' &&
-                   artFab.consumption !== 1.5 && artFab.consumption !== '1.5') {
-          rawDyed = artFab.consumption;
-        }
+          const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
+          const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
+          const finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
 
-        return {
-          key: fc.key || `row_${idx}`,
-          articleIndex: artIdx >= 0 ? artIdx : idx,
-          articleName: artName,
-          articleCode: artName.toUpperCase(),
-          articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
-          role: autoCapitalizeWords(fc.role || artFab.pieceLabel || artFab.role || 'Main'),
-          fabricQuality: fabQuality,
-          source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
-          width: initialWidth,
-          colorName: fc.colorName || 'Standard',
-          colorHex: fc.colorHex || '#94a3b8',
-          dyedRate: rawDyed !== '' ? rawDyed : '',
-          shrinkPct: shrink,
-          bufferPct: buf,
-          pcs: finalPcs,
-          locked: fc.locked !== undefined ? !!fc.locked : false,
-          _userSelectedWidth: Boolean(initialWidth),
-          _userEditedDyed: Boolean(rawDyed !== '')
-        };
-      });
+          // Dyed Rate: do NOT pre-fill dummy 1.5, 2.5, 3.0 unless explicitly edited by user
+          let rawDyed = '';
+          if (fc._userEditedDyed) {
+            rawDyed = fc.dyedRate;
+          } else if (fc.dyedRate !== undefined && fc.dyedRate !== null && fc.dyedRate !== '' &&
+            fc.dyedRate !== 1.5 && fc.dyedRate !== '1.5' &&
+            fc.dyedRate !== 2.5 && fc.dyedRate !== '2.5' &&
+            fc.dyedRate !== 2.0 && fc.dyedRate !== '2.0' &&
+            fc.dyedRate !== 3.0 && fc.dyedRate !== '3.0' &&
+            fc.dyedRate !== 2.25 && fc.dyedRate !== '2.25') {
+            rawDyed = fc.dyedRate;
+          } else if (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' &&
+            artFab.consumption !== 1.5 && artFab.consumption !== '1.5') {
+            rawDyed = artFab.consumption;
+          }
+
+          return {
+            key: fc.key || `row_${idx}`,
+            articleIndex: artIdx >= 0 ? artIdx : idx,
+            articleName: artName,
+            articleCode: artName.toUpperCase(),
+            articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+            role: autoCapitalizeWords(fc.role || artFab.pieceLabel || artFab.role || 'Main'),
+            fabricQuality: fabQuality,
+            source: fc.source || artFab.source || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
+            width: initialWidth,
+            colorName: fc.colorName || 'Standard',
+            colorHex: fc.colorHex || '#94a3b8',
+            dyedRate: rawDyed !== '' ? rawDyed : '',
+            shrinkPct: shrink,
+            bufferPct: buf,
+            pcs: finalPcs,
+            locked: fc.locked !== undefined ? !!fc.locked : false,
+            _userSelectedWidth: Boolean(initialWidth),
+            _userEditedDyed: Boolean(rawDyed !== '')
+          };
+        });
     }
 
     // Otherwise, generate rows from order.articles and customer orders or default matching Prototype Demo (Kurta, Pant, Dupatta)
     const articles = (order?.articles && order.articles.length > 0)
       ? order.articles
       : (isMockSample ? [
-          { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
-          { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
-          { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
-        ] : []);
+        { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
+        { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
+        { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
+      ] : []);
 
     // Colors list from customer orders
     let colors = [];
@@ -2376,26 +2377,26 @@ export default function OrderDetailView({
       const fabricsToIterate = (Array.isArray(art.fabrics) && art.fabrics.length > 0)
         ? art.fabrics
         : [{
-            fabricQuality: art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc'),
-            role: 'Main',
-            width: art.width,
-            source: art.sourcing || art.source,
-            shrinkage: art.shrinkage,
-            consumption: art.consumption
-          }];
+          fabricQuality: art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc'),
+          role: 'Main',
+          width: art.width,
+          source: art.sourcing || art.source,
+          shrinkage: art.shrinkage,
+          consumption: art.consumption
+        }];
 
       fabricsToIterate.forEach((artFab, fIdx) => {
         const fabName = artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || (aIdx === 0 ? '100/100 Mulmul' : aIdx === 1 ? '2.40/20s CF' : '60os Cambryc');
         const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || (fIdx === 0 ? 'Main' : 'Outer'));
         const source = artFab.source || art.sourcing || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric');
-        
+
         const initialWidth = resolveWidth(artFab.width) || '';
 
         const masterShrink = getFabricMasterShrinkage(fabName);
         const shrinkVal = masterShrink;
         const bufferVal = parseFloat(artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
-        const defaultDyed = (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' && artFab.consumption !== 1.5 && artFab.consumption !== '1.5') 
-          ? artFab.consumption 
+        const defaultDyed = (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' && artFab.consumption !== 1.5 && artFab.consumption !== '1.5')
+          ? artFab.consumption
           : (art.consumption !== undefined && art.consumption !== null && art.consumption !== '' && art.consumption !== 1.5 && art.consumption !== '1.5' ? art.consumption : '');
 
         // Dupatta might only have 1 color in sample
@@ -2508,7 +2509,7 @@ export default function OrderDetailView({
           order.customerOrders.forEach(cust => {
             Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
               const matchesArt = (item.id && key.startsWith(`${item.id}_`)) ||
-                                 (name && key.toLowerCase().includes(name.toLowerCase()));
+                (name && key.toLowerCase().includes(name.toLowerCase()));
               if (matchesArt && cfg) {
                 if (Array.isArray(cfg?.seriesConfigs)) {
                   cfg.seriesConfigs.forEach(sc => {
@@ -2715,7 +2716,7 @@ export default function OrderDetailView({
       try {
         const stored = getStoredData('raindrop_fabrics_v1', null);
         if (Array.isArray(stored)) allFabrics = stored;
-      } catch (e) {}
+      } catch (e) { }
     }
     if (!allFabrics || allFabrics.length === 0) {
       allFabrics = procurementFabrics || [];
@@ -2992,10 +2993,10 @@ export default function OrderDetailView({
     const totalCost = activeRows.reduce((sum, r) => sum + r.totalCost, 0);
     const totalMetres = activeRows.reduce((sum, r) => sum + r.totalMetres, 0);
     const totalPcs = activeRows.reduce((sum, r) => sum + r.pcs, 0);
-    
+
     const hasMultipleWidths = rateCalculations.length > activeRows.length;
     let rec = "Greige sourcing path with in-house processing saves ~8.4% margin across standard widths. Optimal marker efficiency achieved with minimal cut wastage.";
-    
+
     if (hasMultipleWidths) {
       rec = "All available widths calculated: Wider widths (e.g. 58\") provide ~12-18% marker nesting efficiency over narrower widths (44\"), reducing total cut metres and lowering overall fabric cost per garment.";
     }
@@ -3095,7 +3096,7 @@ export default function OrderDetailView({
           window.dispatchEvent(new Event('storage'));
           window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
         }
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
   };
@@ -3120,7 +3121,7 @@ export default function OrderDetailView({
           window.dispatchEvent(new Event('storage'));
           window.dispatchEvent(new CustomEvent('erp_sales_order_updated', { detail: updatedOrder }));
         }
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
   };
@@ -3189,13 +3190,12 @@ export default function OrderDetailView({
                 {autoCapitalizeWords(order.styleName || 'Kurta')}
               </h3>
               <span
-                className={`badge border rounded-2 px-2.5 py-1 fw-medium d-inline-flex align-items-center gap-1.5 ${
-                  confirmed
+                className={`badge border rounded-2 px-2.5 py-1 fw-medium d-inline-flex align-items-center gap-1.5 ${confirmed
                     ? 'bg-success-subtle text-success border-success-subtle'
                     : (order.status === 'Draft' && !order.hasProceededToNextStep)
-                    ? 'bg-light text-secondary border-secondary-subtle'
-                    : 'bg-warning-subtle text-warning border-warning-subtle'
-                }`}
+                      ? 'bg-light text-secondary border-secondary-subtle'
+                      : 'bg-warning-subtle text-warning border-warning-subtle'
+                  }`}
                 style={{ fontSize: '12px' }}
               >
                 <i className={confirmed ? 'ti ti-check text-success' : (order.status === 'Draft' && !order.hasProceededToNextStep) ? 'ti ti-file-text text-muted' : 'ti ti-clock text-warning'} style={{ fontSize: '13px', lineHeight: 1 }}></i>
@@ -4046,15 +4046,15 @@ export default function OrderDetailView({
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Article</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Fabric</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Width<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(in)</span>
+                  Width<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(in)</span>
                 </th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Colour</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Dyed<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
+                  Dyed<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
                 </th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Shrink %</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Greige<br/><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
+                  Greige<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
                 </th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Pcs</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Dyed</th>
@@ -4117,9 +4117,8 @@ export default function OrderDetailView({
                             <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
                               <button
                                 type="button"
-                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
-                                  !isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                }`}
+                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${!isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                  }`}
                                 style={{
                                   fontSize: '11px',
                                   backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
@@ -4132,9 +4131,8 @@ export default function OrderDetailView({
                               </button>
                               <button
                                 type="button"
-                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
-                                  isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                }`}
+                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                  }`}
                                 style={{
                                   fontSize: '11px',
                                   backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
@@ -4927,9 +4925,8 @@ export default function OrderDetailView({
               <button
                 key={cat.id}
                 type="button"
-                className={`btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs ${
-                  isActive ? 'fw-bold' : ''
-                }`}
+                className={`btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs ${isActive ? 'fw-bold' : ''
+                  }`}
                 style={{
                   width: '100%',
                   height: '76px',

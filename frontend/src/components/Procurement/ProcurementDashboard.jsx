@@ -1239,6 +1239,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         ? qcData.issuePieces.map((p) => `Bale ${p.baleNo} - Piece ${p.pieceNo} (${p.status})`).join(', ')
         : (isWholeRejected ? 'Whole Shipment Rejected' : (isSentToAdmin ? 'Whole Shipment to Admin' : 'Defect Qty Held Back'));
 
+      const allQcPhotos = [
+        ...(qcData.photos || []),
+        ...Object.values(qcData.pieceInspections || {}).flatMap((p) => p?.photos || [])
+      ];
+      const uniqueQcPhotos = Array.from(new Map(allQcPhotos.map((p) => [p.url || p.name, p])).values());
+
       const newRej = {
         id: `REJ-${String(Math.floor(1000 + Math.random() * 9000))}`,
         sourceQcRef: qcData.id,
@@ -1253,6 +1259,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
         dateFlagged: new Date().toLocaleDateString('en-GB'),
         status: isWholeRejected ? 'In Pool' : 'Pending Admin Review',
         heldBackPieces: qcData.issuePieces || [],
+        photos: uniqueQcPhotos,
         actionDetails: null
       };
 
@@ -1600,6 +1607,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               transporters={transporters}
               purchaseOrders={purchaseOrders}
               qualityChecks={qualityChecks}
+              allGRNs={grns}
               onBack={() => {
                 setSelectedGRN(null);
                 setActiveGrnView('list');
@@ -1838,6 +1846,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
           {activeQcView === 'damaged' && (
             <DamagedItemDetailView
               damagedItem={selectedDamagedItem}
+              qualityChecks={qualityChecks}
               onBack={() => setActiveQcView('detail')}
               onResolveDecision={handleDamagedResolve}
             />

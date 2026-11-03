@@ -232,7 +232,8 @@ export default function QualityCheckList({
   const adminCount = expandedQcRecords.filter(
     (qc) =>
       (qc.qcStatus === 'Send for Admin Approval' ||
-      qc.qcStatus === 'Admin Approval') && !qc.adminDecision
+       qc.qcStatus === 'Admin Approval' ||
+       qc.qcStatus === 'Pending Admin Approval') && !qc.adminDecision
   ).length;
   const completedCount = expandedQcRecords.filter(
     (qc) =>
@@ -298,7 +299,8 @@ function parseDateForSort(d, id) {
     } else if (activeTabFilter === 'admin') {
       matchesTab =
         (qc.qcStatus === 'Send for Admin Approval' ||
-        qc.qcStatus === 'Admin Approval') && !qc.adminDecision;
+         qc.qcStatus === 'Admin Approval' ||
+         qc.qcStatus === 'Pending Admin Approval') && !qc.adminDecision;
     } else if (activeTabFilter === 'completed') {
       matchesTab =
         qc.qcStatus === 'OK' ||
@@ -551,7 +553,7 @@ function parseDateForSort(d, id) {
                           <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill">
                             Partial OK
                           </span>
-                        ) : d.status === 'Send for Admin Approval' || d.status === 'Admin Approval' ? (
+                        ) : d.status === 'Send for Admin Approval' || d.status === 'Admin Approval' || d.status === 'Pending Admin Approval' ? (
                           qc.adminDecision ? (
                             <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold">
                               Approved by Admin

@@ -154,6 +154,27 @@ export default function QualityCheckForm({
     return 'all';
   });
 
+  // Real Camera Capture States
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraTargetKey, setCameraTargetKey] = useState('shipment'); // 'shipment' or piece key like '0_0'
+  const [cameraError, setCameraError] = useState(null);
+  const videoRef = React.useRef(null);
+  const cameraStreamRef = React.useRef(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (isCameraActive && videoRef.current && cameraStreamRef.current) {
+      videoRef.current.srcObject = cameraStreamRef.current;
+    }
+  }, [isCameraActive]);
+
   const showToast = (message, type = 'success') => {
     setToastNotification({ message, type });
     setTimeout(() => {
@@ -418,70 +439,165 @@ export default function QualityCheckForm({
   };
 
 
-  const handlePiecePhotoUpload = (key, e) => {
-    const files = Array.from(e.target.files);
-    const newPhotos = files.map((f) => ({
-      name: f.name,
-      url: URL.createObjectURL(f),
-      time: new Date().toLocaleTimeString()
-    }));
-    setPieceInspections((prev) => {
-      const cur = prev[key] || { photos: [] };
-      return {
-        ...prev,
-        [key]: {
-          ...cur,
-          photos: [...(cur.photos || []), ...newPhotos]
-        }
-      };
-    });
-  };
-
-  const handlePieceSimulateCamera = (key) => {
-    const mockCameraPhoto = {
-      name: `Piece_Capture_${Date.now()}.jpg`,
-      url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500',
-      time: new Date().toLocaleTimeString()
-    };
-    setPieceInspections((prev) => {
-      const cur = prev[key] || { photos: [] };
-      return {
-        ...prev,
-        [key]: {
-          ...cur,
-          photos: [...(cur.photos || []), mockCameraPhoto]
-        }
-      };
-    });
-    showToast('Piece snapshot captured and attached!', 'success');
-  };
-
-  // Handle Photo upload simulation
+  // Photo Upload via FileReader (Base64 persists cleanly across reloads & admin reviews)
   const handlePhotoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newPhotos = files.map((f) => ({
-      name: f.name,
-      url: URL.createObjectURL(f),
-      time: new Date().toLocaleTimeString()
-    }));
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...prev.photos, ...newPhotos]
-    }));
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    files.forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const newPhoto = {
+          name: f.name,
+          url: ev.target.result,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setFormData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, newPhoto]
+        }));
+      };
+      reader.readAsDataURL(f);
+    });
+    e.target.value = '';
+    showToast(`${files.length} photo(s) attached`, 'success');
   };
 
-  // Open Camera simulation
-  const handleSimulateCamera = () => {
-    const mockCameraPhoto = {
-      name: `Camera_Capture_${Date.now()}.jpg`,
-      url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500',
-      time: new Date().toLocaleTimeString()
-    };
+  const handlePiecePhotoUpload = (key, e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    files.forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const newPhoto = {
+          name: f.name,
+          url: ev.target.result,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setPieceInspections((prev) => {
+          const cur = prev[key] || { photos: [] };
+          return {
+            ...prev,
+            [key]: {
+              ...cur,
+              photos: [...(cur.photos || []), newPhoto]
+            }
+          };
+        });
+      };
+      reader.readAsDataURL(f);
+    });
+    e.target.value = '';
+    showToast(`${files.length} piece photo(s) attached`, 'success');
+  };
+
+  // Remove Photo handlers (Cancel uploaded / captured photo)
+  const handleRemoveShipmentPhoto = (idxToRemove) => {
     setFormData((prev) => ({
       ...prev,
-      photos: [...prev.photos, mockCameraPhoto]
+      photos: prev.photos.filter((_, idx) => idx !== idxToRemove)
     }));
-    showToast('Camera snapshot captured and attached to QC record!', 'success');
+    showToast('Photo removed', 'info');
+  };
+
+  const handleRemovePiecePhoto = (pieceKey, idxToRemove) => {
+    setPieceInspections((prev) => {
+      const cur = prev[pieceKey] || { photos: [] };
+      return {
+        ...prev,
+        [pieceKey]: {
+          ...cur,
+          photos: (cur.photos || []).filter((_, idx) => idx !== idxToRemove)
+        }
+      };
+    });
+    showToast('Piece photo removed', 'info');
+  };
+
+  // Real Laptop Camera Stream & Capture
+  const handleOpenCamera = (targetKey = 'shipment') => {
+    setCameraTargetKey(targetKey);
+    setIsCameraActive(true);
+    setCameraError(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Webcam is not supported by your browser or environment. Please choose a file instead.');
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'environment'
+      }
+    })
+    .then((stream) => {
+      cameraStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    })
+    .catch((err) => {
+      console.warn('Camera error:', err);
+      setCameraError(
+        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+          ? 'Camera permission was denied. Please allow camera permissions in your browser bar, or choose an image file.'
+          : err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError'
+          ? 'No camera/webcam was detected on this laptop/device. Please upload an image file instead.'
+          : 'Unable to start camera. Please verify device permissions or upload an image file.'
+      );
+    });
+  };
+
+  const handleCloseCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraActive(false);
+    setCameraError(null);
+  };
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+
+    const nowStr = new Date().toISOString().replace(/[:.]/g, '-');
+    const newPhoto = {
+      name: `Camera_Capture_${nowStr.slice(0, 19)}.jpg`,
+      url: dataUrl,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    if (cameraTargetKey === 'shipment') {
+      setFormData((prev) => ({
+        ...prev,
+        photos: [...prev.photos, newPhoto]
+      }));
+      showToast('Camera photo attached to QC record!', 'success');
+    } else {
+      setPieceInspections((prev) => {
+        const cur = prev[cameraTargetKey] || { photos: [] };
+        return {
+          ...prev,
+          [cameraTargetKey]: {
+            ...cur,
+            photos: [...(cur.photos || []), newPhoto]
+          }
+        };
+      });
+      showToast('Piece camera snapshot captured and attached!', 'success');
+    }
+
+    handleCloseCamera();
   };
 
   // Calculation of Piece Split & Quality Quantities
@@ -611,8 +727,14 @@ export default function QualityCheckForm({
       finalHeldBackQty = totalReceivedMeters;
     }
 
+    // Requirement: Gather all photos from shipment and piece-level inspections
+    const piecePhotos = Object.values(pieceInspections || {}).flatMap((p) => p?.photos || []);
+    const allCombinedPhotos = [...(formData.photos || []), ...piecePhotos];
+    const uniquePhotos = Array.from(new Map(allCombinedPhotos.map((p) => [p.url || p.name, p])).values());
+
     const payload = {
       ...formData,
+      photos: uniquePhotos,
       inspectorName: (formData.inspectorName || '').replace(/(?:^|\s)\S/g, (c) => c.toUpperCase()).trim(),
       qcStatus: finalStatus,
       hasDiscrepancy: hasAnyMismatch,
@@ -941,7 +1063,8 @@ export default function QualityCheckForm({
                   type="button"
                   className="btn btn-sm text-white fs-12 d-flex align-items-center gap-1 shadow-2xs"
                   style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                  onClick={handleSimulateCamera}
+                  onClick={() => handleOpenCamera('shipment')}
+                  title="Open Camera to capture photo"
                 >
                   <i className="ti ti-camera"></i> Open Camera
                 </button>
@@ -952,14 +1075,37 @@ export default function QualityCheckForm({
                   {formData.photos.map((ph, idx) => (
                     <div
                       key={idx}
-                      className="position-relative border rounded-2 p-1 bg-white"
-                      style={{ width: '80px' }}
+                      className="position-relative border rounded-2 p-1 bg-white shadow-xs"
+                      style={{ width: '85px' }}
                     >
+                      {/* Cancel / Delete photo button */}
+                      <button
+                        type="button"
+                        className="btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                        style={{
+                          top: '-6px',
+                          right: '-6px',
+                          width: '20px',
+                          height: '20px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          lineHeight: 1,
+                          zIndex: 3,
+                          cursor: 'pointer'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveShipmentPhoto(idx);
+                        }}
+                        title="Cancel / Remove Photo"
+                      >
+                        &times;
+                      </button>
                       <img
                         src={ph.url}
                         alt={ph.name}
                         className="rounded-1 w-100"
-                        style={{ height: '60px', objectFit: 'cover' }}
+                        style={{ height: '65px', objectFit: 'cover' }}
                       />
                       <div
                         className="text-truncate fs-10 text-muted mt-1 text-center"
@@ -1328,7 +1474,7 @@ export default function QualityCheckForm({
                                   type="button"
                                   className="btn btn-primary btn-sm px-2 fs-11 d-flex align-items-center gap-1 text-white shadow-sm"
                                   style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                                  onClick={() => handlePieceSimulateCamera(pc.key)}
+                                  onClick={() => handleOpenCamera(pc.key)}
                                   title="Capture Camera Photo"
                                 >
                                   <i className="ti ti-camera"></i>
@@ -1354,12 +1500,35 @@ export default function QualityCheckForm({
                           {pieceData.photos && pieceData.photos.length > 0 && (
                             <div className="d-flex flex-wrap gap-2 pt-1">
                               {pieceData.photos.map((ph, phIdx) => (
-                                <div key={phIdx} className="border rounded-2 p-1 bg-white" style={{ width: '70px' }}>
+                                <div key={phIdx} className="position-relative border rounded-2 p-1 bg-white shadow-xs" style={{ width: '75px' }}>
+                                  {/* Cancel / Delete piece photo button */}
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                                    style={{
+                                      top: '-6px',
+                                      right: '-6px',
+                                      width: '18px',
+                                      height: '18px',
+                                      fontSize: '11px',
+                                      fontWeight: 'bold',
+                                      lineHeight: 1,
+                                      zIndex: 3,
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemovePiecePhoto(pc.key, phIdx);
+                                    }}
+                                    title="Cancel / Remove Photo"
+                                  >
+                                    &times;
+                                  </button>
                                   <img
                                     src={ph.url}
                                     alt={ph.name}
                                     className="rounded-1 w-100"
-                                    style={{ height: '50px', objectFit: 'cover' }}
+                                    style={{ height: '52px', objectFit: 'cover' }}
                                   />
                                   <div className="text-truncate fs-10 text-muted mt-1 text-center" title={ph.name}>
                                     {ph.name}
@@ -1611,6 +1780,110 @@ export default function QualityCheckForm({
                 >
                   Back to GRN
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REAL CAMERA CAPTURE MODAL */}
+      {isCameraActive && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.75)', zIndex: 1060 }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white">
+              <div className="modal-header border-bottom px-4 py-3 bg-light">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="p-1.5 rounded-circle bg-primary-subtle text-primary">
+                    <i className="ti ti-camera fs-18"></i>
+                  </span>
+                  <div>
+                    <h5 className="modal-title fw-bold text-dark fs-16 mb-0">
+                      Capture Photo via Camera
+                    </h5>
+                    <span className="text-muted fs-11">
+                      {cameraTargetKey === 'shipment' ? 'Whole Shipment Inspection Photo' : 'Piece-Level Inspection Photo'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseCamera}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body p-4 text-center">
+                {cameraError ? (
+                  <div className="p-4 bg-light rounded-3 border text-start">
+                    <div className="d-flex align-items-start gap-2.5 mb-3 text-warning-emphasis">
+                      <i className="ti ti-alert-triangle fs-22 flex-shrink-0 mt-0.5 text-warning"></i>
+                      <div>
+                        <h6 className="fw-bold mb-1 text-dark">Camera Access Not Available</h6>
+                        <p className="fs-13 text-secondary mb-0">{cameraError}</p>
+                      </div>
+                    </div>
+                    <div className="border-top pt-3 text-center">
+                      <label className="btn btn-primary btn-sm px-4 py-2 fs-13 rounded-3 text-white shadow-sm cursor-pointer">
+                        <i className="ti ti-upload me-1"></i> Choose File from Computer
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="d-none"
+                          onChange={(e) => {
+                            if (cameraTargetKey === 'shipment') {
+                              handlePhotoUpload(e);
+                            } else {
+                              handlePiecePhotoUpload(cameraTargetKey, e);
+                            }
+                            handleCloseCamera();
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="position-relative bg-dark rounded-3 overflow-hidden d-inline-block w-100 shadow-inner" style={{ minHeight: '340px' }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-100 rounded-3"
+                      style={{ maxHeight: '420px', objectFit: 'contain', background: '#000' }}
+                    />
+                    <div
+                      className="position-absolute bottom-0 start-0 end-0 p-2 text-center text-white-50 fs-11"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65), transparent)' }}
+                    >
+                      Point camera at the fabric or defect area, then click &ldquo;Capture Photo&rdquo;
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer border-top px-4 py-3 bg-light d-flex justify-content-between">
+                <button
+                  type="button"
+                  className="btn btn-white border px-3 py-2 fs-13 text-secondary rounded-3"
+                  onClick={handleCloseCamera}
+                >
+                  Cancel
+                </button>
+                {!cameraError && (
+                  <button
+                    type="button"
+                    className="btn btn-primary px-4 py-2 fs-13 rounded-3 text-white fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                    onClick={handleCapturePhoto}
+                  >
+                    <i className="ti ti-camera fs-16"></i>
+                    <span>Capture Photo</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

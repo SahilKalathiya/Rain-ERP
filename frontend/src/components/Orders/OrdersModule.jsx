@@ -122,6 +122,15 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
 
   const handleEditOrder = (order) => {
     setSelectedOrder(order);
+    if (order?.hasProceededToNextStep && order?.status === 'Draft') {
+      setViewMode('detail');
+      if (onNavigate) {
+        onNavigate(`/orders/${order.id}`, order);
+      } else if (typeof window !== 'undefined' && window.history?.pushState) {
+        window.history.pushState(null, '', `/react/orders/${order.id}`);
+      }
+      return;
+    }
     setViewMode('create');
     if (onNavigate) {
       onNavigate(`/orders/edit/${order.id}`, order);

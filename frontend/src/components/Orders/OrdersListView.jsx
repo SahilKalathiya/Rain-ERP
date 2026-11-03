@@ -123,15 +123,15 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
             </thead>
             <tbody>
               {filteredOrders.map((ord) => {
-                const isDraft = ord.status === 'Draft' && !ord.hasProceededToNextStep;
-                const isPending = ord.status === 'Pending Confirmation' || (ord.hasProceededToNextStep && ord.status !== 'Confirmed' && ord.status !== 'In Production' && ord.status !== 'Completed');
+                const isInitialDraft = ord.status === 'Draft' && !ord.hasProceededToNextStep;
+                const isPending = ord.status === 'Pending Confirmation';
                 const isConfirmed = ord.status === 'Confirmed' || ord.stage === 'Confirmed';
                 return (
                   <tr
                     key={ord.id}
                     style={{ cursor: 'pointer' }}
                     onClick={() => {
-                      if (isDraft) {
+                      if (isInitialDraft) {
                         onEditOrder(ord);
                       } else {
                         onViewOrder(ord);
@@ -167,7 +167,7 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
                     <td className="px-3 text-center">
                       <span
                         className={`badge px-2.5 py-1 rounded-pill fw-medium ${
-                          isDraft
+                          ord.status === 'Draft'
                             ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
                             : isPending
                             ? 'bg-warning-subtle text-warning border border-warning-subtle'
@@ -179,7 +179,7 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
                         }`}
                         style={{ fontSize: '12px' }}
                       >
-                        {isDraft && <i className="ti ti-file me-1 fs-11"></i>}
+                        {ord.status === 'Draft' && <i className="ti ti-file me-1 fs-11"></i>}
                         {isPending && <i className="ti ti-clock me-1 fs-11"></i>}
                         {isConfirmed && <i className="ti ti-check me-1 fs-11"></i>}
                         {ord.status || 'Confirmed'}
@@ -196,8 +196,14 @@ export default function OrdersListView({ orders: propOrders, onNewOrder, onViewO
                       {!isConfirmed && ord.status !== 'In Production' && ord.status !== 'Completed' ? (
                         <button
                           className="btn btn-sm btn-light text-primary fw-medium"
-                          title={isDraft ? "Edit Draft Order (Continue Editing)" : "Edit Order Configuration"}
-                          onClick={() => onEditOrder(ord)}
+                          title={isInitialDraft ? "Edit Draft Order (Continue Editing)" : "Edit Order Configuration"}
+                          onClick={() => {
+                            if (isInitialDraft) {
+                              onEditOrder(ord);
+                            } else {
+                              onViewOrder(ord);
+                            }
+                          }}
                         >
                           <i className="ti ti-edit"></i>
                         </button>
