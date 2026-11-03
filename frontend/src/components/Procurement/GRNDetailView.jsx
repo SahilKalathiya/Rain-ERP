@@ -233,12 +233,14 @@ export default function GRNDetailView({
     (q) => (q.qcStatus && q.qcStatus !== 'Pending') || ['In Progress', 'Completed', 'Approved', 'Rejected', 'Passed'].includes(q.status)
   );
 
-  const isQcSubmitted = Boolean(
+  const isDraftGRN = ['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(grn.status) || !grn.status;
+
+  const isQcSubmitted = !isDraftGRN && Boolean(
     grn.isSubmittedToQC === true ||
     ['Submitted to QC', 'QC In Progress', 'QC Approved', 'QC Passed', 'QC Rejected', 'Pending Admin Approval'].includes(grn.status)
-  ) && !['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(grn.status);
+  );
 
-  const isQcStarted = Boolean(
+  const isQcStarted = !isDraftGRN && Boolean(
     isQcPassedOrApproved ||
     (grn.isQcActioned && grn.status !== 'Completed' && grn.status !== 'Submitted to QC') ||
     (grn.qcStatus && grn.qcStatus !== 'Pending') ||
@@ -256,6 +258,39 @@ export default function GRNDetailView({
     const piecesArr = Array.isArray(b?.pieces) ? b.pieces : [];
     return sum + (piecesArr.length || Number(b?.piecesCount) || 0);
   }, 0) || Number(grn.totalPieces) || 0;
+
+  const poOrderedTotal = useMemo(() => {
+    if (linkedPO?.items && linkedPO.items.length > 0) {
+      return linkedPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    }
+    return Number(linkedPO?.totalQuantity || linkedPO?.quantity || 0);
+  }, [linkedPO]);
+
+  const targetTrackingMeters = poOrderedTotal > 0 ? poOrderedTotal : (declaredTotalQty > 0 ? declaredTotalQty : totalMeters);
+  const pendingTrackingMeters = Math.max(0, targetTrackingMeters - totalMeters);
+  const trackingPct = targetTrackingMeters > 0 ? Math.min(100, Math.round((totalMeters / targetTrackingMeters) * 100)) : (totalMeters > 0 ? 100 : 0);
+
+  // Calculate QC totals (Approved, Rejected, Pending)
+  const qcAwaitingInspectionMeters = useMemo(() => {
+    let approved = 0;
+    let rejected = 0;
+    qcRecs.forEach((q) => {
+      const qM = Number(q.totalReceivedMeters || q.receivedQty || 0);
+      if (q.qcStatus === 'Approved' || q.qcStatus === 'QC Approved' || q.qcStatus === 'OK' || q.qcStatus === 'Passed') {
+        approved += qM;
+      } else if (q.qcStatus === 'Reject' || q.qcStatus === 'Rejected') {
+        rejected += qM;
+      }
+    });
+    const pending = Math.max(0, totalMeters - approved - rejected);
+    return {
+      approvedMeters: approved,
+      rejectedMeters: rejected,
+      pendingMeters: pending > 0 ? pending : (totalMeters > 0 && approved === 0 ? totalMeters : 0),
+      isAllApproved: totalMeters > 0 && approved >= totalMeters,
+      isPartiallyDone: approved > 0 || rejected > 0
+    };
+  }, [qcRecs, totalMeters]);
 
   // Expected Width & Fold
   const expectedWidth = mainQC?.expectedWidth || linkedPO?.items?.[0]?.width || '42"';
@@ -477,8 +512,10 @@ export default function GRNDetailView({
 
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
           <div>
-            <h2 className="fw-bold text-dark mb-1 fs-24 d-flex align-items-center gap-2.5">
-              <span>{grn.id}</span>
+            <div className="d-flex align-items-center gap-2">
+              <h3 className="fw-bold text-dark mb-0 fs-20">
+                Goods Receipt Note: {grn.id}
+              </h3>
               <span
                 className={`badge px-2.5 py-1 fs-11 rounded-pill ${
                   grn.status === 'QC Approved'
@@ -496,14 +533,11 @@ export default function GRNDetailView({
                 <span className="badge bg-light text-secondary border px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1">
                   <i className="ti ti-lock text-warning"></i> Locked (Submitted to QC &mdash; Non-editable)
                 </span>
-              ) : (
-                <span className="badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-medium">
-                  <i className="ti ti-check me-1"></i> Editable (Draft)
-                </span>
-              )}
-            </h2>
-            <p className="text-secondary fs-13 mb-0">
-              Against <strong>{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</strong>
+              ) : null}
+            </div>
+            <p className="text-secondary mb-0 fs-13 mt-1">
+              Raw Material Fabric Procurement &mdash; Recording receipt against{' '}
+              <strong>{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</strong>
               {vendorDisplayName && vendorDisplayName !== '—' && (
                 <> · <span className="fw-semibold text-dark">{vendorDisplayName}</span></>
               )}
@@ -514,7 +548,7 @@ export default function GRNDetailView({
             {!isQcStarted ? (
               <button
                 type="button"
-                className="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-1.5 fw-semibold fs-13 rounded-2 shadow-sm text-white"
+                className="btn btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-white shadow-sm"
                 style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
                 onClick={() => {
                   if (onEditGRN) {
@@ -526,7 +560,7 @@ export default function GRNDetailView({
                 title="Edit entire GRN record and container bales"
               >
                 <i className="ti ti-edit fs-15"></i>
-                <span>Edit GRN</span>
+                <span>Edit Record</span>
               </button>
             ) : (
               <span className="badge bg-light text-secondary border px-3 py-2 fs-12 rounded-2 d-inline-flex align-items-center gap-1.5">
@@ -538,94 +572,276 @@ export default function GRNDetailView({
         </div>
       </div>
 
-      {/* CARD 1: Receipt details */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
-          <h5 className="fw-bold text-dark mb-0 fs-16">Receipt details</h5>
-          {canEditHeader ? (
+      {/* SECTION 1: HEADER & RECEIPT INFORMATION (Image 2 Style) */}
+      <div
+        className="card mb-4 shadow-none"
+        style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          padding: '16px 20px'
+        }}
+      >
+        <div className="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+          <span
+            className="fw-bold text-secondary text-uppercase"
+            style={{ fontSize: '12px', letterSpacing: '0.05em' }}
+          >
+            1. HEADER &amp; RECEIPT INFORMATION
+          </span>
+          {!isQcStarted && (
             <button
               type="button"
-              className="btn btn-outline-secondary btn-sm px-3 py-1 rounded-3 fs-12 fw-medium"
-              onClick={() => setShowEditHeaderModal(true)}
+              className="btn btn-link text-primary p-0 text-decoration-none fs-12 fw-semibold d-inline-flex align-items-center gap-1"
+              onClick={() => {
+                if (onEditGRN) onEditGRN(grn);
+                else if (onEditBales) onEditBales(grn);
+              }}
             >
-              <i className="ti ti-edit me-1"></i>
-              Edit
+              <i className="ti ti-edit fs-13"></i>
+              <span>Edit Section</span>
             </button>
+          )}
+        </div>
+
+        <div className="row g-3 fs-13">
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>GRN NO.</div>
+            <div className="fw-bold text-primary font-monospace fs-13">{grn.id}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>RECEIVED DATE *</div>
+            <div className="fw-bold text-dark fs-13">{grn.date || grn.receivedDate || '2026-11-03'}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>VENDOR *</div>
+            <div className="fw-bold text-dark fs-13 text-truncate" title={vendorDisplayName}>{vendorDisplayName}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>AGAINST PO</div>
+            <div className="fw-bold text-dark fs-13 font-monospace">{grn.linkedPOs && grn.linkedPOs.length > 1 ? grn.linkedPOs.join(', ') : (linkedPoId ? `${linkedPoId}` : 'Direct Inward')}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>VENDOR CHALLAN</div>
+            <div className="fw-bold text-dark fs-13">{grn.vendorChallanNo || grn.challan || '—'}</div>
+            {(grn.vendorChallanDate || grn.challanDate) && (
+              <div className="text-muted fs-11">{grn.vendorChallanDate || grn.challanDate}</div>
+            )}
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>VENDOR INVOICE</div>
+            <div className="fw-bold text-dark fs-13">{grn.vendorInvoiceNo || grn.invoice || '—'}</div>
+            {(grn.vendorInvoiceDate || grn.invoiceDate) && (
+              <div className="text-muted fs-11">{grn.vendorInvoiceDate || grn.invoiceDate}</div>
+            )}
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>TRANSPORTER</div>
+            <div className="fw-bold text-dark fs-13 text-truncate">{grn.transporterName || transporterObj?.name || '—'}</div>
+          </div>
+          <div className="col-6 col-sm-4 col-md-3">
+            <div className="text-secondary fs-11 text-uppercase fw-semibold mb-1" style={{ letterSpacing: '0.04em' }}>LR NO. / DATE</div>
+            <div className="fw-bold text-dark fs-13">{grn.lrNumber || grn.lrNo || '—'}</div>
+            {grn.lrDate && <div className="text-muted fs-11">{grn.lrDate}</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2: DELIVERY & SHIPMENT TRACKING (Image 2 Style with QC Status) */}
+      <div
+        className="card mb-4 shadow-none"
+        style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          padding: '16px 20px'
+        }}
+      >
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <div className="d-flex align-items-center gap-2">
+            <span
+              className="p-1 rounded d-inline-flex align-items-center justify-content-center"
+              style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', width: '28px', height: '28px' }}
+            >
+              <i className="ti ti-truck-delivery fs-16"></i>
+            </span>
+            <div>
+              <span
+                className="fw-bold text-secondary text-uppercase"
+                style={{ fontSize: '12px', letterSpacing: '0.05em' }}
+              >
+                DELIVERY &amp; SHIPMENT TRACKING
+              </span>
+              <div className="text-muted" style={{ fontSize: '11px' }}>
+                Goods Receipt Notes (GRN), Linked Consolidations &amp; Meter Fulfillment
+              </div>
+            </div>
+          </div>
+          {isDraftGRN ? (
+            <span className="badge bg-white text-secondary border px-3 py-1.5 fs-11 rounded-pill shadow-2xs">
+              Awaiting GRN Submission
+            </span>
           ) : (
-            <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
-              <i className="ti ti-lock fs-13 text-muted"></i>
-              <span>Locked (Submitted to QC &mdash; Non-editable)</span>
+            <span
+              className={`badge px-2.5 py-1 fs-11 rounded-pill ${
+                qcAwaitingInspectionMeters.isAllApproved
+                  ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                  : qcAwaitingInspectionMeters.isPartiallyDone
+                  ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                  : 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-50'
+              }`}
+            >
+              <i className={`ti ${qcAwaitingInspectionMeters.isAllApproved ? 'ti-check' : 'ti-clock'} me-1`}></i>
+              {qcAwaitingInspectionMeters.isAllApproved
+                ? 'QC Approved (100%)'
+                : qcAwaitingInspectionMeters.isPartiallyDone
+                ? 'QC In Progress'
+                : 'QC Pending'}
             </span>
           )}
         </div>
 
-        <div className="row g-4 fs-13">
-          <div className="col-6 col-sm-4 col-md-3">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR</div>
-            <div className="fw-bold text-dark fs-14 text-truncate" title={vendorDisplayName}>
-              {vendorDisplayName}
+        {/* Summary Stat Cards Grid */}
+        <div className="row g-2 text-center mb-3">
+          <div className="col-6 col-sm-4 col-md">
+            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+              <div className="text-secondary fs-11 fw-semibold mb-1">Total Ordered</div>
+              <div className="fw-bold text-dark fs-14">
+                {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()} m
+              </div>
             </div>
           </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">RECEIVED DATE</div>
-            <div className="fw-bold text-dark">{grn.date || grn.receivedDate || '2026-10-07'}</div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR CHALLAN</div>
-            <div className="fw-bold text-dark">
-              {grn.vendorChallanNo || grn.challan || '—'}
-              {(grn.vendorChallanDate || grn.challanDate) && (
-                <div className="text-muted fs-11 fw-normal">{grn.vendorChallanDate || grn.challanDate}</div>
+          <div className="col-6 col-sm-4 col-md">
+            <div
+              className="p-2.5 rounded bg-white border"
+              style={{
+                borderColor: isDraftGRN ? '#c7d2fe' : '#bbf7d0',
+                backgroundColor: isDraftGRN ? '#f5f3ff' : '#f0fdf4'
+              }}
+            >
+              <div
+                className="fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1"
+                style={{ color: isDraftGRN ? '#4f46e5' : '#15803d' }}
+              >
+                {isDraftGRN && <i className="ti ti-pencil fs-12"></i>}
+                <span>{isDraftGRN ? 'Draft Inward Qty' : 'Received (Inward)'}</span>
+              </div>
+              <div
+                className="fw-bold fs-14"
+                style={{ color: isDraftGRN ? '#4f46e5' : '#15803d' }}
+              >
+                {totalMeters.toLocaleString()} m
+              </div>
+              {isDraftGRN && (
+                <div className="text-muted" style={{ fontSize: '10px' }}>Unsubmitted Draft</div>
               )}
             </div>
           </div>
-          <div className="col-6 col-sm-4 col-md-3">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">VENDOR INVOICE</div>
-            <div className="fw-bold text-dark">
-              {grn.vendorInvoiceNo || grn.invoice || '—'}
-              {(grn.vendorInvoiceDate || grn.invoiceDate) && (
-                <div className="text-muted fs-11 fw-normal">{grn.vendorInvoiceDate || grn.invoiceDate}</div>
-              )}
-              {/* Invoice value removed per requirement */}
-            </div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TRANSPORTER</div>
-            <div className="fw-bold text-dark">{grn.transporterName || transporterObj?.name || 'Bhiwandi Roadlines'}</div>
-          </div>
-
-          <div className="col-6 col-sm-4 col-md-3">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">LR NO. / DATE</div>
-            <div className="fw-bold text-dark">
-              {grn.lrNumber || grn.lrNo || '—'}
-              {grn.lrDate && (
-                <div className="text-muted fs-11 fw-normal">{grn.lrDate}</div>
+          <div className="col-6 col-sm-4 col-md">
+            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+              <div className="text-secondary fs-11 fw-semibold mb-1">Pending to Inward</div>
+              <div className="fw-bold text-secondary fs-14">
+                {(pendingTrackingMeters > 0 ? pendingTrackingMeters : 0).toLocaleString()} m
+              </div>
+              {isDraftGRN && (
+                <div className="text-muted" style={{ fontSize: '10px' }}>After Submission</div>
               )}
             </div>
           </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">WEIGHT</div>
-            <div className="fw-bold text-dark">{grn.weightKg || grn.weight || '—'} kg</div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL QUANTITY</div>
-            <div className="fw-bold text-dark">
-              {(() => {
-                const dec = Number(grn.declaredTotalMeters) || Number(grn.totalQty) || 0;
-                const finalM = (totalMeters > 0 && (dec === 2000 || dec === 0)) ? totalMeters : (dec > 0 ? dec : totalMeters);
-                return `${Number(finalM).toLocaleString()}m`;
-              })()}
+          {!isDraftGRN && (
+            <>
+              <div className="col-6 col-sm-4 col-md">
+                <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#fde68a', backgroundColor: '#fffdf0' }}>
+                  <div className="text-warning-emphasis fs-11 fw-semibold mb-1 d-flex align-items-center justify-content-center gap-1">
+                    <i className="ti ti-clock text-warning"></i>
+                    <span>QC Pending</span>
+                  </div>
+                  <div className="fw-bold text-warning-emphasis fs-14">
+                    {qcAwaitingInspectionMeters.pendingMeters.toLocaleString()} m
+                  </div>
+                </div>
+              </div>
+              <div className="col-6 col-sm-4 col-md">
+                <div className="p-2.5 rounded bg-white border" style={{ borderColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#bbf7d0' : '#e2e8f0', backgroundColor: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#f0fdf4' : '#ffffff' }}>
+                  <div className="fs-11 fw-semibold mb-1" style={{ color: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#15803d' : '#64748b' }}>
+                    QC Approved
+                  </div>
+                  <div className="fw-bold fs-14" style={{ color: qcAwaitingInspectionMeters.approvedMeters > 0 ? '#15803d' : '#64748b' }}>
+                    {qcAwaitingInspectionMeters.approvedMeters.toLocaleString()} m
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+          <div className="col-6 col-sm-4 col-md">
+            <div className="p-2.5 rounded bg-white border" style={{ borderColor: '#e2e8f0' }}>
+              <div className="text-secondary fs-11 fw-semibold mb-1">
+                {isDraftGRN ? 'Total GRN Inwards' : 'Containers'}
+              </div>
+              <div className="fw-bold text-dark fs-14">
+                {bales.length || grn.totalBales || 1} Container(s)
+              </div>
+              {isDraftGRN && (
+                <div className="text-muted" style={{ fontSize: '10px' }}>Bales Entered</div>
+              )}
             </div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-2">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">NO. OF BALES</div>
-            <div className="fw-bold text-dark">{bales.length || grn.totalBales || 0}</div>
-          </div>
-          <div className="col-6 col-sm-4 col-md-3">
-            <div className="text-muted fs-11 text-uppercase fw-semibold mb-1">TOTAL PIECES</div>
-            <div className="fw-bold text-dark">{totalPiecesCount}</div>
           </div>
         </div>
+
+        {/* Inward vs QC Progress Summary */}
+        {isDraftGRN ? (
+          <div>
+            <div className="d-flex align-items-center justify-content-between fs-12 mb-1.5">
+              <span className="text-secondary fw-semibold">Draft Inward Allocation Progress:</span>
+              <span className="fw-bold text-dark">{trackingPct}% ({totalMeters.toLocaleString()}m in draft / {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()}m ordered)</span>
+            </div>
+            <div className="progress rounded-pill overflow-hidden" style={{ height: '7px', backgroundColor: '#e2e8f0' }}>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                style={{ width: `${Math.min(100, trackingPct)}%`, backgroundColor: '#5b47fb' }}
+              ></div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="d-flex flex-wrap align-items-center justify-content-between fs-12 mb-1.5 gap-2">
+              <div className="d-flex align-items-center gap-1.5">
+                <span className="text-secondary fw-semibold">Inward Delivery:</span>
+                <span className="fw-bold text-success">
+                  {trackingPct}% Received ({totalMeters.toLocaleString()}m / {(targetTrackingMeters > 0 ? targetTrackingMeters : totalMeters).toLocaleString()}m)
+                </span>
+              </div>
+              <div className="d-flex align-items-center gap-1.5">
+                <span className="text-secondary fw-semibold">Quality Inspection:</span>
+                <span className={`fw-bold ${qcAwaitingInspectionMeters.isAllApproved ? 'text-success' : 'text-warning-emphasis'}`}>
+                  <i className={`ti ${qcAwaitingInspectionMeters.isAllApproved ? 'ti-circle-check text-success' : 'ti-clock text-warning'} me-1`}></i>
+                  {qcAwaitingInspectionMeters.isAllApproved
+                    ? '100% QC Approved'
+                    : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m to inspect)`}
+                </span>
+              </div>
+            </div>
+            <div className="progress rounded-pill overflow-hidden" style={{ height: '7px', backgroundColor: '#e2e8f0' }}>
+              {qcAwaitingInspectionMeters.approvedMeters > 0 && (
+                <div
+                  className="progress-bar bg-success"
+                  role="progressbar"
+                  style={{ width: `${Math.round((qcAwaitingInspectionMeters.approvedMeters / targetTrackingMeters) * 100)}%` }}
+                  title={`QC Approved: ${qcAwaitingInspectionMeters.approvedMeters}m`}
+                ></div>
+              )}
+              {qcAwaitingInspectionMeters.pendingMeters > 0 && (
+                <div
+                  className="progress-bar bg-warning"
+                  role="progressbar"
+                  style={{ width: `${Math.round((qcAwaitingInspectionMeters.pendingMeters / targetTrackingMeters) * 100)}%` }}
+                  title={`QC Pending: ${qcAwaitingInspectionMeters.pendingMeters}m`}
+                ></div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Requirement 57: Multi-PO FIFO Delivery Breakdown Card */}
@@ -758,14 +974,17 @@ export default function GRNDetailView({
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
         <div className="card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between">
           <h5 className="fw-bold text-dark mb-0 fs-16">Bale-wise breakdown</h5>
-          {canEditBales && onEditBales ? (
+          {canEditBales ? (
             <button
               type="button"
-              className="btn btn-sm btn-primary px-3 py-1 text-white rounded-3 fs-12 fw-semibold"
-              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-              onClick={() => onEditBales(grn)}
+              className="btn btn-sm btn-link text-primary p-0 text-decoration-none fs-12 fw-semibold d-inline-flex align-items-center gap-1"
+              onClick={() => {
+                if (onEditGRN) onEditGRN(grn);
+                else if (onEditBales) onEditBales(grn);
+              }}
             >
-              <i className="ti ti-edit me-1"></i> Edit Bale Entries
+              <i className="ti ti-edit fs-13"></i>
+              <span>Edit Bale Entries</span>
             </button>
           ) : (
             <span className="badge bg-light text-secondary border px-3 py-1.5 fs-12 rounded-3 d-inline-flex align-items-center gap-1.5">
@@ -818,10 +1037,12 @@ export default function GRNDetailView({
                           className={`badge rounded-pill px-2.5 py-1 fs-11 ${
                             isQcLocked
                               ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                              : isDraftGRN
+                              ? 'bg-light text-secondary border'
                               : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
                           }`}
                         >
-                          {bale.qcStatus || (isQcLocked ? 'QC Approved' : 'Pending QC')}
+                          {bale.qcStatus || (isQcLocked ? 'QC Approved' : isDraftGRN ? 'Draft Entry' : 'Pending QC')}
                         </span>
                       </td>
                       <td className="pe-4 py-3 text-end">
@@ -845,8 +1066,9 @@ export default function GRNDetailView({
         </div>
       </div>
 
-      {/* CARD 3: Quality Check by Item (Clickable - Redirects to QC inspection) */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+      {/* SECTION 4: QUALITY CHECK BY ITEM (Only for Active / Received GRNs, NOT Drafts) */}
+      {!isDraftGRN && (
+        <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
         <div className="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
           <div className="d-flex align-items-center gap-2">
             <h5 className="fw-bold text-dark mb-0 fs-16">Quality check by item</h5>
@@ -856,12 +1078,24 @@ export default function GRNDetailView({
               </span>
             )}
           </div>
-          {!isBaleEntriesComplete && !isQcStarted && (
-            <span className="badge bg-warning-subtle text-dark border border-warning border-opacity-50 px-2.5 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1">
-              <i className="ti ti-alert-triangle text-warning"></i>
-              <span>QC Locked: Complete Bale Entries Required ({baleMetersEntered}m / {declaredTotalQty}m)</span>
+          <div className="d-flex align-items-center gap-2">
+            <span
+              className={`badge px-2.5 py-1 fs-11 rounded-pill ${
+                qcAwaitingInspectionMeters.isAllApproved
+                  ? 'bg-success-subtle text-success border border-success border-opacity-25'
+                  : qcAwaitingInspectionMeters.isPartiallyDone
+                  ? 'bg-info-subtle text-info border border-info border-opacity-25'
+                  : 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-50'
+              }`}
+            >
+              <i className={`ti ${qcAwaitingInspectionMeters.isAllApproved ? 'ti-check' : 'ti-clock'} me-1`}></i>
+              {qcAwaitingInspectionMeters.isAllApproved
+                ? 'QC Approved (100%)'
+                : qcAwaitingInspectionMeters.isPartiallyDone
+                ? 'QC In Progress'
+                : `QC Pending (${qcAwaitingInspectionMeters.pendingMeters.toLocaleString()}m)`}
             </span>
-          )}
+          </div>
         </div>
 
         <div className="d-flex flex-column gap-3">
@@ -955,10 +1189,10 @@ export default function GRNDetailView({
                         ? 'bg-danger-subtle text-danger border border-danger border-opacity-25'
                         : isItemAdmin
                         ? 'bg-warning-subtle text-warning-emphasis border border-warning'
-                        : 'bg-primary-subtle text-primary border border-primary border-opacity-25'
+                        : 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-50'
                     }`}
                   >
-                    {!isBaleEntriesComplete && !isQcStarted ? 'Incomplete Bales' : (item.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'Awaiting QC'))}
+                    {!isBaleEntriesComplete && !isQcStarted ? 'Incomplete Bales' : (item.qcStatus || (grn.status === 'QC Approved' ? 'Approved' : 'QC Pending'))}
                   </span>
                   <button
                     type="button"
@@ -987,6 +1221,33 @@ export default function GRNDetailView({
             );
           })}
         </div>
+      </div>
+      )}
+
+      {/* BOTTOM ACTION BUTTONS (Matches PO Detail Image 2) */}
+      <div className="d-flex flex-wrap align-items-center gap-3 pt-2 mb-5">
+        <button
+          type="button"
+          className="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold fs-13 text-white shadow-sm"
+          style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb', borderRadius: '8px', height: '42px' }}
+          onClick={() => {
+            if (onEditGRN) onEditGRN(grn);
+            else if (onEditBales) onEditBales(grn);
+          }}
+        >
+          <i className="ti ti-edit fs-15"></i>
+          <span>{isDraftGRN ? 'Resume / Edit Draft GRN' : 'Edit Record'}</span>
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-outline-secondary d-inline-flex align-items-center gap-2 px-4 py-2 fw-medium fs-13 shadow-sm bg-white"
+          style={{ borderColor: '#cbd5e1', borderRadius: '8px', height: '42px' }}
+          onClick={onBack}
+        >
+          <i className="ti ti-arrow-left fs-15"></i>
+          <span>Back to GRN Register</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}

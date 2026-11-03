@@ -239,9 +239,7 @@ export default function OrderDetailView({
     if (Array.isArray(order?.fabricConsumptions)) {
       const match = order.fabricConsumptions.find(fc => String(fc.articleName || fc.article || '').toLowerCase().trim() === artNameClean);
       if (match) {
-        const raw = match.bufferPercent !== undefined && match.bufferPercent !== null && match.bufferPercent !== ''
-          ? match.bufferPercent
-          : match.bufferPct;
+        const raw = match.maxBuffer ?? match.bufferPercent ?? match.bufferPct;
         if (raw !== undefined && raw !== null && raw !== '') {
           const val = parseFloat(raw);
           if (!isNaN(val) && val >= 0) return val;
@@ -253,25 +251,19 @@ export default function OrderDetailView({
     if (Array.isArray(order?.articles)) {
       const match = order.articles.find(a => String(a.name || a.articleName || '').toLowerCase().trim() === artNameClean);
       if (match) {
-        const raw = match.bufferPercent !== undefined && match.bufferPercent !== null && match.bufferPercent !== ''
-          ? match.bufferPercent
-          : match.bufferPct;
-        if (raw !== undefined && raw !== null && raw !== '') {
-          const val = parseFloat(raw);
-          if (!isNaN(val) && val >= 0) return val;
-        }
         if (Array.isArray(match.fabrics) && match.fabrics.length > 0) {
           for (const f of match.fabrics) {
-            const fBuf = f.bufferPercent !== undefined && f.bufferPercent !== null && f.bufferPercent !== ''
-              ? f.bufferPercent
-              : (f.bufferPct !== undefined && f.bufferPct !== null && f.bufferPct !== ''
-                  ? f.bufferPct
-                  : f.maxBuffer);
+            const fBuf = f.maxBuffer ?? f.bufferPercent ?? f.bufferPct;
             if (fBuf !== undefined && fBuf !== null && fBuf !== '') {
               const val = parseFloat(fBuf);
               if (!isNaN(val) && val >= 0) return val;
             }
           }
+        }
+        const raw = match.maxBuffer ?? match.bufferPercent ?? match.bufferPct;
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0) return val;
         }
       }
     }
@@ -304,9 +296,7 @@ export default function OrderDetailView({
       }
     }
 
-    // 4. Default fallback matching prototype mock
-    if (artNameClean.includes('pant')) return 8;
-    return 10;
+    return 2;
   };
 
   const matchesCategory = (itemCat, tabCat) => {
@@ -316,6 +306,72 @@ export default function OrderDetailView({
     const normItem = String(itemCat).toLowerCase().replace(/s$/, '');
     const normTab = String(tabCat).toLowerCase().replace(/s$/, '');
     return normItem === normTab;
+  };
+
+  // Sourced directly from Accessories Master (Maximum Buffer % configured per accessory)
+  const getAccessoryMasterBuffer = (item, currentArticle) => {
+    if (item?.maxBuffer !== undefined && item?.maxBuffer !== null && item?.maxBuffer !== '') {
+      const val = parseFloat(item.maxBuffer);
+      if (!isNaN(val) && val >= 0) return val;
+    }
+
+    const catName = String(item?.category || '').toLowerCase().trim();
+    const varName = String(item?.varietyName || item?.name || '').toLowerCase().trim();
+
+    if (Array.isArray(masterAccessories) && masterAccessories.length > 0) {
+      let matched = masterAccessories.find(m => {
+        const mCat = String(m.category || '').toLowerCase().trim();
+        const mName = String(m.name || '').toLowerCase().trim();
+        const catMatch = !catName || mCat === catName || matchesCategory(mCat, catName);
+        const nameMatch = mName && (mName === varName || varName.includes(mName) || mName.includes(varName));
+        return catMatch && nameMatch;
+      });
+
+      if (!matched) {
+        for (const m of masterAccessories) {
+          if (Array.isArray(m.varieties)) {
+            const vMatch = m.varieties.find(v => {
+              const vName = String(v?.name || '').toLowerCase().trim();
+              return vName && (vName === varName || varName.includes(vName) || vName.includes(varName));
+            });
+            if (vMatch) {
+              const vBuf = vMatch.maxBuffer ?? vMatch.bufferPct ?? vMatch.buffer;
+              if (vBuf !== undefined && vBuf !== null && vBuf !== '') {
+                const val = parseFloat(vBuf);
+                if (!isNaN(val) && val >= 0) return val;
+              }
+              matched = m;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!matched && varName) {
+        matched = masterAccessories.find(m => {
+          const mName = String(m.name || '').toLowerCase().trim();
+          return mName && (mName === varName || varName.includes(mName));
+        });
+      }
+
+      if (!matched && catName) {
+        matched = masterAccessories.find(m => {
+          const mCat = String(m.category || '').toLowerCase().trim();
+          return mCat && (mCat === catName || matchesCategory(mCat, catName));
+        });
+      }
+
+      if (matched) {
+        const raw = matched.maxBuffer ?? matched.bufferPercent ?? matched.bufferPct ?? matched.buffer;
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0) return val;
+        }
+      }
+    }
+
+    const fabBuf = getArticleFabricBuffer(currentArticle);
+    return (fabBuf !== undefined && fabBuf !== null && !isNaN(fabBuf)) ? fabBuf : 10;
   };
 
   const CATEGORY_METADATA = {
@@ -387,7 +443,8 @@ export default function OrderDetailView({
                 defaultPlacement: '',
                 defaultReqPerPc: '',
                 type: v.type || m.source || '',
-                unit: m.unit || meta.defaultUnit
+                unit: m.unit || meta.defaultUnit,
+                maxBuffer: v.maxBuffer !== undefined ? v.maxBuffer : m.maxBuffer
               });
             }
           });
@@ -412,7 +469,8 @@ export default function OrderDetailView({
               defaultPlacement: '',
               defaultReqPerPc: '',
               type: m.subType || m.source || '',
-              unit: m.unit || meta.defaultUnit
+              unit: m.unit || meta.defaultUnit,
+              maxBuffer: m.maxBuffer
             });
           }
         }
@@ -437,7 +495,8 @@ export default function OrderDetailView({
               defaultPlacement: '',
               defaultReqPerPc: '',
               type: m.subType || m.source || '',
-              unit: m.unit || meta.defaultUnit
+              unit: m.unit || meta.defaultUnit,
+              maxBuffer: m.maxBuffer
             });
           }
         }
@@ -470,7 +529,7 @@ export default function OrderDetailView({
             const rawSize = r.size || '';
             const rawReq = r.reqPerPiece ?? r.reqPerPc ?? '';
             const rawExtra = r.extraPerPack ?? '';
-            const defaultBuf = getArticleFabricBuffer(r.article || acc.article || 'Kurta');
+            const defaultBuf = getAccessoryMasterBuffer({ ...acc, ...r }, r.article || acc.article || 'Kurta');
             const hasUserEdited = r._userEditedBuffer === true;
             const resBuf = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
               ? r.bufferPct
@@ -499,7 +558,7 @@ export default function OrderDetailView({
           const rawSize = acc.size || '';
           const rawReq = acc.reqPerPiece ?? acc.reqPerPc ?? '';
           const rawExtra = acc.extraPerPack ?? '';
-          const defaultBuf = getArticleFabricBuffer(acc.article || 'Kurta');
+          const defaultBuf = getAccessoryMasterBuffer(acc, acc.article || 'Kurta');
           const hasUserEdited = acc._userEditedBuffer === true;
           const resBuf = (acc.bufferPct !== undefined && acc.bufferPct !== null && acc.bufferPct !== '' && (hasUserEdited || parseFloat(acc.bufferPct) > 0))
             ? acc.bufferPct
@@ -781,7 +840,7 @@ export default function OrderDetailView({
     const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
     const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
-    const defaultBuffer = getArticleFabricBuffer(articleName);
+    const defaultBuffer = getAccessoryMasterBuffer(item, articleName);
 
     if (item.articleRows && Array.isArray(item.articleRows[articleName]) && item.articleRows[articleName].length > 0) {
       // Deduplicate rows according to article color (eliminating duplicates caused by multiple fabrics)
@@ -849,8 +908,8 @@ export default function OrderDetailView({
       if (value !== '' && value !== null && value !== undefined) {
         const num = parseFloat(value);
         if (!isNaN(num)) {
-          if (num > 10) {
-            finalValue = '10';
+          if (num > 100) {
+            finalValue = '100';
           } else if (num < 0) {
             finalValue = '0';
           } else {
@@ -993,7 +1052,7 @@ export default function OrderDetailView({
       const initialArticleRows = {};
       orderArticles.forEach(art => {
         const colorOpts = getArticleColorOptions(art.name);
-        const defaultBuffer = getArticleFabricBuffer(art.name);
+        const defaultBuffer = getAccessoryMasterBuffer({ category: catId, varietyName: resolvedVarName, ...varObj }, art.name);
         initialArticleRows[art.name] = colorOpts.map((co, cIdx) => ({
           id: `row_${art.name}_${cIdx}`,
           articleColor: co.display,
@@ -1031,7 +1090,7 @@ export default function OrderDetailView({
         fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
-        bufferPct: getArticleFabricBuffer(targetArticle),
+        bufferPct: getAccessoryMasterBuffer({ category: catId, varietyName: resolvedVarName, ...varObj }, targetArticle),
         total: '0.0'
       });
 
@@ -1304,7 +1363,7 @@ export default function OrderDetailView({
                   const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
                   const packNum = parseFloat(packInput);
                   const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
-                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
                   const hasUserEdited = row._userEditedBuffer === true;
                   const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
                     ? (parseFloat(row.bufferPct) || 0)
@@ -1507,7 +1566,7 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max={defaultBuf || 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
                               value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
@@ -1520,7 +1579,7 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -1577,7 +1636,7 @@ export default function OrderDetailView({
                   const dyedVal = parseFloat(row.dyedRate) || 0;
                   const shrinkVal = parseFloat(row.shrinkPct) || 0;
                   const greigeVal = dyedVal * (1 + shrinkVal / 100);
-                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
                   const hasUserEdited = row._userEditedBuffer === true;
                   const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
                     ? (parseFloat(row.bufferPct) || 0)
@@ -1658,7 +1717,7 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max={defaultBuf || 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
                               value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
@@ -1671,7 +1730,7 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -1727,7 +1786,7 @@ export default function OrderDetailView({
                 return rows.map((row, rIdx) => {
                   const isAllColours = row.articleColor === 'All colours';
                   const reqVal = parseFloat(row.reqPerPc) || 0;
-                  const defaultBuf = getArticleFabricBuffer(currentArticle);
+                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
                   const hasUserEdited = row._userEditedBuffer === true;
                   const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
                     ? (parseFloat(row.bufferPct) || 0)
@@ -1825,7 +1884,7 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max={defaultBuf || 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
                               value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
@@ -1838,7 +1897,7 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -1892,7 +1951,7 @@ export default function OrderDetailView({
               return rows.map((row, rIdx) => {
                 const isAllColours = row.articleColor === 'All colours';
                 const reqVal = parseFloat(row.reqPerPc) || 0;
-                const defaultBuf = getArticleFabricBuffer(currentArticle);
+                const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
                 const hasUserEdited = row._userEditedBuffer === true;
                 const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
                   ? (parseFloat(row.bufferPct) || 0)
@@ -2011,7 +2070,7 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max={defaultBuf || 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
                               value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
@@ -2024,7 +2083,7 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max 10</span>
+                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -2198,7 +2257,7 @@ export default function OrderDetailView({
 
         const masterShrink = getFabricMasterShrinkage(fabQuality);
         const shrink = masterShrink;
-        const buf = parseFloat(fc.bufferPercent || fc.bufferPct || artFab.bufferPercent || 10);
+        const buf = parseFloat(fc.maxBuffer || fc.bufferPercent || fc.bufferPct || artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
 
         const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
         const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
@@ -2334,7 +2393,7 @@ export default function OrderDetailView({
 
         const masterShrink = getFabricMasterShrinkage(fabName);
         const shrinkVal = masterShrink;
-        const bufferVal = parseFloat(artFab.bufferPercent || 10);
+        const bufferVal = parseFloat(artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
         const defaultDyed = (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' && artFab.consumption !== 1.5 && artFab.consumption !== '1.5') 
           ? artFab.consumption 
           : (art.consumption !== undefined && art.consumption !== null && art.consumption !== '' && art.consumption !== 1.5 && art.consumption !== '1.5' ? art.consumption : '');
@@ -2568,6 +2627,7 @@ export default function OrderDetailView({
     const updatedOrder = {
       ...order,
       fabricConsumptions: consumptionRows,
+      accessories: addedAccessories,
       totalFabricGreige: parseFloat(totalGreigeCalculated.toFixed(1)) || order.totalFabricGreige || 0,
       totalFabricDyed: parseFloat(totalDyedCalculated.toFixed(1)) || order.totalFabricDyed || 0,
       articleSourcing
@@ -2602,6 +2662,7 @@ export default function OrderDetailView({
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
       setConsumptionRows([...order.fabricConsumptions]);
     }
+    setIsConsumptionEditing(false);
     setShowRateCalculation(false);
     setToastMessage('Changes cancelled.');
     setShowToast(true);
@@ -3998,7 +4059,9 @@ export default function OrderDetailView({
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Pcs</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Dyed</th>
                 <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Greige</th>
-                <th style={{ width: '40px', padding: '12px 6px', textAlign: 'center' }}></th>
+                {isConsumptionEditing && (
+                  <th style={{ width: '40px', padding: '12px 6px', textAlign: 'center' }}></th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -4050,38 +4113,52 @@ export default function OrderDetailView({
                           </div>
 
                           {/* Toggle Buttons: [ Greige ] [ Dyed ] */}
-                          <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
-                            <button
-                              type="button"
-                              className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
-                                !isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                              }`}
+                          {isConsumptionEditing ? (
+                            <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
+                              <button
+                                type="button"
+                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
+                                  !isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                }`}
+                                style={{
+                                  fontSize: '11px',
+                                  backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
+                                  border: 'none'
+                                }}
+                                onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality, group.role)}
+                                title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
+                              >
+                                Greige
+                              </button>
+                              <button
+                                type="button"
+                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
+                                  isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                }`}
+                                style={{
+                                  fontSize: '11px',
+                                  backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
+                                  border: 'none'
+                                }}
+                                onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality, group.role)}
+                                title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
+                              >
+                                Dyed
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              className="badge px-2.5 py-1 rounded-2 fw-semibold"
                               style={{
                                 fontSize: '11px',
-                                backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
-                                border: 'none'
+                                backgroundColor: isDyedSourced ? '#e0f2fe' : '#eef2ff',
+                                color: isDyedSourced ? '#0284c7' : '#4361ee',
+                                border: isDyedSourced ? '1px solid #bae6fd' : '1px solid #c7d2fe'
                               }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality, group.role)}
-                              title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
                             >
-                              Greige
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${
-                                isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                              }`}
-                              style={{
-                                fontSize: '11px',
-                                backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
-                                border: 'none'
-                              }}
-                              onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality, group.role)}
-                              title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
-                            >
-                              Dyed
-                            </button>
-                          </div>
+                              {isDyedSourced ? 'Dyed' : 'Greige'}
+                            </span>
+                          )}
                         </td>
                       )}
 
@@ -4119,120 +4196,136 @@ export default function OrderDetailView({
                             borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          <div className="position-relative d-inline-block">
-                            <button
-                              type="button"
-                              className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1.5 fw-semibold transition-all shadow-none"
-                              style={{
-                                minWidth: '66px',
-                                height: '30px',
-                                padding: '2px 8px',
-                                fontSize: '12.5px',
-                                fontWeight: 600,
-                                color: group.width && group.width !== '—' ? '#4361ee' : '#64748b',
-                                backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#ffffff',
-                                border: activeWidthDropdown === group.key
-                                  ? '1.5px solid #4361ee'
-                                  : (group.width && group.width !== '—' ? '1.5px solid #c7d2fe' : '1.5px solid #cbd5e1'),
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                boxShadow: activeWidthDropdown === group.key
-                                  ? '0 0 0 3px rgba(67, 97, 238, 0.15)'
-                                  : 'none'
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveWidthDropdown(activeWidthDropdown === group.key ? null : group.key);
-                              }}
-                              title="Select fabric width from Fabric Master"
-                            >
-                              <span>{group.width || '—'}</span>
-                              <i
-                                className={`ti ti-chevron-${activeWidthDropdown === group.key ? 'up' : 'down'}`}
-                                style={{ fontSize: '11px', color: '#4361ee', transition: 'transform 0.15s ease' }}
-                              ></i>
-                            </button>
-
-                            {activeWidthDropdown === group.key && (
-                              <div
-                                className="position-absolute bg-white rounded-3 border py-1 animate__animated animate__fadeIn"
+                          {isConsumptionEditing ? (
+                            <div className="position-relative d-inline-block">
+                              <button
+                                type="button"
+                                className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1.5 fw-semibold transition-all shadow-none"
                                 style={{
-                                  top: 'calc(100% + 4px)',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
-                                  zIndex: 1060,
-                                  minWidth: '95px',
-                                  borderColor: '#c7d2fe',
-                                  boxShadow: '0 10px 25px -5px rgba(67, 97, 238, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.06)',
-                                  borderRadius: '8px'
+                                  minWidth: '66px',
+                                  height: '30px',
+                                  padding: '2px 8px',
+                                  fontSize: '12.5px',
+                                  fontWeight: 600,
+                                  color: group.width && group.width !== '—' ? '#4361ee' : '#64748b',
+                                  backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#ffffff',
+                                  border: activeWidthDropdown === group.key
+                                    ? '1.5px solid #4361ee'
+                                    : (group.width && group.width !== '—' ? '1.5px solid #c7d2fe' : '1.5px solid #cbd5e1'),
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  boxShadow: activeWidthDropdown === group.key
+                                    ? '0 0 0 3px rgba(67, 97, 238, 0.15)'
+                                    : 'none'
                                 }}
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveWidthDropdown(activeWidthDropdown === group.key ? null : group.key);
+                                }}
+                                title="Select fabric width from Fabric Master"
                               >
+                                <span>{group.width || '—'}</span>
+                                <i
+                                  className={`ti ti-chevron-${activeWidthDropdown === group.key ? 'up' : 'down'}`}
+                                  style={{ fontSize: '11px', color: '#4361ee', transition: 'transform 0.15s ease' }}
+                                ></i>
+                              </button>
+
+                              {activeWidthDropdown === group.key && (
                                 <div
-                                  className="px-2.5 py-1 border-bottom mb-1 fw-bold"
-                                  style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6366f1' }}
-                                >
-                                  Fabric Width
-                                </div>
-                                <button
-                                  type="button"
-                                  className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
+                                  className="position-absolute bg-white rounded-3 border py-1 animate__animated animate__fadeIn"
                                   style={{
-                                    fontSize: '12.5px',
-                                    color: (!group.width || group.width === '—') ? '#4361ee' : '#64748b',
-                                    backgroundColor: (!group.width || group.width === '—') ? '#eef2ff' : 'transparent',
-                                    cursor: 'pointer'
+                                    top: 'calc(100% + 4px)',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    zIndex: 1060,
+                                    minWidth: '95px',
+                                    borderColor: '#c7d2fe',
+                                    boxShadow: '0 10px 25px -5px rgba(67, 97, 238, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.06)',
+                                    borderRadius: '8px'
                                   }}
-                                  onMouseEnter={(e) => {
-                                    if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = '#f8fafc';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
-                                  }}
-                                  onClick={() => {
-                                    handleUpdateArticleWidth(group.articleName, '', group.fabricQuality, group.role);
-                                    setActiveWidthDropdown(null);
-                                  }}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <span>—</span>
-                                  {(!group.width || group.width === '—') && (
-                                    <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
-                                  )}
-                                </button>
-                                {widthOptions.map((w) => {
-                                  const isSelected = group.width === w;
-                                  return (
-                                    <button
-                                      key={w}
-                                      type="button"
-                                      className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
-                                      style={{
-                                        fontSize: '12.5px',
-                                        color: isSelected ? '#4361ee' : '#334155',
-                                        backgroundColor: isSelected ? '#eef2ff' : 'transparent',
-                                        cursor: 'pointer'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                                      }}
-                                      onClick={() => {
-                                        handleUpdateArticleWidth(group.articleName, w, group.fabricQuality, group.role);
-                                        setActiveWidthDropdown(null);
-                                      }}
-                                    >
-                                      <span>{w}</span>
-                                      {isSelected && (
-                                        <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
+                                  <div
+                                    className="px-2.5 py-1 border-bottom mb-1 fw-bold"
+                                    style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6366f1' }}
+                                  >
+                                    Fabric Width
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
+                                    style={{
+                                      fontSize: '12.5px',
+                                      color: (!group.width || group.width === '—') ? '#4361ee' : '#64748b',
+                                      backgroundColor: (!group.width || group.width === '—') ? '#eef2ff' : 'transparent',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = '#f8fafc';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                    onClick={() => {
+                                      handleUpdateArticleWidth(group.articleName, '', group.fabricQuality, group.role);
+                                      setActiveWidthDropdown(null);
+                                    }}
+                                  >
+                                    <span>—</span>
+                                    {(!group.width || group.width === '—') && (
+                                      <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
+                                    )}
+                                  </button>
+                                  {widthOptions.map((w) => {
+                                    const isSelected = group.width === w;
+                                    return (
+                                      <button
+                                        key={w}
+                                        type="button"
+                                        className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
+                                        style={{
+                                          fontSize: '12.5px',
+                                          color: isSelected ? '#4361ee' : '#334155',
+                                          backgroundColor: isSelected ? '#eef2ff' : 'transparent',
+                                          cursor: 'pointer'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                        }}
+                                        onClick={() => {
+                                          handleUpdateArticleWidth(group.articleName, w, group.fabricQuality, group.role);
+                                          setActiveWidthDropdown(null);
+                                        }}
+                                      >
+                                        <span>{w}</span>
+                                        {isSelected && (
+                                          <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span
+                              className="badge fw-semibold font-monospace"
+                              style={{
+                                fontSize: '12px',
+                                padding: '4px 8px',
+                                color: group.width && group.width !== '—' ? '#4361ee' : '#94a3b8',
+                                backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#f1f5f9',
+                                border: '1px solid',
+                                borderColor: group.width && group.width !== '—' ? '#c7d2fe' : '#e2e8f0'
+                              }}
+                            >
+                              {group.width || '—'}
+                            </span>
+                          )}
                         </td>
                       )}
 
@@ -4266,35 +4359,43 @@ export default function OrderDetailView({
                             borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            className="form-control form-control-sm text-center font-monospace"
-                            style={{
-                              width: '78px',
-                              height: '32px',
-                              margin: '0 auto',
-                              border: '1.5px solid #cbd5e1',
-                              backgroundColor: '#ffffff',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#1e293b',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onFocus={(e) => {
-                              e.currentTarget.style.borderColor = '#4361ee';
-                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(67, 97, 238, 0.15)';
-                            }}
-                            onBlur={(e) => {
-                              e.currentTarget.style.borderColor = '#cbd5e1';
-                              e.currentTarget.style.boxShadow = 'none';
-                            }}
-                            placeholder="0.000"
-                            value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
-                            onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality, group.role)}
-                          />
+                          {isConsumptionEditing ? (
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              className="form-control form-control-sm text-center font-monospace"
+                              style={{
+                                width: '78px',
+                                height: '32px',
+                                margin: '0 auto',
+                                border: '1.5px solid #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: '#1e293b',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#4361ee';
+                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(67, 97, 238, 0.15)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                              placeholder="0.000"
+                              value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
+                              onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality, group.role)}
+                            />
+                          ) : (
+                            <span className="font-monospace fw-bold text-dark fs-13">
+                              {group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' && parseFloat(group.dyedRate) > 0
+                                ? parseFloat(group.dyedRate).toFixed(3)
+                                : '—'}
+                            </span>
+                          )}
                         </td>
                       )}
 
@@ -4377,23 +4478,25 @@ export default function OrderDetailView({
                       </td>
 
                       {/* ACTION (Delete row) */}
-                      <td
-                        style={{
-                          padding: '8px 6px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-icon p-1 text-danger border-0 bg-transparent rounded"
-                          style={{ width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                          onClick={() => handleDeleteConsumptionRow(row.key, row.originalIndex)}
-                          title="Remove this fabric colour row"
+                      {isConsumptionEditing && (
+                        <td
+                          style={{
+                            padding: '8px 6px',
+                            textAlign: 'center',
+                            borderBottom: '1px solid #f1f5f9'
+                          }}
                         >
-                          <i className="ti ti-trash" style={{ fontSize: '15px' }}></i>
-                        </button>
-                      </td>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-icon p-1 text-danger border-0 bg-transparent rounded"
+                            style={{ width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => handleDeleteConsumptionRow(row.key, row.originalIndex)}
+                            title="Remove this fabric colour row"
+                          >
+                            <i className="ti ti-trash" style={{ fontSize: '15px' }}></i>
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 });
@@ -4447,7 +4550,9 @@ export default function OrderDetailView({
                   >
                     {fs.hasValues && fs.totalGreige > 0 ? fs.totalGreige.toFixed(2) : '—'}
                   </td>
-                  <td style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}></td>
+                  {isConsumptionEditing && (
+                    <td style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}></td>
+                  )}
                 </tr>
               ))}
 
@@ -4489,7 +4594,9 @@ export default function OrderDetailView({
                       ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0).toFixed(2)
                       : '—'}
                   </td>
-                  <td style={{ backgroundColor: '#f1f5f9' }}></td>
+                  {isConsumptionEditing && (
+                    <td style={{ backgroundColor: '#f1f5f9' }}></td>
+                  )}
                 </tr>
               )}
             </tbody>
@@ -4501,43 +4608,83 @@ export default function OrderDetailView({
           className="d-flex align-items-center justify-content-end gap-2.5 p-3 px-4 bg-white"
           style={{ borderTop: '1px solid #f1f5f9' }}
         >
-          <button
-            type="button"
-            className="btn btn-outline-secondary px-3.5 py-2 rounded-3 fw-semibold bg-white shadow-xs transition-all"
-            style={{ borderColor: '#cbd5e1', color: '#475569', fontSize: '13px' }}
-            onClick={handleCancelConsumption}
-          >
-            Cancel
-          </button>
+          {isConsumptionEditing ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline-secondary px-3.5 py-2 rounded-3 fw-semibold bg-white shadow-xs transition-all"
+                style={{ borderColor: '#cbd5e1', color: '#475569', fontSize: '13px' }}
+                onClick={() => {
+                  handleCancelConsumption();
+                  setIsConsumptionEditing(false);
+                }}
+              >
+                Cancel
+              </button>
 
-          <button
-            type="button"
-            className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
-            style={{
-              backgroundColor: '#eef2ff',
-              borderColor: '#c7d2fe',
-              fontSize: '13px'
-            }}
-            onClick={() => setShowRateCalculation(prev => !prev)}
-            title="Calculate Rate & View Costing Breakdown"
-          >
-            <i className="ti ti-calculator fs-5"></i>
-            <span>Calculate Rate</span>
-          </button>
+              <button
+                type="button"
+                className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
+                style={{
+                  backgroundColor: '#eef2ff',
+                  borderColor: '#c7d2fe',
+                  fontSize: '13px'
+                }}
+                onClick={() => setShowRateCalculation(prev => !prev)}
+                title="Calculate Rate & View Costing Breakdown"
+              >
+                <i className="ti ti-calculator fs-5"></i>
+                <span>Calculate Rate</span>
+              </button>
 
-          <button
-            type="button"
-            className="btn px-4 py-2 rounded-3 fw-semibold text-white shadow-sm d-flex align-items-center gap-2 transition-all"
-            style={{
-              backgroundColor: '#2e37a4',
-              borderColor: '#2e37a4',
-              fontSize: '13px'
-            }}
-            onClick={handleSaveConsumption}
-          >
-            <i className="ti ti-device-floppy fs-5"></i>
-            <span>Save</span>
-          </button>
+              <button
+                type="button"
+                className="btn px-4 py-2 rounded-3 fw-semibold text-white shadow-sm d-flex align-items-center gap-2 transition-all"
+                style={{
+                  backgroundColor: '#2e37a4',
+                  borderColor: '#2e37a4',
+                  fontSize: '13px'
+                }}
+                onClick={handleSaveConsumption}
+              >
+                <i className="ti ti-device-floppy fs-5"></i>
+                <span>Save</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
+                style={{
+                  backgroundColor: '#eef2ff',
+                  borderColor: '#c7d2fe',
+                  fontSize: '13px'
+                }}
+                onClick={() => setShowRateCalculation(prev => !prev)}
+                title="Calculate Rate & View Costing Breakdown"
+              >
+                <i className="ti ti-calculator fs-5"></i>
+                <span>Calculate Rate</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-sm rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs transition-all"
+                style={{
+                  color: '#7c3aed',
+                  borderColor: '#c4b5fd',
+                  backgroundColor: '#ffffff',
+                  fontSize: '13px'
+                }}
+                onClick={() => setIsConsumptionEditing(true)}
+                title="Edit Fabric Colour & Consumption"
+              >
+                <i className="ti ti-edit fs-5"></i>
+                <span>Edit</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Section 8 Intelligent Costing & Rate Calculation Breakdown */}

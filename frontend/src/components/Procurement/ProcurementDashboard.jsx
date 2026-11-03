@@ -1558,7 +1558,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActiveGrnView('detail');
               }}
               onEditGRN={(g) => {
-                const isLocked = Boolean(
+                const isDraft = ['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(g.status) || !g.status;
+                const isLocked = !isDraft && Boolean(
                   g.isQcActioned ||
                   (g.qcStatus && g.qcStatus !== 'Pending') ||
                   ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(g.status) ||
@@ -1604,7 +1605,8 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
                 setActiveGrnView('list');
               }}
               onEditGRN={(g) => {
-                const isLocked = Boolean(
+                const isDraft = ['Draft', 'Bale Entry in Progress', 'Header Saved'].includes(g.status) || !g.status;
+                const isLocked = !isDraft && Boolean(
                   g.isQcActioned ||
                   (g.qcStatus && g.qcStatus !== 'Pending') ||
                   ['QC Approved', 'QC Rejected', 'QC Passed', 'QC In Progress', 'Pending Admin Approval'].includes(g.status) ||
