@@ -20,7 +20,7 @@ import ColorMasterView from './ColorMasterView';
 import TransporterMasterView from './TransporterMasterView';
 import ThreadMasterView from './ThreadMasterView';
 import ActivityHistoryModal from './ActivityHistoryModal';
-import { getMetersForPoFromGrn, calculateFifoPoAllocations } from '../../utils/procurementUtils';
+import { getMetersForPoFromGrn, calculateFifoPoAllocations, getPoEffectiveOrderedMeters } from '../../utils/procurementUtils';
 
 // Seed Data
 import {
@@ -664,14 +664,12 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       )
     );
 
-    const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const orderedMeters = getPoEffectiveOrderedMeters(po);
     const alreadyReceived = existingGrnsForPo.reduce(
       (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
       0
     );
-    const pendingMeters = po.pendingQtyToReceive !== undefined
-      ? Number(po.pendingQtyToReceive)
-      : Math.max(0, orderedMeters - alreadyReceived);
+    const pendingMeters = Math.max(0, orderedMeters - alreadyReceived);
 
     // If PO is already 100% fulfilled, block further GRN creation
     if ((orderedMeters > 0 && pendingMeters <= 0) || po.status === 'Completed') {
@@ -767,7 +765,7 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
       targetLinkedPoIds.forEach((linkedPoId) => {
         const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
         if (targetPo) {
-          const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          const poOrderedMeters = getPoEffectiveOrderedMeters(targetPo);
           const allGrnsForPo = updated.filter((g) => g && (
             (g.linkedPOs && g.linkedPOs.includes(linkedPoId)) ||
             g.poId === linkedPoId

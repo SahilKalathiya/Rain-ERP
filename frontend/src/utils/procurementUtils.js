@@ -15,6 +15,32 @@
  */
 
 /**
+ * Helper to compute effective ordered meters for a PO, incorporating buffer tolerance (+%) if allowed.
+ * e.g. 1,000m ordered with 5% buffer -> 1,050m.
+ * Without buffer or if buffer is 0% -> exactly 1,000m.
+ */
+export function getPoEffectiveOrderedMeters(po) {
+  if (!po) return 0;
+  const base = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+  if (po.bufferAllowed && Number(po.bufferPercent) > 0) {
+    return Math.round(base * (1 + Number(po.bufferPercent) / 100) * 100) / 100;
+  }
+  return base;
+}
+
+/**
+ * Helper to compute effective ordered quantity for an individual PO line item.
+ */
+export function getPoItemEffectiveQty(item, po) {
+  if (!item) return 0;
+  const base = Number(item.quantity) || 0;
+  if (po && po.bufferAllowed && Number(po.bufferPercent) > 0) {
+    return Math.round(base * (1 + Number(po.bufferPercent) / 100) * 100) / 100;
+  }
+  return base;
+}
+
+/**
  * Issue 57: Calculates FIFO (First-In, First-Out chronological) allocation of a GRN's meters
  * across multiple linked Purchase Orders for the same vendor/fabric.
  *
@@ -53,7 +79,7 @@ export function calculateFifoPoAllocations(linkedPos = [], totalGrnMeters = 0, p
 
   const allocations = sortedPos.map((po, index) => {
     const pId = String(po.id || '').trim();
-    const ordered = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    const ordered = getPoEffectiveOrderedMeters(po);
 
     // Calculate how much this PO previously received from prior GRNs
     let prevReceived = 0;
@@ -116,6 +142,7 @@ export function calculateFifoPoAllocations(linkedPos = [], totalGrnMeters = 0, p
       index: index + 1,
       isFirstOrder: index === 0,
       ordered,
+      bufferPercent: po.bufferAllowed && Number(po.bufferPercent) > 0 ? Number(po.bufferPercent) : 0,
       prevReceived,
       pendingBeforeGrn,
       allocatedInThisGrn,
@@ -311,7 +338,7 @@ export function getPoFulfillmentData(po, grns = [], allPurchaseOrders = []) {
   };
 
   const allPoGrns = (grns || []).filter(isGrnLinkedToPo);
-  const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+  const totalOrdered = getPoEffectiveOrderedMeters(po);
 
   // Calculate received meters for THIS specific PO across all GRNs
   let totalReceived = 0;
@@ -338,7 +365,7 @@ export function getPoFulfillmentData(po, grns = [], allPurchaseOrders = []) {
     const consolidatedBreakdown = linkedPoIds.map((lPoId) => {
       const matchedPo = (allPurchaseOrders || []).find((p) => String(p.id).trim() === String(lPoId).trim()) || null;
       const poItemsList = matchedPo?.items || (String(lPoId).trim() === String(po.id).trim() ? po.items : []);
-      const lPoOrdered = poItemsList.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const lPoOrdered = matchedPo ? getPoEffectiveOrderedMeters(matchedPo) : poItemsList.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
       const mtrsInThisGrn = getMetersForPoFromGrn(g, lPoId, poItemsList);
 
       // Total received to date across all GRNs for that linked PO
@@ -498,13 +525,13 @@ export function calculatePoFabricFulfillment(po, grns = []) {
     )
   );
 
-  const totalOrdered = po.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+  const totalOrdered = getPoEffectiveOrderedMeters(po);
 
   return po.items.map((item, idx) => {
     const fName = item.fabricName || item.fabricQuality || `Fabric Quality ${idx + 1}`;
     const colorName = item.colorName || item.color || '';
     const width = item.width || '';
-    const ordered = Number(item.quantity) || 0;
+    const ordered = getPoItemEffectiveQty(item, po);
     let received = 0;
 
     poGrns.forEach((g) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import TransporterMasterView from './TransporterMasterView';
-import { calculatePoFabricFulfillment, isPieceOrBaleMatchForItem, calculateFifoPoAllocations } from '../../utils/procurementUtils';
+import { calculatePoFabricFulfillment, isPieceOrBaleMatchForItem, calculateFifoPoAllocations, getPoEffectiveOrderedMeters, getPoItemEffectiveQty } from '../../utils/procurementUtils';
 
 /**
  * GRNForm - Goods Receipt Note (GRN) Module
@@ -457,12 +457,10 @@ const cleanDate = (d) => {
     (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || (grn?.linkedPOs && grn.linkedPOs.includes(p.id))) : null) ||
     null;
 
-  // Ordered meters across ALL linked POs
+  // Ordered meters across ALL linked POs (Buffer % incorporated if allowed on PO)
   const poOrderedMeters = linkedPOObjects.length > 0
-    ? linkedPOObjects.reduce((sum, po) => sum + (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)
-    : (currentPO && currentPO.items && currentPO.items.length > 0
-        ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
-        : Number(grn?.poOrderedMeters || 0));
+    ? linkedPOObjects.reduce((sum, po) => sum + getPoEffectiveOrderedMeters(po), 0)
+    : (currentPO ? getPoEffectiveOrderedMeters(currentPO) : Number(grn?.poOrderedMeters || 0));
   const totalLinkedOrderedMeters = poOrderedMeters;
 
   // Existing previous GRNs for these POs (excluding current GRN being edited)
@@ -491,7 +489,7 @@ const cleanDate = (d) => {
     if (!p || !p.id) return false;
     if (linkedPoIds.includes(p.id)) return false;
     if (currentVendorId && p.vendorId && p.vendorId !== currentVendorId) return false;
-    const poTotalMtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    const poTotalMtrs = getPoEffectiveOrderedMeters(p);
     const poPrevReceived = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(p.id)) || g.poId === p.id)
       .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
     const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
@@ -804,7 +802,7 @@ const cleanDate = (d) => {
 
       items.forEach((it, itIdx) => {
         const ful = itemFuls.find((f) => f.index === itIdx);
-        const ordered = Number(it.quantity) || 0;
+        const ordered = getPoItemEffectiveQty(it, poObj);
         const prevReceived = ful ? ful.received : 0;
         const pending = Math.max(0, ordered - prevReceived);
 
@@ -919,8 +917,8 @@ const cleanDate = (d) => {
 
     const vName = getPoVendorName(selectedPO);
 
-    // Calculate remaining pending balance for the selected PO
-    const poTotalM = (selectedPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    // Calculate remaining pending balance for the selected PO (including buffer if configured)
+    const poTotalM = getPoEffectiveOrderedMeters(selectedPO);
     const prevM = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(selectedPO.id)) || g.poId === selectedPO.id)
       .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
     const pend = Math.max(0, poTotalM - prevM);
@@ -2043,11 +2041,12 @@ const cleanDate = (d) => {
                     <option value="PO-DIRECT">Direct Inward (Without PO)</option>
                     {eligiblePOs.map((po) => {
                       const vName = getPoVendorName(po);
-                      const poTotalMtrs = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+                      const poTotalMtrs = getPoEffectiveOrderedMeters(po);
                       const poPrevReceived = (grns || []).filter(g => (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(po.id)) || g.poId === po.id)
                         .reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
                       const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
                       const isPoFull = po.status === 'Completed' || (poTotalMtrs > 0 && poBalPending <= 0);
+                      const hasBuffer = Boolean(po.bufferAllowed && Number(po.bufferPercent) > 0);
 
                       return (
                         <option
@@ -2058,7 +2057,7 @@ const cleanDate = (d) => {
                         >
                           {po.id} — {vName || 'Vendor'} {isPoFull
                             ? `[Fully Received: Complete — 0m Pending]`
-                            : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered]`}
+                            : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered${hasBuffer ? ` (+${po.bufferPercent}% Buffer)` : ''}]`}
                         </option>
                       );
                     })}
@@ -2128,6 +2127,11 @@ const cleanDate = (d) => {
                                 <td className="py-2 px-2.5 text-muted">{alloc.poDate || '—'}</td>
                                 <td className="py-2 px-2.5 text-end fw-semibold text-dark">
                                   {alloc.ordered.toLocaleString()} m
+                                  {alloc.bufferPercent > 0 && (
+                                    <span className="badge bg-info-subtle text-info border border-info border-opacity-25 ms-1 px-1.5 py-0.5 fs-10 rounded-pill">
+                                      +{alloc.bufferPercent}%
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-2 px-2.5 text-end text-muted">
                                   {alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : '0 m'}
@@ -2222,10 +2226,11 @@ const cleanDate = (d) => {
                       >
                         <option value="">-- Select PO to consolidate --</option>
                         {availableVendorPOs.map((p) => {
-                          const mtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+                          const mtrs = getPoEffectiveOrderedMeters(p);
+                          const hasBuf = Boolean(p.bufferAllowed && Number(p.bufferPercent) > 0);
                           return (
                             <option key={p.id} value={p.id}>
-                              {p.id} — {p.date} ({mtrs}m ordered, status: {p.status})
+                              {p.id} — {p.date} ({mtrs.toLocaleString()}m ordered{hasBuf ? ` +${p.bufferPercent}% buffer` : ''}, status: {p.status})
                             </option>
                           );
                         })}
@@ -2265,6 +2270,11 @@ const cleanDate = (d) => {
                         <span className="fs-13 fw-bold text-dark">
                           PO Delivery Status: {currentPO.id}
                         </span>
+                        {currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 && (
+                          <span className="badge bg-info-subtle text-info border border-info border-opacity-25 px-2 py-0.5 rounded-pill fs-11 fw-semibold">
+                            +{currentPO.bufferPercent}% Buffer Active
+                          </span>
+                        )}
                       </div>
                       <span className={`badge px-2.5 py-1 rounded-pill fs-11 fw-semibold ${
                         isPoAlreadyCompleted
@@ -2284,7 +2294,9 @@ const cleanDate = (d) => {
                     <div className="row g-2 text-center fs-12 mb-2">
                       <div className="col-4">
                         <div className="p-2 rounded bg-white border">
-                          <div className="text-muted fs-11">Total Ordered</div>
+                          <div className="text-muted fs-11">
+                            Total Ordered {currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 ? `(+${currentPO.bufferPercent}% buf)` : ''}
+                          </div>
                           <div className="fw-bold text-dark fs-13">{poOrderedMeters.toLocaleString()} m</div>
                         </div>
                       </div>
@@ -2615,7 +2627,7 @@ const cleanDate = (d) => {
 
               <div style={{ flex: '1 1 180px', minWidth: '160px', maxWidth: '240px' }}>
                 <label className="form-label fs-13 fw-semibold text-secondary mb-1">
-                  Total qty {poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : (poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : '(m)')} <span className="text-danger">*</span>
+                  Total qty {currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 ? `(+${currentPO.bufferPercent}% Buffer) ` : ''}{poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : (poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : '(m)')} <span className="text-danger">*</span>
                 </label>
                 <input
                   type="number"

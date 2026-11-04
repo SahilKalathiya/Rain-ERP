@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
 
 // ============================================================
 // ThreadMasterView — 3 Sections:
@@ -7,9 +8,9 @@ import React, { useState } from 'react';
 //   3. Thread Brand Master (Brand + Vendors + Rates per box size)
 // ============================================================
 
-const LS_QUALITIES  = 'raindrop_thread_qualities_v1';
-const LS_BOX_SIZES  = 'raindrop_thread_box_sizes_v1';
-const LS_BRANDS     = 'raindrop_thread_brands_v1';
+const LS_QUALITIES = 'raindrop_thread_qualities_v1';
+const LS_BOX_SIZES = 'raindrop_thread_box_sizes_v1';
+const LS_BRANDS = 'raindrop_thread_brands_v1';
 
 // ---- Default seed data ----
 const DEFAULT_QUALITIES = [
@@ -22,10 +23,10 @@ const DEFAULT_QUALITIES = [
 ];
 
 const DEFAULT_BOX_SIZES = [
-  { id: 'TBS-001', sizeName: 'Size 1', type: 'Box',  noOfReels: 15, reelLengthMts: 400,  totalThread: 6000 },
-  { id: 'TBS-002', sizeName: 'Size 2', type: 'Cone', noOfReels: 1,  reelLengthMts: 5000, totalThread: 5000 },
-  { id: 'TBS-003', sizeName: 'Size 3', type: 'Cone', noOfReels: 1,  reelLengthMts: 15,   totalThread: 15   },
-  { id: 'TBS-004', sizeName: 'Size 4', type: 'Box',  noOfReels: 10, reelLengthMts: 800,  totalThread: 8000 },
+  { id: 'TBS-001', sizeName: 'Size 1', type: 'Box', noOfReels: 15, reelLengthMts: 400, totalThread: 6000 },
+  { id: 'TBS-002', sizeName: 'Size 2', type: 'Cone', noOfReels: 1, reelLengthMts: 5000, totalThread: 5000 },
+  { id: 'TBS-003', sizeName: 'Size 3', type: 'Cone', noOfReels: 1, reelLengthMts: 15, totalThread: 15 },
+  { id: 'TBS-004', sizeName: 'Size 4', type: 'Box', noOfReels: 10, reelLengthMts: 800, totalThread: 8000 },
 ];
 
 const DEFAULT_BRANDS = [
@@ -41,16 +42,40 @@ const DEFAULT_BRANDS = [
   }
 ];
 
+// Helper to format box/cone size formula for thread rates (e.g. "Box-10*800 = 8,000 mts")
+export function formatBoxSizeLabel(bs) {
+  if (!bs) return { icon: '📦', sizeName: '', calcBreakdown: '', fullLabel: '' };
+  const icon = bs.type === 'Box' ? '📦' : '🧵';
+  const typeLabel = bs.type === 'Box' ? 'Box' : 'Cone';
+  const reels = Number(bs.noOfReels) || 1;
+  const length = Number(bs.reelLengthMts) || 0;
+  const total = Number(bs.totalThread || (reels * length)).toLocaleString();
+
+  // "Box-10*800 = 8,000 mts" or "Cone-1*5000 = 5,000 mts"
+  const calcBreakdown = `${typeLabel}-${reels}*${length.toLocaleString()} = ${total} mts`;
+  
+  return {
+    icon,
+    sizeName: bs.sizeName,
+    typeLabel,
+    reels,
+    length,
+    total,
+    calcBreakdown,
+    fullLabel: `${icon} ${bs.sizeName} — ${calcBreakdown}`
+  };
+}
+
 // ---- Helpers ----
 function loadLS(key, def) {
   try {
     const s = localStorage.getItem(key);
     if (s) return JSON.parse(s);
-  } catch (e) {}
+  } catch (e) { }
   return def;
 }
 function saveLS(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { }
 }
 function genId(prefix, list) {
   const max = list.reduce((m, item) => {
@@ -94,6 +119,56 @@ export default function ThreadMasterView() {
     rates: []
   });
   const [brandFormErr, setBrandFormErr] = useState({});
+  const [customVendorRows, setCustomVendorRows] = useState({});
+
+  // Master Vendors State (loaded strictly from Vendor Master / localStorage / API)
+  const [masterVendors, setMasterVendors] = useState(() => {
+    try {
+      const s = localStorage.getItem('raindrop_vendors_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  // Keep masterVendors synchronized with Vendor Master in real-time
+  useEffect(() => {
+    const handleVendorsSync = () => {
+      try {
+        const s = localStorage.getItem('raindrop_vendors_v1');
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed)) {
+            setMasterVendors(parsed);
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('storage', handleVendorsSync);
+    window.addEventListener('raindrop_vendors_updated', handleVendorsSync);
+
+    async function loadApiVendors() {
+      try {
+        if (api && api.getVendors) {
+          const res = await api.getVendors();
+          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+            setMasterVendors(res.data);
+          }
+        }
+      } catch (err) {}
+    }
+    loadApiVendors();
+
+    return () => {
+      window.removeEventListener('storage', handleVendorsSync);
+      window.removeEventListener('raindrop_vendors_updated', handleVendorsSync);
+    };
+  }, []);
 
   // ===================== QUALITY HANDLERS =====================
   const handleAddQuality = () => {
@@ -182,6 +257,7 @@ export default function ThreadMasterView() {
   // ===================== BRAND MODAL HELPERS =====================
   const openNewBrand = () => {
     setEditingBrand(null);
+    setCustomVendorRows({});
     setBrandForm({
       brandName: '',
       vendors: [''],
@@ -193,6 +269,7 @@ export default function ThreadMasterView() {
 
   const openEditBrand = (brand) => {
     setEditingBrand(brand);
+    setCustomVendorRows({});
     // Merge existing rates with current box sizes
     const rates = boxSizes.map(bs => {
       const existing = (brand.rates || []).find(r => r.boxSizeId === bs.id);
@@ -690,12 +767,17 @@ export default function ThreadMasterView() {
                         <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: 600 }}>
                           <th style={{ padding: '8px 10px', border: '1px solid #dee2e6', minWidth: '120px' }}>BRAND NAME</th>
                           <th style={{ padding: '8px 10px', border: '1px solid #dee2e6' }}>VENDOR(S)</th>
-                          {boxSizes.map(bs => (
-                            <th key={bs.id} className="text-center" style={{ padding: '8px 8px', border: '1px solid #dee2e6', minWidth: '110px', background: '#fffbeb' }}>
-                              <div>{bs.type === 'Box' ? '📦' : '🧵'} {bs.sizeName}</div>
-                              <div className="fw-normal text-muted fs-10">{Number(bs.totalThread).toLocaleString()} mts</div>
-                            </th>
-                          ))}
+                          {boxSizes.map(bs => {
+                            const info = formatBoxSizeLabel(bs);
+                            return (
+                              <th key={bs.id} className="text-center" style={{ padding: '8px 8px', border: '1px solid #dee2e6', minWidth: '130px', background: '#fffbeb' }}>
+                                <div className="fw-bold">{info.icon} {bs.sizeName}</div>
+                                <div className="fw-semibold text-secondary font-monospace" style={{ fontSize: '10.5px' }}>
+                                  {info.calcBreakdown}
+                                </div>
+                              </th>
+                            );
+                          })}
                           <th style={{ width: '80px', padding: '8px 6px', border: '1px solid #dee2e6' }}></th>
                         </tr>
                       </thead>
@@ -786,13 +868,15 @@ export default function ThreadMasterView() {
                     style={{ borderColor: brandFormErr.brandName ? '#dc3545' : '#cbd5e1' }}
                   />
                   {brandFormErr.brandName && <div className="invalid-feedback">{brandFormErr.brandName}</div>}
-                  <div className="form-text fs-11 mt-1">Manual Entry — e.g. "Sapphire"</div>
+                  {/* <div className="form-text fs-11 mt-1">Manual Entry — e.g. "Sapphire"</div> */}
                 </div>
 
                 {/* Vendor Names */}
                 <div className="mb-3 p-3 bg-light rounded-3">
                   <div className="d-flex align-items-center justify-content-between mb-2">
-                    <label className="form-label fs-12 fw-bold text-uppercase text-secondary mb-0">Vendor Name(s) <span className="text-muted fw-normal">(optional, can be multiple)</span></label>
+                    <label className="form-label fs-12 fw-bold text-uppercase text-secondary mb-0">
+                      VENDOR NAME(S) (OPTIONAL, CAN BE MULTIPLE)
+                    </label>
                     <button
                       type="button"
                       className="btn btn-link btn-sm p-0 text-primary fs-12 text-decoration-none fw-medium"
@@ -802,35 +886,82 @@ export default function ThreadMasterView() {
                     </button>
                   </div>
                   <div className="d-flex flex-column gap-2">
-                    {brandForm.vendors.map((v, i) => (
-                      <div key={i} className="d-flex gap-2 align-items-center">
-                        <input
-                          type="text"
-                          className="form-control form-control-sm bg-white fs-13"
-                          placeholder={`Vendor ${i + 1} name...`}
-                          value={v}
-                          onChange={e => handleBrandVendorChange(i, e.target.value)}
-                          style={{ borderColor: '#cbd5e1' }}
-                        />
-                        {brandForm.vendors.length > 1 && (
+                    {brandForm.vendors.map((v, i) => {
+                      const isCustom = customVendorRows[i];
+                      return (
+                        <div key={i} className="d-flex gap-2 align-items-center">
+                          {isCustom ? (
+                            <input
+                              type="text"
+                              className="form-control form-control-sm bg-white fs-13"
+                              placeholder={`Vendor ${i + 1} name...`}
+                              value={v}
+                              onChange={e => handleBrandVendorChange(i, e.target.value)}
+                              style={{ borderColor: '#cbd5e1' }}
+                              autoFocus
+                            />
+                          ) : (
+                            <select
+                              className="form-select form-select-sm bg-white fs-13"
+                              value={v}
+                              onChange={e => {
+                                if (e.target.value === '__CUSTOM__') {
+                                  setCustomVendorRows(prev => ({ ...prev, [i]: true }));
+                                  handleBrandVendorChange(i, '');
+                                } else {
+                                  handleBrandVendorChange(i, e.target.value);
+                                }
+                              }}
+                              style={{ borderColor: '#cbd5e1' }}
+                            >
+                              <option value="">Select vendor from Vendor Master...</option>
+                              {masterVendors.map((vnd, vIdx) => {
+                                const vName = vnd.name || vnd.vendorName || vnd.companyName;
+                                return (
+                                  <option key={vnd.id || `${vName}_${vIdx}`} value={vName}>
+                                    {vName} {vnd.type ? `(${vnd.type})` : ''} {vnd.city ? `• ${vnd.city}` : ''}
+                                  </option>
+                                );
+                              })}
+                              {v && !masterVendors.some(m => (m.name || m.vendorName || m.companyName) === v) && (
+                                <option value={v}>{v}</option>
+                              )}
+                              <option value="__CUSTOM__">✍️ + Type Custom Vendor Name...</option>
+                            </select>
+                          )}
+
+                          {/* Toggle between Master Vendor Dropdown and Custom Input */}
                           <button
                             type="button"
-                            className="btn btn-sm btn-light text-danger p-1 rounded-2 flex-shrink-0"
-                            onClick={() => handleRemoveVendorField(i)}
-                            title="Remove vendor"
+                            className="btn btn-sm btn-light border px-2 py-1 fs-12 text-secondary flex-shrink-0"
+                            title={isCustom ? "Select from Master list" : "Type custom vendor name"}
+                            onClick={() => {
+                              setCustomVendorRows(prev => ({ ...prev, [i]: !isCustom }));
+                            }}
                           >
-                            <i className="ti ti-x fs-13"></i>
+                            <i className={isCustom ? "ti ti-list" : "ti ti-pencil"}></i>
                           </button>
-                        )}
-                      </div>
-                    ))}
+
+                          {brandForm.vendors.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-light text-danger p-1 rounded-2 flex-shrink-0"
+                              onClick={() => handleRemoveVendorField(i)}
+                              title="Remove vendor"
+                            >
+                              <i className="ti ti-x fs-13"></i>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Thread Rates */}
                 <div className="mb-3 p-3 bg-light rounded-3">
                   <label className="form-label fs-12 fw-bold text-uppercase text-secondary mb-2">
-                    Thread Rates <span className="text-muted fw-normal">(optional — per box size)</span>
+                    THREAD RATES (OPTIONAL — PER BOX SIZE)
                   </label>
                   {boxSizes.length === 0 ? (
                     <div className="text-muted fs-12 py-2">
@@ -842,18 +973,28 @@ export default function ThreadMasterView() {
                       {brandForm.rates.map(rateRow => {
                         const bs = boxSizes.find(b => b.id === rateRow.boxSizeId);
                         if (!bs) return null;
-                        const label = `${bs.type === 'Box' ? '📦' : '🧵'} ${bs.sizeName} — ${Number(bs.totalThread).toLocaleString()} mts`;
+                        const info = formatBoxSizeLabel(bs);
                         return (
-                          <div key={rateRow.boxSizeId} className="row align-items-center g-2">
-                            <div className="col-6 col-md-7">
-                              <div className="text-dark fs-13 fw-medium">{label}</div>
+                          <div key={rateRow.boxSizeId} className="row align-items-center g-2 py-1">
+                            <div className="col-12 col-sm-7">
+                              <div className="text-dark fs-13 fw-medium d-flex align-items-center gap-1.5 flex-wrap">
+                                <span>{info.icon}</span>
+                                <span className="fw-bold text-dark">{bs.sizeName}</span>
+                                <span className="text-muted fw-normal">—</span>
+                                <span
+                                  className="badge bg-white text-dark border px-2 py-1 font-monospace fw-semibold shadow-2xs"
+                                  style={{ borderColor: '#cbd5e1', fontSize: '11.5px' }}
+                                >
+                                  {info.calcBreakdown}
+                                </span>
+                              </div>
                             </div>
-                            <div className="col-6 col-md-5">
+                            <div className="col-12 col-sm-5">
                               <div className="input-group input-group-sm">
-                                <span className="input-group-text bg-white fs-13">₹</span>
+                                <span className="input-group-text bg-white fs-13 fw-semibold text-muted">₹</span>
                                 <input
                                   type="number"
-                                  className="form-control form-control-sm bg-white fs-13 text-end no-spinner"
+                                  className="form-control form-control-sm bg-white fs-13 text-end no-spinner fw-semibold"
                                   placeholder="Enter rate..."
                                   value={rateRow.rate}
                                   onChange={e => handleBrandRateChange(rateRow.boxSizeId, e.target.value)}

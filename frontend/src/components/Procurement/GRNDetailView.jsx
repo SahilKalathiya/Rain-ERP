@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { calculateFifoPoAllocations } from '../../utils/procurementUtils';
+import { calculateFifoPoAllocations, getPoEffectiveOrderedMeters } from '../../utils/procurementUtils';
 
 /**
  * GRNDetailView - Step 3: GRN Details
@@ -151,7 +151,8 @@ export default function GRNDetailView({
 
       return sortedPos.map((po, index) => {
         const pId = String(po.id).trim();
-        const ordered = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+        const ordered = getPoEffectiveOrderedMeters(po);
+        const bufPct = po.bufferAllowed && Number(po.bufferPercent) > 0 ? Number(po.bufferPercent) : 0;
         const allocatedInThisGrn = Number(grn.poAllocations[pId]) || 0;
         const totalRecdPo = Number(po.receivedQty) || 0;
         const prevReceived = Math.max(0, totalRecdPo - allocatedInThisGrn);
@@ -168,6 +169,7 @@ export default function GRNDetailView({
           index: index + 1,
           isFirstOrder: index === 0,
           ordered,
+          bufferPercent: bufPct,
           prevReceived,
           pendingBeforeGrn,
           allocatedInThisGrn,
@@ -1165,6 +1167,11 @@ export default function GRNDetailView({
                     <td className="py-3 text-muted">{alloc.poDate || '—'}</td>
                     <td className="py-3 text-end fw-semibold text-dark">
                       {alloc.ordered.toLocaleString()} m
+                      {alloc.bufferPercent > 0 && (
+                        <span className="badge bg-info-subtle text-info border border-info border-opacity-25 ms-1 px-1.5 py-0.5 fs-10 rounded-pill">
+                          +{alloc.bufferPercent}%
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 text-end text-muted">
                       {alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : '0 m'}

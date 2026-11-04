@@ -26839,16 +26839,7 @@
                 className: "rounded-circle border",
                 style: { width: "12px", height: "12px", backgroundColor: colorObj.hex }
               }
-            ), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "15px" } }, artObj.name, " \u2014 ", colName)), cfg && (cust.selectedColors || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: "btn btn-sm erp-btn-outline rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1 shadow-xs",
-                onClick: () => openCopySizesDialog(ci, artId, colName)
-              },
-              /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-copy me-1" }),
-              " Copy sizes to other colours"
-            )),
+            ), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "15px" } }, artObj.name, " \u2014 ", colName))),
             (() => {
               const activeSeriesList = getPairSeriesConfigs(cust, artId, colName);
               let pairTotalPieces2 = 0;
@@ -32497,6 +32488,22 @@
   var import_react17 = __toESM(require_react());
 
   // frontend/src/utils/procurementUtils.js
+  function getPoEffectiveOrderedMeters(po) {
+    if (!po) return 0;
+    const base = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    if (po.bufferAllowed && Number(po.bufferPercent) > 0) {
+      return Math.round(base * (1 + Number(po.bufferPercent) / 100) * 100) / 100;
+    }
+    return base;
+  }
+  function getPoItemEffectiveQty(item, po) {
+    if (!item) return 0;
+    const base = Number(item.quantity) || 0;
+    if (po && po.bufferAllowed && Number(po.bufferPercent) > 0) {
+      return Math.round(base * (1 + Number(po.bufferPercent) / 100) * 100) / 100;
+    }
+    return base;
+  }
   function calculateFifoPoAllocations(linkedPos = [], totalGrnMeters = 0, previousGrns = []) {
     if (!Array.isArray(linkedPos) || linkedPos.length === 0) return [];
     const sortedPos = [...linkedPos].sort((a, b) => {
@@ -32520,7 +32527,7 @@
     let remainingGrnMeters = Math.max(0, Number(totalGrnMeters) || 0);
     const allocations = sortedPos.map((po, index) => {
       const pId = String(po.id || "").trim();
-      const ordered = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const ordered = getPoEffectiveOrderedMeters(po);
       let prevReceived = 0;
       (previousGrns || []).forEach((g) => {
         if (!g) return;
@@ -32568,6 +32575,7 @@
         index: index + 1,
         isFirstOrder: index === 0,
         ordered,
+        bufferPercent: po.bufferAllowed && Number(po.bufferPercent) > 0 ? Number(po.bufferPercent) : 0,
         prevReceived,
         pendingBeforeGrn,
         allocatedInThisGrn,
@@ -32705,7 +32713,7 @@
       );
     };
     const allPoGrns = (grns || []).filter(isGrnLinkedToPo);
-    const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const totalOrdered = getPoEffectiveOrderedMeters(po);
     let totalReceived = 0;
     allPoGrns.forEach((g) => {
       totalReceived += getMetersForPoFromGrn(g, po.id, po.items);
@@ -32723,7 +32731,7 @@
       const consolidatedBreakdown = linkedPoIds.map((lPoId) => {
         const matchedPo = (allPurchaseOrders || []).find((p) => String(p.id).trim() === String(lPoId).trim()) || null;
         const poItemsList = matchedPo?.items || (String(lPoId).trim() === String(po.id).trim() ? po.items : []);
-        const lPoOrdered = poItemsList.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+        const lPoOrdered = matchedPo ? getPoEffectiveOrderedMeters(matchedPo) : poItemsList.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
         const mtrsInThisGrn = getMetersForPoFromGrn(g, lPoId, poItemsList);
         let lPoTotalReceivedToDate = 0;
         (grns || []).forEach((otherGrn) => {
@@ -32836,12 +32844,12 @@
     const poGrns = (grns || []).filter(
       (g) => g && (Array.isArray(g.linkedPOs) && g.linkedPOs.map(String).includes(targetPoId) || String(g.poId || "").trim() === targetPoId || String(g.poNumber || "").trim() === targetPoId || String(g.againstPo || "").trim() === targetPoId)
     );
-    const totalOrdered = po.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const totalOrdered = getPoEffectiveOrderedMeters(po);
     return po.items.map((item, idx) => {
       const fName = item.fabricName || item.fabricQuality || `Fabric Quality ${idx + 1}`;
       const colorName = item.colorName || item.color || "";
       const width = item.width || "";
-      const ordered = Number(item.quantity) || 0;
+      const ordered = getPoItemEffectiveQty(item, po);
       let received = 0;
       poGrns.forEach((g) => {
         const gBales = g.bales || [];
@@ -33064,7 +33072,7 @@
         onChange: (e) => setSearchTerm(e.target.value)
       }
     )), /* @__PURE__ */ import_react17.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 fs-12" }, filtered.length, " Orders"))), /* @__PURE__ */ import_react17.default.createElement("div", { className: "table-responsive", style: { overflowX: "hidden" } }, /* @__PURE__ */ import_react17.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { width: "100%", fontSize: "11px", tableLayout: "auto" } }, /* @__PURE__ */ import_react17.default.createElement("thead", { className: "text-secondary", style: { background: "#f8fafc", borderBottom: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react17.default.createElement("tr", null, /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", width: "10%" } }, "PO No."), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", width: "9%" } }, "Date"), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", width: "13%" } }, "Vendor"), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", width: "18%" } }, "Fabric Quality"), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", width: "9%" } }, "Fabric Width"), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", width: "12%" } }, "Fab Color"), /* @__PURE__ */ import_react17.default.createElement("th", { className: "text-end", style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", width: "10%" } }, "Rate"), /* @__PURE__ */ import_react17.default.createElement("th", { style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", width: "10%" } }, "Status"), /* @__PURE__ */ import_react17.default.createElement("th", { className: "text-end", style: { padding: "7px 6px", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.03em", width: "9%" } }, "Actions"))), /* @__PURE__ */ import_react17.default.createElement("tbody", null, sortedList.length === 0 ? /* @__PURE__ */ import_react17.default.createElement("tr", null, /* @__PURE__ */ import_react17.default.createElement("td", { colSpan: "9", className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react17.default.createElement("i", { className: "ti ti-file-off fs-32 d-block mb-2" }), "No Purchase Orders found.")) : sortedList.map((po) => {
-      const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+      const totalOrdered = getPoEffectiveOrderedMeters(po);
       const poGrns = (grns || []).filter((g) => g.linkedPOs && g.linkedPOs.includes(po.id) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
       const hasExistingGrn = poGrns.length > 0 || Number(po.receivedQty) > 0 || po.status === "Partially Received" || po.status === "Completed";
       const receivedMeters = poGrns.reduce((sum, g) => sum + getMetersForPoFromGrn(g, po.id, po.items, purchaseOrders), 0) || Number(po.receivedQty) || 0;
@@ -36495,7 +36503,7 @@
     const linkedPoIds = formData.linkedPOs && formData.linkedPOs.length > 0 ? formData.linkedPOs : formData.poId && formData.poId !== "PO-DIRECT" ? [formData.poId] : [];
     const linkedPOObjects = linkedPoIds.map((id) => purchaseOrders.find((p) => p.id === id)).filter(Boolean);
     const currentPO = purchaseOrders.find((p) => p.id === formData.poId) || linkedPOObjects[0] || (isLinkedFromPO ? purchaseOrders.find((p) => p.id === grn?.poId || grn?.linkedPOs && grn.linkedPOs.includes(p.id)) : null) || null;
-    const poOrderedMeters = linkedPOObjects.length > 0 ? linkedPOObjects.reduce((sum, po) => sum + (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0) : currentPO && currentPO.items && currentPO.items.length > 0 ? currentPO.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0) : Number(grn?.poOrderedMeters || 0);
+    const poOrderedMeters = linkedPOObjects.length > 0 ? linkedPOObjects.reduce((sum, po) => sum + getPoEffectiveOrderedMeters(po), 0) : currentPO ? getPoEffectiveOrderedMeters(currentPO) : Number(grn?.poOrderedMeters || 0);
     const totalLinkedOrderedMeters = poOrderedMeters;
     const previousGrnsForPo = (grns || []).filter(
       (g) => g && g.id !== formData.id && (g.linkedPOs && g.linkedPOs.some((pId) => linkedPoIds.includes(pId)) || linkedPoIds.includes(g.poId))
@@ -36513,7 +36521,7 @@
       if (!p || !p.id) return false;
       if (linkedPoIds.includes(p.id)) return false;
       if (currentVendorId && p.vendorId && p.vendorId !== currentVendorId) return false;
-      const poTotalMtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const poTotalMtrs = getPoEffectiveOrderedMeters(p);
       const poPrevReceived = (grns || []).filter((g) => Array.isArray(g.linkedPOs) && g.linkedPOs.includes(p.id) || g.poId === p.id).reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
       const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
       if (!isExisting && (p.status === "Completed" || poTotalMtrs > 0 && poBalPending <= 0)) return false;
@@ -36780,7 +36788,7 @@
         const itemFuls = calculatePoFabricFulfillment(poObj, otherGrns);
         items.forEach((it, itIdx) => {
           const ful = itemFuls.find((f) => f.index === itIdx);
-          const ordered = Number(it.quantity) || 0;
+          const ordered = getPoItemEffectiveQty(it, poObj);
           const prevReceived = ful ? ful.received : 0;
           const pending = Math.max(0, ordered - prevReceived);
           const rawLabel = getPoItemLabel(it);
@@ -36877,7 +36885,7 @@
       const selectedPO = purchaseOrders.find((p) => p.id === newPoId);
       if (!selectedPO) return;
       const vName = getPoVendorName(selectedPO);
-      const poTotalM = (selectedPO.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+      const poTotalM = getPoEffectiveOrderedMeters(selectedPO);
       const prevM = (grns || []).filter((g) => Array.isArray(g.linkedPOs) && g.linkedPOs.includes(selectedPO.id) || g.poId === selectedPO.id).reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
       const pend = Math.max(0, poTotalM - prevM);
       setFormData((prev) => {
@@ -37660,10 +37668,11 @@
         /* @__PURE__ */ import_react23.default.createElement("option", { value: "PO-DIRECT" }, "Direct Inward (Without PO)"),
         eligiblePOs.map((po) => {
           const vName = getPoVendorName(po);
-          const poTotalMtrs = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          const poTotalMtrs = getPoEffectiveOrderedMeters(po);
           const poPrevReceived = (grns || []).filter((g) => Array.isArray(g.linkedPOs) && g.linkedPOs.includes(po.id) || g.poId === po.id).reduce((s, g) => s + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0), 0);
           const poBalPending = Math.max(0, poTotalMtrs - poPrevReceived);
           const isPoFull = po.status === "Completed" || poTotalMtrs > 0 && poBalPending <= 0;
+          const hasBuffer = Boolean(po.bufferAllowed && Number(po.bufferPercent) > 0);
           return /* @__PURE__ */ import_react23.default.createElement(
             "option",
             {
@@ -37676,7 +37685,7 @@
             " \u2014 ",
             vName || "Vendor",
             " ",
-            isPoFull ? `[Fully Received: Complete \u2014 0m Pending]` : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered]`
+            isPoFull ? `[Fully Received: Complete \u2014 0m Pending]` : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered${hasBuffer ? ` (+${po.bufferPercent}% Buffer)` : ""}]`
           );
         })
       ), fifoPoAllocations && fifoPoAllocations.length > 1 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "mt-3 p-3 rounded-3 bg-white border border-primary border-opacity-25 shadow-xs" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 mb-2.5 border-bottom" }, /* @__PURE__ */ import_react23.default.createElement("div", null, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-primary text-white px-2 py-1 rounded-2 fs-11 fw-bold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-layers-intersect me-1" }), "CONSOLIDATED SHIPMENT (", fifoPoAllocations.length, " POs)"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2 py-1 rounded-2 fs-11 fw-semibold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-clock-check me-1" }), "FIFO Auto-Allocation Rule")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11 mt-1" }, "Material is deducted first from the oldest PO. Remaining material is allocated to subsequent POs only after the earlier PO is 100% fulfilled.")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-11 text-muted d-block" }, "Entering in this GRN:"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-15 fw-bold text-success" }, effectiveGrnMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react23.default.createElement("table", { className: "table table-sm table-bordered align-middle mb-0 fs-12 text-nowrap" }, /* @__PURE__ */ import_react23.default.createElement("thead", { className: "table-light text-secondary" }, /* @__PURE__ */ import_react23.default.createElement("tr", null, /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Priority & PO ID"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Order Date"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Previously Recd"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end bg-success-subtle text-success fw-bold" }, "Receiving in this GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-center" }, "Fulfillment Status"), !isQcActioned && /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2 text-center", style: { width: "40px" } }, "Action"))), /* @__PURE__ */ import_react23.default.createElement("tbody", null, fifoPoAllocations.map((alloc) => {
@@ -37689,7 +37698,7 @@
           alloc.index,
           " ",
           alloc.isFirstOrder ? "1st Priority (Earliest)" : `${alloc.index}nd Priority`
-        ), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fw-bold text-dark" }, alloc.poId))), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-muted" }, alloc.poDate || "\u2014"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end fw-semibold text-dark" }, alloc.ordered.toLocaleString(), " m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end text-muted" }, alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : "0 m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end text-dark" }, alloc.pendingBeforeGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end bg-success-subtle text-success fw-bold fs-13" }, "+", alloc.allocatedInThisGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end fw-bold" }, alloc.remainingBalance === 0 ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-success" }, "0 m (Nil)") : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, alloc.remainingBalance.toLocaleString(), " m")), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-center" }, alloc.isComplete ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2 py-1 rounded-pill fs-11 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-check" }), " 100% Completed") : alloc.isPartial ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25 px-2 py-1 rounded-pill fs-11 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-progress" }), " Partial (", alloc.fulfillmentPercent, "%)") : /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 rounded-pill fs-11 fw-medium" }, "Pending (0%)")), !isQcActioned && /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2 text-center" }, formData.linkedPOs && formData.linkedPOs.length > 1 && /* @__PURE__ */ import_react23.default.createElement(
+        ), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fw-bold text-dark" }, alloc.poId))), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-muted" }, alloc.poDate || "\u2014"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end fw-semibold text-dark" }, alloc.ordered.toLocaleString(), " m", alloc.bufferPercent > 0 && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 ms-1 px-1.5 py-0.5 fs-10 rounded-pill" }, "+", alloc.bufferPercent, "%")), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end text-muted" }, alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : "0 m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end text-dark" }, alloc.pendingBeforeGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end bg-success-subtle text-success fw-bold fs-13" }, "+", alloc.allocatedInThisGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-end fw-bold" }, alloc.remainingBalance === 0 ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-success" }, "0 m (Nil)") : /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, alloc.remainingBalance.toLocaleString(), " m")), /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5 text-center" }, alloc.isComplete ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2 py-1 rounded-pill fs-11 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-check" }), " 100% Completed") : alloc.isPartial ? /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25 px-2 py-1 rounded-pill fs-11 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-progress" }), " Partial (", alloc.fulfillmentPercent, "%)") : /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-light text-secondary border px-2 py-1 rounded-pill fs-11 fw-medium" }, "Pending (0%)")), !isQcActioned && /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2 text-center" }, formData.linkedPOs && formData.linkedPOs.length > 1 && /* @__PURE__ */ import_react23.default.createElement(
           "button",
           {
             type: "button",
@@ -37710,8 +37719,9 @@
         },
         /* @__PURE__ */ import_react23.default.createElement("option", { value: "" }, "-- Select PO to consolidate --"),
         availableVendorPOs.map((p) => {
-          const mtrs = (p.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-          return /* @__PURE__ */ import_react23.default.createElement("option", { key: p.id, value: p.id }, p.id, " \u2014 ", p.date, " (", mtrs, "m ordered, status: ", p.status, ")");
+          const mtrs = getPoEffectiveOrderedMeters(p);
+          const hasBuf = Boolean(p.bufferAllowed && Number(p.bufferPercent) > 0);
+          return /* @__PURE__ */ import_react23.default.createElement("option", { key: p.id, value: p.id }, p.id, " \u2014 ", p.date, " (", mtrs.toLocaleString(), "m ordered", hasBuf ? ` +${p.bufferPercent}% buffer` : "", ", status: ", p.status, ")");
         })
       ), /* @__PURE__ */ import_react23.default.createElement(
         "button",
@@ -37733,8 +37743,8 @@
             borderColor: isPoAlreadyCompleted ? "#fca5a5" : alreadyReceivedMeters > 0 ? "#bbf7d0" : "#e2e8f0"
           }
         },
-        /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: `ti ${isPoAlreadyCompleted ? "ti-circle-check text-success" : "ti-truck-delivery text-primary"} fs-17` }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-13 fw-bold text-dark" }, "PO Delivery Status: ", currentPO.id)), /* @__PURE__ */ import_react23.default.createElement("span", { className: `badge px-2.5 py-1 rounded-pill fs-11 fw-semibold ${isPoAlreadyCompleted ? "bg-success text-white" : alreadyReceivedMeters > 0 ? "bg-primary text-white" : "bg-secondary text-white"}` }, isPoAlreadyCompleted ? "100% Fulfilled (Complete)" : alreadyReceivedMeters > 0 ? `Multi-Installment (${Math.round(alreadyReceivedMeters / poOrderedMeters * 100)}% Received)` : "Initial Delivery")),
-        /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-2 text-center fs-12 mb-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Total Ordered"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, poOrderedMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Previously Received"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-success fs-13" }, alreadyReceivedMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Remaining Pending"), /* @__PURE__ */ import_react23.default.createElement("div", { className: `fw-bold fs-13 ${poPendingMeters > 0 ? "text-primary" : "text-secondary"}` }, poPendingMeters.toLocaleString(), " m")))),
+        /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: `ti ${isPoAlreadyCompleted ? "ti-circle-check text-success" : "ti-truck-delivery text-primary"} fs-17` }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-13 fw-bold text-dark" }, "PO Delivery Status: ", currentPO.id), currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 && /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2 py-0.5 rounded-pill fs-11 fw-semibold" }, "+", currentPO.bufferPercent, "% Buffer Active")), /* @__PURE__ */ import_react23.default.createElement("span", { className: `badge px-2.5 py-1 rounded-pill fs-11 fw-semibold ${isPoAlreadyCompleted ? "bg-success text-white" : alreadyReceivedMeters > 0 ? "bg-primary text-white" : "bg-secondary text-white"}` }, isPoAlreadyCompleted ? "100% Fulfilled (Complete)" : alreadyReceivedMeters > 0 ? `Multi-Installment (${Math.round(alreadyReceivedMeters / poOrderedMeters * 100)}% Received)` : "Initial Delivery")),
+        /* @__PURE__ */ import_react23.default.createElement("div", { className: "row g-2 text-center fs-12 mb-2" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Total Ordered ", currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 ? `(+${currentPO.bufferPercent}% buf)` : ""), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-dark fs-13" }, poOrderedMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Previously Received"), /* @__PURE__ */ import_react23.default.createElement("div", { className: "fw-bold text-success fs-13" }, alreadyReceivedMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "p-2 rounded bg-white border" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11" }, "Remaining Pending"), /* @__PURE__ */ import_react23.default.createElement("div", { className: `fw-bold fs-13 ${poPendingMeters > 0 ? "text-primary" : "text-secondary"}` }, poPendingMeters.toLocaleString(), " m")))),
         previousGrnsForPo.length > 0 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-1.5 pt-1 border-top border-light-subtle fs-12" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-muted fs-11" }, "Previous GRNs:"), previousGrnsForPo.map((g) => /* @__PURE__ */ import_react23.default.createElement("span", { key: g.id, className: "badge bg-white text-secondary border px-2 py-0.5 fs-11 rounded-pill" }, g.id, ": ", (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0).toLocaleString(), "m"))),
         !isPoAlreadyCompleted && poPendingMeters > 0 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11 mt-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-info-circle text-primary" }), /* @__PURE__ */ import_react23.default.createElement("span", null, "Multiple GRNs are supported for partial shipments. Once all ", poOrderedMeters.toLocaleString(), "m have arrived, no further GRN can be created."))
       )), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-13 fw-semibold text-secondary mb-1" }, "Received date ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "position-relative", ref: datePickerRef }, /* @__PURE__ */ import_react23.default.createElement(
@@ -37940,7 +37950,7 @@
           value: formData.weight,
           onChange: (e) => setFormData({ ...formData, weight: e.target.value })
         }
-      )), /* @__PURE__ */ import_react23.default.createElement("div", { style: { flex: "1 1 180px", minWidth: "160px", maxWidth: "240px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-13 fw-semibold text-secondary mb-1" }, "Total qty ", poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : "(m)", " ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement(
+      )), /* @__PURE__ */ import_react23.default.createElement("div", { style: { flex: "1 1 180px", minWidth: "160px", maxWidth: "240px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-13 fw-semibold text-secondary mb-1" }, "Total qty ", currentPO?.bufferAllowed && Number(currentPO?.bufferPercent) > 0 ? `(+${currentPO.bufferPercent}% Buffer) ` : "", poPendingMeters > 0 && alreadyReceivedMeters > 0 ? `(${poPendingMeters}m pending)` : poOrderedMeters > 0 ? `(${poOrderedMeters}m)` : "(m)", " ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement(
         "input",
         {
           type: "number",
@@ -38483,7 +38493,8 @@
         });
         return sortedPos.map((po, index) => {
           const pId = String(po.id).trim();
-          const ordered = (po.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          const ordered = getPoEffectiveOrderedMeters(po);
+          const bufPct = po.bufferAllowed && Number(po.bufferPercent) > 0 ? Number(po.bufferPercent) : 0;
           const allocatedInThisGrn = Number(grn.poAllocations[pId]) || 0;
           const totalRecdPo = Number(po.receivedQty) || 0;
           const prevReceived = Math.max(0, totalRecdPo - allocatedInThisGrn);
@@ -38499,6 +38510,7 @@
             index: index + 1,
             isFirstOrder: index === 0,
             ordered,
+            bufferPercent: bufPct,
             prevReceived,
             pendingBeforeGrn,
             allocatedInThisGrn,
@@ -39100,7 +39112,7 @@
       alloc.index,
       " ",
       alloc.isFirstOrder ? "1st Priority (Earliest)" : `${alloc.index}nd Priority`
-    ), /* @__PURE__ */ import_react24.default.createElement("strong", { className: "text-primary font-monospace" }, alloc.poId))), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-muted" }, alloc.poDate || "\u2014"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end fw-semibold text-dark" }, alloc.ordered.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-muted" }, alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : "0 m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, alloc.pendingBeforeGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end bg-success-subtle text-success fw-bold fs-14" }, "+", alloc.allocatedInThisGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end fw-bold" }, alloc.remainingBalance === 0 ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2 py-1 rounded-pill" }, "0 m (Nil)") : /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-danger fw-bold" }, alloc.remainingBalance.toLocaleString(), " m")), /* @__PURE__ */ import_react24.default.createElement("td", { className: "pe-4 py-3 text-center" }, alloc.isComplete ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-3 py-1.5 rounded-pill fs-12 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-check fs-13" }), " 100% Completed") : alloc.isPartial ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25 px-3 py-1.5 rounded-pill fs-12 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-progress fs-13" }), " Partially Received (", alloc.fulfillmentPercent, "%)") : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 rounded-pill fs-12 fw-medium" }, "Pending (0%)"))))), /* @__PURE__ */ import_react24.default.createElement("tfoot", { className: "table-light fw-bold fs-13" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("td", { colSpan: 2, className: "ps-4 py-3 text-dark" }, "Total Consolidated Summary:"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.ordered, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-muted" }, fifoAllocations.reduce((s, a) => s + a.prevReceived, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.pendingBeforeGrn, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end bg-success-subtle text-success fs-14" }, "+", fifoAllocations.reduce((s, a) => s + a.allocatedInThisGrn, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.remainingBalance, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "pe-4 py-3 text-center text-muted fs-12" }, fifoAllocations.filter((a) => a.isComplete).length, " of ", fifoAllocations.length, " POs 100% Completed")))))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Bale-wise breakdown"), canEditBales ? /* @__PURE__ */ import_react24.default.createElement(
+    ), /* @__PURE__ */ import_react24.default.createElement("strong", { className: "text-primary font-monospace" }, alloc.poId))), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-muted" }, alloc.poDate || "\u2014"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end fw-semibold text-dark" }, alloc.ordered.toLocaleString(), " m", alloc.bufferPercent > 0 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 ms-1 px-1.5 py-0.5 fs-10 rounded-pill" }, "+", alloc.bufferPercent, "%")), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-muted" }, alloc.prevReceived > 0 ? `${alloc.prevReceived.toLocaleString()} m` : "0 m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, alloc.pendingBeforeGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end bg-success-subtle text-success fw-bold fs-14" }, "+", alloc.allocatedInThisGrn.toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end fw-bold" }, alloc.remainingBalance === 0 ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2 py-1 rounded-pill" }, "0 m (Nil)") : /* @__PURE__ */ import_react24.default.createElement("span", { className: "text-danger fw-bold" }, alloc.remainingBalance.toLocaleString(), " m")), /* @__PURE__ */ import_react24.default.createElement("td", { className: "pe-4 py-3 text-center" }, alloc.isComplete ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-3 py-1.5 rounded-pill fs-12 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-check fs-13" }), " 100% Completed") : alloc.isPartial ? /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25 px-3 py-1.5 rounded-pill fs-12 fw-semibold d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-progress fs-13" }), " Partially Received (", alloc.fulfillmentPercent, "%)") : /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-light text-secondary border px-3 py-1.5 rounded-pill fs-12 fw-medium" }, "Pending (0%)"))))), /* @__PURE__ */ import_react24.default.createElement("tfoot", { className: "table-light fw-bold fs-13" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("td", { colSpan: 2, className: "ps-4 py-3 text-dark" }, "Total Consolidated Summary:"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.ordered, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-muted" }, fifoAllocations.reduce((s, a) => s + a.prevReceived, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.pendingBeforeGrn, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end bg-success-subtle text-success fs-14" }, "+", fifoAllocations.reduce((s, a) => s + a.allocatedInThisGrn, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "py-3 text-end text-dark" }, fifoAllocations.reduce((s, a) => s + a.remainingBalance, 0).toLocaleString(), " m"), /* @__PURE__ */ import_react24.default.createElement("td", { className: "pe-4 py-3 text-center text-muted fs-12" }, fifoAllocations.filter((a) => a.isComplete).length, " of ", fifoAllocations.length, " POs 100% Completed")))))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, "Bale-wise breakdown"), canEditBales ? /* @__PURE__ */ import_react24.default.createElement(
       "button",
       {
         type: "button",
@@ -43966,6 +43978,25 @@
       ]
     }
   ];
+  function formatBoxSizeLabel(bs) {
+    if (!bs) return { icon: "\u{1F4E6}", sizeName: "", calcBreakdown: "", fullLabel: "" };
+    const icon = bs.type === "Box" ? "\u{1F4E6}" : "\u{1F9F5}";
+    const typeLabel = bs.type === "Box" ? "Box" : "Cone";
+    const reels = Number(bs.noOfReels) || 1;
+    const length = Number(bs.reelLengthMts) || 0;
+    const total = Number(bs.totalThread || reels * length).toLocaleString();
+    const calcBreakdown = `${typeLabel}-${reels}*${length.toLocaleString()} = ${total} mts`;
+    return {
+      icon,
+      sizeName: bs.sizeName,
+      typeLabel,
+      reels,
+      length,
+      total,
+      calcBreakdown,
+      fullLabel: `${icon} ${bs.sizeName} \u2014 ${calcBreakdown}`
+    };
+  }
   function loadLS(key, def) {
     try {
       const s = localStorage.getItem(key);
@@ -44010,6 +44041,52 @@
       rates: []
     });
     const [brandFormErr, setBrandFormErr] = (0, import_react32.useState)({});
+    const [customVendorRows, setCustomVendorRows] = (0, import_react32.useState)({});
+    const [masterVendors, setMasterVendors] = (0, import_react32.useState)(() => {
+      try {
+        const s = localStorage.getItem("raindrop_vendors_v1");
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+      }
+      return [];
+    });
+    (0, import_react32.useEffect)(() => {
+      const handleVendorsSync = () => {
+        try {
+          const s = localStorage.getItem("raindrop_vendors_v1");
+          if (s) {
+            const parsed = JSON.parse(s);
+            if (Array.isArray(parsed)) {
+              setMasterVendors(parsed);
+            }
+          }
+        } catch (e) {
+        }
+      };
+      window.addEventListener("storage", handleVendorsSync);
+      window.addEventListener("raindrop_vendors_updated", handleVendorsSync);
+      async function loadApiVendors() {
+        try {
+          if (api && api.getVendors) {
+            const res = await api.getVendors();
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+              setMasterVendors(res.data);
+            }
+          }
+        } catch (err) {
+        }
+      }
+      loadApiVendors();
+      return () => {
+        window.removeEventListener("storage", handleVendorsSync);
+        window.removeEventListener("raindrop_vendors_updated", handleVendorsSync);
+      };
+    }, []);
     const handleAddQuality = () => {
       const name = qualityInput.trim();
       if (!name) return;
@@ -44085,6 +44162,7 @@
     };
     const openNewBrand = () => {
       setEditingBrand(null);
+      setCustomVendorRows({});
       setBrandForm({
         brandName: "",
         vendors: [""],
@@ -44095,6 +44173,7 @@
     };
     const openEditBrand = (brand) => {
       setEditingBrand(brand);
+      setCustomVendorRows({});
       const rates = boxSizes.map((bs) => {
         const existing = (brand.rates || []).find((r) => r.boxSizeId === bs.id);
         return { boxSizeId: bs.id, totalMts: bs.totalThread, rate: existing ? existing.rate : "" };
@@ -44367,7 +44446,10 @@
       },
       /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-plus fs-14" }),
       /* @__PURE__ */ import_react32.default.createElement("span", null, "New Brand")
-    )), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, brands.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-center text-muted py-5 fs-13" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-tag fs-30 d-block mb-2 opacity-40" }), 'No brands added yet. Click "+ New Brand" to add.') : /* @__PURE__ */ import_react32.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react32.default.createElement("table", { className: "table table-bordered align-middle mb-0 fs-13", style: { border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: 600 } }, /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6", minWidth: "120px" } }, "BRAND NAME"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "VENDOR(S)"), boxSizes.map((bs) => /* @__PURE__ */ import_react32.default.createElement("th", { key: bs.id, className: "text-center", style: { padding: "8px 8px", border: "1px solid #dee2e6", minWidth: "110px", background: "#fffbeb" } }, /* @__PURE__ */ import_react32.default.createElement("div", null, bs.type === "Box" ? "\u{1F4E6}" : "\u{1F9F5}", " ", bs.sizeName), /* @__PURE__ */ import_react32.default.createElement("div", { className: "fw-normal text-muted fs-10" }, Number(bs.totalThread).toLocaleString(), " mts"))), /* @__PURE__ */ import_react32.default.createElement("th", { style: { width: "80px", padding: "8px 6px", border: "1px solid #dee2e6" } }))), /* @__PURE__ */ import_react32.default.createElement("tbody", null, brands.map((brand) => /* @__PURE__ */ import_react32.default.createElement("tr", { key: brand.id, style: { borderBottom: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "10px 12px", border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "fw-bold text-dark fs-14" }, brand.brandName), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11 font-monospace" }, brand.id)), /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "10px 12px", border: "1px solid #dee2e6" } }, brand.vendors && brand.vendors.length > 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-wrap gap-1" }, brand.vendors.filter(Boolean).map((v, i) => /* @__PURE__ */ import_react32.default.createElement("span", { key: i, className: "badge bg-light text-secondary border fs-11 fw-normal px-2 py-1" }, v))) : /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-muted fs-12" }, "\u2014 None \u2014")), boxSizes.map((bs) => {
+    )), /* @__PURE__ */ import_react32.default.createElement("div", { className: "card-body px-4 py-3" }, brands.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-center text-muted py-5 fs-13" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-tag fs-30 d-block mb-2 opacity-40" }), 'No brands added yet. Click "+ New Brand" to add.') : /* @__PURE__ */ import_react32.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react32.default.createElement("table", { className: "table table-bordered align-middle mb-0 fs-13", style: { border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("thead", { style: { background: "#f8fafc", borderBottom: "2px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("tr", { style: { color: "#475569", fontSize: "11.5px", fontWeight: 600 } }, /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6", minWidth: "120px" } }, "BRAND NAME"), /* @__PURE__ */ import_react32.default.createElement("th", { style: { padding: "8px 10px", border: "1px solid #dee2e6" } }, "VENDOR(S)"), boxSizes.map((bs) => {
+      const info = formatBoxSizeLabel(bs);
+      return /* @__PURE__ */ import_react32.default.createElement("th", { key: bs.id, className: "text-center", style: { padding: "8px 8px", border: "1px solid #dee2e6", minWidth: "130px", background: "#fffbeb" } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "fw-bold" }, info.icon, " ", bs.sizeName), /* @__PURE__ */ import_react32.default.createElement("div", { className: "fw-semibold text-secondary font-monospace", style: { fontSize: "10.5px" } }, info.calcBreakdown));
+    }), /* @__PURE__ */ import_react32.default.createElement("th", { style: { width: "80px", padding: "8px 6px", border: "1px solid #dee2e6" } }))), /* @__PURE__ */ import_react32.default.createElement("tbody", null, brands.map((brand) => /* @__PURE__ */ import_react32.default.createElement("tr", { key: brand.id, style: { borderBottom: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "10px 12px", border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "fw-bold text-dark fs-14" }, brand.brandName), /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-11 font-monospace" }, brand.id)), /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "10px 12px", border: "1px solid #dee2e6" } }, brand.vendors && brand.vendors.length > 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-wrap gap-1" }, brand.vendors.filter(Boolean).map((v, i) => /* @__PURE__ */ import_react32.default.createElement("span", { key: i, className: "badge bg-light text-secondary border fs-11 fw-normal px-2 py-1" }, v))) : /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-muted fs-12" }, "\u2014 None \u2014")), boxSizes.map((bs) => {
       const rateEntry = (brand.rates || []).find((r) => r.boxSizeId === bs.id);
       return /* @__PURE__ */ import_react32.default.createElement("td", { key: bs.id, className: "text-center", style: { padding: "10px 8px", border: "1px solid #dee2e6", background: "#fffbeb" } }, rateEntry && rateEntry.rate ? /* @__PURE__ */ import_react32.default.createElement("span", { className: "fw-semibold text-dark fs-13" }, "\u20B9", rateEntry.rate) : /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border fs-11 fw-normal px-2 py-1" }, "\u2014"));
     }), /* @__PURE__ */ import_react32.default.createElement("td", { style: { padding: "8px 6px", border: "1px solid #dee2e6" } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex gap-1 justify-content-center" }, /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-light text-primary p-1 rounded-2", onClick: () => openEditBrand(brand), title: "Edit Brand" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-edit fs-13" })), /* @__PURE__ */ import_react32.default.createElement("button", { className: "btn btn-sm btn-light text-danger p-1 rounded-2", onClick: () => handleDeleteBrand(brand.id), title: "Delete Brand" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-trash fs-13" }))))))))))))), showBrandModal && /* @__PURE__ */ import_react32.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "modal-dialog modal-dialog-centered modal-lg" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "modal-content border-0 shadow-lg rounded-4 p-4 bg-white" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "badge bg-warning-subtle text-warning p-2 rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-tag fs-16" })), /* @__PURE__ */ import_react32.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-18" }, editingBrand ? `Edit Brand \u2014 ${editingBrand.brandName}` : "Create New Thread Brand")), /* @__PURE__ */ import_react32.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowBrandModal(false) })), /* @__PURE__ */ import_react32.default.createElement("div", { style: { maxHeight: "calc(80vh - 150px)", overflowY: "auto", paddingRight: "4px" } }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-1" }, "Brand Name ", /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react32.default.createElement(
@@ -44380,7 +44462,7 @@
         onChange: (e) => setBrandForm((prev) => ({ ...prev, brandName: e.target.value })),
         style: { borderColor: brandFormErr.brandName ? "#dc3545" : "#cbd5e1" }
       }
-    ), brandFormErr.brandName && /* @__PURE__ */ import_react32.default.createElement("div", { className: "invalid-feedback" }, brandFormErr.brandName), /* @__PURE__ */ import_react32.default.createElement("div", { className: "form-text fs-11 mt-1" }, 'Manual Entry \u2014 e.g. "Sapphire"')), /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-0" }, "Vendor Name(s) ", /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-muted fw-normal" }, "(optional, can be multiple)")), /* @__PURE__ */ import_react32.default.createElement(
+    ), brandFormErr.brandName && /* @__PURE__ */ import_react32.default.createElement("div", { className: "invalid-feedback" }, brandFormErr.brandName)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-0" }, "VENDOR NAME(S) (OPTIONAL, CAN BE MULTIPLE)"), /* @__PURE__ */ import_react32.default.createElement(
       "button",
       {
         type: "button",
@@ -44388,34 +44470,78 @@
         onClick: handleAddVendorField
       },
       "+ Add Another Vendor"
-    )), /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-column gap-2" }, brandForm.vendors.map((v, i) => /* @__PURE__ */ import_react32.default.createElement("div", { key: i, className: "d-flex gap-2 align-items-center" }, /* @__PURE__ */ import_react32.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white fs-13",
-        placeholder: `Vendor ${i + 1} name...`,
-        value: v,
-        onChange: (e) => handleBrandVendorChange(i, e.target.value),
-        style: { borderColor: "#cbd5e1" }
-      }
-    ), brandForm.vendors.length > 1 && /* @__PURE__ */ import_react32.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-sm btn-light text-danger p-1 rounded-2 flex-shrink-0",
-        onClick: () => handleRemoveVendorField(i),
-        title: "Remove vendor"
-      },
-      /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-x fs-13" })
-    ))))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-2" }, "Thread Rates ", /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-muted fw-normal" }, "(optional \u2014 per box size)")), boxSizes.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-12 py-2" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-info-circle me-1" }), "No box sizes defined yet. Add box sizes in Section 2 first.") : /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-column gap-2" }, brandForm.rates.map((rateRow) => {
+    )), /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-column gap-2" }, brandForm.vendors.map((v, i) => {
+      const isCustom = customVendorRows[i];
+      return /* @__PURE__ */ import_react32.default.createElement("div", { key: i, className: "d-flex gap-2 align-items-center" }, isCustom ? /* @__PURE__ */ import_react32.default.createElement(
+        "input",
+        {
+          type: "text",
+          className: "form-control form-control-sm bg-white fs-13",
+          placeholder: `Vendor ${i + 1} name...`,
+          value: v,
+          onChange: (e) => handleBrandVendorChange(i, e.target.value),
+          style: { borderColor: "#cbd5e1" },
+          autoFocus: true
+        }
+      ) : /* @__PURE__ */ import_react32.default.createElement(
+        "select",
+        {
+          className: "form-select form-select-sm bg-white fs-13",
+          value: v,
+          onChange: (e) => {
+            if (e.target.value === "__CUSTOM__") {
+              setCustomVendorRows((prev) => ({ ...prev, [i]: true }));
+              handleBrandVendorChange(i, "");
+            } else {
+              handleBrandVendorChange(i, e.target.value);
+            }
+          },
+          style: { borderColor: "#cbd5e1" }
+        },
+        /* @__PURE__ */ import_react32.default.createElement("option", { value: "" }, "Select vendor from Vendor Master..."),
+        masterVendors.map((vnd, vIdx) => {
+          const vName = vnd.name || vnd.vendorName || vnd.companyName;
+          return /* @__PURE__ */ import_react32.default.createElement("option", { key: vnd.id || `${vName}_${vIdx}`, value: vName }, vName, " ", vnd.type ? `(${vnd.type})` : "", " ", vnd.city ? `\u2022 ${vnd.city}` : "");
+        }),
+        v && !masterVendors.some((m) => (m.name || m.vendorName || m.companyName) === v) && /* @__PURE__ */ import_react32.default.createElement("option", { value: v }, v),
+        /* @__PURE__ */ import_react32.default.createElement("option", { value: "__CUSTOM__" }, "\u270D\uFE0F + Type Custom Vendor Name...")
+      ), /* @__PURE__ */ import_react32.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-sm btn-light border px-2 py-1 fs-12 text-secondary flex-shrink-0",
+          title: isCustom ? "Select from Master list" : "Type custom vendor name",
+          onClick: () => {
+            setCustomVendorRows((prev) => ({ ...prev, [i]: !isCustom }));
+          }
+        },
+        /* @__PURE__ */ import_react32.default.createElement("i", { className: isCustom ? "ti ti-list" : "ti ti-pencil" })
+      ), brandForm.vendors.length > 1 && /* @__PURE__ */ import_react32.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-sm btn-light text-danger p-1 rounded-2 flex-shrink-0",
+          onClick: () => handleRemoveVendorField(i),
+          title: "Remove vendor"
+        },
+        /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-x fs-13" })
+      ));
+    }))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-2" }, "THREAD RATES (OPTIONAL \u2014 PER BOX SIZE)"), boxSizes.length === 0 ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-muted fs-12 py-2" }, /* @__PURE__ */ import_react32.default.createElement("i", { className: "ti ti-info-circle me-1" }), "No box sizes defined yet. Add box sizes in Section 2 first.") : /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex flex-column gap-2" }, brandForm.rates.map((rateRow) => {
       const bs = boxSizes.find((b) => b.id === rateRow.boxSizeId);
       if (!bs) return null;
-      const label = `${bs.type === "Box" ? "\u{1F4E6}" : "\u{1F9F5}"} ${bs.sizeName} \u2014 ${Number(bs.totalThread).toLocaleString()} mts`;
-      return /* @__PURE__ */ import_react32.default.createElement("div", { key: rateRow.boxSizeId, className: "row align-items-center g-2" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-6 col-md-7" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-dark fs-13 fw-medium" }, label)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-6 col-md-5" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "input-group-text bg-white fs-13" }, "\u20B9"), /* @__PURE__ */ import_react32.default.createElement(
+      const info = formatBoxSizeLabel(bs);
+      return /* @__PURE__ */ import_react32.default.createElement("div", { key: rateRow.boxSizeId, className: "row align-items-center g-2 py-1" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12 col-sm-7" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "text-dark fs-13 fw-medium d-flex align-items-center gap-1.5 flex-wrap" }, /* @__PURE__ */ import_react32.default.createElement("span", null, info.icon), /* @__PURE__ */ import_react32.default.createElement("span", { className: "fw-bold text-dark" }, bs.sizeName), /* @__PURE__ */ import_react32.default.createElement("span", { className: "text-muted fw-normal" }, "\u2014"), /* @__PURE__ */ import_react32.default.createElement(
+        "span",
+        {
+          className: "badge bg-white text-dark border px-2 py-1 font-monospace fw-semibold shadow-2xs",
+          style: { borderColor: "#cbd5e1", fontSize: "11.5px" }
+        },
+        info.calcBreakdown
+      ))), /* @__PURE__ */ import_react32.default.createElement("div", { className: "col-12 col-sm-5" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "input-group-text bg-white fs-13 fw-semibold text-muted" }, "\u20B9"), /* @__PURE__ */ import_react32.default.createElement(
         "input",
         {
           type: "number",
-          className: "form-control form-control-sm bg-white fs-13 text-end no-spinner",
+          className: "form-control form-control-sm bg-white fs-13 text-end no-spinner fw-semibold",
           placeholder: "Enter rate...",
           value: rateRow.rate,
           onChange: (e) => handleBrandRateChange(rateRow.boxSizeId, e.target.value),
@@ -45063,12 +45189,12 @@
       const existingGrnsForPo = (grns || []).filter(
         (g) => g && (g.linkedPOs && g.linkedPOs.includes(po.id) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id)
       );
-      const orderedMeters = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+      const orderedMeters = getPoEffectiveOrderedMeters(po);
       const alreadyReceived = existingGrnsForPo.reduce(
         (sum, g) => sum + (Number(g.totalMetersEntered) || Number(g.declaredTotalMeters) || 0),
         0
       );
-      const pendingMeters = po.pendingQtyToReceive !== void 0 ? Number(po.pendingQtyToReceive) : Math.max(0, orderedMeters - alreadyReceived);
+      const pendingMeters = Math.max(0, orderedMeters - alreadyReceived);
       if (orderedMeters > 0 && pendingMeters <= 0 || po.status === "Completed") {
         alert(`Purchase Order ${po.id} is already fully received (${alreadyReceived.toLocaleString()}m received). All ordered goods have arrived and no further GRN can be created.`);
         return;
@@ -45150,7 +45276,7 @@
         targetLinkedPoIds.forEach((linkedPoId) => {
           const targetPo = purchaseOrders.find((p) => p.id === linkedPoId);
           if (targetPo) {
-            const poOrderedMeters = (targetPo.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+            const poOrderedMeters = getPoEffectiveOrderedMeters(targetPo);
             const allGrnsForPo = updated.filter((g) => g && (g.linkedPOs && g.linkedPOs.includes(linkedPoId) || g.poId === linkedPoId));
             let totalReceivedForPo = 0;
             allGrnsForPo.forEach((g) => {

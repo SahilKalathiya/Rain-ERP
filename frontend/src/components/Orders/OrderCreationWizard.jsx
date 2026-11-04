@@ -2256,16 +2256,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                       </span>
                                     </div>
 
-                                    {/* Copy sizes to other colours button */}
-                                    {cfg && (cust.selectedColors || []).length > 1 && (
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm erp-btn-outline rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
-                                        onClick={() => openCopySizesDialog(ci, artId, colName)}
-                                      >
-                                        <i className="ti ti-copy me-1"></i> Copy sizes to other colours
-                                      </button>
-                                    )}
+
                                   </div>
 
                                   {/* Series Configuration Section */}

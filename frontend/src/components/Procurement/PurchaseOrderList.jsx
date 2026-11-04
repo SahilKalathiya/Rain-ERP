@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getMetersForPoFromGrn } from '../../utils/procurementUtils';
+import { getMetersForPoFromGrn, getPoEffectiveOrderedMeters } from '../../utils/procurementUtils';
 
 /**
  * PurchaseOrderList - 4.0 PO Management List
@@ -227,7 +227,7 @@ export default function PurchaseOrderList({
                 </tr>
               ) : (
                 sortedList.map((po) => {
-                  const totalOrdered = (po.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+                  const totalOrdered = getPoEffectiveOrderedMeters(po);
                   const poGrns = (grns || []).filter((g) => (g.linkedPOs && g.linkedPOs.includes(po.id)) || g.poId === po.id || g.poNumber === po.id || g.againstPo === po.id);
                   const hasExistingGrn = poGrns.length > 0 || (Number(po.receivedQty) > 0) || po.status === 'Partially Received' || po.status === 'Completed';
                   const receivedMeters = poGrns.reduce((sum, g) => sum + getMetersForPoFromGrn(g, po.id, po.items, purchaseOrders), 0) || Number(po.receivedQty) || 0;
