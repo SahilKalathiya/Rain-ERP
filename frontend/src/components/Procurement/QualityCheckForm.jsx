@@ -145,6 +145,57 @@ export default function QualityCheckForm({
   const [pieceInspections, setPieceInspections] = useState(qc?.pieceInspections || {});
   const [toastNotification, setToastNotification] = useState(null);
 
+  // Photo Zoom / Lightbox State
+  const [zoomedPhoto, setZoomedPhoto] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [rotation, setRotation] = useState(0);
+
+  const handleOpenZoomModal = (photo) => {
+    setZoomedPhoto(photo);
+    setZoomScale(1);
+    setRotation(0);
+  };
+
+  const handleCloseZoomModal = () => {
+    setZoomedPhoto(null);
+    setZoomScale(1);
+    setRotation(0);
+  };
+
+  const handleZoomIn = () => {
+    setZoomScale((prev) => Math.min(prev + 0.25, 4));
+  };
+
+  const handleZoomOut = () => {
+    setZoomScale((prev) => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoomScale(1);
+    setRotation(0);
+  };
+
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!zoomedPhoto) return;
+      if (e.key === 'Escape') {
+        handleCloseZoomModal();
+      } else if (e.key === '+' || e.key === '=') {
+        handleZoomIn();
+      } else if (e.key === '-') {
+        handleZoomOut();
+      } else if (e.key === '0') {
+        handleResetZoom();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedPhoto]);
+
   // Dropdown states for Bale / Piece-level inspection (Requirement 24)
   const [selectedBaleFilter, setSelectedBaleFilter] = useState('');
   const [selectedPieceKey, setSelectedPieceKey] = useState('');
@@ -1076,7 +1127,21 @@ export default function QualityCheckForm({
                     <div
                       key={idx}
                       className="position-relative border rounded-2 p-1 bg-white shadow-xs"
-                      style={{ width: '85px' }}
+                      style={{
+                        width: '85px',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                      }}
+                      onClick={() => handleOpenZoomModal(ph)}
+                      title="Click to zoom / inspect photo"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(91, 71, 251, 0.25)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '';
+                      }}
                     >
                       {/* Cancel / Delete photo button */}
                       <button
@@ -1101,12 +1166,21 @@ export default function QualityCheckForm({
                       >
                         &times;
                       </button>
-                      <img
-                        src={ph.url}
-                        alt={ph.name}
-                        className="rounded-1 w-100"
-                        style={{ height: '65px', objectFit: 'cover' }}
-                      />
+                      <div className="position-relative overflow-hidden rounded-1" style={{ height: '65px' }}>
+                        <img
+                          src={ph.url}
+                          alt={ph.name}
+                          className="w-100 h-100"
+                          style={{ objectFit: 'cover' }}
+                        />
+                        <div
+                          className="position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1 py-0.5 d-flex align-items-center"
+                          style={{ fontSize: '10px' }}
+                          title="Click to zoom"
+                        >
+                          <i className="ti ti-zoom-in"></i>
+                        </div>
+                      </div>
                       <div
                         className="text-truncate fs-10 text-muted mt-1 text-center"
                         title={ph.name}
@@ -1500,7 +1574,25 @@ export default function QualityCheckForm({
                           {pieceData.photos && pieceData.photos.length > 0 && (
                             <div className="d-flex flex-wrap gap-2 pt-1">
                               {pieceData.photos.map((ph, phIdx) => (
-                                <div key={phIdx} className="position-relative border rounded-2 p-1 bg-white shadow-xs" style={{ width: '75px' }}>
+                                <div
+                                  key={phIdx}
+                                  className="position-relative border rounded-2 p-1 bg-white shadow-xs"
+                                  style={{
+                                    width: '75px',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                                  }}
+                                  onClick={() => handleOpenZoomModal(ph)}
+                                  title="Click to zoom / inspect photo"
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(91, 71, 251, 0.25)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '';
+                                  }}
+                                >
                                   {/* Cancel / Delete piece photo button */}
                                   <button
                                     type="button"
@@ -1524,12 +1616,21 @@ export default function QualityCheckForm({
                                   >
                                     &times;
                                   </button>
-                                  <img
-                                    src={ph.url}
-                                    alt={ph.name}
-                                    className="rounded-1 w-100"
-                                    style={{ height: '52px', objectFit: 'cover' }}
-                                  />
+                                  <div className="position-relative overflow-hidden rounded-1" style={{ height: '52px' }}>
+                                    <img
+                                      src={ph.url}
+                                      alt={ph.name}
+                                      className="w-100 h-100"
+                                      style={{ objectFit: 'cover' }}
+                                    />
+                                    <div
+                                      className="position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1 py-0.5 d-flex align-items-center"
+                                      style={{ fontSize: '9px' }}
+                                      title="Click to zoom"
+                                    >
+                                      <i className="ti ti-zoom-in"></i>
+                                    </div>
+                                  </div>
                                   <div className="text-truncate fs-10 text-muted mt-1 text-center" title={ph.name}>
                                     {ph.name}
                                   </div>
@@ -1884,6 +1985,171 @@ export default function QualityCheckForm({
                     <span>Capture Photo</span>
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULL PHOTO ZOOM / LIGHTBOX MODAL */}
+      {zoomedPhoto && (
+        <div
+          className="modal show d-block"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 1075
+          }}
+          tabIndex="-1"
+          onClick={handleCloseZoomModal}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-xl"
+            style={{ maxWidth: '92vw', height: '92vh', margin: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="modal-content rounded-4 border-0 shadow-2xl overflow-hidden bg-dark text-white d-flex flex-column"
+              style={{ height: '90vh' }}
+            >
+              {/* Modal Header */}
+              <div className="modal-header border-bottom border-secondary border-opacity-25 px-4 py-2.5 bg-dark d-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center gap-2 text-truncate me-3">
+                  <span className="p-1.5 rounded-circle bg-primary bg-opacity-25 text-white">
+                    <i className="ti ti-photo fs-16"></i>
+                  </span>
+                  <div className="text-truncate">
+                    <h6 className="modal-title fw-bold text-white fs-14 mb-0 text-truncate">
+                      {zoomedPhoto.name || 'Inspection Photo'}
+                    </h6>
+                    {zoomedPhoto.time && (
+                      <span className="text-white-50 fs-11">Captured: {zoomedPhoto.time}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Zoom & Transform Controls */}
+                <div className="d-flex align-items-center gap-1.5">
+                  <div className="btn-group btn-group-sm bg-black bg-opacity-50 p-1 rounded-3 border border-secondary border-opacity-25">
+                    <button
+                      type="button"
+                      className="btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1"
+                      onClick={handleZoomOut}
+                      disabled={zoomScale <= 0.5}
+                      title="Zoom Out (-)"
+                    >
+                      <i className="ti ti-zoom-out fs-15"></i>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-dark btn-sm text-white px-2.5 border-0 font-monospace fs-12 fw-semibold"
+                      onClick={handleResetZoom}
+                      title="Reset Zoom (0)"
+                    >
+                      {Math.round(zoomScale * 100)}%
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1"
+                      onClick={handleZoomIn}
+                      disabled={zoomScale >= 4}
+                      title="Zoom In (+)"
+                    >
+                      <i className="ti ti-zoom-in fs-15"></i>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1"
+                    onClick={handleRotate}
+                    title="Rotate 90° Clockwise"
+                  >
+                    <i className="ti ti-rotate fs-15"></i>
+                    <span className="d-none d-sm-inline fs-11">Rotate</span>
+                  </button>
+
+                  {zoomedPhoto.url && (
+                    <a
+                      href={zoomedPhoto.url}
+                      download={zoomedPhoto.name || 'qc-photo.jpg'}
+                      className="btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1"
+                      title="Download / Save Photo"
+                    >
+                      <i className="ti ti-download fs-15"></i>
+                      <span className="d-none d-sm-inline fs-11">Save</span>
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white ms-2"
+                    onClick={handleCloseZoomModal}
+                    aria-label="Close"
+                  ></button>
+                </div>
+              </div>
+
+              {/* Modal Body / Image Viewer */}
+              <div
+                className="modal-body p-0 d-flex align-items-center justify-content-center overflow-auto position-relative"
+                style={{
+                  backgroundColor: '#0a0f1d',
+                  cursor: zoomScale > 1 ? 'grab' : 'zoom-in',
+                  userSelect: 'none'
+                }}
+                onWheel={(e) => {
+                  if (e.deltaY < 0) handleZoomIn();
+                  else handleZoomOut();
+                }}
+                onClick={() => {
+                  if (zoomScale === 1) handleZoomIn();
+                  else handleResetZoom();
+                }}
+                title="Click or scroll to zoom. Drag to view."
+              >
+                <div
+                  style={{
+                    transition: 'transform 0.15s ease-out',
+                    transform: `scale(${zoomScale}) rotate(${rotation}deg)`,
+                    transformOrigin: 'center center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    maxWidth: '100%',
+                    maxHeight: '100%'
+                  }}
+                >
+                  <img
+                    src={zoomedPhoto.url}
+                    alt={zoomedPhoto.name || 'Inspection Photo'}
+                    className="img-fluid rounded-2"
+                    style={{
+                      maxHeight: '75vh',
+                      maxWidth: '85vw',
+                      objectFit: 'contain',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+                    }}
+                    draggable={false}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="modal-footer border-top border-secondary border-opacity-25 px-4 py-2 bg-dark d-flex align-items-center justify-content-between text-white-50 fs-12">
+                <div className="d-flex align-items-center gap-3">
+                  <span><kbd className="bg-secondary text-white px-1.5 py-0.5 rounded fs-10">+</kbd> / <kbd className="bg-secondary text-white px-1.5 py-0.5 rounded fs-10">-</kbd> Zoom</span>
+                  <span><kbd className="bg-secondary text-white px-1.5 py-0.5 rounded fs-10">0</kbd> Reset</span>
+                  <span><kbd className="bg-secondary text-white px-1.5 py-0.5 rounded fs-10">ESC</kbd> Close</span>
+                  <span className="d-none d-md-inline text-secondary">| Scroll mouse wheel to zoom</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm px-3 rounded-2 fs-12"
+                  onClick={handleCloseZoomModal}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

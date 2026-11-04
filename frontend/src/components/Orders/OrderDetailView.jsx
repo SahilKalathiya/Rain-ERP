@@ -374,6 +374,75 @@ export default function OrderDetailView({
     return (fabBuf !== undefined && fabBuf !== null && !isNaN(fabBuf)) ? fabBuf : 10;
   };
 
+  // Helper to dynamically resolve available colors from item and Accessories Master
+  const getItemAvailableColors = (accItem) => {
+    if (Array.isArray(accItem?.colors) && accItem.colors.length > 0) {
+      return accItem.colors;
+    }
+    const targetName = (accItem?.varietyName || accItem?.name || '').toLowerCase().trim();
+    const match = (masterAccessories || []).find(m => {
+      const mName = (m.name || '').toLowerCase().trim();
+      if (!mName) return false;
+      return mName === targetName || targetName.startsWith(mName) || targetName.includes(mName);
+    });
+    if (match) {
+      const cols = (match.buttonColorsList && match.buttonColorsList.length > 0)
+        ? match.buttonColorsList
+        : (match.buttonColors ? match.buttonColors.split(',').map(s => s.trim()).filter(Boolean) : (match.colors?.length ? match.colors : (match.color ? [match.color] : [])));
+      if (cols.length > 0) return cols;
+    }
+    // Also check all items under matching category in masterAccessories
+    const itemCat = (accItem?.category || '').toLowerCase();
+    const isButton = itemCat.includes('button');
+    if (isButton) {
+      const allBtnCols = new Set();
+      (masterAccessories || [])
+        .filter(m => (m.category || '').toLowerCase().includes('button'))
+        .forEach(m => {
+          const cols = (m.buttonColorsList && m.buttonColorsList.length > 0)
+            ? m.buttonColorsList
+            : (m.buttonColors ? m.buttonColors.split(',').map(s => s.trim()).filter(Boolean) : (m.colors?.length ? m.colors : (m.color ? [m.color] : [])));
+          cols.forEach(c => allBtnCols.add(c));
+        });
+      if (allBtnCols.size > 0) return Array.from(allBtnCols);
+    }
+    return [];
+  };
+
+  // Helper to dynamically resolve available sizes from item and Accessories Master
+  const getItemAvailableSizes = (accItem) => {
+    if (Array.isArray(accItem?.sizes) && accItem.sizes.length > 0) {
+      return accItem.sizes;
+    }
+    const targetName = (accItem?.varietyName || accItem?.name || '').toLowerCase().trim();
+    const match = (masterAccessories || []).find(m => {
+      const mName = (m.name || '').toLowerCase().trim();
+      if (!mName) return false;
+      return mName === targetName || targetName.startsWith(mName) || targetName.includes(mName);
+    });
+    if (match) {
+      const szs = (match.buttonSizesList && match.buttonSizesList.length > 0)
+        ? match.buttonSizesList
+        : (match.buttonSizes ? match.buttonSizes.split(',').map(s => s.trim()).filter(Boolean) : (match.variants?.length ? match.variants : (match.sizes?.length ? match.sizes : (match.size ? [match.size] : []))));
+      if (szs.length > 0) return szs;
+    }
+    const itemCat = (accItem?.category || '').toLowerCase();
+    const isButton = itemCat.includes('button');
+    if (isButton) {
+      const allBtnSizes = new Set();
+      (masterAccessories || [])
+        .filter(m => (m.category || '').toLowerCase().includes('button'))
+        .forEach(m => {
+          const szs = (m.buttonSizesList && m.buttonSizesList.length > 0)
+            ? m.buttonSizesList
+            : (m.buttonSizes ? m.buttonSizes.split(',').map(s => s.trim()).filter(Boolean) : (m.variants?.length ? m.variants : (m.sizes?.length ? m.sizes : (m.size ? [m.size] : []))));
+          szs.forEach(s => allBtnSizes.add(s));
+        });
+      if (allBtnSizes.size > 0) return Array.from(allBtnSizes);
+    }
+    return [];
+  };
+
   const CATEGORY_METADATA = {
     'Buttons': { name: 'Buttons', icon: 'ti ti-circle-dot', iconColor: '#475569', bgColor: '#f1f5f9', poBtnText: 'Button PO', poBtnColor: '#2563eb', defaultUnit: 'PCS' },
     'Lace': { name: 'Lace', icon: 'ti ti-cut', iconColor: '#2563eb', bgColor: '#eff6ff', poBtnText: 'Lace PO', poBtnColor: '#9333ea', defaultUnit: 'METER' },
@@ -531,9 +600,9 @@ export default function OrderDetailView({
             const rawExtra = r.extraPerPack ?? '';
             const defaultBuf = getAccessoryMasterBuffer({ ...acc, ...r }, r.article || acc.article || 'Kurta');
             const hasUserEdited = r._userEditedBuffer === true;
-            const resBuf = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+            const resBuf = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && hasUserEdited)
               ? r.bufferPct
-              : defaultBuf;
+              : '';
             flattened.push({
               id: `acc_${acc.category || 'acc'}_${aIdx}_${rIdx}`,
               category: acc.category || 'Buttons',
@@ -560,9 +629,9 @@ export default function OrderDetailView({
           const rawExtra = acc.extraPerPack ?? '';
           const defaultBuf = getAccessoryMasterBuffer(acc, acc.article || 'Kurta');
           const hasUserEdited = acc._userEditedBuffer === true;
-          const resBuf = (acc.bufferPct !== undefined && acc.bufferPct !== null && acc.bufferPct !== '' && (hasUserEdited || parseFloat(acc.bufferPct) > 0))
+          const resBuf = (acc.bufferPct !== undefined && acc.bufferPct !== null && acc.bufferPct !== '' && hasUserEdited)
             ? acc.bufferPct
-            : defaultBuf;
+            : '';
           flattened.push({
             ...acc,
             placement: (rawPlacement === 'Front Placket' || rawPlacement === 'Front..') ? '' : rawPlacement,
@@ -613,10 +682,9 @@ export default function OrderDetailView({
                 const packInput = r.extraPerPack !== undefined && r.extraPerPack !== null ? String(r.extraPerPack).trim() : '';
                 const packNum = parseFloat(packInput);
                 const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
-                const hasUserEdited = r._userEditedBuffer === true;
-                const bufVal = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+                const bufVal = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '')
                   ? (parseFloat(r.bufferPct) || 0)
-                  : defaultBuf;
+                  : 0;
                 const artPcs = parseFloat(r.totalQty) || 0;
                 const reqQty = artPcs * reqVal;
                 const packQty = artPcs * packVal;
@@ -854,9 +922,9 @@ export default function OrderDetailView({
           seen.add(key);
           const matchedOpt = colorOpts.find(co => co.color.toLowerCase() === key || co.display.toLowerCase() === raw.toLowerCase());
           const hasUserEdited = r._userEditedBuffer === true;
-          const resolvedBuffer = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && (hasUserEdited || parseFloat(r.bufferPct) > 0))
+          const resolvedBuffer = (r.bufferPct !== undefined && r.bufferPct !== null && r.bufferPct !== '' && hasUserEdited)
             ? r.bufferPct
-            : defaultBuffer;
+            : '';
           deduped.push({
             ...r,
             bufferPct: resolvedBuffer,
@@ -880,7 +948,7 @@ export default function OrderDetailView({
       fabricColor: (item.fabricColor && item.fabricColor !== '—') ? item.fabricColor : '',
       reqPerPc: item.reqPerPc || '',
       extraPerPack: item.extraPerPack || '',
-      bufferPct: (item.bufferPct !== undefined && item.bufferPct !== '' && (item._userEditedBuffer || parseFloat(item.bufferPct) > 0)) ? item.bufferPct : defaultBuffer,
+      bufferPct: (item.bufferPct !== undefined && item.bufferPct !== '' && item._userEditedBuffer) ? item.bufferPct : '',
       dyedRate: item.dyedRate || '',
       shrinkPct: item.shrinkPct || '',
       lines: item.lines || ''
@@ -897,7 +965,7 @@ export default function OrderDetailView({
         fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
-        bufferPct: defaultBuffer
+        bufferPct: ''
       }
     ];
   };
@@ -908,8 +976,10 @@ export default function OrderDetailView({
       if (value !== '' && value !== null && value !== undefined) {
         const num = parseFloat(value);
         if (!isNaN(num)) {
-          if (num > 100) {
-            finalValue = '100';
+          const targetItem = addedAccessories.find(a => a.id === itemId);
+          const maxAllowed = getAccessoryMasterBuffer(targetItem, articleName);
+          if (num > maxAllowed) {
+            finalValue = String(maxAllowed);
           } else if (num < 0) {
             finalValue = '0';
           } else {
@@ -1064,7 +1134,7 @@ export default function OrderDetailView({
           fabricColor: '',
           reqPerPc: '',
           extraPerPack: '',
-          bufferPct: defaultBuffer,
+          bufferPct: '',
           dyedRate: '',
           shrinkPct: '',
           lines: ''
@@ -1090,7 +1160,7 @@ export default function OrderDetailView({
         fabricColor: '',
         reqPerPc: '',
         extraPerPack: '',
-        bufferPct: getAccessoryMasterBuffer({ category: catId, varietyName: resolvedVarName, ...varObj }, targetArticle),
+        bufferPct: '',
         total: '0.0'
       });
 
@@ -1365,10 +1435,9 @@ export default function OrderDetailView({
                   const packNum = parseFloat(packInput);
                   const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
                   const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const hasUserEdited = row._userEditedBuffer === true;
-                  const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                  const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
                     ? (parseFloat(row.bufferPct) || 0)
-                    : defaultBuf;
+                    : 0;
                   const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const reqQty = artPcs * reqVal;
                   const packQty = artPcs * packVal;
@@ -1447,14 +1516,31 @@ export default function OrderDetailView({
 
                       <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. Pearl Wh"
-                            value={row.accessoryColor ?? ''}
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
-                            style={inputStyle}
-                          />
+                          getItemAvailableColors(item).length > 0 ? (
+                            <select
+                              className="form-select form-select-sm"
+                              value={row.accessoryColor ?? ''}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
+                              style={selectStyle}
+                            >
+                              <option value="">Select Color</option>
+                              {getItemAvailableColors(item).map((c, cIdx) => (
+                                <option key={cIdx} value={c}>{c}</option>
+                              ))}
+                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
+                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
+                              )}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="e.g. Pearl Wh"
+                              value={row.accessoryColor ?? ''}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
+                              style={inputStyle}
+                            />
+                          )
                         ) : (
                           <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
                         )}
@@ -1462,7 +1548,7 @@ export default function OrderDetailView({
 
                       <td style={{ minWidth: '120px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          item.hasSizes && item.sizes && item.sizes.length > 0 ? (
+                          getItemAvailableSizes(item).length > 0 ? (
                             <select
                               className="form-select form-select-sm"
                               value={row.size ?? ''}
@@ -1470,7 +1556,10 @@ export default function OrderDetailView({
                               style={selectStyle}
                             >
                               <option value="">Select Size</option>
-                              {item.sizes.map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
+                              {getItemAvailableSizes(item).map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
+                              {row.size && !getItemAvailableSizes(item).includes(row.size) && (
+                                <option value={row.size}>{row.size}</option>
+                              )}
                             </select>
                           ) : (
                             <input
@@ -1567,11 +1656,11 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max={defaultBuf || 100}
+                              max={defaultBuf ?? 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
-                              placeholder={String(defaultBuf)}
+                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
+                              placeholder=""
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1580,11 +1669,19 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
+                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
                           </div>
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {bufVal}%
-                          </span>
+                          <div className="d-flex flex-column align-items-center">
+                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                              {bufVal > 0 ? `${bufVal}%` : '0%'}
+                            </span>
+                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
+                          </div>
                         )}
                       </td>
 
@@ -1637,10 +1734,9 @@ export default function OrderDetailView({
                   const shrinkVal = parseFloat(row.shrinkPct) || 0;
                   const greigeVal = dyedVal * (1 + shrinkVal / 100);
                   const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const hasUserEdited = row._userEditedBuffer === true;
-                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
                     ? (parseFloat(row.bufferPct) || 0)
-                    : defaultBuf;
+                    : 0;
                   const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const totalValNum = (greigeVal * qtyVal * (1 + bufferVal / 100));
                   const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
@@ -1682,10 +1778,13 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          item.colors && item.colors.length > 0 ? (
+                          getItemAvailableColors(item).length > 0 ? (
                             <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
                               <option value="">Select Color</option>
-                              {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                              {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
+                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
+                              )}
                             </select>
                           ) : (
                             <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
@@ -1717,11 +1816,11 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max={defaultBuf || 100}
+                              max={defaultBuf ?? 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
-                              placeholder={String(defaultBuf)}
+                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
+                              placeholder=""
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1730,11 +1829,19 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
+                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
                           </div>
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {bufferVal}%
-                          </span>
+                          <div className="d-flex flex-column align-items-center">
+                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                              {bufferVal > 0 ? `${bufferVal}%` : '0%'}
+                            </span>
+                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
+                          </div>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -1786,10 +1893,9 @@ export default function OrderDetailView({
                   const isAllColours = row.articleColor === 'All colours';
                   const reqVal = parseFloat(row.reqPerPc) || 0;
                   const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const hasUserEdited = row._userEditedBuffer === true;
-                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
                     ? (parseFloat(row.bufferPct) || 0)
-                    : defaultBuf;
+                    : 0;
                   const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                   const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
                   const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
@@ -1832,10 +1938,13 @@ export default function OrderDetailView({
                       </td>
                       <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                         {isEditing ? (
-                          item.colors && item.colors.length > 0 ? (
+                          getItemAvailableColors(item).length > 0 ? (
                             <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
                               <option value="">Select Color</option>
-                              {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                              {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
+                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
+                              )}
                             </select>
                           ) : (
                             <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
@@ -1883,11 +1992,11 @@ export default function OrderDetailView({
                             <input
                               type="number"
                               min="0"
-                              max={defaultBuf || 100}
+                              max={defaultBuf ?? 100}
                               step="0.5"
                               className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
-                              placeholder={String(defaultBuf)}
+                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
+                              placeholder=""
                               onKeyDown={(e) => {
                                 if (['-', '+', 'e', 'E'].includes(e.key)) {
                                   e.preventDefault();
@@ -1896,11 +2005,19 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
+                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
                           </div>
                         ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {bufferVal}%
-                          </span>
+                          <div className="d-flex flex-column align-items-center">
+                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                              {bufferVal > 0 ? `${bufferVal}%` : '0%'}
+                            </span>
+                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                              max {defaultBuf}%
+                            </div>
+                          </div>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -1950,10 +2067,9 @@ export default function OrderDetailView({
                 const isAllColours = row.articleColor === 'All colours';
                 const reqVal = parseFloat(row.reqPerPc) || 0;
                 const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                const hasUserEdited = row._userEditedBuffer === true;
-                const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '' && (hasUserEdited || parseFloat(row.bufferPct) > 0))
+                const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
                   ? (parseFloat(row.bufferPct) || 0)
-                  : defaultBuf;
+                  : 0;
                 const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
                 const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
                 const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
@@ -1996,10 +2112,13 @@ export default function OrderDetailView({
                     </td>
                     <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        item.colors && item.colors.length > 0 ? (
+                        getItemAvailableColors(item).length > 0 ? (
                           <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
                             <option value="">Select Color</option>
-                            {item.colors.map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                            {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                            {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
+                              <option value={row.accessoryColor}>{row.accessoryColor}</option>
+                            )}
                           </select>
                         ) : (
                           <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
@@ -2010,10 +2129,13 @@ export default function OrderDetailView({
                     </td>
                     <td style={{ minWidth: '110px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        item.hasSizes && item.sizes && item.sizes.length > 0 ? (
+                        getItemAvailableSizes(item).length > 0 ? (
                           <select className="form-select form-select-sm" value={row.size ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)} style={selectStyle}>
                             <option value="">Select Size</option>
-                            {item.sizes.map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
+                            {getItemAvailableSizes(item).map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
+                            {row.size && !getItemAvailableSizes(item).includes(row.size) && (
+                              <option value={row.size}>{row.size}</option>
+                            )}
                           </select>
                         ) : (
                           <input
@@ -2068,11 +2190,11 @@ export default function OrderDetailView({
                           <input
                             type="number"
                             min="0"
-                            max={defaultBuf || 100}
+                            max={defaultBuf ?? 100}
                             step="0.5"
                             className="form-control form-control-sm text-center"
-                            value={row.bufferPct !== undefined && row.bufferPct !== '' && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf}
-                            placeholder={String(defaultBuf)}
+                            value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
+                            placeholder=""
                             onKeyDown={(e) => {
                               if (['-', '+', 'e', 'E'].includes(e.key)) {
                                 e.preventDefault();
@@ -2081,11 +2203,19 @@ export default function OrderDetailView({
                             onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                             style={inputStyle}
                           />
+                          <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            max {defaultBuf}%
+                          </div>
                         </div>
                       ) : (
-                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                          {bufferVal}%
-                        </span>
+                        <div className="d-flex flex-column align-items-center">
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                            {bufferVal > 0 ? `${bufferVal}%` : '0%'}
+                          </span>
+                          <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                            max {defaultBuf}%
+                          </div>
+                        </div>
                       )}
                     </td>
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
@@ -2231,14 +2361,9 @@ export default function OrderDetailView({
 
     const isMockSample = !order || (!order.id && !order.styleName && (!order.articles || order.articles.length === 0));
 
-    // If order already has saved fabricConsumptions, initialize from them (excluding 0 pcs rows)
+    // If order already has saved fabricConsumptions, initialize from them
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
       return order.fabricConsumptions
-        .filter(fc => {
-          const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
-          const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
-          return isNaN(parsedPcs) || parsedPcs > 0;
-        })
         .map((fc, idx) => {
           const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
           const artIdx = fc.articleIndex !== undefined
@@ -2262,9 +2387,20 @@ export default function OrderDetailView({
           const shrink = masterShrink;
           const buf = parseFloat(fc.maxBuffer || fc.bufferPercent || fc.bufferPct || artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
 
+          const roleStr = (fc.role || artFab.pieceLabel || artFab.role || '').toLowerCase();
+          const isMain = roleStr === 'main' || fc.isMainFabric || (Array.isArray(art.fabrics) && art.fabrics[0] === artFab);
+
           const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
           const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
-          const finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          // If secondary fabric and not explicitly edited by user, do not auto-fill article pieces
+          let finalPcs = 0;
+          if (fc._userEditedPcs) {
+            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          } else if (isMain) {
+            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          } else {
+            finalPcs = 0;
+          }
 
           // Dyed Rate: do NOT pre-fill dummy 1.5, 2.5, 3.0 unless explicitly edited by user
           let rawDyed = '';
@@ -2298,9 +2434,11 @@ export default function OrderDetailView({
             shrinkPct: shrink,
             bufferPct: buf,
             pcs: finalPcs,
+            isMainFabric: isMain,
             locked: fc.locked !== undefined ? !!fc.locked : false,
             _userSelectedWidth: Boolean(initialWidth),
-            _userEditedDyed: Boolean(rawDyed !== '')
+            _userEditedDyed: Boolean(rawDyed !== ''),
+            _userEditedPcs: Boolean(fc._userEditedPcs)
           };
         });
     }
@@ -2411,7 +2549,8 @@ export default function OrderDetailView({
         colorsForThisFab.forEach((col, cIdx) => {
           const custPcs = getCustomerPcs(artName, col);
           if (custPcs <= 0 && colorsForThisFab.length > 0) return;
-          const pcsVal = custPcs > 0 ? custPcs : 0;
+          const isMainFabric = fIdx === 0 || (role || '').toLowerCase() === 'main';
+          const pcsVal = isMainFabric ? (custPcs > 0 ? custPcs : 0) : (parseInt(artFab.pcs, 10) || 0);
 
           rows.push({
             key: `${artName}_${fabName}_${role}_${col}_${fIdx}_${cIdx}`,
@@ -2429,6 +2568,7 @@ export default function OrderDetailView({
             shrinkPct: shrinkVal,
             bufferPct: bufferVal,
             pcs: pcsVal,
+            isMainFabric: isMainFabric,
             locked: false
           });
         });
@@ -2804,6 +2944,28 @@ export default function OrderDetailView({
     }));
   };
 
+  const handleUpdateRowPcs = (rowKey, val) => {
+    const num = val === '' ? '' : (parseInt(val, 10) || 0);
+    setConsumptionRows(prev => prev.map(r => {
+      if (r.key === rowKey) {
+        return { ...r, pcs: num, _userEditedPcs: true };
+      }
+      return r;
+    }));
+  };
+
+  const handleUpdateSummaryDyedRate = (fabricName, width, val) => {
+    const num = val === '' ? '' : (parseFloat(val) || 0);
+    setConsumptionRows(prev => prev.map(r => {
+      const matchFab = (r.fabricQuality || '').toLowerCase() === (fabricName || '').toLowerCase();
+      const matchWidth = (r.width || '') === (width || '') || (!r.width && !width);
+      if (matchFab && matchWidth) {
+        return { ...r, dyedRate: num, _userEditedDyed: true };
+      }
+      return r;
+    }));
+  };
+
   const [showRateCalculation, setShowRateCalculation] = useState(false);
   const [customMarketRates, setCustomMarketRates] = useState({});
 
@@ -2845,9 +3007,7 @@ export default function OrderDetailView({
           rows: []
         });
       }
-      if ((parseInt(row.pcs, 10) || 0) > 0) {
-        map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
-      }
+      map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
     });
     return Array.from(map.values()).filter(g => g.rows.length > 0);
   }, [consumptionRows, articleSourcing, masterFabricsList]);
@@ -2876,9 +3036,11 @@ export default function OrderDetailView({
         map.set(key, {
           fabricName: fabName,
           width: width,
+          shrinkPct: shrink,
           pcs: 0,
           totalDyed: 0,
           totalGreige: 0,
+          dyedRates: [],
           hasValues: false
         });
       }
@@ -2886,9 +3048,21 @@ export default function OrderDetailView({
       cur.pcs += pcs;
       cur.totalDyed += totalDyed;
       cur.totalGreige += totalGreige;
+      if (r.dyedRate !== undefined && r.dyedRate !== null && r.dyedRate !== '') {
+        cur.dyedRates.push(r.dyedRate);
+      }
       if (dyed > 0) cur.hasValues = true;
     });
-    return Array.from(map.values());
+    return Array.from(map.values()).map(cur => {
+      const avgDyed = cur.dyedRates.length > 0 ? cur.dyedRates[0] : '';
+      const numDyed = parseFloat(avgDyed) || 0;
+      const avgGreige = numDyed > 0 ? (cur.shrinkPct ? numDyed * (1 + cur.shrinkPct / 100) : numDyed) : 0;
+      return {
+        ...cur,
+        avgDyed,
+        avgGreige
+      };
+    });
   }, [consumptionRows, articleSourcing, masterFabricsList]);
 
   // Section 8 Rate Calculations & Intelligent Recommendation Engine (Calculates across ALL available widths)
@@ -3036,24 +3210,63 @@ export default function OrderDetailView({
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleUploadPhoto = (e) => {
-    e.preventDefault();
-    if (!photoCaption.trim()) {
-      setToastMessage('Please enter an optional caption or description for the photo');
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isImg = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|svg)$/i.test(file.name);
+
+    const onFileReady = (url) => {
+      const newP = {
+        id: Date.now(),
+        type: photoType || 'Reference',
+        caption: photoCaption.trim() || file.name,
+        fileName: file.name,
+        url: url || '',
+        isImage: isImg,
+        date: new Date().toLocaleDateString('en-GB')
+      };
+      setPhotos(prev => {
+        const updated = [newP, ...prev];
+        if (onUpdateOrder && order) {
+          onUpdateOrder({ ...order, photos: updated });
+        }
+        return updated;
+      });
+      setPhotoCaption('');
+      setPhotoFileName('');
+      e.target.value = '';
+      setToastMessage('Photo / File added successfully!');
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-      return;
-    }
-    const newP = {
-      id: Date.now(),
-      type: photoType,
-      caption: photoCaption,
-      fileName: photoFileName || 'uploaded_image.jpg',
-      date: new Date().toLocaleDateString()
+      setTimeout(() => setShowToast(false), 2500);
     };
-    setPhotos(prev => [...prev, newP]);
-    setPhotoCaption('');
-    setPhotoFileName('');
+
+    if (isImg) {
+      const reader = new FileReader();
+      reader.onload = (loadEvt) => {
+        onFileReady(loadEvt.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      onFileReady('');
+    }
+  };
+
+  const handleRemovePhoto = (photoId) => {
+    setPhotos(prev => {
+      const updated = prev.filter(p => p.id !== photoId);
+      if (onUpdateOrder && order) {
+        onUpdateOrder({ ...order, photos: updated });
+      }
+      return updated;
+    });
+    setToastMessage('Photo removed successfully');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
+  };
+
+  const handleUploadPhoto = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
   };
 
   // Group subtotals per fabric quality + width (Demo 5 specification)
@@ -3874,12 +4087,12 @@ export default function OrderDetailView({
           <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '16px' }}>Photos ({photos.length})</h6>
         </div>
 
-        {/* Upload Form */}
-        <form onSubmit={handleUploadPhoto} className="row g-2 align-items-end mb-4">
-          <div className="col-12 col-sm-3 col-md-2">
+        {/* File Select Row (Uploads automatically on selection, no Upload button needed) */}
+        <div className="row g-2 align-items-end mb-4">
+          <div className="col-12 col-sm-4 col-md-3">
             <label className="form-label small text-muted mb-1">Type</label>
             <select
-              className="form-select form-select-sm rounded-3"
+              className="form-select form-select-sm rounded-3 bg-white"
               value={photoType}
               onChange={(e) => setPhotoType(e.target.value)}
             >
@@ -3889,34 +4102,26 @@ export default function OrderDetailView({
               <option value="QC Defect">QC Defect</option>
             </select>
           </div>
-          <div className="col-12 col-sm-4 col-md-5">
-            <label className="form-label small text-muted mb-1">Caption</label>
+          <div className="col-12 col-sm-4 col-md-4">
+            <label className="form-label small text-muted mb-1">Caption / Description</label>
             <input
               type="text"
-              className="form-control form-control-sm rounded-3"
+              className="form-control form-control-sm rounded-3 bg-white"
               placeholder="Optional description"
               value={photoCaption}
               onChange={(e) => setPhotoCaption(e.target.value)}
             />
           </div>
-          <div className="col-12 col-sm-3 col-md-3">
-            <label className="form-label small text-muted mb-1">File</label>
+          <div className="col-12 col-sm-4 col-md-5">
+            <label className="form-label small text-muted mb-1">File (Select to add directly)</label>
             <input
               type="file"
-              className="form-control form-control-sm rounded-3"
-              onChange={(e) => setPhotoFileName(e.target.files?.[0]?.name || '')}
+              accept="image/*,.pdf,.doc,.docx"
+              className="form-control form-control-sm rounded-3 bg-white"
+              onChange={handleFileSelect}
             />
           </div>
-          <div className="col-12 col-sm-2 col-md-2">
-            <button
-              type="submit"
-              className="btn btn-sm text-white w-100 rounded-3 fw-semibold shadow-xs"
-              style={{ backgroundColor: '#6366f1', height: '31px' }}
-            >
-              <i className="ti ti-upload me-1" style={{ fontSize: '14px', lineHeight: 1 }}></i> Upload
-            </button>
-          </div>
-        </form>
+        </div>
 
         {/* Photos Empty State */}
         {photos.length === 0 ? (
@@ -3925,20 +4130,129 @@ export default function OrderDetailView({
               <i className="ti ti-photo text-secondary opacity-50" style={{ fontSize: '38px', lineHeight: 1 }}></i>
             </div>
             <p className="text-muted small mb-0">
-              No photos yet. Upload reference images, fabric swatches, samples, or QC defect evidence.
+              No photos or files yet. Choose a file above to add reference images, fabric swatches, or samples.
             </p>
           </div>
         ) : (
           <div className="row g-3">
-            {photos.map((p) => (
-              <div key={p.id} className="col-md-4">
-                <div className="card border p-3 rounded-3 bg-light">
-                  <div className="badge bg-secondary mb-1 w-auto align-self-start">{p.type}</div>
-                  <strong className="text-dark small">{p.caption}</strong>
-                  <span className="text-muted small mt-1">{p.date} &bull; {p.fileName}</span>
+            {photos.map((p) => {
+              const hasImg = Boolean(p.url || p.dataUrl || (p.isImage && p.url));
+              return (
+                <div key={p.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                  <div
+                    className="card border rounded-3 overflow-hidden shadow-2xs position-relative h-100 bg-white"
+                    style={{ borderColor: '#e2e8f0', transition: 'box-shadow 0.2s ease' }}
+                  >
+                    {/* Close / Delete button on top-right corner */}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-light rounded-circle shadow-sm position-absolute d-flex align-items-center justify-content-center"
+                      style={{
+                        top: '8px',
+                        right: '8px',
+                        width: '28px',
+                        height: '28px',
+                        padding: 0,
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #ef4444',
+                        color: '#ef4444',
+                        zIndex: 10,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                      }}
+                      title="Remove file"
+                      onClick={() => handleRemovePhoto(p.id)}
+                    >
+                      <i className="ti ti-x" style={{ fontSize: '14px', fontWeight: 'bold' }}></i>
+                    </button>
+
+                    {/* Image Thumbnail / File Preview */}
+                    {hasImg ? (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '160px',
+                          backgroundColor: '#f8fafc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        <img
+                          src={p.url || p.dataUrl}
+                          alt={p.caption || p.fileName}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                        <div
+                          style={{
+                            display: 'none',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                            color: '#6366f1'
+                          }}
+                        >
+                          <i className="ti ti-photo" style={{ fontSize: '36px' }}></i>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '130px',
+                          backgroundColor: '#f8fafc',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          borderBottom: '1px solid #e2e8f0'
+                        }}
+                      >
+                        <i className="ti ti-file-text" style={{ fontSize: '36px', color: '#6366f1' }}></i>
+                        <span className="small text-muted text-truncate px-3 mt-1" style={{ maxWidth: '100%' }}>
+                          {p.fileName}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Meta info */}
+                    <div className="p-3 d-flex flex-column gap-1">
+                      <div className="d-flex align-items-center justify-content-between gap-1 mb-1">
+                        <span
+                          className="badge fw-semibold rounded-pill px-2.5 py-1"
+                          style={{
+                            backgroundColor: '#eef2ff',
+                            color: '#4361ee',
+                            fontSize: '11px',
+                            border: '1px solid #c7d2fe'
+                          }}
+                        >
+                          {p.type || 'Reference'}
+                        </span>
+                        <span className="text-muted" style={{ fontSize: '11px' }}>{p.date}</span>
+                      </div>
+                      {p.caption && (
+                        <strong className="text-dark small text-truncate" title={p.caption}>
+                          {p.caption}
+                        </strong>
+                      )}
+                      <span className="text-muted small text-truncate" style={{ fontSize: '11.5px' }} title={p.fileName}>
+                        <i className="ti ti-paperclip me-1"></i>{p.fileName}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -4079,8 +4393,8 @@ export default function OrderDetailView({
                   const isFirstRow = rIdx === 0;
                   const pcs = parseInt(row.pcs, 10) || 0;
                   const greigePerPc = hasDyedVal ? (isDyedSourced ? dyedVal : dyedVal * (1 + shrinkPct / 100)) : null;
-                  const totalDyed = hasDyedVal ? dyedVal * pcs : null;
-                  const totalGreige = greigePerPc !== null ? greigePerPc * pcs : null;
+                  const totalDyed = (hasDyedVal && pcs > 0) ? dyedVal * pcs : null;
+                  const totalGreige = (greigePerPc !== null && pcs > 0) ? greigePerPc * pcs : null;
 
                   return (
                     <tr
@@ -4408,13 +4722,26 @@ export default function OrderDetailView({
                             textAlign: 'center',
                             padding: '10px 8px',
                             borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0',
-                            fontSize: '13px',
-                            color: '#475569',
-                            fontWeight: 500
+                            borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          {isDyedSourced ? '—' : (group.shrinkPct ? `${group.shrinkPct}%` : '—')}
+                          <div className="d-flex justify-content-center">
+                            <div
+                              className="d-inline-flex align-items-center justify-content-center font-monospace fw-semibold"
+                              style={{
+                                minWidth: '58px',
+                                height: '30px',
+                                padding: '0 8px',
+                                borderRadius: '6px',
+                                backgroundColor: '#f8fafc',
+                                color: '#475569',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '12px'
+                              }}
+                            >
+                              {isDyedSourced ? '0%' : (group.shrinkPct ? `${group.shrinkPct}%` : '0%')}
+                            </div>
+                          </div>
                         </td>
                       )}
 
@@ -4423,28 +4750,75 @@ export default function OrderDetailView({
                         style={{
                           padding: '10px 8px',
                           textAlign: 'center',
-                          fontVariantNumeric: 'tabular-nums',
-                          color: '#334155',
-                          fontSize: '13px',
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        {greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(2) : '—'}
+                        <div className="d-flex justify-content-center">
+                          <div
+                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                            style={{
+                              minWidth: '68px',
+                              height: '30px',
+                              padding: '0 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#f8fafc',
+                              color: greigePerPc !== null && greigePerPc > 0 ? '#1e293b' : '#94a3b8',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '12.5px'
+                            }}
+                          >
+                            {greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(3) : '0.000'}
+                          </div>
+                        </div>
                       </td>
 
                       {/* PCS */}
                       <td
                         style={{
-                          padding: '10px 8px',
+                          padding: '8px 6px',
                           textAlign: 'center',
-                          fontVariantNumeric: 'tabular-nums',
-                          color: '#1e293b',
-                          fontWeight: 600,
-                          fontSize: '13px',
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        {pcs}
+                        {isConsumptionEditing ? (
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-control form-control-sm text-center font-monospace"
+                            style={{
+                              width: '74px',
+                              height: '32px',
+                              margin: '0 auto',
+                              border: '1.5px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: '#1e293b'
+                            }}
+                            value={row.pcs !== undefined && row.pcs !== null ? row.pcs : ''}
+                            placeholder="0"
+                            onChange={(e) => handleUpdateRowPcs(row.key, e.target.value)}
+                          />
+                        ) : (
+                          <div className="d-flex justify-content-center">
+                            <div
+                              className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                              style={{
+                                minWidth: '64px',
+                                height: '30px',
+                                padding: '0 8px',
+                                borderRadius: '6px',
+                                backgroundColor: '#f8fafc',
+                                color: pcs > 0 ? '#1e293b' : '#94a3b8',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '12.5px'
+                              }}
+                            >
+                              {pcs > 0 ? pcs : '0'}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* TOTAL DYED */}
@@ -4452,14 +4826,26 @@ export default function OrderDetailView({
                         style={{
                           padding: '10px 12px',
                           textAlign: 'center',
-                          fontVariantNumeric: 'tabular-nums',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                          color: '#1d4ed8',
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        {totalDyed !== null && totalDyed > 0 ? totalDyed.toFixed(2) : '—'}
+                        <div className="d-flex justify-content-center">
+                          <div
+                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                            style={{
+                              minWidth: '78px',
+                              height: '30px',
+                              padding: '0 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#eef2ff',
+                              color: '#1d4ed8',
+                              border: '1px solid #c7d2fe',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {totalDyed !== null && totalDyed > 0 ? `${totalDyed.toFixed(2)}m` : '0.00m'}
+                          </div>
+                        </div>
                       </td>
 
                       {/* TOTAL GREIGE */}
@@ -4467,14 +4853,26 @@ export default function OrderDetailView({
                         style={{
                           padding: '10px 12px',
                           textAlign: 'center',
-                          fontVariantNumeric: 'tabular-nums',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                          color: '#7e22ce',
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        {totalGreige !== null && totalGreige > 0 ? totalGreige.toFixed(2) : '—'}
+                        <div className="d-flex justify-content-center">
+                          <div
+                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                            style={{
+                              minWidth: '78px',
+                              height: '30px',
+                              padding: '0 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#faf5ff',
+                              color: '#7e22ce',
+                              border: '1px solid #e9d5ff',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {totalGreige !== null && totalGreige > 0 ? `${totalGreige.toFixed(2)}m` : '0.00m'}
+                          </div>
+                        </div>
                       </td>
 
                       {/* ACTION (Delete row) */}
@@ -4502,97 +4900,87 @@ export default function OrderDetailView({
                 });
               })}
 
-              {/* SUMMARY ROWS AT BOTTOM */}
-              {fabricSummaryRows.map((fs, idx) => (
-                <tr
-                  key={`summary_${idx}`}
-                  style={{
-                    borderTop: idx === 0 ? '2px solid #cbd5e1' : '1px solid #e2e8f0',
-                    borderBottom: '1px solid #e2e8f0',
-                    backgroundColor: '#f8fafc'
-                  }}
-                >
-                  <td
-                    colSpan={7}
-                    className="fw-bold text-dark ps-3 py-2.5"
-                    style={{ fontSize: '13.5px' }}
-                  >
-                    <span>{fs.fabricName}</span>
-                    {fs.width ? (
-                      <span className="badge bg-white text-primary border ms-2 font-monospace" style={{ fontSize: '11px', borderColor: '#c7d2fe' }}>
-                        {fs.width}
-                      </span>
-                    ) : ''}
-                  </td>
-                  <td
-                    className="text-center fw-bold text-dark py-2.5"
-                    style={{ fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {fs.pcs}
-                  </td>
-                  <td
-                    className="text-center fw-bold py-2.5"
-                    style={{
-                      fontSize: '13px',
-                      color: '#4361ee',
-                      fontVariantNumeric: 'tabular-nums'
-                    }}
-                  >
-                    {fs.hasValues && fs.totalDyed > 0 ? fs.totalDyed.toFixed(2) : '—'}
-                  </td>
-                  <td
-                    className="text-center fw-bold py-2.5"
-                    style={{
-                      fontSize: '13px',
-                      color: '#0284c7',
-                      fontVariantNumeric: 'tabular-nums'
-                    }}
-                  >
-                    {fs.hasValues && fs.totalGreige > 0 ? fs.totalGreige.toFixed(2) : '—'}
-                  </td>
-                  {isConsumptionEditing && (
-                    <td style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}></td>
-                  )}
-                </tr>
-              ))}
-
               {/* GRAND TOTAL ROW */}
-              {fabricSummaryRows.length > 0 && (
+              {consumptionRows.length > 0 && (
                 <tr
                   style={{
-                    borderTop: '2px solid #94a3b8',
+                    borderTop: '2px solid #cbd5e1',
                     backgroundColor: '#f1f5f9',
                     fontWeight: 700
                   }}
                 >
                   <td
-                    colSpan={7}
+                    colSpan={2}
                     className="text-uppercase text-dark ps-3 py-2.5 fw-bold"
                     style={{ fontSize: '12px', letterSpacing: '0.05em' }}
                   >
                     <span>Total Garment Pieces</span>
                   </td>
-                  <td
-                    className="text-center text-dark py-2.5 fw-bold"
-                    style={{ fontSize: '13.5px', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {order?.totalPcs || order?.orderQuantity || fabricSummaryRows.reduce((sum, fs) => sum + (parseInt(fs.pcs, 10) || 0), 0)} pcs
+                  <td className="text-center text-muted small">—</td>
+                  <td className="text-center text-muted small">—</td>
+                  <td className="text-center text-muted small">—</td>
+                  <td className="text-center text-muted small">—</td>
+                  <td className="text-center text-muted small">—</td>
+                  <td className="text-center py-2.5">
+                    <div className="d-flex justify-content-center">
+                      <div
+                        className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                        style={{
+                          minWidth: '75px',
+                          height: '32px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          border: '1.5px solid #cbd5e1',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {order?.totalPcs || order?.orderQuantity || fabricSummaryRows.reduce((sum, fs) => sum + (parseInt(fs.pcs, 10) || 0), 0)} pcs
+                      </div>
+                    </div>
                   </td>
-                  <td
-                    className="text-center py-2.5 fw-bold"
-                    style={{ fontSize: '13px', color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0) > 0
-                      ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0).toFixed(2)
-                      : '—'}
+                  <td className="text-center py-2.5">
+                    <div className="d-flex justify-content-center">
+                      <div
+                        className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                        style={{
+                          minWidth: '85px',
+                          height: '32px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          backgroundColor: '#dbeafe',
+                          color: '#1e40af',
+                          border: '1.5px solid #93c5fd',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0) > 0
+                          ? `${fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0).toFixed(2)}m`
+                          : '0.00m'}
+                      </div>
+                    </div>
                   </td>
-                  <td
-                    className="text-center py-2.5 fw-bold"
-                    style={{ fontSize: '13px', color: '#0284c7', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0) > 0
-                      ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0).toFixed(2)
-                      : '—'}
+                  <td className="text-center py-2.5">
+                    <div className="d-flex justify-content-center">
+                      <div
+                        className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                        style={{
+                          minWidth: '85px',
+                          height: '32px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          backgroundColor: '#f3e8ff',
+                          color: '#6b21a8',
+                          border: '1.5px solid #d8b4fe',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0) > 0
+                          ? `${fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0).toFixed(2)}m`
+                          : '0.00m'}
+                      </div>
+                    </div>
                   </td>
                   {isConsumptionEditing && (
                     <td style={{ backgroundColor: '#f1f5f9' }}></td>

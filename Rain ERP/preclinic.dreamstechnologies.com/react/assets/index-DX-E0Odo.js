@@ -14803,6 +14803,33 @@
     } catch (e) {
     }
   };
+  var getStoredArticlesMaster = () => {
+    try {
+      const cleaned = localStorage.getItem("erp_articles_cleared_mock_v2");
+      if (!cleaned) {
+        localStorage.setItem("erp_articles_v1", JSON.stringify([]));
+        localStorage.setItem("erp_articles_master", JSON.stringify([]));
+        localStorage.setItem("erp_articles_cleared_mock_v2", "true");
+        return [];
+      }
+    } catch (e) {
+    }
+    let stored = getStoredData("erp_articles_v1", null);
+    if (stored === null) {
+      stored = getStoredData("erp_articles_master", null);
+    }
+    const source = Array.isArray(stored) ? stored : initialArticles || [];
+    return source;
+  };
+  var setStoredArticlesMaster = (articlesList) => {
+    setStoredData("erp_articles_v1", articlesList);
+    setStoredData("erp_articles_master", articlesList);
+    try {
+      window.dispatchEvent(new Event("erp_articles_updated"));
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {
+    }
+  };
   var getStoredAccessoriesMaster = () => {
     const data = getStoredData("erp_accessories_master_v1", initialAccessoryMasters);
     if (Array.isArray(data)) {
@@ -17573,6 +17600,58 @@
       const fabBuf = getArticleFabricBuffer(currentArticle);
       return fabBuf !== void 0 && fabBuf !== null && !isNaN(fabBuf) ? fabBuf : 10;
     };
+    const getItemAvailableColors = (accItem) => {
+      if (Array.isArray(accItem?.colors) && accItem.colors.length > 0) {
+        return accItem.colors;
+      }
+      const targetName = (accItem?.varietyName || accItem?.name || "").toLowerCase().trim();
+      const match = (masterAccessories || []).find((m) => {
+        const mName = (m.name || "").toLowerCase().trim();
+        if (!mName) return false;
+        return mName === targetName || targetName.startsWith(mName) || targetName.includes(mName);
+      });
+      if (match) {
+        const cols = match.buttonColorsList && match.buttonColorsList.length > 0 ? match.buttonColorsList : match.buttonColors ? match.buttonColors.split(",").map((s) => s.trim()).filter(Boolean) : match.colors?.length ? match.colors : match.color ? [match.color] : [];
+        if (cols.length > 0) return cols;
+      }
+      const itemCat = (accItem?.category || "").toLowerCase();
+      const isButton = itemCat.includes("button");
+      if (isButton) {
+        const allBtnCols = /* @__PURE__ */ new Set();
+        (masterAccessories || []).filter((m) => (m.category || "").toLowerCase().includes("button")).forEach((m) => {
+          const cols = m.buttonColorsList && m.buttonColorsList.length > 0 ? m.buttonColorsList : m.buttonColors ? m.buttonColors.split(",").map((s) => s.trim()).filter(Boolean) : m.colors?.length ? m.colors : m.color ? [m.color] : [];
+          cols.forEach((c) => allBtnCols.add(c));
+        });
+        if (allBtnCols.size > 0) return Array.from(allBtnCols);
+      }
+      return [];
+    };
+    const getItemAvailableSizes = (accItem) => {
+      if (Array.isArray(accItem?.sizes) && accItem.sizes.length > 0) {
+        return accItem.sizes;
+      }
+      const targetName = (accItem?.varietyName || accItem?.name || "").toLowerCase().trim();
+      const match = (masterAccessories || []).find((m) => {
+        const mName = (m.name || "").toLowerCase().trim();
+        if (!mName) return false;
+        return mName === targetName || targetName.startsWith(mName) || targetName.includes(mName);
+      });
+      if (match) {
+        const szs = match.buttonSizesList && match.buttonSizesList.length > 0 ? match.buttonSizesList : match.buttonSizes ? match.buttonSizes.split(",").map((s) => s.trim()).filter(Boolean) : match.variants?.length ? match.variants : match.sizes?.length ? match.sizes : match.size ? [match.size] : [];
+        if (szs.length > 0) return szs;
+      }
+      const itemCat = (accItem?.category || "").toLowerCase();
+      const isButton = itemCat.includes("button");
+      if (isButton) {
+        const allBtnSizes = /* @__PURE__ */ new Set();
+        (masterAccessories || []).filter((m) => (m.category || "").toLowerCase().includes("button")).forEach((m) => {
+          const szs = m.buttonSizesList && m.buttonSizesList.length > 0 ? m.buttonSizesList : m.buttonSizes ? m.buttonSizes.split(",").map((s) => s.trim()).filter(Boolean) : m.variants?.length ? m.variants : m.sizes?.length ? m.sizes : m.size ? [m.size] : [];
+          szs.forEach((s) => allBtnSizes.add(s));
+        });
+        if (allBtnSizes.size > 0) return Array.from(allBtnSizes);
+      }
+      return [];
+    };
     const CATEGORY_METADATA = {
       "Buttons": { name: "Buttons", icon: "ti ti-circle-dot", iconColor: "#475569", bgColor: "#f1f5f9", poBtnText: "Button PO", poBtnColor: "#2563eb", defaultUnit: "PCS" },
       "Lace": { name: "Lace", icon: "ti ti-cut", iconColor: "#2563eb", bgColor: "#eff6ff", poBtnText: "Lace PO", poBtnColor: "#9333ea", defaultUnit: "METER" },
@@ -17712,7 +17791,7 @@
               const rawExtra = r.extraPerPack ?? "";
               const defaultBuf = getAccessoryMasterBuffer({ ...acc, ...r }, r.article || acc.article || "Kurta");
               const hasUserEdited = r._userEditedBuffer === true;
-              const resBuf = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" && (hasUserEdited || parseFloat(r.bufferPct) > 0) ? r.bufferPct : defaultBuf;
+              const resBuf = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" && hasUserEdited ? r.bufferPct : "";
               flattened.push({
                 id: `acc_${acc.category || "acc"}_${aIdx}_${rIdx}`,
                 category: acc.category || "Buttons",
@@ -17739,7 +17818,7 @@
             const rawExtra = acc.extraPerPack ?? "";
             const defaultBuf = getAccessoryMasterBuffer(acc, acc.article || "Kurta");
             const hasUserEdited = acc._userEditedBuffer === true;
-            const resBuf = acc.bufferPct !== void 0 && acc.bufferPct !== null && acc.bufferPct !== "" && (hasUserEdited || parseFloat(acc.bufferPct) > 0) ? acc.bufferPct : defaultBuf;
+            const resBuf = acc.bufferPct !== void 0 && acc.bufferPct !== null && acc.bufferPct !== "" && hasUserEdited ? acc.bufferPct : "";
             flattened.push({
               ...acc,
               placement: rawPlacement === "Front Placket" || rawPlacement === "Front.." ? "" : rawPlacement,
@@ -17789,8 +17868,7 @@
                   const packInput = r.extraPerPack !== void 0 && r.extraPerPack !== null ? String(r.extraPerPack).trim() : "";
                   const packNum = parseFloat(packInput);
                   const packVal = !isNaN(packNum) && packNum >= 0 ? packNum : 0;
-                  const hasUserEdited = r._userEditedBuffer === true;
-                  const bufVal = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" && (hasUserEdited || parseFloat(r.bufferPct) > 0) ? parseFloat(r.bufferPct) || 0 : defaultBuf;
+                  const bufVal = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" ? parseFloat(r.bufferPct) || 0 : 0;
                   const artPcs = parseFloat(r.totalQty) || 0;
                   const reqQty = artPcs * reqVal;
                   const packQty = artPcs * packVal;
@@ -17999,7 +18077,7 @@
             seen.add(key);
             const matchedOpt = colorOpts.find((co) => co.color.toLowerCase() === key || co.display.toLowerCase() === raw.toLowerCase());
             const hasUserEdited = r._userEditedBuffer === true;
-            const resolvedBuffer = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" && (hasUserEdited || parseFloat(r.bufferPct) > 0) ? r.bufferPct : defaultBuffer;
+            const resolvedBuffer = r.bufferPct !== void 0 && r.bufferPct !== null && r.bufferPct !== "" && hasUserEdited ? r.bufferPct : "";
             deduped.push({
               ...r,
               bufferPct: resolvedBuffer,
@@ -18022,7 +18100,7 @@
         fabricColor: item.fabricColor && item.fabricColor !== "\u2014" ? item.fabricColor : "",
         reqPerPc: item.reqPerPc || "",
         extraPerPack: item.extraPerPack || "",
-        bufferPct: item.bufferPct !== void 0 && item.bufferPct !== "" && (item._userEditedBuffer || parseFloat(item.bufferPct) > 0) ? item.bufferPct : defaultBuffer,
+        bufferPct: item.bufferPct !== void 0 && item.bufferPct !== "" && item._userEditedBuffer ? item.bufferPct : "",
         dyedRate: item.dyedRate || "",
         shrinkPct: item.shrinkPct || "",
         lines: item.lines || ""
@@ -18039,7 +18117,7 @@
           fabricColor: "",
           reqPerPc: "",
           extraPerPack: "",
-          bufferPct: defaultBuffer
+          bufferPct: ""
         }
       ];
     };
@@ -18049,8 +18127,10 @@
         if (value !== "" && value !== null && value !== void 0) {
           const num = parseFloat(value);
           if (!isNaN(num)) {
-            if (num > 100) {
-              finalValue = "100";
+            const targetItem = addedAccessories.find((a) => a.id === itemId);
+            const maxAllowed = getAccessoryMasterBuffer(targetItem, articleName);
+            if (num > maxAllowed) {
+              finalValue = String(maxAllowed);
             } else if (num < 0) {
               finalValue = "0";
             } else {
@@ -18185,7 +18265,7 @@
             fabricColor: "",
             reqPerPc: "",
             extraPerPack: "",
-            bufferPct: defaultBuffer,
+            bufferPct: "",
             dyedRate: "",
             shrinkPct: "",
             lines: ""
@@ -18210,7 +18290,7 @@
           fabricColor: "",
           reqPerPc: "",
           extraPerPack: "",
-          bufferPct: getAccessoryMasterBuffer({ category: catId, varietyName: resolvedVarName, ...varObj }, targetArticle),
+          bufferPct: "",
           total: "0.0"
         });
         newEditingIds[itemId] = true;
@@ -18425,8 +18505,7 @@
             const packNum = parseFloat(packInput);
             const packVal = !isNaN(packNum) && packNum >= 0 ? packNum : 0;
             const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-            const hasUserEdited = row._userEditedBuffer === true;
-            const bufVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" && (hasUserEdited || parseFloat(row.bufferPct) > 0) ? parseFloat(row.bufferPct) || 0 : defaultBuf;
+            const bufVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" ? parseFloat(row.bufferPct) || 0 : 0;
             const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
             const reqQty = artPcs * reqVal;
             const packQty = artPcs * packVal;
@@ -18473,7 +18552,18 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value),
                 style: inputStyle
               }
-            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement(
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? getItemAvailableColors(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement(
+              "select",
+              {
+                className: "form-select form-select-sm",
+                value: row.accessoryColor ?? "",
+                onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value),
+                style: selectStyle
+              },
+              /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"),
+              getItemAvailableColors(item).map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c)),
+              row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.accessoryColor }, row.accessoryColor)
+            ) : /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
                 type: "text",
@@ -18483,7 +18573,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value),
                 style: inputStyle
               }
-            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "120px", padding: "6px 8px" } }, isEditing ? item.hasSizes && item.sizes && item.sizes.length > 0 ? /* @__PURE__ */ import_react5.default.createElement(
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "120px", padding: "6px 8px" } }, isEditing ? getItemAvailableSizes(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement(
               "select",
               {
                 className: "form-select form-select-sm",
@@ -18492,7 +18582,8 @@
                 style: selectStyle
               },
               /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Size"),
-              item.sizes.map((s, sIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: sIdx, value: s }, s))
+              getItemAvailableSizes(item).map((s, sIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: sIdx, value: s }, s)),
+              row.size && !getItemAvailableSizes(item).includes(row.size) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.size }, row.size)
             ) : /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
@@ -18555,11 +18646,11 @@
               {
                 type: "number",
                 min: "0",
-                max: defaultBuf || 100,
+                max: defaultBuf ?? 100,
                 step: "0.5",
                 className: "form-control form-control-sm text-center",
-                value: row.bufferPct !== void 0 && row.bufferPct !== "" && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf,
-                placeholder: String(defaultBuf),
+                value: row.bufferPct !== void 0 && row.bufferPct !== null ? row.bufferPct : "",
+                placeholder: "",
                 onKeyDown: (e) => {
                   if (["-", "+", "e", "E"].includes(e.key)) {
                     e.preventDefault();
@@ -18568,7 +18659,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
+            ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-1", style: { fontSize: "10px", color: "#64748b", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufVal > 0 ? `${bufVal}%` : "0%"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-0.5", style: { fontSize: "10px", color: "#94a3b8", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
           });
         }))));
       }
@@ -18586,21 +18677,20 @@
             const shrinkVal = parseFloat(row.shrinkPct) || 0;
             const greigeVal = dyedVal * (1 + shrinkVal / 100);
             const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-            const hasUserEdited = row._userEditedBuffer === true;
-            const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" && (hasUserEdited || parseFloat(row.bufferPct) > 0) ? parseFloat(row.bufferPct) || 0 : defaultBuf;
+            const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" ? parseFloat(row.bufferPct) || 0 : 0;
             const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
             const totalValNum = greigeVal * qtyVal * (1 + bufferVal / 100);
             const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
-            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? item.colors && item.colors.length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), item.colors.map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c))) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "90px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", step: "0.01", min: "0", className: "form-control form-control-sm text-center", value: row.dyedRate ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "dyedRate", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.dyedRate || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.shrinkPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "shrinkPct", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.shrinkPct ? row.shrinkPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "85px", padding: "6px 8px", fontSize: "13px" } }, greigeVal.toFixed(3)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
+            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? getItemAvailableColors(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), getItemAvailableColors(item).map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c)), row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.accessoryColor }, row.accessoryColor)) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "90px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", step: "0.01", min: "0", className: "form-control form-control-sm text-center", value: row.dyedRate ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "dyedRate", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.dyedRate || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.shrinkPct ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "shrinkPct", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.shrinkPct ? row.shrinkPct + "%" : "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center font-monospace", style: { minWidth: "85px", padding: "6px 8px", fontSize: "13px" } }, greigeVal.toFixed(3)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
                 type: "number",
                 min: "0",
-                max: defaultBuf || 100,
+                max: defaultBuf ?? 100,
                 step: "0.5",
                 className: "form-control form-control-sm text-center",
-                value: row.bufferPct !== void 0 && row.bufferPct !== "" && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf,
-                placeholder: String(defaultBuf),
+                value: row.bufferPct !== void 0 && row.bufferPct !== null ? row.bufferPct : "",
+                placeholder: "",
                 onKeyDown: (e) => {
                   if (["-", "+", "e", "E"].includes(e.key)) {
                     e.preventDefault();
@@ -18609,7 +18699,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
+            ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-1", style: { fontSize: "10px", color: "#64748b", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal > 0 ? `${bufferVal}%` : "0%"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-0.5", style: { fontSize: "10px", color: "#94a3b8", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
           });
         }))));
       }
@@ -18625,22 +18715,21 @@
             const isAllColours = row.articleColor === "All colours";
             const reqVal = parseFloat(row.reqPerPc) || 0;
             const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-            const hasUserEdited = row._userEditedBuffer === true;
-            const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" && (hasUserEdited || parseFloat(row.bufferPct) > 0) ? parseFloat(row.bufferPct) || 0 : defaultBuf;
+            const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" ? parseFloat(row.bufferPct) || 0 : 0;
             const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
             const totalValNum = reqVal * qtyVal * (1 + bufferVal / 100);
             const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
             const isJobWork = /job/i.test(row.source || "");
-            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? item.colors && item.colors.length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), item.colors.map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c))) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? isJobWork ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: isJobWork ? "text-dark" : "text-muted d-block text-center", style: { fontSize: "13px" } }, isJobWork ? row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014" : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "70px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "95px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
+            return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? getItemAvailableColors(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), getItemAvailableColors(item).map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c)), row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.accessoryColor }, row.accessoryColor)) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.source ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "source", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select..."), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Ready Made" }, "Ready Made"), /* @__PURE__ */ import_react5.default.createElement("option", { value: "Job Work" }, "Job Work")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.source || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "125px", padding: "6px 8px" } }, isEditing ? isJobWork ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g., Maroon", value: row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "fabricColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted d-block text-center", style: { fontSize: "13px" } }, "\u2014") : /* @__PURE__ */ import_react5.default.createElement("span", { className: isJobWork ? "text-dark" : "text-muted d-block text-center", style: { fontSize: "13px" } }, isJobWork ? row.fabricColor && row.fabricColor !== "\u2014" ? row.fabricColor : "\u2014" : "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "70px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "75px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "number", min: "0", className: "form-control form-control-sm text-center", value: row.reqPerPc ?? "", placeholder: "0", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "reqPerPc", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, row.reqPerPc || "0")), /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted", style: { minWidth: "95px", padding: "6px 8px" } }, "\u2014"), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "80px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement(
               "input",
               {
                 type: "number",
                 min: "0",
-                max: defaultBuf || 100,
+                max: defaultBuf ?? 100,
                 step: "0.5",
                 className: "form-control form-control-sm text-center",
-                value: row.bufferPct !== void 0 && row.bufferPct !== "" && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf,
-                placeholder: String(defaultBuf),
+                value: row.bufferPct !== void 0 && row.bufferPct !== null ? row.bufferPct : "",
+                placeholder: "",
                 onKeyDown: (e) => {
                   if (["-", "+", "e", "E"].includes(e.key)) {
                     e.preventDefault();
@@ -18649,7 +18738,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+            ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-1", style: { fontSize: "10px", color: "#64748b", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal > 0 ? `${bufferVal}%` : "0%"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-0.5", style: { fontSize: "10px", color: "#94a3b8", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
           });
         }))));
       }
@@ -18664,13 +18753,12 @@
           const isAllColours = row.articleColor === "All colours";
           const reqVal = parseFloat(row.reqPerPc) || 0;
           const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-          const hasUserEdited = row._userEditedBuffer === true;
-          const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" && (hasUserEdited || parseFloat(row.bufferPct) > 0) ? parseFloat(row.bufferPct) || 0 : defaultBuf;
+          const bufferVal = row.bufferPct !== void 0 && row.bufferPct !== null && row.bufferPct !== "" ? parseFloat(row.bufferPct) || 0 : 0;
           const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
           const totalValNum = reqVal * qtyVal * (1 + bufferVal / 100);
           const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
           const isJobWork = /job/i.test(row.source || "");
-          return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? item.colors && item.colors.length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), item.colors.map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c))) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", padding: "6px 8px" } }, isEditing ? item.hasSizes && item.sizes && item.sizes.length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.size ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "size", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Size"), item.sizes.map((s, sIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: sIdx, value: s }, s))) : /* @__PURE__ */ import_react5.default.createElement(
+          return /* @__PURE__ */ import_react5.default.createElement("tr", { key: `${currentArticle}_${row.id || rIdx}`, style: { borderBottom: "1px solid #f8fafc" } }, /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", verticalAlign: "middle", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 fw-semibold text-dark", style: { fontSize: "13px", whiteSpace: "nowrap" } }, /* @__PURE__ */ import_react5.default.createElement("span", null, isBottom ? "\u{1F456}" : "\u{1F3BD}"), /* @__PURE__ */ import_react5.default.createElement("span", null, currentArticle), isAllColours && /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge ms-1.5", style: { backgroundColor: "#fef3c7", color: "#b45309", fontSize: "9.5px", fontWeight: 800, padding: "2px 5px", lineHeight: 1.1, borderRadius: "4px", border: "1px solid #fde68a" } }, "FILLS", /* @__PURE__ */ import_react5.default.createElement("br", null), "ALL"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "165px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.articleColor || "", onChange: (e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "All colours" }, "All colours"), colorOptions.map((co, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: co.display }, co.display))) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "13px" } }, row.articleColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-semibold", style: { backgroundColor: "#e0f2fe", color: "#0284c7", fontSize: "12px", padding: "6px 12px", borderRadius: "6px" } }, isAllColours ? row.totalQty && row.totalQty !== "\u2014" ? row.totalQty : totalAllQty : row.totalQty || 0)), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "130px", padding: "6px 8px" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "Placement", value: row.placement ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "placement", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.placement || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "135px", padding: "6px 8px" } }, isEditing ? getItemAvailableColors(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Color"), getItemAvailableColors(item).map((c, cIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: cIdx, value: c }, c)), row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.accessoryColor }, row.accessoryColor)) : /* @__PURE__ */ import_react5.default.createElement("input", { type: "text", className: "form-control form-control-sm", placeholder: "e.g. Pearl Wh", value: row.accessoryColor ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "accessoryColor", e.target.value), style: inputStyle }) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark", style: { fontSize: "13px" } }, row.accessoryColor || "\u2014")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { minWidth: "110px", padding: "6px 8px" } }, isEditing ? getItemAvailableSizes(item).length > 0 ? /* @__PURE__ */ import_react5.default.createElement("select", { className: "form-select form-select-sm", value: row.size ?? "", onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "size", e.target.value), style: selectStyle }, /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "Select Size"), getItemAvailableSizes(item).map((s, sIdx) => /* @__PURE__ */ import_react5.default.createElement("option", { key: sIdx, value: s }, s)), row.size && !getItemAvailableSizes(item).includes(row.size) && /* @__PURE__ */ import_react5.default.createElement("option", { value: row.size }, row.size)) : /* @__PURE__ */ import_react5.default.createElement(
             "input",
             {
               type: "text",
@@ -18685,11 +18773,11 @@
             {
               type: "number",
               min: "0",
-              max: defaultBuf || 100,
+              max: defaultBuf ?? 100,
               step: "0.5",
               className: "form-control form-control-sm text-center",
-              value: row.bufferPct !== void 0 && row.bufferPct !== "" && (row._userEditedBuffer || parseFloat(row.bufferPct) > 0) ? row.bufferPct : defaultBuf,
-              placeholder: String(defaultBuf),
+              value: row.bufferPct !== void 0 && row.bufferPct !== null ? row.bufferPct : "",
+              placeholder: "",
               onKeyDown: (e) => {
                 if (["-", "+", "e", "E"].includes(e.key)) {
                   e.preventDefault();
@@ -18698,7 +18786,7 @@
               onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
               style: inputStyle
             }
-          )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+          ), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-1", style: { fontSize: "10px", color: "#64748b", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal > 0 ? `${bufferVal}%` : "0%"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted text-center mt-0.5", style: { fontSize: "10px", color: "#94a3b8", whiteSpace: "nowrap" } }, "max ", defaultBuf, "%"))), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
         });
       }))));
     };
@@ -18803,11 +18891,7 @@
       };
       const isMockSample = !order || !order.id && !order.styleName && (!order.articles || order.articles.length === 0);
       if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
-        return order.fabricConsumptions.filter((fc) => {
-          const rawPcs = fc.pcs !== void 0 ? fc.pcs : fc.pieces;
-          const parsedPcs = rawPcs !== void 0 && rawPcs !== null && rawPcs !== "" ? parseInt(rawPcs, 10) : NaN;
-          return isNaN(parsedPcs) || parsedPcs > 0;
-        }).map((fc, idx) => {
+        return order.fabricConsumptions.map((fc, idx) => {
           const artName = fc.articleName || fc.article || order?.articles?.[idx]?.name || (idx === 0 ? "Kurta" : idx === 1 ? "Pant" : "Dupatta");
           const artIdx = fc.articleIndex !== void 0 ? fc.articleIndex : order?.articles ? order.articles.findIndex((a) => a.name === artName) : idx;
           const art = order?.articles && order.articles[artIdx] || {};
@@ -18824,9 +18908,18 @@
           const masterShrink = getFabricMasterShrinkage(fabQuality);
           const shrink = masterShrink;
           const buf = parseFloat(fc.maxBuffer || fc.bufferPercent || fc.bufferPct || artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
+          const roleStr = (fc.role || artFab.pieceLabel || artFab.role || "").toLowerCase();
+          const isMain = roleStr === "main" || fc.isMainFabric || Array.isArray(art.fabrics) && art.fabrics[0] === artFab;
           const rawPcs = fc.pcs !== void 0 ? fc.pcs : fc.pieces;
           const parsedPcs = rawPcs !== void 0 && rawPcs !== null && rawPcs !== "" ? parseInt(rawPcs, 10) : NaN;
-          const finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          let finalPcs = 0;
+          if (fc._userEditedPcs) {
+            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          } else if (isMain) {
+            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          } else {
+            finalPcs = 0;
+          }
           let rawDyed = "";
           if (fc._userEditedDyed) {
             rawDyed = fc.dyedRate;
@@ -18851,9 +18944,11 @@
             shrinkPct: shrink,
             bufferPct: buf,
             pcs: finalPcs,
+            isMainFabric: isMain,
             locked: fc.locked !== void 0 ? !!fc.locked : false,
             _userSelectedWidth: Boolean(initialWidth),
-            _userEditedDyed: Boolean(rawDyed !== "")
+            _userEditedDyed: Boolean(rawDyed !== ""),
+            _userEditedPcs: Boolean(fc._userEditedPcs)
           };
         });
       }
@@ -18943,7 +19038,8 @@
           colorsForThisFab.forEach((col, cIdx) => {
             const custPcs = getCustomerPcs2(artName, col);
             if (custPcs <= 0 && colorsForThisFab.length > 0) return;
-            const pcsVal = custPcs > 0 ? custPcs : 0;
+            const isMainFabric = fIdx === 0 || (role || "").toLowerCase() === "main";
+            const pcsVal = isMainFabric ? custPcs > 0 ? custPcs : 0 : parseInt(artFab.pcs, 10) || 0;
             rows.push({
               key: `${artName}_${fabName}_${role}_${col}_${fIdx}_${cIdx}`,
               articleIndex: aIdx,
@@ -18960,6 +19056,7 @@
               shrinkPct: shrinkVal,
               bufferPct: bufferVal,
               pcs: pcsVal,
+              isMainFabric,
               locked: false
             });
           });
@@ -19279,6 +19376,26 @@
         return r;
       }));
     };
+    const handleUpdateRowPcs = (rowKey, val) => {
+      const num = val === "" ? "" : parseInt(val, 10) || 0;
+      setConsumptionRows((prev) => prev.map((r) => {
+        if (r.key === rowKey) {
+          return { ...r, pcs: num, _userEditedPcs: true };
+        }
+        return r;
+      }));
+    };
+    const handleUpdateSummaryDyedRate = (fabricName, width, val) => {
+      const num = val === "" ? "" : parseFloat(val) || 0;
+      setConsumptionRows((prev) => prev.map((r) => {
+        const matchFab = (r.fabricQuality || "").toLowerCase() === (fabricName || "").toLowerCase();
+        const matchWidth = (r.width || "") === (width || "") || !r.width && !width;
+        if (matchFab && matchWidth) {
+          return { ...r, dyedRate: num, _userEditedDyed: true };
+        }
+        return r;
+      }));
+    };
     const [showRateCalculation, setShowRateCalculation] = (0, import_react5.useState)(false);
     const [customMarketRates, setCustomMarketRates] = (0, import_react5.useState)({});
     const articleGroups = (0, import_react5.useMemo)(() => {
@@ -19308,9 +19425,7 @@
             rows: []
           });
         }
-        if ((parseInt(row.pcs, 10) || 0) > 0) {
-          map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
-        }
+        map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
       });
       return Array.from(map.values()).filter((g) => g.rows.length > 0);
     }, [consumptionRows, articleSourcing, masterFabricsList]);
@@ -19336,9 +19451,11 @@
           map.set(key, {
             fabricName: fabName,
             width,
+            shrinkPct: shrink,
             pcs: 0,
             totalDyed: 0,
             totalGreige: 0,
+            dyedRates: [],
             hasValues: false
           });
         }
@@ -19346,9 +19463,21 @@
         cur.pcs += pcs;
         cur.totalDyed += totalDyed;
         cur.totalGreige += totalGreige;
+        if (r.dyedRate !== void 0 && r.dyedRate !== null && r.dyedRate !== "") {
+          cur.dyedRates.push(r.dyedRate);
+        }
         if (dyed > 0) cur.hasValues = true;
       });
-      return Array.from(map.values());
+      return Array.from(map.values()).map((cur) => {
+        const avgDyed = cur.dyedRates.length > 0 ? cur.dyedRates[0] : "";
+        const numDyed = parseFloat(avgDyed) || 0;
+        const avgGreige = numDyed > 0 ? cur.shrinkPct ? numDyed * (1 + cur.shrinkPct / 100) : numDyed : 0;
+        return {
+          ...cur,
+          avgDyed,
+          avgGreige
+        };
+      });
     }, [consumptionRows, articleSourcing, masterFabricsList]);
     const rateCalculations = (0, import_react5.useMemo)(() => {
       const fabricsInOrder = /* @__PURE__ */ new Map();
@@ -19461,24 +19590,58 @@
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3e3);
     };
-    const handleUploadPhoto = (e) => {
-      e.preventDefault();
-      if (!photoCaption.trim()) {
-        setToastMessage("Please enter an optional caption or description for the photo");
+    const handleFileSelect = (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const isImg = file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg)$/i.test(file.name);
+      const onFileReady = (url) => {
+        const newP = {
+          id: Date.now(),
+          type: photoType || "Reference",
+          caption: photoCaption.trim() || file.name,
+          fileName: file.name,
+          url: url || "",
+          isImage: isImg,
+          date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB")
+        };
+        setPhotos((prev) => {
+          const updated = [newP, ...prev];
+          if (onUpdateOrder && order) {
+            onUpdateOrder({ ...order, photos: updated });
+          }
+          return updated;
+        });
+        setPhotoCaption("");
+        setPhotoFileName("");
+        e.target.value = "";
+        setToastMessage("Photo / File added successfully!");
         setShowToast(true);
-        setTimeout(() => setShowToast(false), 3e3);
-        return;
-      }
-      const newP = {
-        id: Date.now(),
-        type: photoType,
-        caption: photoCaption,
-        fileName: photoFileName || "uploaded_image.jpg",
-        date: (/* @__PURE__ */ new Date()).toLocaleDateString()
+        setTimeout(() => setShowToast(false), 2500);
       };
-      setPhotos((prev) => [...prev, newP]);
-      setPhotoCaption("");
-      setPhotoFileName("");
+      if (isImg) {
+        const reader = new FileReader();
+        reader.onload = (loadEvt) => {
+          onFileReady(loadEvt.target.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        onFileReady("");
+      }
+    };
+    const handleRemovePhoto = (photoId) => {
+      setPhotos((prev) => {
+        const updated = prev.filter((p) => p.id !== photoId);
+        if (onUpdateOrder && order) {
+          onUpdateOrder({ ...order, photos: updated });
+        }
+        return updated;
+      });
+      setToastMessage("Photo removed successfully");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2e3);
+    };
+    const handleUploadPhoto = (e) => {
+      if (e && e.preventDefault) e.preventDefault();
     };
     const fabricGroups = (0, import_react5.useMemo)(() => {
       const map = {};
@@ -20037,10 +20200,10 @@
         },
         /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-camera", style: { fontSize: "18px", lineHeight: 1 } })
       ), /* @__PURE__ */ import_react5.default.createElement("h6", { className: "fw-bold text-dark mb-0", style: { fontSize: "16px" } }, "Photos (", photos.length, ")")),
-      /* @__PURE__ */ import_react5.default.createElement("form", { onSubmit: handleUploadPhoto, className: "row g-2 align-items-end mb-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-3 col-md-2" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Type"), /* @__PURE__ */ import_react5.default.createElement(
+      /* @__PURE__ */ import_react5.default.createElement("div", { className: "row g-2 align-items-end mb-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-4 col-md-3" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Type"), /* @__PURE__ */ import_react5.default.createElement(
         "select",
         {
-          className: "form-select form-select-sm rounded-3",
+          className: "form-select form-select-sm rounded-3 bg-white",
           value: photoType,
           onChange: (e) => setPhotoType(e.target.value)
         },
@@ -20048,33 +20211,129 @@
         /* @__PURE__ */ import_react5.default.createElement("option", { value: "Fabric Swatch" }, "Fabric Swatch"),
         /* @__PURE__ */ import_react5.default.createElement("option", { value: "Sample" }, "Sample"),
         /* @__PURE__ */ import_react5.default.createElement("option", { value: "QC Defect" }, "QC Defect")
-      )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-4 col-md-5" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Caption"), /* @__PURE__ */ import_react5.default.createElement(
+      )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-4 col-md-4" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Caption / Description"), /* @__PURE__ */ import_react5.default.createElement(
         "input",
         {
           type: "text",
-          className: "form-control form-control-sm rounded-3",
+          className: "form-control form-control-sm rounded-3 bg-white",
           placeholder: "Optional description",
           value: photoCaption,
           onChange: (e) => setPhotoCaption(e.target.value)
         }
-      )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-3 col-md-3" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "File"), /* @__PURE__ */ import_react5.default.createElement(
+      )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-4 col-md-5" }, /* @__PURE__ */ import_react5.default.createElement("label", { className: "form-label small text-muted mb-1" }, "File (Select to add directly)"), /* @__PURE__ */ import_react5.default.createElement(
         "input",
         {
           type: "file",
-          className: "form-control form-control-sm rounded-3",
-          onChange: (e) => setPhotoFileName(e.target.files?.[0]?.name || "")
+          accept: "image/*,.pdf,.doc,.docx",
+          className: "form-control form-control-sm rounded-3 bg-white",
+          onChange: handleFileSelect
         }
-      )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "col-12 col-sm-2 col-md-2" }, /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "submit",
-          className: "btn btn-sm text-white w-100 rounded-3 fw-semibold shadow-xs",
-          style: { backgroundColor: "#6366f1", height: "31px" }
-        },
-        /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-upload me-1", style: { fontSize: "14px", lineHeight: 1 } }),
-        " Upload"
       ))),
-      photos.length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "p-4 text-center rounded-3 bg-light border", style: { borderColor: "#f1f5f9" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted mb-2" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-photo text-secondary opacity-50", style: { fontSize: "38px", lineHeight: 1 } })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "text-muted small mb-0" }, "No photos yet. Upload reference images, fabric swatches, samples, or QC defect evidence.")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "row g-3" }, photos.map((p) => /* @__PURE__ */ import_react5.default.createElement("div", { key: p.id, className: "col-md-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "card border p-3 rounded-3 bg-light" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "badge bg-secondary mb-1 w-auto align-self-start" }, p.type), /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small" }, p.caption), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted small mt-1" }, p.date, " \u2022 ", p.fileName)))))
+      photos.length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "p-4 text-center rounded-3 bg-light border", style: { borderColor: "#f1f5f9" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted mb-2" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-photo text-secondary opacity-50", style: { fontSize: "38px", lineHeight: 1 } })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "text-muted small mb-0" }, "No photos or files yet. Choose a file above to add reference images, fabric swatches, or samples.")) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "row g-3" }, photos.map((p) => {
+        const hasImg = Boolean(p.url || p.dataUrl || p.isImage && p.url);
+        return /* @__PURE__ */ import_react5.default.createElement("div", { key: p.id, className: "col-12 col-sm-6 col-md-4 col-lg-3" }, /* @__PURE__ */ import_react5.default.createElement(
+          "div",
+          {
+            className: "card border rounded-3 overflow-hidden shadow-2xs position-relative h-100 bg-white",
+            style: { borderColor: "#e2e8f0", transition: "box-shadow 0.2s ease" }
+          },
+          /* @__PURE__ */ import_react5.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-sm btn-light rounded-circle shadow-sm position-absolute d-flex align-items-center justify-content-center",
+              style: {
+                top: "8px",
+                right: "8px",
+                width: "28px",
+                height: "28px",
+                padding: 0,
+                backgroundColor: "#ffffff",
+                border: "1.5px solid #ef4444",
+                color: "#ef4444",
+                zIndex: 10,
+                cursor: "pointer",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+              },
+              title: "Remove file",
+              onClick: () => handleRemovePhoto(p.id)
+            },
+            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "14px", fontWeight: "bold" } })
+          ),
+          hasImg ? /* @__PURE__ */ import_react5.default.createElement(
+            "div",
+            {
+              style: {
+                width: "100%",
+                height: "160px",
+                backgroundColor: "#f8fafc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                borderBottom: "1px solid #f1f5f9"
+              }
+            },
+            /* @__PURE__ */ import_react5.default.createElement(
+              "img",
+              {
+                src: p.url || p.dataUrl,
+                alt: p.caption || p.fileName,
+                style: { width: "100%", height: "100%", objectFit: "cover" },
+                onError: (e) => {
+                  e.target.style.display = "none";
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                }
+              }
+            ),
+            /* @__PURE__ */ import_react5.default.createElement(
+              "div",
+              {
+                style: {
+                  display: "none",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: "100%",
+                  color: "#6366f1"
+                }
+              },
+              /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-photo", style: { fontSize: "36px" } })
+            )
+          ) : /* @__PURE__ */ import_react5.default.createElement(
+            "div",
+            {
+              style: {
+                width: "100%",
+                height: "130px",
+                backgroundColor: "#f8fafc",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#64748b",
+                borderBottom: "1px solid #e2e8f0"
+              }
+            },
+            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-file-text", style: { fontSize: "36px", color: "#6366f1" } }),
+            /* @__PURE__ */ import_react5.default.createElement("span", { className: "small text-muted text-truncate px-3 mt-1", style: { maxWidth: "100%" } }, p.fileName)
+          ),
+          /* @__PURE__ */ import_react5.default.createElement("div", { className: "p-3 d-flex flex-column gap-1" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center justify-content-between gap-1 mb-1" }, /* @__PURE__ */ import_react5.default.createElement(
+            "span",
+            {
+              className: "badge fw-semibold rounded-pill px-2.5 py-1",
+              style: {
+                backgroundColor: "#eef2ff",
+                color: "#4361ee",
+                fontSize: "11px",
+                border: "1px solid #c7d2fe"
+              }
+            },
+            p.type || "Reference"
+          ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, p.date)), p.caption && /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small text-truncate", title: p.caption }, p.caption), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted small text-truncate", style: { fontSize: "11.5px" }, title: p.fileName }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-paperclip me-1" }), p.fileName))
+        ));
+      }))
     ), /* @__PURE__ */ import_react5.default.createElement(
       "div",
       {
@@ -20168,8 +20427,8 @@
               const isFirstRow = rIdx === 0;
               const pcs = parseInt(row.pcs, 10) || 0;
               const greigePerPc = hasDyedVal ? isDyedSourced ? dyedVal : dyedVal * (1 + shrinkPct / 100) : null;
-              const totalDyed = hasDyedVal ? dyedVal * pcs : null;
-              const totalGreige = greigePerPc !== null ? greigePerPc * pcs : null;
+              const totalDyed = hasDyedVal && pcs > 0 ? dyedVal * pcs : null;
+              const totalGreige = greigePerPc !== null && pcs > 0 ? greigePerPc * pcs : null;
               return /* @__PURE__ */ import_react5.default.createElement(
                 "tr",
                 {
@@ -20451,13 +20710,26 @@
                       textAlign: "center",
                       padding: "10px 8px",
                       borderRight: "1px solid #f1f5f9",
-                      borderBottom: "1px solid #e2e8f0",
-                      fontSize: "13px",
-                      color: "#475569",
-                      fontWeight: 500
+                      borderBottom: "1px solid #e2e8f0"
                     }
                   },
-                  isDyedSourced ? "\u2014" : group.shrinkPct ? `${group.shrinkPct}%` : "\u2014"
+                  /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+                    "div",
+                    {
+                      className: "d-inline-flex align-items-center justify-content-center font-monospace fw-semibold",
+                      style: {
+                        minWidth: "58px",
+                        height: "30px",
+                        padding: "0 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#f8fafc",
+                        color: "#475569",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "12px"
+                      }
+                    },
+                    isDyedSourced ? "0%" : group.shrinkPct ? `${group.shrinkPct}%` : "0%"
+                  ))
                 ),
                 /* @__PURE__ */ import_react5.default.createElement(
                   "td",
@@ -20465,28 +20737,74 @@
                     style: {
                       padding: "10px 8px",
                       textAlign: "center",
-                      fontVariantNumeric: "tabular-nums",
-                      color: "#334155",
-                      fontSize: "13px",
                       borderBottom: "1px solid #f1f5f9"
                     }
                   },
-                  greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(2) : "\u2014"
+                  /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+                    "div",
+                    {
+                      className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                      style: {
+                        minWidth: "68px",
+                        height: "30px",
+                        padding: "0 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#f8fafc",
+                        color: greigePerPc !== null && greigePerPc > 0 ? "#1e293b" : "#94a3b8",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "12.5px"
+                      }
+                    },
+                    greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(3) : "0.000"
+                  ))
                 ),
                 /* @__PURE__ */ import_react5.default.createElement(
                   "td",
                   {
                     style: {
-                      padding: "10px 8px",
+                      padding: "8px 6px",
                       textAlign: "center",
-                      fontVariantNumeric: "tabular-nums",
-                      color: "#1e293b",
-                      fontWeight: 600,
-                      fontSize: "13px",
                       borderBottom: "1px solid #f1f5f9"
                     }
                   },
-                  pcs
+                  isConsumptionEditing ? /* @__PURE__ */ import_react5.default.createElement(
+                    "input",
+                    {
+                      type: "number",
+                      min: "0",
+                      className: "form-control form-control-sm text-center font-monospace",
+                      style: {
+                        width: "74px",
+                        height: "32px",
+                        margin: "0 auto",
+                        border: "1.5px solid #cbd5e1",
+                        backgroundColor: "#ffffff",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#1e293b"
+                      },
+                      value: row.pcs !== void 0 && row.pcs !== null ? row.pcs : "",
+                      placeholder: "0",
+                      onChange: (e) => handleUpdateRowPcs(row.key, e.target.value)
+                    }
+                  ) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+                    "div",
+                    {
+                      className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                      style: {
+                        minWidth: "64px",
+                        height: "30px",
+                        padding: "0 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#f8fafc",
+                        color: pcs > 0 ? "#1e293b" : "#94a3b8",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "12.5px"
+                      }
+                    },
+                    pcs > 0 ? pcs : "0"
+                  ))
                 ),
                 /* @__PURE__ */ import_react5.default.createElement(
                   "td",
@@ -20494,14 +20812,26 @@
                     style: {
                       padding: "10px 12px",
                       textAlign: "center",
-                      fontVariantNumeric: "tabular-nums",
-                      fontWeight: 700,
-                      fontSize: "13px",
-                      color: "#1d4ed8",
                       borderBottom: "1px solid #f1f5f9"
                     }
                   },
-                  totalDyed !== null && totalDyed > 0 ? totalDyed.toFixed(2) : "\u2014"
+                  /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+                    "div",
+                    {
+                      className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                      style: {
+                        minWidth: "78px",
+                        height: "30px",
+                        padding: "0 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#eef2ff",
+                        color: "#1d4ed8",
+                        border: "1px solid #c7d2fe",
+                        fontSize: "12px"
+                      }
+                    },
+                    totalDyed !== null && totalDyed > 0 ? `${totalDyed.toFixed(2)}m` : "0.00m"
+                  ))
                 ),
                 /* @__PURE__ */ import_react5.default.createElement(
                   "td",
@@ -20509,14 +20839,26 @@
                     style: {
                       padding: "10px 12px",
                       textAlign: "center",
-                      fontVariantNumeric: "tabular-nums",
-                      fontWeight: 700,
-                      fontSize: "13px",
-                      color: "#7e22ce",
                       borderBottom: "1px solid #f1f5f9"
                     }
                   },
-                  totalGreige !== null && totalGreige > 0 ? totalGreige.toFixed(2) : "\u2014"
+                  /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+                    "div",
+                    {
+                      className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                      style: {
+                        minWidth: "78px",
+                        height: "30px",
+                        padding: "0 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#faf5ff",
+                        color: "#7e22ce",
+                        border: "1px solid #e9d5ff",
+                        fontSize: "12px"
+                      }
+                    },
+                    totalGreige !== null && totalGreige > 0 ? `${totalGreige.toFixed(2)}m` : "0.00m"
+                  ))
                 ),
                 isConsumptionEditing && /* @__PURE__ */ import_react5.default.createElement(
                   "td",
@@ -20541,64 +20883,11 @@
                 )
               );
             });
-          }), fabricSummaryRows.map((fs, idx) => /* @__PURE__ */ import_react5.default.createElement(
-            "tr",
-            {
-              key: `summary_${idx}`,
-              style: {
-                borderTop: idx === 0 ? "2px solid #cbd5e1" : "1px solid #e2e8f0",
-                borderBottom: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc"
-              }
-            },
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
-              {
-                colSpan: 7,
-                className: "fw-bold text-dark ps-3 py-2.5",
-                style: { fontSize: "13.5px" }
-              },
-              /* @__PURE__ */ import_react5.default.createElement("span", null, fs.fabricName),
-              fs.width ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-white text-primary border ms-2 font-monospace", style: { fontSize: "11px", borderColor: "#c7d2fe" } }, fs.width) : ""
-            ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
-              {
-                className: "text-center fw-bold text-dark py-2.5",
-                style: { fontSize: "13px", fontVariantNumeric: "tabular-nums" }
-              },
-              fs.pcs
-            ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
-              {
-                className: "text-center fw-bold py-2.5",
-                style: {
-                  fontSize: "13px",
-                  color: "#4361ee",
-                  fontVariantNumeric: "tabular-nums"
-                }
-              },
-              fs.hasValues && fs.totalDyed > 0 ? fs.totalDyed.toFixed(2) : "\u2014"
-            ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
-              {
-                className: "text-center fw-bold py-2.5",
-                style: {
-                  fontSize: "13px",
-                  color: "#0284c7",
-                  fontVariantNumeric: "tabular-nums"
-                }
-              },
-              fs.hasValues && fs.totalGreige > 0 ? fs.totalGreige.toFixed(2) : "\u2014"
-            ),
-            isConsumptionEditing && /* @__PURE__ */ import_react5.default.createElement("td", { style: { backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" } })
-          )), fabricSummaryRows.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
+          }), consumptionRows.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
             "tr",
             {
               style: {
-                borderTop: "2px solid #94a3b8",
+                borderTop: "2px solid #cbd5e1",
                 backgroundColor: "#f1f5f9",
                 fontWeight: 700
               }
@@ -20606,37 +20895,69 @@
             /* @__PURE__ */ import_react5.default.createElement(
               "td",
               {
-                colSpan: 7,
+                colSpan: 2,
                 className: "text-uppercase text-dark ps-3 py-2.5 fw-bold",
                 style: { fontSize: "12px", letterSpacing: "0.05em" }
               },
               /* @__PURE__ */ import_react5.default.createElement("span", null, "Total Garment Pieces")
             ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small" }, "\u2014"),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small" }, "\u2014"),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small" }, "\u2014"),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small" }, "\u2014"),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small" }, "\u2014"),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center py-2.5" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+              "div",
               {
-                className: "text-center text-dark py-2.5 fw-bold",
-                style: { fontSize: "13.5px", fontVariantNumeric: "tabular-nums" }
+                className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                style: {
+                  minWidth: "75px",
+                  height: "32px",
+                  padding: "0 8px",
+                  borderRadius: "6px",
+                  backgroundColor: "#ffffff",
+                  color: "#0f172a",
+                  border: "1.5px solid #cbd5e1",
+                  fontSize: "13px"
+                }
               },
               order?.totalPcs || order?.orderQuantity || fabricSummaryRows.reduce((sum, fs) => sum + (parseInt(fs.pcs, 10) || 0), 0),
               " pcs"
-            ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
+            ))),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center py-2.5" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+              "div",
               {
-                className: "text-center py-2.5 fw-bold",
-                style: { fontSize: "13px", color: "#1d4ed8", fontVariantNumeric: "tabular-nums" }
+                className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                style: {
+                  minWidth: "85px",
+                  height: "32px",
+                  padding: "0 8px",
+                  borderRadius: "6px",
+                  backgroundColor: "#dbeafe",
+                  color: "#1e40af",
+                  border: "1.5px solid #93c5fd",
+                  fontSize: "13px"
+                }
               },
-              fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalDyed || 0 : 0), 0) > 0 ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalDyed || 0 : 0), 0).toFixed(2) : "\u2014"
-            ),
-            /* @__PURE__ */ import_react5.default.createElement(
-              "td",
+              fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalDyed || 0 : 0), 0) > 0 ? `${fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalDyed || 0 : 0), 0).toFixed(2)}m` : "0.00m"
+            ))),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center py-2.5" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex justify-content-center" }, /* @__PURE__ */ import_react5.default.createElement(
+              "div",
               {
-                className: "text-center py-2.5 fw-bold",
-                style: { fontSize: "13px", color: "#0284c7", fontVariantNumeric: "tabular-nums" }
+                className: "d-inline-flex align-items-center justify-content-center font-monospace fw-bold",
+                style: {
+                  minWidth: "85px",
+                  height: "32px",
+                  padding: "0 8px",
+                  borderRadius: "6px",
+                  backgroundColor: "#f3e8ff",
+                  color: "#6b21a8",
+                  border: "1.5px solid #d8b4fe",
+                  fontSize: "13px"
+                }
               },
-              fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0) > 0 ? fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0).toFixed(2) : "\u2014"
-            ),
+              fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0) > 0 ? `${fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0).toFixed(2)}m` : "0.00m"
+            ))),
             isConsumptionEditing && /* @__PURE__ */ import_react5.default.createElement("td", { style: { backgroundColor: "#f1f5f9" } })
           ))
         )
@@ -22385,35 +22706,14 @@
       sortOrder: idx + 1
     }));
   };
-  var DEFAULT_MASTER_ARTICLES = [
-    { id: "ART-001", name: "Kurta", articleType: "Kurta", icon: "\u{1F458}", sortOrder: 1, active: true, description: "Men & Women Long Tunics / Kurtas" },
-    { id: "ART-002", name: "Pant", articleType: "Pant", icon: "\u{1F456}", sortOrder: 2, active: true, description: "Pants, Churidars & Trousers" },
-    { id: "ART-003", name: "Dupatta", articleType: "Dupatta", icon: "\u{1F380}", sortOrder: 3, active: true, description: "Stoles & Chiffon/Mulmul Dupattas" },
-    { id: "ART-004", name: "Shirt", articleType: "Shirt", icon: "\u{1F454}", sortOrder: 4, active: true, description: "Shirts & Formals" },
-    { id: "ART-005", name: "Top", articleType: "Top", icon: "\u{1F45A}", sortOrder: 5, active: true, description: "Women Tops & Short Tunics" },
-    { id: "ART-006", name: "Tunic", articleType: "Other", icon: "\u{1F457}", sortOrder: 6, active: true, description: "Tunics & Dresses" },
-    { id: "ART-007", name: "Jacket", articleType: "Jacket", icon: "\u{1F9E5}", sortOrder: 7, active: true, description: "Nehru & Modi Cut Waistcoats" }
-  ];
   function ArticleMasterView({ isInline = false, onSaveInline, onCloseInline }) {
     const [articles, setArticles] = (0, import_react7.useState)(() => {
-      let list = getStoredData("erp_articles_v1", null);
-      if (!list || !Array.isArray(list) || list.length === 0) {
-        const fallback = getStoredData("erp_articles_master", null);
-        if (Array.isArray(fallback) && fallback.length > 0) {
-          list = fallback;
-        } else if (Array.isArray(initialArticles) && initialArticles.length > 0) {
-          list = initialArticles;
-        } else {
-          list = DEFAULT_MASTER_ARTICLES;
-        }
-      }
-      const normalized = normalizeArticleOrders(list);
-      setStoredData("erp_articles_v1", normalized);
-      return normalized;
+      const list = getStoredArticlesMaster();
+      return normalizeArticleOrders(list);
     });
     (0, import_react7.useEffect)(() => {
       const handleUpdate = () => {
-        const stored = getStoredData("erp_articles_v1", null) !== null ? getStoredData("erp_articles_v1", null) : getStoredData("erp_articles_master", null);
+        const stored = getStoredArticlesMaster();
         if (Array.isArray(stored)) {
           setArticles(normalizeArticleOrders(stored));
         }
@@ -22486,7 +22786,7 @@
       const updated = reorderArticlePositions(articles, fromIdx, targetIdx);
       const moved = updated[targetIdx];
       setArticles(updated);
-      setStoredData("erp_articles_v1", updated);
+      setStoredArticlesMaster(updated);
       try {
         window.dispatchEvent(new Event("erp_articles_updated"));
       } catch (err) {
@@ -22629,7 +22929,7 @@
       }
       const normalized = normalizeArticleOrders(updated);
       setArticles(normalized);
-      setStoredData("erp_articles_v1", normalized);
+      setStoredArticlesMaster(normalized);
       try {
         window.dispatchEvent(new Event("erp_articles_updated"));
       } catch (err) {
@@ -22661,7 +22961,7 @@
         changeSummary || `Updated ${secName} section`
       );
       setArticles(updatedList);
-      setStoredData("erp_articles_v1", updatedList);
+      setStoredArticlesMaster(updatedList);
       setSelectedArticle(savedArticle);
       setEditingSection(null);
       showToast(`${secName.toUpperCase()} section saved successfully (Rank #${savedArticle.sortOrder || "\u2014"}).`);
@@ -22685,7 +22985,7 @@
       );
       const updatedList = articles.map((a) => a.id === updated.id ? updated : a);
       setArticles(updatedList);
-      setStoredData("erp_articles_v1", updatedList);
+      setStoredArticlesMaster(updatedList);
       if (selectedArticle?.id === art.id) {
         setSelectedArticle(updated);
       }
@@ -22697,7 +22997,7 @@
       const remaining = articles.filter((a) => a.id !== artId);
       const normalized = normalizeArticleOrders(remaining);
       setArticles(normalized);
-      setStoredData("erp_articles_v1", normalized);
+      setStoredArticlesMaster(normalized);
       if (selectedArticle?.id === artId) {
         setSelectedArticle(null);
       }
@@ -23166,7 +23466,16 @@
         },
         /* @__PURE__ */ import_react7.default.createElement("i", { className: "ti ti-trash fs-5" })
       )))
-    )))))), isModalOpen && /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-dialog modal-dialog-centered" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-content shadow-lg border-0 rounded-4 bg-white" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react7.default.createElement("h5", { className: "modal-title fw-bold text-dark mb-0" }, isEditingExisting ? isModalEditMode ? `Edit Article: ${formData.name || ""}` : `Article Details: ${formData.name || ""}` : "Add New Article"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isEditingExisting && (!isModalEditMode ? /* @__PURE__ */ import_react7.default.createElement(
+    )), filteredArticles.length === 0 && /* @__PURE__ */ import_react7.default.createElement("tr", null, /* @__PURE__ */ import_react7.default.createElement("td", { colSpan: "6", className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fs-1 mb-2" }, "\u{1F4E6}"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fw-semibold text-dark mb-1" }, "No articles found in master."), /* @__PURE__ */ import_react7.default.createElement("div", { className: "small text-muted mb-3" }, 'Click "+ Add New Article" to create an article.'), /* @__PURE__ */ import_react7.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-primary rounded-3 px-3 py-1.5 shadow-xs",
+        onClick: handleOpenAddModal
+      },
+      /* @__PURE__ */ import_react7.default.createElement("i", { className: "ti ti-plus me-1" }),
+      " Add New Article"
+    ))))))), isModalOpen && /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal show d-block", style: { backgroundColor: "rgba(15,23,42,0.6)", zIndex: 1060 } }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-dialog modal-dialog-centered" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-content shadow-lg border-0 rounded-4 bg-white" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react7.default.createElement("h5", { className: "modal-title fw-bold text-dark mb-0" }, isEditingExisting ? isModalEditMode ? `Edit Article: ${formData.name || ""}` : `Article Details: ${formData.name || ""}` : "Add New Article"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isEditingExisting && (!isModalEditMode ? /* @__PURE__ */ import_react7.default.createElement(
       "button",
       {
         type: "button",
@@ -24788,9 +25097,8 @@
     return "ALL_SEASON";
   };
   var loadSyncedArticles = () => {
-    const stored = getStoredData("erp_articles_v1", null);
-    const source = Array.isArray(stored) && stored.length > 0 ? stored : initialArticles;
-    return source.filter((a) => a.active !== false).map((a, idx) => ({
+    const source = getStoredArticlesMaster();
+    return (Array.isArray(source) ? source : []).filter((a) => a.active !== false).map((a, idx) => ({
       id: a.id || `ART-${idx + 1}`,
       name: a.name,
       emoji: a.icon || a.emoji || "\u{1F455}",
@@ -25753,13 +26061,15 @@
           const specificColor = fr.color || fr.colorName;
           const colorsToIterate = specificColor && specificColor !== "All Colours" && specificColor !== "All" ? [specificColor] : usedColors.size > 0 ? Array.from(usedColors) : ["Standard"];
           colorsToIterate.forEach((colName) => {
-            const pcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
-            if (pcs <= 0 && usedColors.size > 0) return;
+            const articlePcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
+            if (articlePcs <= 0 && usedColors.size > 0) return;
+            const isMainFabric = frIdx === 0 || (fr.role || "").toLowerCase() === "main";
+            const pcs = isMainFabric ? articlePcs : parseInt(fr.pcs, 10) || 0;
             const colorObj = masterColors.find((c) => c.name === colName) || { hex: "#94a3b8" };
             const widthVal = fr.width || art.width || "";
             const greigeLengthPerPiece = dyedPerPiece && dyedPerPiece > 0 ? Number((dyedPerPiece * (1 + shrinkPct / 100) * (1 + bufferPct / 100)).toFixed(3)) : 0;
-            const totalDyed = dyedPerPiece && dyedPerPiece > 0 ? Number((dyedPerPiece * pcs).toFixed(1)) : 0;
-            const totalGreige = greigeLengthPerPiece && greigeLengthPerPiece > 0 ? Number((greigeLengthPerPiece * pcs).toFixed(1)) : 0;
+            const totalDyed = dyedPerPiece && dyedPerPiece > 0 && pcs > 0 ? Number((dyedPerPiece * pcs).toFixed(1)) : 0;
+            const totalGreige = greigeLengthPerPiece && greigeLengthPerPiece > 0 && pcs > 0 ? Number((greigeLengthPerPiece * pcs).toFixed(1)) : 0;
             const orderQty = totalGreige;
             rows.push({
               key: `${art.id}_${frIdx}_${colName}`,
@@ -25777,6 +26087,7 @@
               bufferPct,
               greigeLengthPerPiece,
               pcs,
+              isMainFabric,
               totalDyed,
               totalGreige,
               orderQty
@@ -37368,7 +37679,7 @@
             isPoFull ? `[Fully Received: Complete \u2014 0m Pending]` : `[${poBalPending.toLocaleString()}m Pending / ${poTotalMtrs.toLocaleString()}m Ordered]`
           );
         })
-      ), fifoPoAllocations && fifoPoAllocations.length > 1 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "mt-3 p-3 rounded-3 bg-white border border-primary border-opacity-25 shadow-xs" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 mb-2.5 border-bottom" }, /* @__PURE__ */ import_react23.default.createElement("div", null, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-primary text-white px-2 py-1 rounded-2 fs-11 fw-bold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-layers-intersect me-1" }), "CONSOLIDATED SHIPMENT (", fifoPoAllocations.length, " POs)"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2 py-1 rounded-2 fs-11 fw-semibold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-clock-check me-1" }), "FIFO Auto-Allocation Rule")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11 mt-1" }, "\u0AB8\u0ACC\u0AA5\u0AC0 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0AAC\u0AA8\u0AC7\u0AB2\u0ABE (Oldest) PO \u0AAE\u0ABE\u0A82\u0AA5\u0AC0 \u0AAE\u0ABE\u0AB2 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0A95\u0A9F \u0AA5\u0AB6\u0AC7. \u0A8F\u0A95 PO 100% \u0AAA\u0AC1\u0AB0\u0ACB \u0AA5\u0AAF\u0ABE \u0AAA\u0A9B\u0AC0 \u0A9C \u0AAC\u0ABE\u0A95\u0AC0 \u0AB5\u0AA7\u0AC7\u0AB2\u0ACB \u0AAE\u0ABE\u0AB2 \u0AAC\u0AC0\u0A9C\u0ABE PO \u0AAE\u0ABE\u0A82 \u0AAB\u0ABE\u0AB3\u0AB5\u0ABE\u0AB6\u0AC7.")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-11 text-muted d-block" }, "Entering in this GRN:"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-15 fw-bold text-success" }, effectiveGrnMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react23.default.createElement("table", { className: "table table-sm table-bordered align-middle mb-0 fs-12 text-nowrap" }, /* @__PURE__ */ import_react23.default.createElement("thead", { className: "table-light text-secondary" }, /* @__PURE__ */ import_react23.default.createElement("tr", null, /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Priority & PO ID"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Order Date"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Previously Recd"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end bg-success-subtle text-success fw-bold" }, "Receiving in this GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-center" }, "Fulfillment Status"), !isQcActioned && /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2 text-center", style: { width: "40px" } }, "Action"))), /* @__PURE__ */ import_react23.default.createElement("tbody", null, fifoPoAllocations.map((alloc) => {
+      ), fifoPoAllocations && fifoPoAllocations.length > 1 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "mt-3 p-3 rounded-3 bg-white border border-primary border-opacity-25 shadow-xs" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 mb-2.5 border-bottom" }, /* @__PURE__ */ import_react23.default.createElement("div", null, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-primary text-white px-2 py-1 rounded-2 fs-11 fw-bold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-layers-intersect me-1" }), "CONSOLIDATED SHIPMENT (", fifoPoAllocations.length, " POs)"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2 py-1 rounded-2 fs-11 fw-semibold" }, /* @__PURE__ */ import_react23.default.createElement("i", { className: "ti ti-clock-check me-1" }), "FIFO Auto-Allocation Rule")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-muted fs-11 mt-1" }, "Material is deducted first from the oldest PO. Remaining material is allocated to subsequent POs only after the earlier PO is 100% fulfilled.")), /* @__PURE__ */ import_react23.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-11 text-muted d-block" }, "Entering in this GRN:"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "fs-15 fw-bold text-success" }, effectiveGrnMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react23.default.createElement("table", { className: "table table-sm table-bordered align-middle mb-0 fs-12 text-nowrap" }, /* @__PURE__ */ import_react23.default.createElement("thead", { className: "table-light text-secondary" }, /* @__PURE__ */ import_react23.default.createElement("tr", null, /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Priority & PO ID"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5" }, "Order Date"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Previously Recd"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end bg-success-subtle text-success fw-bold" }, "Receiving in this GRN"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2.5 text-center" }, "Fulfillment Status"), !isQcActioned && /* @__PURE__ */ import_react23.default.createElement("th", { className: "py-2 px-2 text-center", style: { width: "40px" } }, "Action"))), /* @__PURE__ */ import_react23.default.createElement("tbody", null, fifoPoAllocations.map((alloc) => {
         return /* @__PURE__ */ import_react23.default.createElement("tr", { key: alloc.poId, className: alloc.isComplete ? "table-light" : "" }, /* @__PURE__ */ import_react23.default.createElement("td", { className: "py-2 px-2.5" }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react23.default.createElement(
           "span",
           {
@@ -38780,7 +39091,7 @@
           style: { width: "7px", height: "7px", backgroundColor: currentGrnApprovedMeters > 0 ? "#10b981" : "#f59e0b" }
         }
       ), "This GRN: ", totalMeters.toLocaleString(), "m (", currentGrnApprovedMeters > 0 ? "QC Approved" : "QC Pending", ")"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "d-inline-block rounded-circle", style: { width: "7px", height: "7px", backgroundColor: "#cbd5e1" } }), "Remaining PO Balance: ", pendingTrackingMeters.toLocaleString(), "m")))
-    ), fifoAllocations && fifoAllocations.length > 1 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-layers-intersect text-primary me-1.5" }), "Consolidated Multi-PO Delivery & FIFO Allocation"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, fifoAllocations.length, " POs Linked"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-clock-check me-1" }), " FIFO Rule Active")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-12 mt-1" }, "\u0AB8\u0ACC\u0AA5\u0AC0 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0AAC\u0AA8\u0AC7\u0AB2\u0ABE (Oldest) PO \u0AAE\u0ABE\u0A82\u0AA5\u0AC0 \u0AAE\u0ABE\u0AB2 \u0AAA\u0AB9\u0AC7\u0AB2\u0ABE \u0A95\u0A9F \u0AA5\u0AB6\u0AC7. \u0AAA\u0ACD\u0AB0\u0AA5\u0AAE PO 100% \u0AAA\u0AC2\u0AB0\u0ACD\u0AA3 \u0AA5\u0AAF\u0ABE \u0AAA\u0A9B\u0AC0 \u0A9C \u0AAC\u0ABE\u0A95\u0AC0\u0AA8\u0ACB \u0AAE\u0ABE\u0AB2 \u0AAA\u0A9B\u0AC0\u0AA8\u0ABE PO \u0AAE\u0ABE\u0A82 \u0AAB\u0ABE\u0AB3\u0AB5\u0AB5\u0ABE\u0AAE\u0ABE\u0A82 \u0A86\u0AB5\u0ACD\u0AAF\u0ACB \u0A9B\u0AC7.")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-11 text-muted d-block text-uppercase fw-semibold" }, "Delivered in this GRN"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-16 fw-bold text-success" }, "+", totalGrnDeliveredMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react24.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13 text-nowrap" }, /* @__PURE__ */ import_react24.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("th", { className: "ps-4 py-3" }, "Priority & PO ID"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3" }, "Order Date"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Previously Received"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end bg-success-subtle text-success fw-bold" }, "Allocated in this GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "pe-4 py-3 text-center" }, "Fulfillment Status"))), /* @__PURE__ */ import_react24.default.createElement("tbody", null, fifoAllocations.map((alloc) => /* @__PURE__ */ import_react24.default.createElement("tr", { key: alloc.poId, className: alloc.isComplete ? "bg-light bg-opacity-50" : "" }, /* @__PURE__ */ import_react24.default.createElement("td", { className: "ps-4 py-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement(
+    ), fifoAllocations && fifoAllocations.length > 1 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "card-header bg-white border-bottom p-3.5 d-flex flex-wrap align-items-center justify-content-between gap-2" }, /* @__PURE__ */ import_react24.default.createElement("div", null, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement("h5", { className: "fw-bold text-dark mb-0 fs-16" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-layers-intersect text-primary me-1.5" }), "Consolidated Multi-PO Delivery & FIFO Allocation"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, fifoAllocations.length, " POs Linked"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info border-opacity-25 px-2.5 py-1 rounded-pill fs-11 fw-semibold" }, /* @__PURE__ */ import_react24.default.createElement("i", { className: "ti ti-clock-check me-1" }), " FIFO Rule Active")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-muted fs-12 mt-1" }, "Material is deducted first from the oldest PO. Remaining material is allocated to subsequent POs only after the earlier PO is 100% fulfilled.")), /* @__PURE__ */ import_react24.default.createElement("div", { className: "text-end" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-11 text-muted d-block text-uppercase fw-semibold" }, "Delivered in this GRN"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "fs-16 fw-bold text-success" }, "+", totalGrnDeliveredMeters.toLocaleString(), " m"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react24.default.createElement("table", { className: "table table-hover align-middle mb-0 fs-13 text-nowrap" }, /* @__PURE__ */ import_react24.default.createElement("thead", { className: "table-light text-secondary fs-12 text-uppercase fw-bold" }, /* @__PURE__ */ import_react24.default.createElement("tr", null, /* @__PURE__ */ import_react24.default.createElement("th", { className: "ps-4 py-3" }, "Priority & PO ID"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3" }, "Order Date"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Ordered Qty"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Previously Received"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Pending Before GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end bg-success-subtle text-success fw-bold" }, "Allocated in this GRN"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "py-3 text-end" }, "Remaining Balance"), /* @__PURE__ */ import_react24.default.createElement("th", { className: "pe-4 py-3 text-center" }, "Fulfillment Status"))), /* @__PURE__ */ import_react24.default.createElement("tbody", null, fifoAllocations.map((alloc) => /* @__PURE__ */ import_react24.default.createElement("tr", { key: alloc.poId, className: alloc.isComplete ? "bg-light bg-opacity-50" : "" }, /* @__PURE__ */ import_react24.default.createElement("td", { className: "ps-4 py-3" }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react24.default.createElement(
       "span",
       {
         className: `badge ${alloc.isFirstOrder ? "bg-primary text-white" : "bg-secondary-subtle text-dark border"} rounded-pill fs-11 px-2.5 py-1`
@@ -39540,6 +39851,48 @@
     });
     const [pieceInspections, setPieceInspections] = (0, import_react26.useState)(qc?.pieceInspections || {});
     const [toastNotification, setToastNotification] = (0, import_react26.useState)(null);
+    const [zoomedPhoto, setZoomedPhoto] = (0, import_react26.useState)(null);
+    const [zoomScale, setZoomScale] = (0, import_react26.useState)(1);
+    const [rotation, setRotation] = (0, import_react26.useState)(0);
+    const handleOpenZoomModal = (photo) => {
+      setZoomedPhoto(photo);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleCloseZoomModal = () => {
+      setZoomedPhoto(null);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleZoomIn = () => {
+      setZoomScale((prev) => Math.min(prev + 0.25, 4));
+    };
+    const handleZoomOut = () => {
+      setZoomScale((prev) => Math.max(prev - 0.25, 0.5));
+    };
+    const handleResetZoom = () => {
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleRotate = () => {
+      setRotation((prev) => (prev + 90) % 360);
+    };
+    import_react26.default.useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (!zoomedPhoto) return;
+        if (e.key === "Escape") {
+          handleCloseZoomModal();
+        } else if (e.key === "+" || e.key === "=") {
+          handleZoomIn();
+        } else if (e.key === "-") {
+          handleZoomOut();
+        } else if (e.key === "0") {
+          handleResetZoom();
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [zoomedPhoto]);
     const [selectedBaleFilter, setSelectedBaleFilter] = (0, import_react26.useState)("");
     const [selectedPieceKey, setSelectedPieceKey] = (0, import_react26.useState)("");
     const [inspectionScope, setInspectionScope] = (0, import_react26.useState)(() => {
@@ -40243,7 +40596,21 @@
       {
         key: idx,
         className: "position-relative border rounded-2 p-1 bg-white shadow-xs",
-        style: { width: "85px" }
+        style: {
+          width: "85px",
+          cursor: "pointer",
+          transition: "transform 0.15s ease, box-shadow 0.15s ease"
+        },
+        onClick: () => handleOpenZoomModal(ph),
+        title: "Click to zoom / inspect photo",
+        onMouseEnter: (e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(91, 71, 251, 0.25)";
+        },
+        onMouseLeave: (e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "";
+        }
       },
       /* @__PURE__ */ import_react26.default.createElement(
         "button",
@@ -40269,15 +40636,23 @@
         },
         "\xD7"
       ),
-      /* @__PURE__ */ import_react26.default.createElement(
+      /* @__PURE__ */ import_react26.default.createElement("div", { className: "position-relative overflow-hidden rounded-1", style: { height: "65px" } }, /* @__PURE__ */ import_react26.default.createElement(
         "img",
         {
           src: ph.url,
           alt: ph.name,
-          className: "rounded-1 w-100",
-          style: { height: "65px", objectFit: "cover" }
+          className: "w-100 h-100",
+          style: { objectFit: "cover" }
         }
-      ),
+      ), /* @__PURE__ */ import_react26.default.createElement(
+        "div",
+        {
+          className: "position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1 py-0.5 d-flex align-items-center",
+          style: { fontSize: "10px" },
+          title: "Click to zoom"
+        },
+        /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-zoom-in" })
+      )),
       /* @__PURE__ */ import_react26.default.createElement(
         "div",
         {
@@ -40492,38 +40867,70 @@
             value: pieceData.notes || "",
             onChange: (e) => updatePieceField(pc.key, "notes", e.target.value)
           }
-        )), pieceData.photos && pieceData.photos.length > 0 && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap gap-2 pt-1" }, pieceData.photos.map((ph, phIdx) => /* @__PURE__ */ import_react26.default.createElement("div", { key: phIdx, className: "position-relative border rounded-2 p-1 bg-white shadow-xs", style: { width: "75px" } }, /* @__PURE__ */ import_react26.default.createElement(
-          "button",
+        )), pieceData.photos && pieceData.photos.length > 0 && /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-wrap gap-2 pt-1" }, pieceData.photos.map((ph, phIdx) => /* @__PURE__ */ import_react26.default.createElement(
+          "div",
           {
-            type: "button",
-            className: "btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm",
+            key: phIdx,
+            className: "position-relative border rounded-2 p-1 bg-white shadow-xs",
             style: {
-              top: "-6px",
-              right: "-6px",
-              width: "18px",
-              height: "18px",
-              fontSize: "11px",
-              fontWeight: "bold",
-              lineHeight: 1,
-              zIndex: 3,
-              cursor: "pointer"
+              width: "75px",
+              cursor: "pointer",
+              transition: "transform 0.15s ease, box-shadow 0.15s ease"
             },
-            onClick: (e) => {
-              e.stopPropagation();
-              handleRemovePiecePhoto(pc.key, phIdx);
+            onClick: () => handleOpenZoomModal(ph),
+            title: "Click to zoom / inspect photo",
+            onMouseEnter: (e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(91, 71, 251, 0.25)";
             },
-            title: "Cancel / Remove Photo"
+            onMouseLeave: (e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "";
+            }
           },
-          "\xD7"
-        ), /* @__PURE__ */ import_react26.default.createElement(
-          "img",
-          {
-            src: ph.url,
-            alt: ph.name,
-            className: "rounded-1 w-100",
-            style: { height: "52px", objectFit: "cover" }
-          }
-        ), /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)))))
+          /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-danger position-absolute p-0 rounded-circle d-flex align-items-center justify-content-center shadow-sm",
+              style: {
+                top: "-6px",
+                right: "-6px",
+                width: "18px",
+                height: "18px",
+                fontSize: "11px",
+                fontWeight: "bold",
+                lineHeight: 1,
+                zIndex: 3,
+                cursor: "pointer"
+              },
+              onClick: (e) => {
+                e.stopPropagation();
+                handleRemovePiecePhoto(pc.key, phIdx);
+              },
+              title: "Cancel / Remove Photo"
+            },
+            "\xD7"
+          ),
+          /* @__PURE__ */ import_react26.default.createElement("div", { className: "position-relative overflow-hidden rounded-1", style: { height: "52px" } }, /* @__PURE__ */ import_react26.default.createElement(
+            "img",
+            {
+              src: ph.url,
+              alt: ph.name,
+              className: "w-100 h-100",
+              style: { objectFit: "cover" }
+            }
+          ), /* @__PURE__ */ import_react26.default.createElement(
+            "div",
+            {
+              className: "position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1 py-0.5 d-flex align-items-center",
+              style: { fontSize: "9px" },
+              title: "Click to zoom"
+            },
+            /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-zoom-in" })
+          )),
+          /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)
+        ))))
       );
     }))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "pt-3" }, isQcFinalized ? /* @__PURE__ */ import_react26.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 bg-light border" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react26.default.createElement(
       "div",
@@ -40744,6 +41151,151 @@
         /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-camera fs-16" }),
         /* @__PURE__ */ import_react26.default.createElement("span", null, "Capture Photo")
       ))))
+    ), zoomedPhoto && /* @__PURE__ */ import_react26.default.createElement(
+      "div",
+      {
+        className: "modal show d-block",
+        style: {
+          backgroundColor: "rgba(15, 23, 42, 0.88)",
+          backdropFilter: "blur(5px)",
+          zIndex: 1075
+        },
+        tabIndex: "-1",
+        onClick: handleCloseZoomModal
+      },
+      /* @__PURE__ */ import_react26.default.createElement(
+        "div",
+        {
+          className: "modal-dialog modal-dialog-centered modal-xl",
+          style: { maxWidth: "92vw", height: "92vh", margin: "auto" },
+          onClick: (e) => e.stopPropagation()
+        },
+        /* @__PURE__ */ import_react26.default.createElement(
+          "div",
+          {
+            className: "modal-content rounded-4 border-0 shadow-2xl overflow-hidden bg-dark text-white d-flex flex-column",
+            style: { height: "90vh" }
+          },
+          /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-header border-bottom border-secondary border-opacity-25 px-4 py-2.5 bg-dark d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-2 text-truncate me-3" }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "p-1.5 rounded-circle bg-primary bg-opacity-25 text-white" }, /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-photo fs-16" })), /* @__PURE__ */ import_react26.default.createElement("div", { className: "text-truncate" }, /* @__PURE__ */ import_react26.default.createElement("h6", { className: "modal-title fw-bold text-white fs-14 mb-0 text-truncate" }, zoomedPhoto.name || "Inspection Photo"), zoomedPhoto.time && /* @__PURE__ */ import_react26.default.createElement("span", { className: "text-white-50 fs-11" }, "Captured: ", zoomedPhoto.time))), /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "btn-group btn-group-sm bg-black bg-opacity-50 p-1 rounded-3 border border-secondary border-opacity-25" }, /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomOut,
+              disabled: zoomScale <= 0.5,
+              title: "Zoom Out (-)"
+            },
+            /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-zoom-out fs-15" })
+          ), /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 font-monospace fs-12 fw-semibold",
+              onClick: handleResetZoom,
+              title: "Reset Zoom (0)"
+            },
+            Math.round(zoomScale * 100),
+            "%"
+          ), /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomIn,
+              disabled: zoomScale >= 4,
+              title: "Zoom In (+)"
+            },
+            /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-zoom-in fs-15" })
+          )), /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              onClick: handleRotate,
+              title: "Rotate 90\xB0 Clockwise"
+            },
+            /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-rotate fs-15" }),
+            /* @__PURE__ */ import_react26.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Rotate")
+          ), zoomedPhoto.url && /* @__PURE__ */ import_react26.default.createElement(
+            "a",
+            {
+              href: zoomedPhoto.url,
+              download: zoomedPhoto.name || "qc-photo.jpg",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              title: "Download / Save Photo"
+            },
+            /* @__PURE__ */ import_react26.default.createElement("i", { className: "ti ti-download fs-15" }),
+            /* @__PURE__ */ import_react26.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Save")
+          ), /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn-close btn-close-white ms-2",
+              onClick: handleCloseZoomModal,
+              "aria-label": "Close"
+            }
+          ))),
+          /* @__PURE__ */ import_react26.default.createElement(
+            "div",
+            {
+              className: "modal-body p-0 d-flex align-items-center justify-content-center overflow-auto position-relative",
+              style: {
+                backgroundColor: "#0a0f1d",
+                cursor: zoomScale > 1 ? "grab" : "zoom-in",
+                userSelect: "none"
+              },
+              onWheel: (e) => {
+                if (e.deltaY < 0) handleZoomIn();
+                else handleZoomOut();
+              },
+              onClick: () => {
+                if (zoomScale === 1) handleZoomIn();
+                else handleResetZoom();
+              },
+              title: "Click or scroll to zoom. Drag to view."
+            },
+            /* @__PURE__ */ import_react26.default.createElement(
+              "div",
+              {
+                style: {
+                  transition: "transform 0.15s ease-out",
+                  transform: `scale(${zoomScale}) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  maxWidth: "100%",
+                  maxHeight: "100%"
+                }
+              },
+              /* @__PURE__ */ import_react26.default.createElement(
+                "img",
+                {
+                  src: zoomedPhoto.url,
+                  alt: zoomedPhoto.name || "Inspection Photo",
+                  className: "img-fluid rounded-2",
+                  style: {
+                    maxHeight: "75vh",
+                    maxWidth: "85vw",
+                    objectFit: "contain",
+                    boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+                  },
+                  draggable: false
+                }
+              )
+            )
+          ),
+          /* @__PURE__ */ import_react26.default.createElement("div", { className: "modal-footer border-top border-secondary border-opacity-25 px-4 py-2 bg-dark d-flex align-items-center justify-content-between text-white-50 fs-12" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react26.default.createElement("span", null, /* @__PURE__ */ import_react26.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "+"), " / ", /* @__PURE__ */ import_react26.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "-"), " Zoom"), /* @__PURE__ */ import_react26.default.createElement("span", null, /* @__PURE__ */ import_react26.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "0"), " Reset"), /* @__PURE__ */ import_react26.default.createElement("span", null, /* @__PURE__ */ import_react26.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "ESC"), " Close"), /* @__PURE__ */ import_react26.default.createElement("span", { className: "d-none d-md-inline text-secondary" }, "| Scroll mouse wheel to zoom")), /* @__PURE__ */ import_react26.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
+              onClick: handleCloseZoomModal
+            },
+            "Close"
+          ))
+        )
+      )
     ), toastNotification && /* @__PURE__ */ import_react26.default.createElement(
       "div",
       {
@@ -40790,6 +41342,36 @@
     onViewStockPool
   }) {
     const [selectedPhotoModal, setSelectedPhotoModal] = (0, import_react27.useState)(null);
+    const [zoomScale, setZoomScale] = (0, import_react27.useState)(1);
+    const [rotation, setRotation] = (0, import_react27.useState)(0);
+    const handleOpenPhoto = (ph) => {
+      setSelectedPhotoModal(ph);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleClosePhoto = () => {
+      setSelectedPhotoModal(null);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleZoomIn = () => setZoomScale((prev) => Math.min(prev + 0.25, 4));
+    const handleZoomOut = () => setZoomScale((prev) => Math.max(prev - 0.25, 0.5));
+    const handleResetZoom = () => {
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
+    import_react27.default.useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (!selectedPhotoModal) return;
+        if (e.key === "Escape") handleClosePhoto();
+        else if (e.key === "+" || e.key === "=") handleZoomIn();
+        else if (e.key === "-") handleZoomOut();
+        else if (e.key === "0") handleResetZoom();
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedPhotoModal]);
     if (!qc) {
       return /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-shield-off fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Quality Check Not Found"), /* @__PURE__ */ import_react27.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The selected inspection record could not be loaded."), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center justify-content-center gap-2" }, onBackToQC && /* @__PURE__ */ import_react27.default.createElement("button", { type: "button", className: "btn btn-primary px-3.5 py-2 rounded-3 fs-13", onClick: onBackToQC }, "Back to QC Register"), onBackToGRN && /* @__PURE__ */ import_react27.default.createElement(
         "button",
@@ -40873,19 +41455,35 @@
       {
         key: idx,
         className: "card border rounded-2 p-1 bg-white shadow-2xs position-relative",
-        style: { width: "80px", cursor: "pointer" },
-        onClick: () => setSelectedPhotoModal(ph),
-        title: "Click to view full photo"
+        style: { width: "80px", cursor: "pointer", transition: "transform 0.15s ease" },
+        onClick: () => handleOpenPhoto(ph),
+        title: "Click to zoom / inspect photo",
+        onMouseEnter: (e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(91, 71, 251, 0.25)";
+        },
+        onMouseLeave: (e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "";
+        }
       },
-      /* @__PURE__ */ import_react27.default.createElement(
+      /* @__PURE__ */ import_react27.default.createElement("div", { className: "position-relative overflow-hidden rounded-1", style: { height: "65px" } }, /* @__PURE__ */ import_react27.default.createElement(
         "img",
         {
           src: ph.url,
           alt: ph.name,
-          className: "rounded-1 w-100",
-          style: { height: "65px", objectFit: "cover" }
+          className: "w-100 h-100",
+          style: { objectFit: "cover" }
         }
-      ),
+      ), /* @__PURE__ */ import_react27.default.createElement(
+        "div",
+        {
+          className: "position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1 py-0.5 d-flex align-items-center",
+          style: { fontSize: "10px" },
+          title: "Click to zoom"
+        },
+        /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-zoom-in" })
+      )),
       /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-truncate fs-10 text-muted mt-1 text-center", title: ph.name }, ph.name)
     ))) : /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-secondary fs-12" }, "No photo attached during inspection"))), (damagedItem || Number(qc.heldBackQty) > 0 || Number(qc.defectQty) > 0 || qc.issuePieces && qc.issuePieces.length > 0) && /* @__PURE__ */ import_react27.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react27.default.createElement("h5", { className: "fw-bold text-dark mb-2 fs-16" }, "Damaged / defective pieces"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "fs-13 text-secondary" }, /* @__PURE__ */ import_react27.default.createElement("strong", null, damagedItem?.defectivePieces || qc.issuePieces?.length || 1, " piece(s) / ", damagedItem?.quantity || qc.heldBackQty || qc.defectQty || 100, "m"), " ", "flagged \u2014", " ", /* @__PURE__ */ import_react27.default.createElement(
       "span",
@@ -41027,41 +41625,146 @@
       "div",
       {
         className: "modal show d-block",
-        style: { backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1070 },
+        style: {
+          backgroundColor: "rgba(15, 23, 42, 0.88)",
+          backdropFilter: "blur(5px)",
+          zIndex: 1075
+        },
         tabIndex: "-1",
-        onClick: () => setSelectedPhotoModal(null)
+        onClick: handleClosePhoto
       },
       /* @__PURE__ */ import_react27.default.createElement(
         "div",
         {
-          className: "modal-dialog modal-dialog-centered modal-lg",
+          className: "modal-dialog modal-dialog-centered modal-xl",
+          style: { maxWidth: "92vw", height: "92vh", margin: "auto" },
           onClick: (e) => e.stopPropagation()
         },
-        /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-header border-bottom px-4 py-3 bg-light" }, /* @__PURE__ */ import_react27.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-14 mb-0 text-truncate" }, selectedPhotoModal.name), /* @__PURE__ */ import_react27.default.createElement(
-          "button",
+        /* @__PURE__ */ import_react27.default.createElement(
+          "div",
           {
-            type: "button",
-            className: "btn-close",
-            onClick: () => setSelectedPhotoModal(null),
-            "aria-label": "Close"
-          }
-        )), /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-body p-2 text-center bg-dark" }, /* @__PURE__ */ import_react27.default.createElement(
-          "img",
-          {
-            src: selectedPhotoModal.url,
-            alt: selectedPhotoModal.name,
-            className: "img-fluid rounded-2",
-            style: { maxHeight: "70vh", objectFit: "contain" }
-          }
-        )), /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between" }, /* @__PURE__ */ import_react27.default.createElement("span", { className: "text-muted fs-12" }, selectedPhotoModal.time || ""), /* @__PURE__ */ import_react27.default.createElement(
-          "button",
-          {
-            type: "button",
-            className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
-            onClick: () => setSelectedPhotoModal(null)
+            className: "modal-content rounded-4 border-0 shadow-2xl overflow-hidden bg-dark text-white d-flex flex-column",
+            style: { height: "90vh" }
           },
-          "Close"
-        )))
+          /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-header border-bottom border-secondary border-opacity-25 px-4 py-2.5 bg-dark d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center gap-2 text-truncate me-3" }, /* @__PURE__ */ import_react27.default.createElement("span", { className: "p-1.5 rounded-circle bg-primary bg-opacity-25 text-white" }, /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-photo fs-16" })), /* @__PURE__ */ import_react27.default.createElement("div", { className: "text-truncate" }, /* @__PURE__ */ import_react27.default.createElement("h6", { className: "modal-title fw-bold text-white fs-14 mb-0 text-truncate" }, selectedPhotoModal.name || "Inspection Photo"), selectedPhotoModal.time && /* @__PURE__ */ import_react27.default.createElement("span", { className: "text-white-50 fs-11" }, "Captured: ", selectedPhotoModal.time))), /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "btn-group btn-group-sm bg-black bg-opacity-50 p-1 rounded-3 border border-secondary border-opacity-25" }, /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomOut,
+              disabled: zoomScale <= 0.5,
+              title: "Zoom Out (-)"
+            },
+            /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-zoom-out fs-15" })
+          ), /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 font-monospace fs-12 fw-semibold",
+              onClick: handleResetZoom,
+              title: "Reset Zoom (0)"
+            },
+            Math.round(zoomScale * 100),
+            "%"
+          ), /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomIn,
+              disabled: zoomScale >= 4,
+              title: "Zoom In (+)"
+            },
+            /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-zoom-in fs-15" })
+          )), /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              onClick: handleRotate,
+              title: "Rotate 90\xB0 Clockwise"
+            },
+            /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-rotate fs-15" }),
+            /* @__PURE__ */ import_react27.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Rotate")
+          ), selectedPhotoModal.url && /* @__PURE__ */ import_react27.default.createElement(
+            "a",
+            {
+              href: selectedPhotoModal.url,
+              download: selectedPhotoModal.name || "qc-photo.jpg",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              title: "Download / Save Photo"
+            },
+            /* @__PURE__ */ import_react27.default.createElement("i", { className: "ti ti-download fs-15" }),
+            /* @__PURE__ */ import_react27.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Save")
+          ), /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn-close btn-close-white ms-2",
+              onClick: handleClosePhoto,
+              "aria-label": "Close"
+            }
+          ))),
+          /* @__PURE__ */ import_react27.default.createElement(
+            "div",
+            {
+              className: "modal-body p-0 d-flex align-items-center justify-content-center overflow-auto position-relative",
+              style: {
+                backgroundColor: "#0a0f1d",
+                cursor: zoomScale > 1 ? "grab" : "zoom-in",
+                userSelect: "none"
+              },
+              onWheel: (e) => {
+                if (e.deltaY < 0) handleZoomIn();
+                else handleZoomOut();
+              },
+              onClick: () => {
+                if (zoomScale === 1) handleZoomIn();
+                else handleResetZoom();
+              },
+              title: "Click or scroll to zoom. Drag to view."
+            },
+            /* @__PURE__ */ import_react27.default.createElement(
+              "div",
+              {
+                style: {
+                  transition: "transform 0.15s ease-out",
+                  transform: `scale(${zoomScale}) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  maxWidth: "100%",
+                  maxHeight: "100%"
+                }
+              },
+              /* @__PURE__ */ import_react27.default.createElement(
+                "img",
+                {
+                  src: selectedPhotoModal.url,
+                  alt: selectedPhotoModal.name || "Inspection Photo",
+                  className: "img-fluid rounded-2",
+                  style: {
+                    maxHeight: "75vh",
+                    maxWidth: "85vw",
+                    objectFit: "contain",
+                    boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+                  },
+                  draggable: false
+                }
+              )
+            )
+          ),
+          /* @__PURE__ */ import_react27.default.createElement("div", { className: "modal-footer border-top border-secondary border-opacity-25 px-4 py-2 bg-dark d-flex align-items-center justify-content-between text-white-50 fs-12" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react27.default.createElement("span", null, /* @__PURE__ */ import_react27.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "+"), " / ", /* @__PURE__ */ import_react27.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "-"), " Zoom"), /* @__PURE__ */ import_react27.default.createElement("span", null, /* @__PURE__ */ import_react27.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "0"), " Reset"), /* @__PURE__ */ import_react27.default.createElement("span", null, /* @__PURE__ */ import_react27.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "ESC"), " Close"), /* @__PURE__ */ import_react27.default.createElement("span", { className: "d-none d-md-inline text-secondary" }, "| Scroll mouse wheel to zoom")), /* @__PURE__ */ import_react27.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
+              onClick: handleClosePhoto
+            },
+            "Close"
+          ))
+        )
       )
     ));
   }
@@ -41077,6 +41780,36 @@
     const [resolutionNote, setResolutionNote] = (0, import_react28.useState)("");
     const [isModifyingDecision, setIsModifyingDecision] = (0, import_react28.useState)(false);
     const [selectedPhotoModal, setSelectedPhotoModal] = (0, import_react28.useState)(null);
+    const [zoomScale, setZoomScale] = (0, import_react28.useState)(1);
+    const [rotation, setRotation] = (0, import_react28.useState)(0);
+    const handleOpenPhoto = (ph) => {
+      setSelectedPhotoModal(ph);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleClosePhoto = () => {
+      setSelectedPhotoModal(null);
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleZoomIn = () => setZoomScale((prev) => Math.min(prev + 0.25, 4));
+    const handleZoomOut = () => setZoomScale((prev) => Math.max(prev - 0.25, 0.5));
+    const handleResetZoom = () => {
+      setZoomScale(1);
+      setRotation(0);
+    };
+    const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
+    import_react28.default.useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (!selectedPhotoModal) return;
+        if (e.key === "Escape") handleClosePhoto();
+        else if (e.key === "+" || e.key === "=") handleZoomIn();
+        else if (e.key === "-") handleZoomOut();
+        else if (e.key === "0") handleResetZoom();
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedPhotoModal]);
     if (!damagedItem) {
       return /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-4" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-alert-circle fs-40 text-muted mb-3 d-block" }), /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-2" }, "Damaged Item Details Not Found"), /* @__PURE__ */ import_react28.default.createElement("p", { className: "text-secondary fs-13 mb-4" }, "The flagged item record could not be loaded."), /* @__PURE__ */ import_react28.default.createElement("div", null, /* @__PURE__ */ import_react28.default.createElement("button", { type: "button", className: "btn btn-primary px-4 py-2 rounded-3", onClick: onBack }, "Back to Quality Check")));
     }
@@ -41127,20 +41860,28 @@
       {
         className: "card border rounded-3 p-1.5 h-100 bg-light position-relative shadow-2xs hover-shadow transition-all",
         style: { cursor: "pointer", transition: "transform 0.15s ease" },
-        onClick: () => setSelectedPhotoModal(ph),
-        title: "Click to view full photo",
+        onClick: () => handleOpenPhoto(ph),
+        title: "Click to zoom / view full photo",
         onMouseEnter: (e) => e.currentTarget.style.transform = "translateY(-2px)",
         onMouseLeave: (e) => e.currentTarget.style.transform = "translateY(0)"
       },
-      /* @__PURE__ */ import_react28.default.createElement(
+      /* @__PURE__ */ import_react28.default.createElement("div", { className: "position-relative overflow-hidden rounded-2" }, /* @__PURE__ */ import_react28.default.createElement(
         "img",
         {
           src: ph.url,
           alt: ph.name,
-          className: "w-100 rounded-2",
+          className: "w-100",
           style: { height: "110px", objectFit: "cover" }
         }
-      ),
+      ), /* @__PURE__ */ import_react28.default.createElement(
+        "div",
+        {
+          className: "position-absolute bottom-0 end-0 bg-dark bg-opacity-75 text-white rounded-start px-1.5 py-0.5 d-flex align-items-center",
+          style: { fontSize: "10px" },
+          title: "Click to zoom"
+        },
+        /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-zoom-in" })
+      )),
       /* @__PURE__ */ import_react28.default.createElement("div", { className: "pt-1.5 px-1" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-truncate fw-semibold text-dark fs-11", title: ph.name }, ph.name), ph.time && /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-muted fs-10" }, ph.time))
     )))) : /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-center py-4 bg-light rounded-3 border text-muted fs-13" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-photo-off fs-24 mb-1 d-block text-secondary" }), "No defect photos were attached during inspection.")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white" }, /* @__PURE__ */ import_react28.default.createElement("h5", { className: "fw-bold text-dark mb-3 fs-16 border-bottom pb-2" }, "Admin resolution"), /* @__PURE__ */ import_react28.default.createElement(
       "div",
@@ -41254,41 +41995,146 @@
       "div",
       {
         className: "modal show d-block",
-        style: { backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1070 },
+        style: {
+          backgroundColor: "rgba(15, 23, 42, 0.88)",
+          backdropFilter: "blur(5px)",
+          zIndex: 1075
+        },
         tabIndex: "-1",
-        onClick: () => setSelectedPhotoModal(null)
+        onClick: handleClosePhoto
       },
       /* @__PURE__ */ import_react28.default.createElement(
         "div",
         {
-          className: "modal-dialog modal-dialog-centered modal-lg",
+          className: "modal-dialog modal-dialog-centered modal-xl",
+          style: { maxWidth: "92vw", height: "92vh", margin: "auto" },
           onClick: (e) => e.stopPropagation()
         },
-        /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-white" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-header border-bottom px-4 py-3 bg-light" }, /* @__PURE__ */ import_react28.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-14 mb-0 text-truncate" }, selectedPhotoModal.name), /* @__PURE__ */ import_react28.default.createElement(
-          "button",
+        /* @__PURE__ */ import_react28.default.createElement(
+          "div",
           {
-            type: "button",
-            className: "btn-close",
-            onClick: () => setSelectedPhotoModal(null),
-            "aria-label": "Close"
-          }
-        )), /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-body p-2 text-center bg-dark" }, /* @__PURE__ */ import_react28.default.createElement(
-          "img",
-          {
-            src: selectedPhotoModal.url,
-            alt: selectedPhotoModal.name,
-            className: "img-fluid rounded-2",
-            style: { maxHeight: "70vh", objectFit: "contain" }
-          }
-        )), /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-footer border-top px-4 py-2.5 bg-light d-flex justify-content-between" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "text-muted fs-12" }, selectedPhotoModal.time || ""), /* @__PURE__ */ import_react28.default.createElement(
-          "button",
-          {
-            type: "button",
-            className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
-            onClick: () => setSelectedPhotoModal(null)
+            className: "modal-content rounded-4 border-0 shadow-2xl overflow-hidden bg-dark text-white d-flex flex-column",
+            style: { height: "90vh" }
           },
-          "Close"
-        )))
+          /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-header border-bottom border-secondary border-opacity-25 px-4 py-2.5 bg-dark d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-2 text-truncate me-3" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "p-1.5 rounded-circle bg-primary bg-opacity-25 text-white" }, /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-photo fs-16" })), /* @__PURE__ */ import_react28.default.createElement("div", { className: "text-truncate" }, /* @__PURE__ */ import_react28.default.createElement("h6", { className: "modal-title fw-bold text-white fs-14 mb-0 text-truncate" }, selectedPhotoModal.name || "Defect Evidence Photo"), selectedPhotoModal.time && /* @__PURE__ */ import_react28.default.createElement("span", { className: "text-white-50 fs-11" }, "Captured: ", selectedPhotoModal.time))), /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "btn-group btn-group-sm bg-black bg-opacity-50 p-1 rounded-3 border border-secondary border-opacity-25" }, /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomOut,
+              disabled: zoomScale <= 0.5,
+              title: "Zoom Out (-)"
+            },
+            /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-zoom-out fs-15" })
+          ), /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 font-monospace fs-12 fw-semibold",
+              onClick: handleResetZoom,
+              title: "Reset Zoom (0)"
+            },
+            Math.round(zoomScale * 100),
+            "%"
+          ), /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-dark btn-sm text-white px-2.5 border-0 d-flex align-items-center gap-1",
+              onClick: handleZoomIn,
+              disabled: zoomScale >= 4,
+              title: "Zoom In (+)"
+            },
+            /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-zoom-in fs-15" })
+          )), /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              onClick: handleRotate,
+              title: "Rotate 90\xB0 Clockwise"
+            },
+            /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-rotate fs-15" }),
+            /* @__PURE__ */ import_react28.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Rotate")
+          ), selectedPhotoModal.url && /* @__PURE__ */ import_react28.default.createElement(
+            "a",
+            {
+              href: selectedPhotoModal.url,
+              download: selectedPhotoModal.name || "defect-evidence.jpg",
+              className: "btn btn-outline-light btn-sm px-2.5 rounded-3 d-flex align-items-center gap-1",
+              title: "Download / Save Photo"
+            },
+            /* @__PURE__ */ import_react28.default.createElement("i", { className: "ti ti-download fs-15" }),
+            /* @__PURE__ */ import_react28.default.createElement("span", { className: "d-none d-sm-inline fs-11" }, "Save")
+          ), /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn-close btn-close-white ms-2",
+              onClick: handleClosePhoto,
+              "aria-label": "Close"
+            }
+          ))),
+          /* @__PURE__ */ import_react28.default.createElement(
+            "div",
+            {
+              className: "modal-body p-0 d-flex align-items-center justify-content-center overflow-auto position-relative",
+              style: {
+                backgroundColor: "#0a0f1d",
+                cursor: zoomScale > 1 ? "grab" : "zoom-in",
+                userSelect: "none"
+              },
+              onWheel: (e) => {
+                if (e.deltaY < 0) handleZoomIn();
+                else handleZoomOut();
+              },
+              onClick: () => {
+                if (zoomScale === 1) handleZoomIn();
+                else handleResetZoom();
+              },
+              title: "Click or scroll to zoom. Drag to view."
+            },
+            /* @__PURE__ */ import_react28.default.createElement(
+              "div",
+              {
+                style: {
+                  transition: "transform 0.15s ease-out",
+                  transform: `scale(${zoomScale}) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  maxWidth: "100%",
+                  maxHeight: "100%"
+                }
+              },
+              /* @__PURE__ */ import_react28.default.createElement(
+                "img",
+                {
+                  src: selectedPhotoModal.url,
+                  alt: selectedPhotoModal.name || "Defect Evidence Photo",
+                  className: "img-fluid rounded-2",
+                  style: {
+                    maxHeight: "75vh",
+                    maxWidth: "85vw",
+                    objectFit: "contain",
+                    boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+                  },
+                  draggable: false
+                }
+              )
+            )
+          ),
+          /* @__PURE__ */ import_react28.default.createElement("div", { className: "modal-footer border-top border-secondary border-opacity-25 px-4 py-2 bg-dark d-flex align-items-center justify-content-between text-white-50 fs-12" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react28.default.createElement("span", null, /* @__PURE__ */ import_react28.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "+"), " / ", /* @__PURE__ */ import_react28.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "-"), " Zoom"), /* @__PURE__ */ import_react28.default.createElement("span", null, /* @__PURE__ */ import_react28.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "0"), " Reset"), /* @__PURE__ */ import_react28.default.createElement("span", null, /* @__PURE__ */ import_react28.default.createElement("kbd", { className: "bg-secondary text-white px-1.5 py-0.5 rounded fs-10" }, "ESC"), " Close"), /* @__PURE__ */ import_react28.default.createElement("span", { className: "d-none d-md-inline text-secondary" }, "| Scroll mouse wheel to zoom")), /* @__PURE__ */ import_react28.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-secondary btn-sm px-3 rounded-2 fs-12",
+              onClick: handleClosePhoto
+            },
+            "Close"
+          ))
+        )
       )
     ));
   }

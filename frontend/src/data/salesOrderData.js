@@ -32,6 +32,35 @@ export const setStoredData = (key, data) => {
   } catch (e) {}
 };
 
+export const getStoredArticlesMaster = () => {
+  // One-time cleanup for pre-seeded mock articles so Article Master starts clean and empty
+  try {
+    const cleaned = localStorage.getItem('erp_articles_cleared_mock_v2');
+    if (!cleaned) {
+      localStorage.setItem('erp_articles_v1', JSON.stringify([]));
+      localStorage.setItem('erp_articles_master', JSON.stringify([]));
+      localStorage.setItem('erp_articles_cleared_mock_v2', 'true');
+      return [];
+    }
+  } catch (e) {}
+
+  let stored = getStoredData('erp_articles_v1', null);
+  if (stored === null) {
+    stored = getStoredData('erp_articles_master', null);
+  }
+  const source = Array.isArray(stored) ? stored : (initialArticles || []);
+  return source;
+};
+
+export const setStoredArticlesMaster = (articlesList) => {
+  setStoredData('erp_articles_v1', articlesList);
+  setStoredData('erp_articles_master', articlesList);
+  try {
+    window.dispatchEvent(new Event('erp_articles_updated'));
+    window.dispatchEvent(new Event('storage'));
+  } catch (e) {}
+};
+
 export const getStoredAccessoriesMaster = () => {
   const data = getStoredData('erp_accessories_master_v1', initialAccessoryMasters);
   if (Array.isArray(data)) {

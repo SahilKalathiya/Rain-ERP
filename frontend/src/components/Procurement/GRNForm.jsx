@@ -2081,7 +2081,7 @@ const cleanDate = (d) => {
                           </span>
                         </div>
                         <div className="text-muted fs-11 mt-1">
-                          સૌથી પહેલા બનેલા (Oldest) PO માંથી માલ પહેલા કટ થશે. એક PO 100% પુરો થયા પછી જ બાકી વધેલો માલ બીજા PO માં ફાળવાશે.
+                          Material is deducted first from the oldest PO. Remaining material is allocated to subsequent POs only after the earlier PO is 100% fulfilled.
                         </div>
                       </div>
                       <div className="text-end">

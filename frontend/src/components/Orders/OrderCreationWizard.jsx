@@ -6,7 +6,9 @@ import {
   getStoredData,
   setStoredData,
   getStoredColorsMaster,
-  setStoredColorsMaster
+  setStoredColorsMaster,
+  getStoredArticlesMaster,
+  setStoredArticlesMaster
 } from '../../data/salesOrderData';
 import { initialFabrics as procurementFabrics } from '../../data/procurementData';
 import { api } from '../../services/api';
@@ -58,9 +60,8 @@ export const getColorQuarterTag = (col) => {
 
 // Synchronize articles directly from Article Master (erp_articles_v1 / initialArticles)
 export const loadSyncedArticles = () => {
-  const stored = getStoredData('erp_articles_v1', null);
-  const source = (Array.isArray(stored) && stored.length > 0) ? stored : initialArticles;
-  return source.filter(a => a.active !== false).map((a, idx) => ({
+  const source = getStoredArticlesMaster();
+  return (Array.isArray(source) ? source : []).filter(a => a.active !== false).map((a, idx) => ({
     id: a.id || `ART-${idx + 1}`,
     name: a.name,
     emoji: a.icon || a.emoji || '👕',
@@ -1167,9 +1168,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           : (usedColors.size > 0 ? Array.from(usedColors) : ['Standard']);
 
         colorsToIterate.forEach(colName => {
-          const pcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
-          // Skip if 0 pieces ordered for this color
-          if (pcs <= 0 && usedColors.size > 0) return;
+          const articlePcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
+          // Skip if 0 pieces ordered for this color across the entire article
+          if (articlePcs <= 0 && usedColors.size > 0) return;
+
+          // Main fabric gets article pieces; secondary fabrics (frIdx > 0 or role !== 'Main') do not auto-inherit
+          const isMainFabric = frIdx === 0 || (fr.role || '').toLowerCase() === 'main';
+          const pcs = isMainFabric ? articlePcs : (parseInt(fr.pcs, 10) || 0);
 
           const colorObj = masterColors.find(c => c.name === colName) || { hex: '#94a3b8' };
           const widthVal = fr.width || art.width || '';
@@ -1180,10 +1185,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             : 0;
 
           // RULE 2: Total Greige = Greige length per piece * Pieces
-          const totalDyed = (dyedPerPiece && dyedPerPiece > 0)
+          const totalDyed = (dyedPerPiece && dyedPerPiece > 0 && pcs > 0)
             ? Number((dyedPerPiece * pcs).toFixed(1))
             : 0;
-          const totalGreige = (greigeLengthPerPiece && greigeLengthPerPiece > 0)
+          const totalGreige = (greigeLengthPerPiece && greigeLengthPerPiece > 0 && pcs > 0)
             ? Number((greigeLengthPerPiece * pcs).toFixed(1))
             : 0;
           const orderQty = totalGreige;
@@ -1204,6 +1209,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             bufferPct,
             greigeLengthPerPiece,
             pcs,
+            isMainFabric,
             totalDyed,
             totalGreige,
             orderQty

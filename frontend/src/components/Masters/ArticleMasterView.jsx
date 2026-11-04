@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { initialArticles, getStoredData, setStoredData } from '../../data/salesOrderData';
+import { initialArticles, getStoredData, setStoredData, getStoredArticlesMaster, setStoredArticlesMaster } from '../../data/salesOrderData';
 
 const PREDEFINED_EMOJIS = [
   { emoji: '👘', label: 'Kurta / Long Tunic' },
@@ -245,39 +245,17 @@ export const reorderArticlePositions = (allArticles, fromIndex, toIndex) => {
   }));
 };
 
-export const DEFAULT_MASTER_ARTICLES = [
-  { id: 'ART-001', name: 'Kurta', articleType: 'Kurta', icon: '👘', sortOrder: 1, active: true, description: 'Men & Women Long Tunics / Kurtas' },
-  { id: 'ART-002', name: 'Pant', articleType: 'Pant', icon: '👖', sortOrder: 2, active: true, description: 'Pants, Churidars & Trousers' },
-  { id: 'ART-003', name: 'Dupatta', articleType: 'Dupatta', icon: '🎀', sortOrder: 3, active: true, description: 'Stoles & Chiffon/Mulmul Dupattas' },
-  { id: 'ART-004', name: 'Shirt', articleType: 'Shirt', icon: '👔', sortOrder: 4, active: true, description: 'Shirts & Formals' },
-  { id: 'ART-005', name: 'Top', articleType: 'Top', icon: '👚', sortOrder: 5, active: true, description: 'Women Tops & Short Tunics' },
-  { id: 'ART-006', name: 'Tunic', articleType: 'Other', icon: '👗', sortOrder: 6, active: true, description: 'Tunics & Dresses' },
-  { id: 'ART-007', name: 'Jacket', articleType: 'Jacket', icon: '🧥', sortOrder: 7, active: true, description: 'Nehru & Modi Cut Waistcoats' }
-];
+export const DEFAULT_MASTER_ARTICLES = [];
 
 export default function ArticleMasterView({ isInline = false, onSaveInline, onCloseInline }) {
   const [articles, setArticles] = useState(() => {
-    let list = getStoredData('erp_articles_v1', null);
-    if (!list || !Array.isArray(list) || list.length === 0) {
-      const fallback = getStoredData('erp_articles_master', null);
-      if (Array.isArray(fallback) && fallback.length > 0) {
-        list = fallback;
-      } else if (Array.isArray(initialArticles) && initialArticles.length > 0) {
-        list = initialArticles;
-      } else {
-        list = DEFAULT_MASTER_ARTICLES;
-      }
-    }
-    const normalized = normalizeArticleOrders(list);
-    setStoredData('erp_articles_v1', normalized);
-    return normalized;
+    const list = getStoredArticlesMaster();
+    return normalizeArticleOrders(list);
   });
 
   useEffect(() => {
     const handleUpdate = () => {
-      const stored = getStoredData('erp_articles_v1', null) !== null
-        ? getStoredData('erp_articles_v1', null)
-        : getStoredData('erp_articles_master', null);
+      const stored = getStoredArticlesMaster();
       if (Array.isArray(stored)) {
         setArticles(normalizeArticleOrders(stored));
       }
@@ -367,7 +345,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     const updated = reorderArticlePositions(articles, fromIdx, targetIdx);
     const moved = updated[targetIdx];
     setArticles(updated);
-    setStoredData('erp_articles_v1', updated);
+    setStoredArticlesMaster(updated);
 
     try {
       window.dispatchEvent(new Event('erp_articles_updated'));
@@ -530,7 +508,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
 
     const normalized = normalizeArticleOrders(updated);
     setArticles(normalized);
-    setStoredData('erp_articles_v1', normalized);
+    setStoredArticlesMaster(normalized);
 
     // Broadcast event for live sync across ERP
     try {
@@ -574,7 +552,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     );
 
     setArticles(updatedList);
-    setStoredData('erp_articles_v1', updatedList);
+    setStoredArticlesMaster(updatedList);
     setSelectedArticle(savedArticle);
     setEditingSection(null);
     showToast(`${secName.toUpperCase()} section saved successfully (Rank #${savedArticle.sortOrder || '—'}).`);
@@ -599,7 +577,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     );
     const updatedList = articles.map((a) => (a.id === updated.id ? updated : a));
     setArticles(updatedList);
-    setStoredData('erp_articles_v1', updatedList);
+    setStoredArticlesMaster(updatedList);
     if (selectedArticle?.id === art.id) {
       setSelectedArticle(updated);
     }
@@ -612,7 +590,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     const remaining = articles.filter((a) => a.id !== artId);
     const normalized = normalizeArticleOrders(remaining);
     setArticles(normalized);
-    setStoredData('erp_articles_v1', normalized);
+    setStoredArticlesMaster(normalized);
     if (selectedArticle?.id === artId) {
       setSelectedArticle(null);
     }
@@ -1549,6 +1527,22 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                     </td>
                   </tr>
                 ))}
+                {filteredArticles.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="text-center py-5 text-muted">
+                      <div className="fs-1 mb-2">📦</div>
+                      <div className="fw-semibold text-dark mb-1">No articles found in master.</div>
+                      <div className="small text-muted mb-3">Click "+ Add New Article" to create an article.</div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary rounded-3 px-3 py-1.5 shadow-xs"
+                        onClick={handleOpenAddModal}
+                      >
+                        <i className="ti ti-plus me-1"></i> Add New Article
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

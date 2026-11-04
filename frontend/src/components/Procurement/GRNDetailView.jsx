@@ -1122,7 +1122,7 @@ export default function GRNDetailView({
                 </span>
               </div>
               <div className="text-muted fs-12 mt-1">
-                સૌથી પહેલા બનેલા (Oldest) PO માંથી માલ પહેલા કટ થશે. પ્રથમ PO 100% પૂર્ણ થયા પછી જ બાકીનો માલ પછીના PO માં ફાળવવામાં આવ્યો છે.
+                Material is deducted first from the oldest PO. Remaining material is allocated to subsequent POs only after the earlier PO is 100% fulfilled.
               </div>
             </div>
             <div className="text-end">
