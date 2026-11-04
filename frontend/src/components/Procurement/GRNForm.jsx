@@ -2945,7 +2945,7 @@ const cleanDate = (d) => {
                       {/* No. of pieces */}
                       <div className="col-12 col-sm-3 col-md-3" style={{ minWidth: '120px', maxWidth: '170px' }}>
                         <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
-                          No. of Pieces <span className="text-danger">*</span>
+                          No. of Pieces
                         </label>
                         <input
                           type="number"

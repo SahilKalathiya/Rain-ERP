@@ -38101,7 +38101,7 @@
             },
             /* @__PURE__ */ import_react23.default.createElement("option", { value: "MIXED_FABRIC", className: "fw-bold text-primary" }, "\u{1F500} Mixed Bale (Multiple Fabric Qualities)"),
             poItemLabels.length > 0 ? poItemLabels.map((lbl, oIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `po-${oIdx}`, value: lbl }, lbl)) : masterFabricLabels.map((lbl, fIdx) => /* @__PURE__ */ import_react23.default.createElement("option", { key: `mf-${fIdx}`, value: lbl }, lbl))
-          )), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-3 col-md-3", style: { minWidth: "120px", maxWidth: "170px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "No. of Pieces ", /* @__PURE__ */ import_react23.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react23.default.createElement(
+          )), /* @__PURE__ */ import_react23.default.createElement("div", { className: "col-12 col-sm-3 col-md-3", style: { minWidth: "120px", maxWidth: "170px" } }, /* @__PURE__ */ import_react23.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "No. of Pieces"), /* @__PURE__ */ import_react23.default.createElement(
             "input",
             {
               type: "number",

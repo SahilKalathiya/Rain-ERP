@@ -309,13 +309,12 @@ export default function ProcessChallanForm({
               <h5 className="card-title mb-0 fw-bold text-dark fs-18">
                 {isEditing ? (isReadOnly ? `Process Challan #${challanNumber} (View Mode)` : `Edit Challan #${challanNumber}`) : 'Create Process Dispatch Challan'}
               </h5>
-              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${
-                isLocked
+              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${isLocked
                   ? 'bg-secondary text-white border border-secondary shadow-xs'
                   : (poLinkStatus === 'Linked'
                     ? 'bg-success-subtle text-success border border-success-subtle'
                     : 'bg-danger text-white border border-danger shadow-xs')
-              }`}>
+                }`}>
                 {isLocked ? '🔒 Locked (GRN Inwarded)' : (poLinkStatus === 'Linked' ? '● PO Linked' : '⚠ Pending PO Link (Emergency)')}
               </span>
             </div>
@@ -506,11 +505,10 @@ export default function ProcessChallanForm({
                             key={po.id || po.po_number}
                             disabled={!isSectionEditable('header')}
                             onClick={() => togglePOSelection(po)}
-                            className={`btn btn-sm d-flex align-items-center gap-1.5 rounded-2 px-3 py-1.5 transition-all ${
-                              isSelected
+                            className={`btn btn-sm d-flex align-items-center gap-1.5 rounded-2 px-3 py-1.5 transition-all ${isSelected
                                 ? 'btn-primary text-white shadow-xs'
                                 : 'btn-light bg-white border text-secondary'
-                            }`}
+                              }`}
                             style={{ fontSize: '12.5px' }}
                           >
                             <i className={`ti ${isSelected ? 'ti-check' : 'ti-plus'} fs-14`}></i>
@@ -763,11 +761,10 @@ export default function ProcessChallanForm({
                               type="button"
                               disabled={!isSectionEditable('items')}
                               onClick={() => handleItemFieldChange(idx, 'is_partial_cut', !it.is_partial_cut)}
-                              className={`badge border px-2 py-1 ${
-                                it.is_partial_cut
+                              className={`badge border px-2 py-1 ${it.is_partial_cut
                                   ? 'bg-warning-subtle text-dark border-warning'
                                   : 'bg-light text-secondary border'
-                              }`}
+                                }`}
                               style={{ cursor: isSectionEditable('items') ? 'pointer' : 'default', fontSize: '11px' }}
                               title="Toggle Full Roll (Scenario A) / Cut Piece (Scenario B)"
                             >
