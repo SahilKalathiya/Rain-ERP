@@ -31,7 +31,11 @@ const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
-  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
 };
 
 export default function CustomerMasterView({ isInline = false, onSaveInline, onCloseInline }) {
@@ -207,6 +211,8 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
       name: autoCapitalizeWords(formData.name.trim()),
       type: finalCustomerType,
       city: autoCapitalizeWords((formData.city || '').trim()),
+      address: (formData.address || '').trim(),
+      notes: (formData.notes || '').trim(),
       gstin: (formData.gstin || '').trim().toUpperCase(),
       lastModifiedBy: 'Saksham Garg (Procurement & Quality Manager)',
       lastModifiedDate: new Date().toISOString()
@@ -350,7 +356,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                     <label className="form-label fw-semibold small text-muted">Customer Name *</label>
                     <input
                       type="text"
-                      className="form-control"
+                      className="form-control text-uppercase"
                       placeholder="e.g. Manyavar Trends Retail"
                       required
                       value={formData.name}
@@ -378,7 +384,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                           placeholder="Specify Customer Type (e.g. Wholesaler, Boutique)"
                           required
                           value={formData.customType || ''}
-                          onChange={(e) => setFormData({ ...formData, customType: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, customType: autoCapitalizeWords(e.target.value) })}
                           autoFocus
                         />
                       </div>
@@ -569,7 +575,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                       <label className="form-label fw-semibold small text-muted">Customer Name *</label>
                       <input
                         type="text"
-                        className="form-control"
+                        className="form-control text-uppercase"
                         placeholder="e.g. Manyavar Trends Retail"
                         required
                         disabled={!isModalEditMode}
@@ -577,7 +583,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                       />
-                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                      <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold small text-muted">Customer Type *</label>
@@ -604,7 +610,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
                             value={formData.customType || ''}
-                            onChange={(e) => setFormData({ ...formData, customType: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, customType: autoCapitalizeWords(e.target.value) })}
                             autoFocus={isModalEditMode}
                           />
                         </div>

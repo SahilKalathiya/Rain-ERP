@@ -21656,7 +21656,7 @@
   ];
   var autoCapitalizeWords3 = (text) => {
     if (!text) return "";
-    return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
   };
   function CustomerMasterView({ isInline = false, onSaveInline, onCloseInline }) {
     const [customers, setCustomers] = (0, import_react6.useState)(() => getStoredData("erp_customers_v1", initialCustomers));
@@ -21808,6 +21808,8 @@
         name: autoCapitalizeWords3(formData.name.trim()),
         type: finalCustomerType,
         city: autoCapitalizeWords3((formData.city || "").trim()),
+        address: (formData.address || "").trim(),
+        notes: (formData.notes || "").trim(),
         gstin: (formData.gstin || "").trim().toUpperCase(),
         lastModifiedBy: "Saksham Garg (Procurement & Quality Manager)",
         lastModifiedDate: (/* @__PURE__ */ new Date()).toISOString()
@@ -21900,7 +21902,7 @@
         "input",
         {
           type: "text",
-          className: "form-control",
+          className: "form-control text-uppercase",
           placeholder: "e.g. Manyavar Trends Retail",
           required: true,
           value: formData.name,
@@ -21924,7 +21926,7 @@
           placeholder: "Specify Customer Type (e.g. Wholesaler, Boutique)",
           required: true,
           value: formData.customType || "",
-          onChange: (e) => setFormData({ ...formData, customType: e.target.value }),
+          onChange: (e) => setFormData({ ...formData, customType: autoCapitalizeWords3(e.target.value) }),
           autoFocus: true
         }
       ))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react6.default.createElement("label", { className: "form-label fw-semibold small text-muted" }, "Phone Number (10 digits)"), /* @__PURE__ */ import_react6.default.createElement(
@@ -22040,7 +22042,7 @@
       "input",
       {
         type: "text",
-        className: "form-control",
+        className: "form-control text-uppercase",
         placeholder: "e.g. Manyavar Trends Retail",
         required: true,
         disabled: !isModalEditMode,
@@ -22048,7 +22050,7 @@
         value: formData.name,
         onChange: (e) => setFormData({ ...formData, name: autoCapitalizeWords3(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react6.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react6.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react6.default.createElement("label", { className: "form-label fw-semibold small text-muted" }, "Customer Type *"), /* @__PURE__ */ import_react6.default.createElement(
+    ), /* @__PURE__ */ import_react6.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react6.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react6.default.createElement("label", { className: "form-label fw-semibold small text-muted" }, "Customer Type *"), /* @__PURE__ */ import_react6.default.createElement(
       "select",
       {
         className: "form-select",
@@ -22070,7 +22072,7 @@
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
         value: formData.customType || "",
-        onChange: (e) => setFormData({ ...formData, customType: e.target.value }),
+        onChange: (e) => setFormData({ ...formData, customType: autoCapitalizeWords3(e.target.value) }),
         autoFocus: isModalEditMode
       }
     ))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react6.default.createElement("label", { className: "form-label fw-semibold small text-muted" }, "Phone Number (10 digits)"), /* @__PURE__ */ import_react6.default.createElement(
@@ -22679,7 +22681,7 @@
   }
   var autoCapitalizeWords4 = (text) => {
     if (!text) return "";
-    return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
   };
   var normalizeArticleOrders = (list) => {
     if (!list || !list.length) return [];
@@ -22952,6 +22954,9 @@
       if (sectionData.name) {
         updatedArt.name = autoCapitalizeWords4(sectionData.name.trim());
       }
+      if (sectionData.description) {
+        updatedArt.description = (sectionData.description || "").trim();
+      }
       const updatedList = articles.map((a) => a.id === updatedArt.id ? updatedArt : a);
       const savedArticle = updatedArt;
       const changeSummary = Object.keys(sectionData).map((k) => `${k}: ${selectedArticle[k]} \u2794 ${savedArticle[k]}`).join(", ");
@@ -23067,14 +23072,14 @@
         "input",
         {
           type: "text",
-          className: "form-control",
+          className: "form-control text-uppercase",
           placeholder: "e.g., Classic Kurta, Palazzo Pa",
           required: true,
           value: formData.name,
           onChange: (e) => setFormData({ ...formData, name: autoCapitalizeWords4(e.target.value) }),
           style: { height: "44px", borderRadius: "8px" }
         }
-      ), /* @__PURE__ */ import_react7.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react7.default.createElement("label", { className: "form-label fw-semibold text-dark mb-1.5", style: { fontSize: "13.5px" } }, "Icon (Emoji)"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "d-flex align-items-center gap-2 position-relative" }, /* @__PURE__ */ import_react7.default.createElement(
+      ), /* @__PURE__ */ import_react7.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react7.default.createElement("label", { className: "form-label fw-semibold text-dark mb-1.5", style: { fontSize: "13.5px" } }, "Icon (Emoji)"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "d-flex align-items-center gap-2 position-relative" }, /* @__PURE__ */ import_react7.default.createElement(
         "input",
         {
           type: "text",
@@ -23789,7 +23794,8 @@
       });
     };
     const capitalizeWords = (str) => {
-      return str.replace(/\b\w/g, (c) => c.toUpperCase());
+      if (!str) return "";
+      return String(str).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
     };
     const validate = () => {
       const errors = {};
@@ -23833,6 +23839,7 @@
         name: capitalizedQName,
         fabricType: finalFabricType,
         isCustomType: Boolean(isCustomFabricType),
+        description: (formData.description || "").trim(),
         widths: currentWidths,
         gsm: Number(formData.gsm) || null,
         defaultShrinkage: formData.defaultShrinkage !== "" && formData.defaultShrinkage !== null && formData.defaultShrinkage !== void 0 ? Number(formData.defaultShrinkage) : 0,
@@ -23908,7 +23915,7 @@
           autoFocus: true,
           value: formData.fabricType || "",
           onChange: (e) => {
-            const newType = e.target.value;
+            const newType = capitalizeWords(e.target.value);
             setFormData({
               ...formData,
               fabricType: newType,
@@ -24184,23 +24191,23 @@
         required: true,
         disabled: !isEditing,
         placeholder: "e.g. Suh Cotton / Rayon 14kg",
-        className: `form-control form-control-sm ${formErrors.qualityName ? "is-invalid" : ""}`,
+        className: `form-control form-control-sm text-uppercase ${formErrors.qualityName ? "is-invalid" : ""}`,
         style: { backgroundColor: isEditing ? "#ffffff" : "#f8fafc" },
         value: formData.qualityName,
         onChange: (e) => setFormData({ ...formData, qualityName: capitalizeWords(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react8.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word"), formErrors.qualityName && /* @__PURE__ */ import_react8.default.createElement("div", { className: "invalid-feedback fs-11" }, formErrors.qualityName)), /* @__PURE__ */ import_react8.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react8.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Fabric Type *"), isCustomFabricType ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react8.default.createElement(
+    ), /* @__PURE__ */ import_react8.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)"), formErrors.qualityName && /* @__PURE__ */ import_react8.default.createElement("div", { className: "invalid-feedback fs-11" }, formErrors.qualityName)), /* @__PURE__ */ import_react8.default.createElement("div", { className: "row g-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react8.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Fabric Type *"), isCustomFabricType ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react8.default.createElement(
       "input",
       {
         type: "text",
         disabled: !isEditing,
-        className: `form-control form-control-sm ${formErrors.fabricType ? "is-invalid" : ""}`,
+        className: `form-control form-control-sm text-uppercase ${formErrors.fabricType ? "is-invalid" : ""}`,
         style: { backgroundColor: isEditing ? "#ffffff" : "#f8fafc" },
         placeholder: "Type custom fabric type...",
         autoFocus: isEditing,
         value: formData.fabricType || "",
         onChange: (e) => {
-          const newType = e.target.value;
+          const newType = capitalizeWords(e.target.value);
           setFormData({
             ...formData,
             fabricType: newType,
@@ -24229,7 +24236,7 @@
         style: { backgroundColor: isEditing ? "#ffffff" : "#f8fafc" },
         value: formData.fabricType,
         onChange: (e) => {
-          const newType = e.target.value;
+          const newType = capitalizeWords(e.target.value);
           if (newType === "Other") {
             setIsCustomFabricType(true);
             setFormData({
@@ -24363,7 +24370,7 @@
   var import_react9 = __toESM(require_react());
   var autoCapitalizeWords5 = (text) => {
     if (!text) return "";
-    return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
   };
   function hsvToHex(h, s, v) {
     const sat = Math.max(0, Math.min(100, s)) / 100;
@@ -27901,7 +27908,7 @@
   var import_react13 = __toESM(require_react());
   var autoCapitalizeWords7 = (text) => {
     if (!text) return "";
-    return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
   };
   function SizeMasterView() {
     const normalize = (list) => {
@@ -28192,17 +28199,18 @@
       const finalObj = {
         ...seriesFormData,
         name: autoCapitalizeWords7(seriesFormData.name.trim()),
-        sizes: cleanSizes.map((s) => s.sizeName.trim()),
+        sizes: cleanSizes.map((s) => autoCapitalizeWords7(s.sizeName.trim())),
         sizeDetails: cleanSizes.map((s) => ({
-          size: s.sizeName.trim(),
+          size: autoCapitalizeWords7(s.sizeName.trim()),
           label: autoCapitalizeWords7((s.displayName || s.sizeName).trim())
         })),
         sizeRecords: cleanSizes.map((s, idx) => ({
           ...s,
           id: s.id || `SZ-${seriesFormData.id}-${String(idx + 1).padStart(2, "0")}`,
           seriesId: seriesFormData.id,
-          sizeName: s.sizeName.trim(),
-          displayName: (s.displayName || s.sizeName).trim()
+          sizeName: autoCapitalizeWords7(s.sizeName.trim()),
+          displayName: autoCapitalizeWords7((s.displayName || s.sizeName).trim()),
+          description: (s.description || "").trim()
         }))
       };
       let updated;
@@ -28257,9 +28265,9 @@
       const newRecord = {
         id: `SZ-${activeSeriesForAddSize.id}-${String((activeSeriesForAddSize.sizeRecords || []).length + 1).padStart(2, "0")}`,
         seriesId: activeSeriesForAddSize.id,
-        sizeName: newSizeForm.sizeName.trim().toUpperCase(),
+        sizeName: autoCapitalizeWords7(newSizeForm.sizeName.trim()).toUpperCase(),
         displayName: autoCapitalizeWords7((newSizeForm.displayName || newSizeForm.sizeName).trim()),
-        description: newSizeForm.description.trim()
+        description: (newSizeForm.description || "").trim()
       };
       const updated = seriesList.map((s) => {
         if (s.id === activeSeriesForAddSize.id) {
@@ -28520,7 +28528,7 @@
         value: seriesFormData.name,
         onChange: (e) => setSeriesFormData({ ...seriesFormData, name: autoCapitalizeWords7(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Active Status"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-check form-switch pt-1" }, /* @__PURE__ */ import_react13.default.createElement(
+    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Active Status"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-check form-switch pt-1" }, /* @__PURE__ */ import_react13.default.createElement(
       "input",
       {
         className: "form-check-input",
@@ -28653,7 +28661,7 @@
         value: newSizeForm.displayName,
         onChange: (e) => setNewSizeForm({ ...newSizeForm, displayName: autoCapitalizeWords7(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Description (Multiline)"), /* @__PURE__ */ import_react13.default.createElement(
+    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Description (Multiline)"), /* @__PURE__ */ import_react13.default.createElement(
       "textarea",
       {
         className: "form-control",
@@ -28694,7 +28702,7 @@
   };
   var autoCapitalizeWords8 = (text) => {
     if (!text) return "";
-    return text.replace(/\b\w/g, (char) => char.toUpperCase());
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
   };
   var ACCESSORY_CATEGORIES = [
     "Button",
@@ -28821,7 +28829,7 @@
     const inputRef = import_react14.default.useRef(null);
     const addTag = (val) => {
       if (disabled) return;
-      const items = (val || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const items = (val || "").split(",").map((s) => autoCapitalizeWords8(s.trim())).filter(Boolean);
       if (!items.length) return;
       const newTags = [...tags];
       items.forEach((item) => {
@@ -28921,7 +28929,7 @@
           value: inputValue,
           onFocus: () => setIsFocused(true),
           onBlur: handleBlur,
-          onChange: (e) => setInputValue(e.target.value),
+          onChange: (e) => setInputValue(autoCapitalizeWords8(e.target.value)),
           onKeyDown: handleKeyDown
         }
       )
@@ -29862,7 +29870,7 @@
           onChange: (e) => setFormData({ ...formData, name: autoCapitalizeWords8(e.target.value) }),
           style: { height: "42px", borderRadius: "8px" }
         }
-      ), isNameDuplicate ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "invalid-feedback d-block text-danger fw-semibold small mt-1" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-alert-circle me-1" }), 'Duplicate name not allowed: An accessory named "', formData.name.trim(), '" already exists.') : /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Category ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
+      ), isNameDuplicate ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "invalid-feedback d-block text-danger fw-semibold small mt-1" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-alert-circle me-1" }), 'Duplicate name not allowed: An accessory named "', formData.name.trim(), '" already exists.') : /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Category ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
         "select",
         {
           className: "form-select",
@@ -29959,7 +29967,7 @@
           className: "form-control",
           placeholder: "e.g. 2 inch, Medium, 5cm",
           value: formData.size || "",
-          onChange: (e) => setFormData({ ...formData, size: e.target.value }),
+          onChange: (e) => setFormData({ ...formData, size: autoCapitalizeWords8(e.target.value) }),
           style: { height: "42px", borderRadius: "8px" }
         }
       ))), hasTasselType(formData.tasselType, "Job Work") && /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-3 bg-light rounded-3 border mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fw-semibold text-dark small" }, "Size & Thread Consumption:"), /* @__PURE__ */ import_react14.default.createElement(
@@ -29987,7 +29995,7 @@
           onChange: (e) => {
             const next = [...formData.jobWorkRows || []];
             if (!next[i]) next[i] = { size: "", threadConsumption: "" };
-            next[i].size = e.target.value;
+            next[i].size = autoCapitalizeWords8(e.target.value);
             setFormData({ ...formData, jobWorkRows: next });
           }
         }
@@ -30125,7 +30133,7 @@
             onChange: (e) => {
               const updatedBlocks = [...allBlocks];
               const updatedPlacements = [...artBlock.placements];
-              updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], placement: e.target.value };
+              updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], placement: autoCapitalizeWords8(e.target.value) };
               updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
               setFormData({ ...formData, articlePlacements: updatedBlocks });
             }
@@ -30530,7 +30538,7 @@
             value: r.size || "",
             onChange: (e) => {
               const updated = [...elasticEntries];
-              updated[i] = { ...updated[i], size: e.target.value };
+              updated[i] = { ...updated[i], size: autoCapitalizeWords8(e.target.value) };
               setFormData({ ...formData, fabricRows: updated });
             },
             style: { height: "36px", borderRadius: "6px" }
@@ -30639,7 +30647,7 @@
             value: r.size || "",
             onChange: (e) => {
               const updated = [...beadsEntries];
-              updated[i] = { ...updated[i], size: e.target.value };
+              updated[i] = { ...updated[i], size: autoCapitalizeWords8(e.target.value) };
               setFormData({ ...formData, fabricRows: updated });
             },
             style: { height: "36px", borderRadius: "6px" }
@@ -31302,6 +31310,10 @@
 
   // frontend/src/components/Masters/ColorMasterView.jsx
   var import_react15 = __toESM(require_react());
+  var autoCapitalizeWords9 = (text) => {
+    if (!text) return "";
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
+  };
   function isLightColor(hexStr) {
     const clean = (hexStr || "").replace("#", "").trim();
     if (clean.length !== 6) return false;
@@ -31384,7 +31396,7 @@
     const handleModalSave = (savedColor) => {
       if (!savedColor) return;
       const cleanHex = (savedColor.hex || savedColor.hexCode || "#000000").toUpperCase().trim();
-      const capitalizedName = (savedColor.name || "").replace(/\b\w/g, (c) => c.toUpperCase());
+      const capitalizedName = autoCapitalizeWords9(savedColor.name || "");
       const nextNum = colors.length + 1;
       const colorObj = {
         ...savedColor,
@@ -32970,7 +32982,7 @@
         )
       );
       const grnStarted = hasLinkedGrn || status === "Partially Received" || status === "Completed" || Number(po.receivedQty) > 0;
-      return isSent && grnStarted;
+      return false;
     };
     const getVendorName = (po) => {
       if (po.vendorName && po.vendorName.trim()) return po.vendorName;
@@ -33426,7 +33438,8 @@
       if (isInline && onCloseInline) onCloseInline(null);
     };
     const capitalizeWords = (str) => {
-      return str.replace(/\b\w/g, (char) => char.toUpperCase());
+      if (!str) return "";
+      return String(str).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
     };
     const handleTextChange = (field, val, autoCap = false) => {
       const value = autoCap ? capitalizeWords(val) : val;
@@ -33458,6 +33471,10 @@
         ...formData,
         name: capitalizeWords((formData.name || "").trim()),
         type: finalVendorType,
+        contactPerson: capitalizeWords((formData.contactPerson || "").trim()),
+        address: (formData.address || "").trim(),
+        city: capitalizeWords((formData.city || "").trim()),
+        bankName: capitalizeWords((formData.bankName || "").trim()),
         lastModifiedDate: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB")
       };
       let updatedList;
@@ -33680,12 +33697,12 @@
         required: true,
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
-        className: `form-control form-control-sm ${formErrors.name ? "is-invalid" : ""}`,
+        className: `form-control form-control-sm text-uppercase ${formErrors.name ? "is-invalid" : ""}`,
         placeholder: "e.g. Sahil Textile Mill",
         value: formData.name || "",
         onChange: (e) => handleTextChange("name", e.target.value, true)
       }
-    ), isModalEditMode && /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-text small text-muted" }, "Auto-capitalised word by word"), formErrors.name && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.name)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Type *"), /* @__PURE__ */ import_react18.default.createElement(
+    ), isModalEditMode && /* @__PURE__ */ import_react18.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)"), formErrors.name && /* @__PURE__ */ import_react18.default.createElement("div", { className: "invalid-feedback fs-11 d-block" }, formErrors.name)), /* @__PURE__ */ import_react18.default.createElement("div", { className: "col-6" }, /* @__PURE__ */ import_react18.default.createElement("label", { className: "form-label fs-12 fw-semibold mb-1" }, "Vendor Type *"), /* @__PURE__ */ import_react18.default.createElement(
       "select",
       {
         className: `form-select form-select-sm ${formErrors.type ? "is-invalid" : ""}`,
@@ -33712,7 +33729,7 @@
         type: "text",
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
-        className: `form-control form-control-sm ${formErrors.type ? "is-invalid" : ""}`,
+        className: `form-control form-control-sm text-uppercase ${formErrors.type ? "is-invalid" : ""}`,
         placeholder: "Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)",
         value: formData.customType || "",
         onChange: (e) => handleTextChange("customType", e.target.value, true),
@@ -33778,7 +33795,7 @@
         placeholder: "e.g. Rajesh Shah",
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
-        className: "form-control form-control-sm",
+        className: "form-control form-control-sm text-uppercase",
         value: formData.contactPerson || "",
         onChange: (e) => handleTextChange("contactPerson", e.target.value, true)
       }
@@ -33811,7 +33828,7 @@
         placeholder: "e.g. Surat",
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
-        className: "form-control form-control-sm",
+        className: "form-control form-control-sm text-uppercase",
         value: formData.city || "",
         onChange: (e) => handleTextChange("city", e.target.value, true)
       }
@@ -33858,7 +33875,7 @@
         placeholder: "e.g. HDFC Bank",
         disabled: !isModalEditMode,
         style: { backgroundColor: isModalEditMode ? "#ffffff" : "#f8fafc" },
-        className: "form-control form-control-sm",
+        className: "form-control form-control-sm text-uppercase",
         value: formData.bankName || "",
         onChange: (e) => handleTextChange("bankName", e.target.value, true)
       }
@@ -34579,7 +34596,6 @@
     const hasGrnStarted = Boolean(
       linkedGrn || allPoGrns.length > 0 || /partially|received|completed/i.test(currentStatus) || Number(po?.receivedQty) > 0 || Number(formData?.receivedQty) > 0
     );
-    const isPoLocked = Boolean(hasGrnStarted || isSentOrBeyond && hasGrnStarted);
     const currentPoId = po?.id || formData?.id;
     const fulfillmentData = getPoFulfillmentData(
       { ...formData, id: currentPoId, receivedQty: po?.receivedQty || formData?.receivedQty },
@@ -34592,6 +34608,9 @@
     const fulfillmentPercent = fulfillmentData.fulfillmentPercent;
     const grnBreakdowns = fulfillmentData.grnBreakdowns || [];
     const itemFulfillments = fulfillmentData.itemFulfillments || [];
+    const isPoLocked = Boolean(
+      formData.status === "Completed" || po?.status === "Completed" || totalOrderedMtrs > 0 && pendingQuantityToReceive <= 0
+    );
     const numGrnsCreated = allPoGrns.length;
     const findQcForGrn = (g) => {
       if (!g) return null;
@@ -34959,6 +34978,22 @@
         }
       }
     };
+    const [sentToast, setSentToast] = (0, import_react19.useState)(false);
+    const handleSendToVendor = () => {
+      const todayDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const updated = {
+        ...formData,
+        status: "Sent",
+        sentToVendorDate: formData.sentToVendorDate || todayDate,
+        sentAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      setFormData(updated);
+      setSentToast(true);
+      setTimeout(() => setSentToast(false), 4e3);
+      if (onSavePO) {
+        onSavePO(updated, true);
+      }
+    };
     return /* @__PURE__ */ import_react19.default.createElement("div", { className: "container-fluid p-0", style: { maxWidth: "1200px", margin: "0 auto" } }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, (onBack || onCancel) && /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
@@ -35028,34 +35063,18 @@
       },
       /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-circle-check fs-14" }),
       /* @__PURE__ */ import_react19.default.createElement("span", null, "\u2713 Fully Received (", totalOrderedMtrs.toLocaleString(), "m \u2014 Complete)")
-    ) : null, formData.status !== "Cancelled" && (isPoLocked ? /* @__PURE__ */ import_react19.default.createElement(
-      "span",
-      {
-        className: "badge bg-light text-secondary border px-3 py-2 fs-12 d-flex align-items-center gap-1.5 shadow-xs",
-        title: "GRN process has started. This Purchase Order is locked and cannot be edited."
-      },
-      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-lock text-warning fs-14" }),
-      /* @__PURE__ */ import_react19.default.createElement("span", null, "Locked (GRN Started)")
-    ) : !isEditing ? /* @__PURE__ */ import_react19.default.createElement(
+    ) : null, formData.status === "Draft" && /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-white shadow-sm",
-        style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
-        onClick: () => setIsEditing(true)
+        className: "btn btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-white shadow-sm fw-semibold",
+        style: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+        onClick: handleSendToVendor,
+        title: "Send this Purchase Order to Vendor and change status to Sent"
       },
-      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-edit fs-15" }),
-      /* @__PURE__ */ import_react19.default.createElement("span", null, "Edit Record")
-    ) : /* @__PURE__ */ import_react19.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-sm btn-light border d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-secondary",
-        onClick: () => setIsEditing(false)
-      },
-      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-eye fs-15" }),
-      /* @__PURE__ */ import_react19.default.createElement("span", null, "View Mode")
-    )))), formData.status === "Cancelled" && /* @__PURE__ */ import_react19.default.createElement("div", { className: "alert alert-danger d-flex align-items-center gap-2 rounded-3 py-2.5 px-3 mb-3 fs-13 border-danger border-opacity-25 shadow-sm" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-ban fs-18 text-danger" }), /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold" }, "Purchase Order Cancelled:"), " This purchase order has been marked as cancelled. It is closed and cannot be modified or processed for inward GRN deliveries.")), /* @__PURE__ */ import_react19.default.createElement(
+      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-send fs-15" }),
+      /* @__PURE__ */ import_react19.default.createElement("span", null, "Send to Vendor")
+    ))), sentToast && /* @__PURE__ */ import_react19.default.createElement("div", { className: "alert alert-success d-flex align-items-center gap-2 rounded-3 py-2.5 px-3 mb-3 fs-13 border-success border-opacity-25 shadow-sm" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-circle-check fs-18 text-success" }), /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold" }, "Status Updated:"), " Purchase Order ", /* @__PURE__ */ import_react19.default.createElement("strong", null, formData.id), " has been sent to the vendor! Status is now ", /* @__PURE__ */ import_react19.default.createElement("strong", null, "Sent to Vendor"), ".")), formData.status === "Cancelled" && /* @__PURE__ */ import_react19.default.createElement("div", { className: "alert alert-danger d-flex align-items-center gap-2 rounded-3 py-2.5 px-3 mb-3 fs-13 border-danger border-opacity-25 shadow-sm" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-ban fs-18 text-danger" }), /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("span", { className: "fw-bold" }, "Purchase Order Cancelled:"), " This purchase order has been marked as cancelled. It is closed and cannot be modified or processed for inward GRN deliveries.")), /* @__PURE__ */ import_react19.default.createElement(
       "div",
       {
         className: "card mb-4 shadow-none",
@@ -35471,15 +35490,22 @@
           onChange: (e) => setFormData({ ...formData, notes: e.target.value })
         }
       ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "text-secondary fs-13 py-1" }, formData.notes || /* @__PURE__ */ import_react19.default.createElement("span", { className: "text-muted" }, "No internal notes"))
-    ), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-5" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2 text-muted fs-12" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-shopping-cart fs-15 text-muted" }), /* @__PURE__ */ import_react19.default.createElement("span", null, isExisting ? `PO Number: ${formData.id}` : "PO number will be auto-generated as 1-YYYY-####.")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isEditing ? /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, formData.status !== "Cancelled" && (isPoLocked ? /* @__PURE__ */ import_react19.default.createElement(
-      "span",
+    ), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-5" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2 text-muted fs-12" }, /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-shopping-cart fs-15 text-muted" }), /* @__PURE__ */ import_react19.default.createElement("span", null, isExisting ? `PO Number: ${formData.id}` : "PO number will be auto-generated as 1-YYYY-####.")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isEditing ? /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, formData.status === "Draft" && /* @__PURE__ */ import_react19.default.createElement(
+      "button",
       {
-        className: "badge bg-light text-secondary border px-3 py-2 fs-12 d-flex align-items-center gap-1.5",
-        title: "GRN process has started. This Purchase Order is locked and cannot be edited."
+        type: "button",
+        className: "btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-semibold fs-13 rounded-3 text-white shadow-sm",
+        style: {
+          backgroundColor: "#2563eb",
+          borderColor: "#2563eb",
+          borderRadius: "8px"
+        },
+        onClick: handleSendToVendor,
+        title: "Send this Purchase Order to Vendor and change status to Sent"
       },
-      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-lock text-warning fs-14" }),
-      /* @__PURE__ */ import_react19.default.createElement("span", null, "Locked (GRN Started)")
-    ) : /* @__PURE__ */ import_react19.default.createElement(
+      /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-send fs-15" }),
+      /* @__PURE__ */ import_react19.default.createElement("span", null, "Send to Vendor")
+    ), formData.status !== "Cancelled" && !isPoLocked && /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
         type: "button",
@@ -35493,12 +35519,12 @@
       },
       /* @__PURE__ */ import_react19.default.createElement("i", { className: "ti ti-edit fs-15" }),
       /* @__PURE__ */ import_react19.default.createElement("span", null, "Edit Record")
-    )), /* @__PURE__ */ import_react19.default.createElement(
+    ), /* @__PURE__ */ import_react19.default.createElement(
       "button",
       {
         type: "button",
         className: "btn btn-white border px-3 py-2 fw-medium fs-13 rounded-3 text-secondary shadow-sm",
-        style: { borderRadius: "8px" },
+        style: { borderRadius: "8px", backgroundColor: "#ffffff", borderColor: "#cbd5e1" },
         onClick: handleCancel
       },
       "Back to List"
@@ -35946,7 +35972,8 @@
       setIsEditing(false);
     };
     const capitalizeWords = (str) => {
-      return str.replace(/\b\w/g, (c) => c.toUpperCase());
+      if (!str) return "";
+      return String(str).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
     };
     const handleSave = (e) => {
       if (e) e.preventDefault();
@@ -35956,7 +35983,8 @@
       }
       const dataToSave = {
         ...formData,
-        name: capitalizeWords((formData.name || "").trim())
+        name: capitalizeWords((formData.name || "").trim()),
+        address: (formData.address || "").trim()
       };
       let updatedList;
       if (isCreatingNew) {
@@ -43997,6 +44025,10 @@
       fullLabel: `${icon} ${bs.sizeName} \u2014 ${calcBreakdown}`
     };
   }
+  var autoCapitalizeWords10 = (text) => {
+    if (!text) return "";
+    return String(text).toUpperCase().replace(/(\d+)\s*L\b/g, "$1L").replace(/(\d+(?:\.\d+)?)\s*MM\b/g, "$1 MM").replace(/(\d+(?:\.\d+)?)\s*CM\b/g, "$1 CM");
+  };
   function loadLS(key, def) {
     try {
       const s = localStorage.getItem(key);
@@ -44088,7 +44120,7 @@
       };
     }, []);
     const handleAddQuality = () => {
-      const name = qualityInput.trim();
+      const name = autoCapitalizeWords10(qualityInput.trim());
       if (!name) return;
       const newQ = { id: genId("TQ", qualities), name };
       const updated = [...qualities, newQ];
@@ -44103,7 +44135,7 @@
       saveLS(LS_QUALITIES, updated);
     };
     const handleSaveQualityEdit = (id) => {
-      const name = editingQualityName.trim();
+      const name = autoCapitalizeWords10(editingQualityName.trim());
       if (!name) return;
       const updated = qualities.map((q) => q.id === id ? { ...q, name } : q);
       setQualities(updated);
@@ -44112,11 +44144,12 @@
       setEditingQualityName("");
     };
     const handleBsChange = (field, value) => {
+      const val = field === "sizeName" ? autoCapitalizeWords10(value) : value;
       setBsForm((prev) => {
-        const next = { ...prev, [field]: value };
+        const next = { ...prev, [field]: val };
         next.totalThread = calcTotal(
-          field === "noOfReels" ? value : next.noOfReels,
-          field === "reelLengthMts" ? value : next.reelLengthMts
+          field === "noOfReels" ? val : next.noOfReels,
+          field === "reelLengthMts" ? val : next.reelLengthMts
         );
         return next;
       });
@@ -44128,7 +44161,7 @@
         return;
       }
       const totalThread = calcTotal(noOfReels, reelLengthMts);
-      const newBs = { id: genId("TBS", boxSizes), sizeName: sizeName.trim(), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread };
+      const newBs = { id: genId("TBS", boxSizes), sizeName: autoCapitalizeWords10(sizeName.trim()), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread };
       const updated = [...boxSizes, newBs];
       setBoxSizes(updated);
       saveLS(LS_BOX_SIZES, updated);
@@ -44147,7 +44180,7 @@
       }
       const totalThread = calcTotal(noOfReels, reelLengthMts);
       const updated = boxSizes.map(
-        (bs) => bs.id === editingBsId ? { ...bs, sizeName: sizeName.trim(), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread } : bs
+        (bs) => bs.id === editingBsId ? { ...bs, sizeName: autoCapitalizeWords10(sizeName.trim()), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread } : bs
       );
       setBoxSizes(updated);
       saveLS(LS_BOX_SIZES, updated);
@@ -44189,7 +44222,7 @@
     const handleBrandVendorChange = (idx, val) => {
       setBrandForm((prev) => {
         const vendors = [...prev.vendors];
-        vendors[idx] = val;
+        vendors[idx] = autoCapitalizeWords10(val);
         return { ...prev, vendors };
       });
     };
@@ -44215,10 +44248,10 @@
         setBrandFormErr(errs);
         return;
       }
-      const cleanVendors = brandForm.vendors.map((v) => v.trim()).filter(Boolean);
+      const cleanVendors = brandForm.vendors.map((v) => autoCapitalizeWords10(v.trim())).filter(Boolean);
       const saved = {
         id: editingBrand ? editingBrand.id : genId("TB", brands),
-        brandName: brandForm.brandName.trim(),
+        brandName: autoCapitalizeWords10(brandForm.brandName.trim()),
         vendors: cleanVendors,
         rates: brandForm.rates
       };
@@ -44284,7 +44317,7 @@
         className: "form-control form-control-sm fs-13",
         placeholder: "e.g. 2 Ply Poly, Embroidery Viscose...",
         value: qualityInput,
-        onChange: (e) => setQualityInput(e.target.value),
+        onChange: (e) => setQualityInput(autoCapitalizeWords10(e.target.value)),
         onKeyDown: (e) => {
           if (e.key === "Enter") handleAddQuality();
         },
@@ -44314,7 +44347,7 @@
           type: "text",
           className: "form-control form-control-sm fs-13",
           value: editingQualityName,
-          onChange: (e) => setEditingQualityName(e.target.value),
+          onChange: (e) => setEditingQualityName(autoCapitalizeWords10(e.target.value)),
           onKeyDown: (e) => {
             if (e.key === "Enter") handleSaveQualityEdit(q.id);
             if (e.key === "Escape") {
@@ -44456,10 +44489,10 @@
       "input",
       {
         type: "text",
-        className: `form-control bg-white fs-13 ${brandFormErr.brandName ? "is-invalid" : ""}`,
+        className: `form-control bg-white fs-13 text-uppercase ${brandFormErr.brandName ? "is-invalid" : ""}`,
         placeholder: "e.g. Sapphire, Coats, Madura...",
         value: brandForm.brandName,
-        onChange: (e) => setBrandForm((prev) => ({ ...prev, brandName: e.target.value })),
+        onChange: (e) => setBrandForm((prev) => ({ ...prev, brandName: autoCapitalizeWords10(e.target.value) })),
         style: { borderColor: brandFormErr.brandName ? "#dc3545" : "#cbd5e1" }
       }
     ), brandFormErr.brandName && /* @__PURE__ */ import_react32.default.createElement("div", { className: "invalid-feedback" }, brandFormErr.brandName)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "mb-3 p-3 bg-light rounded-3" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react32.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-0" }, "VENDOR NAME(S) (OPTIONAL, CAN BE MULTIPLE)"), /* @__PURE__ */ import_react32.default.createElement(
@@ -45137,19 +45170,13 @@
       };
       setAuditLogs((prev) => [newLog, ...prev]);
     };
-    const handleSavePO = (poData) => {
+    const handleSavePO = (poData, stayInView = false) => {
       const isEdit = purchaseOrders.some((p) => p.id === poData.id);
       const existingPo = purchaseOrders.find((p) => p.id === poData.id);
       if (existingPo) {
         const curStatus = String(existingPo.status || "").trim();
-        const isSentOrBeyond = ["Sent", "Sent to Vendor", "Partially Received", "Completed"].includes(curStatus);
-        const hasGrnStarted = Boolean(
-          curStatus === "Partially Received" || curStatus === "Completed" || Number(existingPo.receivedQty) > 0 || (grns || []).some(
-            (g) => g && (Array.isArray(g.linkedPOs) && g.linkedPOs.includes(existingPo.id) || g.poId === existingPo.id || g.poNumber === existingPo.id || g.againstPo === existingPo.id)
-          )
-        );
-        if (isSentOrBeyond && hasGrnStarted) {
-          alert("This Purchase Order is locked and cannot be edited because its GRN process has already started.");
+        if (curStatus === "Completed") {
+          alert("This Purchase Order is completed and cannot be edited.");
           return;
         }
       }
@@ -45168,7 +45195,9 @@
       }
       api.savePurchaseOrder(enrichedPO).catch((e) => console.warn("PO save sync error:", e));
       setSelectedPO(enrichedPO);
-      setActivePoView("list");
+      if (!stayInView) {
+        setActivePoView("list");
+      }
     };
     const handleViewGRN = (grn) => {
       if (!grn) return;
@@ -45895,9 +45924,11 @@
         qualityChecks,
         onBack: handleExitPOForm,
         onCancel: handleExitPOForm,
-        onSavePO: (savedPo) => {
-          handleSavePO(savedPo);
-          handleExitPOForm();
+        onSavePO: (savedPo, stayInView = false) => {
+          handleSavePO(savedPo, stayInView);
+          if (!stayInView) {
+            handleExitPOForm();
+          }
         },
         onPrintPO: (po) => {
           setSelectedPO(po);

@@ -158,9 +158,14 @@ export default function VendorMasterView({
     if (isInline && onCloseInline) onCloseInline(null);
   };
 
-  // Capitalize word by word
+  // Capitalize all letters (UPPERCASE) with 18L and 3 MM formatting
   const capitalizeWords = (str) => {
-    return str.replace(/\b\w/g, (char) => char.toUpperCase());
+    if (!str) return '';
+    return String(str)
+      .toUpperCase()
+      .replace(/(\d+)\s*L\b/g, '$1L')
+      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
   };
 
   const handleTextChange = (field, val, autoCap = false) => {
@@ -200,6 +205,10 @@ export default function VendorMasterView({
       ...formData,
       name: capitalizeWords((formData.name || '').trim()),
       type: finalVendorType,
+      contactPerson: capitalizeWords((formData.contactPerson || '').trim()),
+      address: (formData.address || '').trim(),
+      city: capitalizeWords((formData.city || '').trim()),
+      bankName: capitalizeWords((formData.bankName || '').trim()),
       lastModifiedDate: new Date().toLocaleDateString('en-GB')
     };
 
@@ -551,7 +560,7 @@ export default function VendorMasterView({
                             required
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm ${
+                            className={`form-control form-control-sm text-uppercase ${
                               formErrors.name ? 'is-invalid' : ''
                             }`}
                             placeholder="e.g. Sahil Textile Mill"
@@ -559,7 +568,7 @@ export default function VendorMasterView({
                             onChange={(e) => handleTextChange('name', e.target.value, true)}
                           />
                           {isModalEditMode && (
-                            <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                            <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                           )}
                           {formErrors.name && (
                             <div className="invalid-feedback fs-11 d-block">{formErrors.name}</div>
@@ -598,7 +607,7 @@ export default function VendorMasterView({
                                 type="text"
                                 disabled={!isModalEditMode}
                                 style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                                className={`form-control form-control-sm ${
+                                className={`form-control form-control-sm text-uppercase ${
                                   formErrors.type ? 'is-invalid' : ''
                                 }`}
                                 placeholder="Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)"
@@ -700,7 +709,7 @@ export default function VendorMasterView({
                             placeholder="e.g. Rajesh Shah"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm"
+                            className="form-control form-control-sm text-uppercase"
                             value={formData.contactPerson || ''}
                             onChange={(e) => handleTextChange('contactPerson', e.target.value, true)}
                           />
@@ -744,7 +753,7 @@ export default function VendorMasterView({
                             placeholder="e.g. Surat"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm"
+                            className="form-control form-control-sm text-uppercase"
                             value={formData.city || ''}
                             onChange={(e) => handleTextChange('city', e.target.value, true)}
                           />
@@ -816,7 +825,7 @@ export default function VendorMasterView({
                             placeholder="e.g. HDFC Bank"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm"
+                            className="form-control form-control-sm text-uppercase"
                             value={formData.bankName || ''}
                             onChange={(e) => handleTextChange('bankName', e.target.value, true)}
                           />

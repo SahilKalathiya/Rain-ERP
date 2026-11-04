@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
-  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
 };
 
 /**

@@ -77,7 +77,12 @@ export default function TransporterMasterView({
   };
 
   const capitalizeWords = (str) => {
-    return str.replace(/\b\w/g, (c) => c.toUpperCase());
+    if (!str) return '';
+    return String(str)
+      .toUpperCase()
+      .replace(/(\d+)\s*L\b/g, '$1L')
+      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
   };
 
   const handleSave = (e) => {
@@ -89,7 +94,8 @@ export default function TransporterMasterView({
 
     const dataToSave = {
       ...formData,
-      name: capitalizeWords((formData.name || '').trim())
+      name: capitalizeWords((formData.name || '').trim()),
+      address: (formData.address || '').trim()
     };
 
     let updatedList;

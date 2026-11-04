@@ -595,24 +595,15 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
   };
 
   // Handlers
-  const handleSavePO = (poData) => {
+  const handleSavePO = (poData, stayInView = false) => {
     const isEdit = purchaseOrders.some((p) => p.id === poData.id);
     const existingPo = purchaseOrders.find((p) => p.id === poData.id);
 
-    // Requirement 15: Check if PO is locked against edits
+    // Check if PO is locked against edits (only if completed/cancelled)
     if (existingPo) {
       const curStatus = String(existingPo.status || '').trim();
-      const isSentOrBeyond = ['Sent', 'Sent to Vendor', 'Partially Received', 'Completed'].includes(curStatus);
-      const hasGrnStarted = Boolean(
-        curStatus === 'Partially Received' ||
-        curStatus === 'Completed' ||
-        Number(existingPo.receivedQty) > 0 ||
-        (grns || []).some(
-          (g) => g && ((Array.isArray(g.linkedPOs) && g.linkedPOs.includes(existingPo.id)) || g.poId === existingPo.id || g.poNumber === existingPo.id || g.againstPo === existingPo.id)
-        )
-      );
-      if (isSentOrBeyond && hasGrnStarted) {
-        alert('This Purchase Order is locked and cannot be edited because its GRN process has already started.');
+      if (curStatus === 'Completed') {
+        alert('This Purchase Order is completed and cannot be edited.');
         return;
       }
     }
@@ -632,7 +623,9 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     }
     api.savePurchaseOrder(enrichedPO).catch((e) => console.warn('PO save sync error:', e));
     setSelectedPO(enrichedPO);
-    setActivePoView('list');
+    if (!stayInView) {
+      setActivePoView('list');
+    }
   };
 
   const handleViewGRN = (grn) => {
@@ -1502,9 +1495,11 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
               qualityChecks={qualityChecks}
               onBack={handleExitPOForm}
               onCancel={handleExitPOForm}
-              onSavePO={(savedPo) => {
-                handleSavePO(savedPo);
-                handleExitPOForm();
+              onSavePO={(savedPo, stayInView = false) => {
+                handleSavePO(savedPo, stayInView);
+                if (!stayInView) {
+                  handleExitPOForm();
+                }
               }}
               onPrintPO={(po) => {
                 setSelectedPO(po);

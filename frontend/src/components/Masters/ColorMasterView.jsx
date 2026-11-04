@@ -2,6 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { initialColors, getStoredData, setStoredData, getStoredColorsMaster, setStoredColorsMaster } from '../../data/salesOrderData';
 import AddColorModal from '../Procurement/AddColorModal';
 
+const autoCapitalizeWords = (text) => {
+  if (!text) return '';
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+};
+
 /**
  * Standard palette for quick color selection in Color Picker dialog
  */
@@ -120,7 +129,7 @@ export default function ColorMasterView({ isInline = false, onSaveInline, onClos
   const handleModalSave = (savedColor) => {
     if (!savedColor) return;
     const cleanHex = (savedColor.hex || savedColor.hexCode || '#000000').toUpperCase().trim();
-    const capitalizedName = (savedColor.name || '').replace(/\b\w/g, (c) => c.toUpperCase());
+    const capitalizedName = autoCapitalizeWords(savedColor.name || '');
     const nextNum = colors.length + 1;
     const colorObj = {
       ...savedColor,

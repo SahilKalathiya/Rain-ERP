@@ -795,8 +795,6 @@ export default function PurchaseOrderForm({
     (Number(formData?.receivedQty) > 0)
   );
 
-  const isPoLocked = Boolean(hasGrnStarted || (isSentOrBeyond && hasGrnStarted));
-
   const currentPoId = po?.id || formData?.id;
   const fulfillmentData = getPoFulfillmentData(
     { ...formData, id: currentPoId, receivedQty: po?.receivedQty || formData?.receivedQty },
@@ -812,6 +810,13 @@ export default function PurchaseOrderForm({
   const fulfillmentPercent = fulfillmentData.fulfillmentPercent;
   const grnBreakdowns = fulfillmentData.grnBreakdowns || [];
   const itemFulfillments = fulfillmentData.itemFulfillments || [];
+
+  // PO is only locked when fully completed / closed (all quantity received or status completed)
+  const isPoLocked = Boolean(
+    formData.status === 'Completed' ||
+    po?.status === 'Completed' ||
+    (totalOrderedMtrs > 0 && pendingQuantityToReceive <= 0)
+  );
 
   // 2. Number of GRNs created
   const numGrnsCreated = allPoGrns.length;
@@ -1273,6 +1278,24 @@ export default function PurchaseOrderForm({
     }
   };
 
+  const [sentToast, setSentToast] = useState(false);
+
+  const handleSendToVendor = () => {
+    const todayDate = new Date().toISOString().split('T')[0];
+    const updated = {
+      ...formData,
+      status: 'Sent',
+      sentToVendorDate: formData.sentToVendorDate || todayDate,
+      sentAt: new Date().toISOString()
+    };
+    setFormData(updated);
+    setSentToast(true);
+    setTimeout(() => setSentToast(false), 4000);
+    if (onSavePO) {
+      onSavePO(updated, true);
+    }
+  };
+
   return (
     <div className="container-fluid p-0" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       {/* Top Header / Action Bar */}
@@ -1393,39 +1416,31 @@ export default function PurchaseOrderForm({
                 <span>✓ Fully Received ({totalOrderedMtrs.toLocaleString()}m — Complete)</span>
               </span>
             ) : null}
-            {formData.status !== 'Cancelled' && (
-              isPoLocked ? (
-                <span
-                  className="badge bg-light text-secondary border px-3 py-2 fs-12 d-flex align-items-center gap-1.5 shadow-xs"
-                  title="GRN process has started. This Purchase Order is locked and cannot be edited."
-                >
-                  <i className="ti ti-lock text-warning fs-14"></i>
-                  <span>Locked (GRN Started)</span>
-                </span>
-              ) : !isEditing ? (
-                <button
-                  type="button"
-                  className="btn btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-white shadow-sm"
-                  style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
-                  onClick={() => setIsEditing(true)}
-                >
-                  <i className="ti ti-edit fs-15"></i>
-                  <span>Edit Record</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-light border d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-secondary"
-                  onClick={() => setIsEditing(false)}
-                >
-                  <i className="ti ti-eye fs-15"></i>
-                  <span>View Mode</span>
-                </button>
-              )
+            {formData.status === 'Draft' && (
+              <button
+                type="button"
+                className="btn btn-sm d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 fs-13 text-white shadow-sm fw-semibold"
+                style={{ backgroundColor: '#2563eb', borderColor: '#2563eb' }}
+                onClick={handleSendToVendor}
+                title="Send this Purchase Order to Vendor and change status to Sent"
+              >
+                <i className="ti ti-send fs-15"></i>
+                <span>Send to Vendor</span>
+              </button>
             )}
           </div>
         )}
       </div>
+
+      {/* Sent to Vendor Toast Notification */}
+      {sentToast && (
+        <div className="alert alert-success d-flex align-items-center gap-2 rounded-3 py-2.5 px-3 mb-3 fs-13 border-success border-opacity-25 shadow-sm">
+          <i className="ti ti-circle-check fs-18 text-success"></i>
+          <div>
+            <span className="fw-bold">Status Updated:</span> Purchase Order <strong>{formData.id}</strong> has been sent to the vendor! Status is now <strong>Sent to Vendor</strong>.
+          </div>
+        </div>
+      )}
 
 
       {/* Cancellation Notice Banner */}
@@ -2386,35 +2401,42 @@ export default function PurchaseOrderForm({
         <div className="d-flex align-items-center gap-2">
           {!isEditing ? (
             <>
-              {formData.status !== 'Cancelled' && (
-                isPoLocked ? (
-                  <span
-                    className="badge bg-light text-secondary border px-3 py-2 fs-12 d-flex align-items-center gap-1.5"
-                    title="GRN process has started. This Purchase Order is locked and cannot be edited."
-                  >
-                    <i className="ti ti-lock text-warning fs-14"></i>
-                    <span>Locked (GRN Started)</span>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-medium fs-13 rounded-3 text-white shadow-sm"
-                    style={{
-                      backgroundColor: '#5b47fb',
-                      borderColor: '#5b47fb',
-                      borderRadius: '8px'
-                    }}
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <i className="ti ti-edit fs-15"></i>
-                    <span>Edit Record</span>
-                  </button>
-                )
+              {formData.status === 'Draft' && (
+                <button
+                  type="button"
+                  className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-semibold fs-13 rounded-3 text-white shadow-sm"
+                  style={{
+                    backgroundColor: '#2563eb',
+                    borderColor: '#2563eb',
+                    borderRadius: '8px'
+                  }}
+                  onClick={handleSendToVendor}
+                  title="Send this Purchase Order to Vendor and change status to Sent"
+                >
+                  <i className="ti ti-send fs-15"></i>
+                  <span>Send to Vendor</span>
+                </button>
+              )}
+
+              {formData.status !== 'Cancelled' && !isPoLocked && (
+                <button
+                  type="button"
+                  className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 fw-medium fs-13 rounded-3 text-white shadow-sm"
+                  style={{
+                    backgroundColor: '#5b47fb',
+                    borderColor: '#5b47fb',
+                    borderRadius: '8px'
+                  }}
+                  onClick={() => setIsEditing(true)}
+                >
+                  <i className="ti ti-edit fs-15"></i>
+                  <span>Edit Record</span>
+                </button>
               )}
               <button
                 type="button"
                 className="btn btn-white border px-3 py-2 fw-medium fs-13 rounded-3 text-secondary shadow-sm"
-                style={{ borderRadius: '8px' }}
+                style={{ borderRadius: '8px', backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
                 onClick={handleCancel}
               >
                 Back to List

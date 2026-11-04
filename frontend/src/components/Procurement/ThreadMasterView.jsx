@@ -66,6 +66,15 @@ export function formatBoxSizeLabel(bs) {
   };
 }
 
+export const autoCapitalizeWords = (text) => {
+  if (!text) return '';
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+};
+
 // ---- Helpers ----
 function loadLS(key, def) {
   try {
@@ -172,7 +181,7 @@ export default function ThreadMasterView() {
 
   // ===================== QUALITY HANDLERS =====================
   const handleAddQuality = () => {
-    const name = qualityInput.trim();
+    const name = autoCapitalizeWords(qualityInput.trim());
     if (!name) return;
     const newQ = { id: genId('TQ', qualities), name };
     const updated = [...qualities, newQ];
@@ -189,7 +198,7 @@ export default function ThreadMasterView() {
   };
 
   const handleSaveQualityEdit = (id) => {
-    const name = editingQualityName.trim();
+    const name = autoCapitalizeWords(editingQualityName.trim());
     if (!name) return;
     const updated = qualities.map(q => q.id === id ? { ...q, name } : q);
     setQualities(updated);
@@ -200,11 +209,12 @@ export default function ThreadMasterView() {
 
   // ===================== BOX SIZE HANDLERS =====================
   const handleBsChange = (field, value) => {
+    const val = field === 'sizeName' ? autoCapitalizeWords(value) : value;
     setBsForm(prev => {
-      const next = { ...prev, [field]: value };
+      const next = { ...prev, [field]: val };
       next.totalThread = calcTotal(
-        field === 'noOfReels' ? value : next.noOfReels,
-        field === 'reelLengthMts' ? value : next.reelLengthMts
+        field === 'noOfReels' ? val : next.noOfReels,
+        field === 'reelLengthMts' ? val : next.reelLengthMts
       );
       return next;
     });
@@ -217,7 +227,7 @@ export default function ThreadMasterView() {
       return;
     }
     const totalThread = calcTotal(noOfReels, reelLengthMts);
-    const newBs = { id: genId('TBS', boxSizes), sizeName: sizeName.trim(), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread };
+    const newBs = { id: genId('TBS', boxSizes), sizeName: autoCapitalizeWords(sizeName.trim()), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread };
     const updated = [...boxSizes, newBs];
     setBoxSizes(updated);
     saveLS(LS_BOX_SIZES, updated);
@@ -238,7 +248,7 @@ export default function ThreadMasterView() {
     }
     const totalThread = calcTotal(noOfReels, reelLengthMts);
     const updated = boxSizes.map(bs => bs.id === editingBsId
-      ? { ...bs, sizeName: sizeName.trim(), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread }
+      ? { ...bs, sizeName: autoCapitalizeWords(sizeName.trim()), type, noOfReels: Number(noOfReels), reelLengthMts: Number(reelLengthMts), totalThread }
       : bs
     );
     setBoxSizes(updated);
@@ -287,7 +297,7 @@ export default function ThreadMasterView() {
   const handleBrandVendorChange = (idx, val) => {
     setBrandForm(prev => {
       const vendors = [...prev.vendors];
-      vendors[idx] = val;
+      vendors[idx] = autoCapitalizeWords(val);
       return { ...prev, vendors };
     });
   };
@@ -315,10 +325,10 @@ export default function ThreadMasterView() {
     if (!brandForm.brandName.trim()) errs.brandName = 'Brand name is required';
     if (Object.keys(errs).length > 0) { setBrandFormErr(errs); return; }
 
-    const cleanVendors = brandForm.vendors.map(v => v.trim()).filter(Boolean);
+    const cleanVendors = brandForm.vendors.map(v => autoCapitalizeWords(v.trim())).filter(Boolean);
     const saved = {
       id: editingBrand ? editingBrand.id : genId('TB', brands),
-      brandName: brandForm.brandName.trim(),
+      brandName: autoCapitalizeWords(brandForm.brandName.trim()),
       vendors: cleanVendors,
       rates: brandForm.rates
     };
@@ -429,7 +439,7 @@ export default function ThreadMasterView() {
                     className="form-control form-control-sm fs-13"
                     placeholder="e.g. 2 Ply Poly, Embroidery Viscose..."
                     value={qualityInput}
-                    onChange={e => setQualityInput(e.target.value)}
+                    onChange={e => setQualityInput(autoCapitalizeWords(e.target.value))}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddQuality(); }}
                     style={{ borderColor: '#cbd5e1' }}
                   />
@@ -466,7 +476,7 @@ export default function ThreadMasterView() {
                                 type="text"
                                 className="form-control form-control-sm fs-13"
                                 value={editingQualityName}
-                                onChange={e => setEditingQualityName(e.target.value)}
+                                onChange={e => setEditingQualityName(autoCapitalizeWords(e.target.value))}
                                 onKeyDown={e => { if (e.key === 'Enter') handleSaveQualityEdit(q.id); if (e.key === 'Escape') { setEditingQualityId(null); } }}
                                 autoFocus
                                 style={{ borderColor: '#6366f1' }}
@@ -861,10 +871,10 @@ export default function ThreadMasterView() {
                   <label className="form-label fs-12 fw-bold text-uppercase text-secondary mb-1">Brand Name <span className="text-danger">*</span></label>
                   <input
                     type="text"
-                    className={`form-control bg-white fs-13 ${brandFormErr.brandName ? 'is-invalid' : ''}`}
+                    className={`form-control bg-white fs-13 text-uppercase ${brandFormErr.brandName ? 'is-invalid' : ''}`}
                     placeholder="e.g. Sapphire, Coats, Madura..."
                     value={brandForm.brandName}
-                    onChange={e => setBrandForm(prev => ({ ...prev, brandName: e.target.value }))}
+                    onChange={e => setBrandForm(prev => ({ ...prev, brandName: autoCapitalizeWords(e.target.value) }))}
                     style={{ borderColor: brandFormErr.brandName ? '#dc3545' : '#cbd5e1' }}
                   />
                   {brandFormErr.brandName && <div className="invalid-feedback">{brandFormErr.brandName}</div>}

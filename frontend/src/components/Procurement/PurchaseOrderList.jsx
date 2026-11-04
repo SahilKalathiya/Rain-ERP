@@ -48,7 +48,7 @@ export default function PurchaseOrderList({
       status === 'Completed' ||
       (Number(po.receivedQty) > 0);
 
-    return isSent && grnStarted;
+    return false;
   };
 
   const getVendorName = (po) => {

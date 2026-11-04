@@ -342,7 +342,12 @@ export default function FabricMasterView({
   };
 
   const capitalizeWords = (str) => {
-    return str.replace(/\b\w/g, (c) => c.toUpperCase());
+    if (!str) return '';
+    return String(str)
+      .toUpperCase()
+      .replace(/(\d+)\s*L\b/g, '$1L')
+      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
   };
 
   const validate = () => {
@@ -391,6 +396,7 @@ export default function FabricMasterView({
       name: capitalizedQName,
       fabricType: finalFabricType,
       isCustomType: Boolean(isCustomFabricType),
+      description: (formData.description || '').trim(),
       widths: currentWidths,
       gsm: Number(formData.gsm) || null,
       defaultShrinkage: (formData.defaultShrinkage !== '' && formData.defaultShrinkage !== null && formData.defaultShrinkage !== undefined) ? Number(formData.defaultShrinkage) : 0,
@@ -500,7 +506,7 @@ export default function FabricMasterView({
                           autoFocus
                           value={formData.fabricType || ''}
                           onChange={(e) => {
-                            const newType = e.target.value;
+                            const newType = capitalizeWords(e.target.value);
                             setFormData({
                               ...formData,
                               fabricType: newType,
@@ -931,7 +937,7 @@ export default function FabricMasterView({
                           required
                           disabled={!isEditing}
                           placeholder="e.g. Suh Cotton / Rayon 14kg"
-                          className={`form-control form-control-sm ${
+                          className={`form-control form-control-sm text-uppercase ${
                             formErrors.qualityName ? 'is-invalid' : ''
                           }`}
                           style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
@@ -940,7 +946,7 @@ export default function FabricMasterView({
                             setFormData({ ...formData, qualityName: capitalizeWords(e.target.value) })
                           }
                         />
-                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                         {formErrors.qualityName && (
                           <div className="invalid-feedback fs-11">{formErrors.qualityName}</div>
                         )}
@@ -954,13 +960,13 @@ export default function FabricMasterView({
                               <input
                                 type="text"
                                 disabled={!isEditing}
-                                className={`form-control form-control-sm ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                                className={`form-control form-control-sm text-uppercase ${formErrors.fabricType ? 'is-invalid' : ''}`}
                                 style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                                 placeholder="Type custom fabric type..."
                                 autoFocus={isEditing}
                                 value={formData.fabricType || ''}
                                 onChange={(e) => {
-                                  const newType = e.target.value;
+                                  const newType = capitalizeWords(e.target.value);
                                   setFormData({
                                     ...formData,
                                     fabricType: newType,
@@ -992,7 +998,7 @@ export default function FabricMasterView({
                               style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                               value={formData.fabricType}
                               onChange={(e) => {
-                                const newType = e.target.value;
+                                const newType = capitalizeWords(e.target.value);
                                 if (newType === 'Other') {
                                   setIsCustomFabricType(true);
                                   setFormData({

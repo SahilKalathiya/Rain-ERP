@@ -185,7 +185,11 @@ function WhatsAppEmojiPicker({ onSelect, onClose }) {
 
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
-  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
 };
 
 // Normalize and ensure unique sequential priority numbers: 1, 2, 3, 4, ...
@@ -537,6 +541,9 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
     if (sectionData.name) {
       updatedArt.name = autoCapitalizeWords(sectionData.name.trim());
     }
+    if (sectionData.description) {
+      updatedArt.description = (sectionData.description || '').trim();
+    }
 
     const updatedList = articles.map((a) => (a.id === updatedArt.id ? updatedArt : a));
     const savedArticle = updatedArt;
@@ -695,14 +702,14 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
               </label>
               <input
                 type="text"
-                className="form-control"
+                className="form-control text-uppercase"
                 placeholder="e.g., Classic Kurta, Palazzo Pa"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                 style={{ height: '44px', borderRadius: '8px' }}
               />
-              <div className="form-text small text-muted">Auto-capitalised word by word</div>
+              <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
             </div>
             <div className="col-5">
               <label className="form-label fw-semibold text-dark mb-1.5" style={{ fontSize: '13.5px' }}>
@@ -1017,7 +1024,7 @@ export default function ArticleMasterView({ isInline = false, onSaveInline, onCl
                           value={sectionData.name || ''}
                           onChange={(e) => setSectionData({ ...sectionData, name: autoCapitalizeWords(e.target.value) })}
                         />
-                        <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                        <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                       </div>
                       <div>
                         <label className="form-label fw-semibold text-primary mb-1.5" style={{ fontSize: '14px' }}>

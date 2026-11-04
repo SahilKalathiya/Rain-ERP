@@ -3,7 +3,11 @@ import { initialSizeSeries, getStoredData, setStoredData } from '../../data/sale
 
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
-  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
 };
 
 export default function SizeMasterView() {
@@ -353,17 +357,18 @@ export default function SizeMasterView() {
     const finalObj = {
       ...seriesFormData,
       name: autoCapitalizeWords(seriesFormData.name.trim()),
-      sizes: cleanSizes.map((s) => s.sizeName.trim()),
+      sizes: cleanSizes.map((s) => autoCapitalizeWords(s.sizeName.trim())),
       sizeDetails: cleanSizes.map((s) => ({
-        size: s.sizeName.trim(),
+        size: autoCapitalizeWords(s.sizeName.trim()),
         label: autoCapitalizeWords((s.displayName || s.sizeName).trim())
       })),
       sizeRecords: cleanSizes.map((s, idx) => ({
         ...s,
         id: s.id || `SZ-${seriesFormData.id}-${String(idx + 1).padStart(2, '0')}`,
         seriesId: seriesFormData.id,
-        sizeName: s.sizeName.trim(),
-        displayName: (s.displayName || s.sizeName).trim()
+        sizeName: autoCapitalizeWords(s.sizeName.trim()),
+        displayName: autoCapitalizeWords((s.displayName || s.sizeName).trim()),
+        description: (s.description || '').trim()
       }))
     };
 
@@ -426,9 +431,9 @@ export default function SizeMasterView() {
     const newRecord = {
       id: `SZ-${activeSeriesForAddSize.id}-${String((activeSeriesForAddSize.sizeRecords || []).length + 1).padStart(2, '0')}`,
       seriesId: activeSeriesForAddSize.id,
-      sizeName: newSizeForm.sizeName.trim().toUpperCase(),
+      sizeName: autoCapitalizeWords(newSizeForm.sizeName.trim()).toUpperCase(),
       displayName: autoCapitalizeWords((newSizeForm.displayName || newSizeForm.sizeName).trim()),
-      description: newSizeForm.description.trim()
+      description: (newSizeForm.description || '').trim()
     };
 
     const updated = seriesList.map((s) => {
@@ -775,7 +780,7 @@ export default function SizeMasterView() {
                         value={seriesFormData.name}
                         onChange={(e) => setSeriesFormData({ ...seriesFormData, name: autoCapitalizeWords(e.target.value) })}
                       />
-                      <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                      <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label small fw-semibold text-muted">Active Status</label>
@@ -986,7 +991,7 @@ export default function SizeMasterView() {
                       value={newSizeForm.displayName}
                       onChange={(e) => setNewSizeForm({ ...newSizeForm, displayName: autoCapitalizeWords(e.target.value) })}
                     />
-                    <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                    <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                   </div>
 
                   <div className="mb-3">

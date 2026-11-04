@@ -48,7 +48,11 @@ export const getStoredArticlesList = () => {
 
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
-  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(text)
+    .toUpperCase()
+    .replace(/(\d+)\s*L\b/g, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
 };
 
 const ACCESSORY_CATEGORIES = [
@@ -166,7 +170,7 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
     if (disabled) return;
     const items = (val || '')
       .split(',')
-      .map((s) => s.trim())
+      .map((s) => autoCapitalizeWords(s.trim()))
       .filter(Boolean);
     if (!items.length) return;
     const newTags = [...tags];
@@ -276,7 +280,7 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
             value={inputValue}
             onFocus={() => setIsFocused(true)}
             onBlur={handleBlur}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => setInputValue(autoCapitalizeWords(e.target.value))}
             onKeyDown={handleKeyDown}
           />
         )}
@@ -1455,7 +1459,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             Duplicate name not allowed: An accessory named &quot;{formData.name.trim()}&quot; already exists.
                           </div>
                         ) : (
-                          <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                          <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                         )}
                       </div>
                       <div className="col-md-6">
@@ -1613,7 +1617,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               className="form-control"
                               placeholder="e.g. 2 inch, Medium, 5cm"
                               value={formData.size || ''}
-                              onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                              onChange={(e) => setFormData({ ...formData, size: autoCapitalizeWords(e.target.value) })}
                               style={{ height: '42px', borderRadius: '8px' }}
                             />
                           </div>
@@ -1651,7 +1655,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     onChange={(e) => {
                                       const next = [...(formData.jobWorkRows || [])];
                                       if (!next[i]) next[i] = { size: '', threadConsumption: '' };
-                                      next[i].size = e.target.value;
+                                      next[i].size = autoCapitalizeWords(e.target.value);
                                       setFormData({ ...formData, jobWorkRows: next });
                                     }}
                                   />
@@ -1891,7 +1895,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                                     onChange={(e) => {
                                                       const updatedBlocks = [...allBlocks];
                                                       const updatedPlacements = [...artBlock.placements];
-                                                      updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], placement: e.target.value };
+                                                      updatedPlacements[plIdx] = { ...updatedPlacements[plIdx], placement: autoCapitalizeWords(e.target.value) };
                                                       updatedBlocks[abIdx] = { ...updatedBlocks[abIdx], placements: updatedPlacements };
                                                       setFormData({ ...formData, articlePlacements: updatedBlocks });
                                                     }}
@@ -2523,7 +2527,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   value={r.size || ''}
                                   onChange={(e) => {
                                     const updated = [...elasticEntries];
-                                    updated[i] = { ...updated[i], size: e.target.value };
+                                    updated[i] = { ...updated[i], size: autoCapitalizeWords(e.target.value) };
                                     setFormData({ ...formData, fabricRows: updated });
                                   }}
                                   style={{ height: '36px', borderRadius: '6px' }}
@@ -2678,7 +2682,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   value={r.size || ''}
                                   onChange={(e) => {
                                     const updated = [...beadsEntries];
-                                    updated[i] = { ...updated[i], size: e.target.value };
+                                    updated[i] = { ...updated[i], size: autoCapitalizeWords(e.target.value) };
                                     setFormData({ ...formData, fabricRows: updated });
                                   }}
                                   style={{ height: '36px', borderRadius: '6px' }}
@@ -3238,7 +3242,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                   Duplicate name not allowed: An accessory named &quot;{sectionFormData.name.trim()}&quot; already exists.
                                 </div>
                               ) : (
-                                <div className="form-text small text-muted">Auto-capitalised word by word</div>
+                                <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                               )}
                             </div>
                             <div className="row g-2">
