@@ -1580,7 +1580,6 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -1731,7 +1730,6 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -1898,7 +1896,6 @@ export default function OrderDetailView({
                               onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                               style={inputStyle}
                             />
-                            <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                           </div>
                         ) : (
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -2084,7 +2081,6 @@ export default function OrderDetailView({
                             onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
                             style={inputStyle}
                           />
-                          <span className="text-muted" style={{ fontSize: '10px', marginTop: '2px' }}>max {defaultBuf}%</span>
                         </div>
                       ) : (
                         <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
@@ -2112,7 +2108,13 @@ export default function OrderDetailView({
   };
 
   // Edit mode vs Saved mode for Fabric Colour & Consumption table
-  const [isConsumptionEditing, setIsConsumptionEditing] = useState(false);
+  const [isConsumptionEditing, setIsConsumptionEditing] = useState(() => {
+    if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
+      const hasAnyFilled = order.fabricConsumptions.some(r => r.dyedRate && parseFloat(r.dyedRate) > 0);
+      return !hasAnyFilled;
+    }
+    return true;
+  });
 
   // Sourced directly from Fabric Master (Shrinkage % allowance per fabric quality)
   const getFabricMasterShrinkage = (fabricQuality) => {

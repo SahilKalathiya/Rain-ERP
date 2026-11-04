@@ -19,9 +19,9 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
       return stored.find((o) => o.id === editMatch[1]) || null;
     }
     const match = routeToCheck.match(/\/orders\/([^/]+)/);
-    if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit') {
+    if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit' && match[1] !== 'create') {
       const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
-      return stored.find((o) => o.id === match[1]) || stored.find((o) => o.id === 'RD-2610-0002') || stored[0] || null;
+      return stored.find((o) => o.id === match[1]) || null;
     }
     return null;
   });
@@ -62,19 +62,19 @@ export default function OrdersModule({ currentRoute, sidebarClickCount = 0, onNa
           setSelectedOrder(found);
         }
         setViewMode('create');
-      } else if (currentRoute === '/orders/new' || currentRoute === '/orders/create') {
+      } else if (currentRoute.includes('/orders/new') || currentRoute.includes('/orders/create')) {
         setSelectedOrder(null);
         setViewMode('create');
       } else {
         const match = currentRoute.match(/\/orders\/([^/]+)/);
-        if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit') {
+        if (match && match[1] && match[1] !== 'new' && match[1] !== 'edit' && match[1] !== 'create') {
           const stored = getStoredData('erp_sales_orders_v1', initialSalesOrders);
-          const found = stored.find((o) => o.id === match[1]) || stored[0];
+          const found = stored.find((o) => o.id === match[1]);
           if (found) {
             setSelectedOrder(found);
             setViewMode('detail');
           }
-        } else if (currentRoute === '/orders' || currentRoute === '/orders/' || currentRoute === '/sales') {
+        } else if (currentRoute === '/orders' || currentRoute === '/orders/' || currentRoute === '/sales' || currentRoute.endsWith('/orders')) {
           setSelectedOrder(null);
           setViewMode('list');
         }

@@ -468,11 +468,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         ]
       };
       setAddedArticles(prev => [...prev, newArticle]);
-      // Auto assign to existing customers
-      setOrderCustomers(prev => prev.map(c => ({
-        ...c,
-        assignedArticleIds: [...(c.assignedArticleIds || []), newArticle.id]
-      })));
+      // Do not auto-assign newly added article to existing customers; user manually chooses
     }
   };
 
@@ -561,7 +557,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       updated.push({
         id: `ORD-CUST-${Date.now()}-${updated.length + 1}`,
         customerId: '',
-        assignedArticleIds: addedArticles.map(a => a.id),
+        assignedArticleIds: [], // Start empty: do not auto-select articles
         selectedColors: [],
         sizeConfigs: {}
       });
@@ -595,8 +591,16 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
       const cur = c.assignedArticleIds || [];
-      const updated = cur.includes(artId) ? cur.filter(id => id !== artId) : [...cur, artId];
-      return { ...c, assignedArticleIds: updated };
+      const isAssigned = cur.includes(artId);
+      const updated = isAssigned ? cur.filter(id => id !== artId) : [...cur, artId];
+      let newSizeConfigs = { ...(c.sizeConfigs || {}) };
+      if (isAssigned) {
+        // If unassigning article, remove any configured size entries for this article
+        newSizeConfigs = Object.fromEntries(
+          Object.entries(newSizeConfigs).filter(([key]) => !key.startsWith(`${artId}_`))
+        );
+      }
+      return { ...c, assignedArticleIds: updated, sizeConfigs: newSizeConfigs };
     }));
   };
 
@@ -1106,20 +1110,6 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
   const grandTotalOrderPieces = useMemo(() => {
     return orderCustomers.reduce((acc, c) => acc + getCustomerTotalPieces(c), 0);
   }, [orderCustomers]);
-
-  // Colors list available for assigning to fabrics
-  const allAvailableColors = useMemo(() => {
-    const list = [];
-    orderCustomers.forEach(c => {
-      (c.selectedColors || []).forEach(col => {
-        if (!list.includes(col)) list.push(col);
-      });
-    });
-    masterColors.forEach(c => {
-      if (c.name && !list.includes(c.name)) list.push(c.name);
-    });
-    return list;
-  }, [orderCustomers, masterColors]);
 
   // =========================================================================
   // SECTION 12.5 FABRIC CONSUMPTION FORMULA (STRICT SPECIFICATION)
@@ -1775,7 +1765,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                         onBlur={(e) => updateFabricField(art.id, fi, 'role', autoCapitalizeWords((e.target.value || '').trim()))}
                       />
                     </div>
-                    <div className="col-12 col-md-5">
+                    <div className="col-12 col-md-8">
                       <label className="form-label small text-muted mb-1">Fabric Quality</label>
                       <div className="input-group input-group-sm">
                         <select
@@ -1805,19 +1795,6 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           <span>New Fabric</span>
                         </button>
                       </div>
-                    </div>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label small text-muted mb-1">Colour</label>
-                      <select
-                        className="form-select form-select-sm bg-white"
-                        value={fr.color || ''}
-                        onChange={(e) => updateFabricField(art.id, fi, 'color', e.target.value)}
-                      >
-                        <option value="">All Colours</option>
-                        {allAvailableColors.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
                     </div>
                     <div className="col-12 col-md-1 text-end pb-1">
                       <button

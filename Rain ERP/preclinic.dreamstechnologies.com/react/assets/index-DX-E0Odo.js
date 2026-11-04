@@ -18568,7 +18568,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
+            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, liveTotal, " PCS")));
           });
         }))));
       }
@@ -18609,7 +18609,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
+            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " m")));
           });
         }))));
       }
@@ -18649,7 +18649,7 @@
                 onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
                 style: inputStyle
               }
-            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+            )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
           });
         }))));
       }
@@ -18698,14 +18698,20 @@
               onChange: (e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, "bufferPct", e.target.value),
               style: inputStyle
             }
-          ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px", marginTop: "2px" } }, "max ", defaultBuf, "%")) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
+          )) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "d-block text-center text-dark", style: { fontSize: "13px" } }, bufferVal, "%")), /* @__PURE__ */ import_react5.default.createElement("td", { style: { textAlign: "center", minWidth: "95px", padding: "6px 8px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", fontSize: "12.5px", padding: "6px 12px", borderRadius: "6px" } }, totalVal, " PCS")));
         });
       }))));
     };
     const renderCategoryItemTable = (cat, item, isEditing = true) => {
       return renderCategoryCardTable(cat, item, getCardSelectedArticles(item), isEditing);
     };
-    const [isConsumptionEditing, setIsConsumptionEditing] = (0, import_react5.useState)(false);
+    const [isConsumptionEditing, setIsConsumptionEditing] = (0, import_react5.useState)(() => {
+      if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
+        const hasAnyFilled = order.fabricConsumptions.some((r) => r.dyedRate && parseFloat(r.dyedRate) > 0);
+        return !hasAnyFilled;
+      }
+      return true;
+    });
     const getFabricMasterShrinkage = (fabricQuality) => {
       let allFabrics = Array.isArray(masterFabricsList) && masterFabricsList.length > 0 ? [...masterFabricsList] : [];
       try {
@@ -25152,10 +25158,6 @@
           ]
         };
         setAddedArticles((prev) => [...prev, newArticle]);
-        setOrderCustomers((prev) => prev.map((c) => ({
-          ...c,
-          assignedArticleIds: [...c.assignedArticleIds || [], newArticle.id]
-        })));
       }
     };
     const removeArticle = (artId) => {
@@ -25236,7 +25238,8 @@
         updated.push({
           id: `ORD-CUST-${Date.now()}-${updated.length + 1}`,
           customerId: "",
-          assignedArticleIds: addedArticles.map((a) => a.id),
+          assignedArticleIds: [],
+          // Start empty: do not auto-select articles
           selectedColors: [],
           sizeConfigs: {}
         });
@@ -25264,8 +25267,15 @@
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
         const cur = c.assignedArticleIds || [];
-        const updated = cur.includes(artId) ? cur.filter((id) => id !== artId) : [...cur, artId];
-        return { ...c, assignedArticleIds: updated };
+        const isAssigned = cur.includes(artId);
+        const updated = isAssigned ? cur.filter((id) => id !== artId) : [...cur, artId];
+        let newSizeConfigs = { ...c.sizeConfigs || {} };
+        if (isAssigned) {
+          newSizeConfigs = Object.fromEntries(
+            Object.entries(newSizeConfigs).filter(([key]) => !key.startsWith(`${artId}_`))
+          );
+        }
+        return { ...c, assignedArticleIds: updated, sizeConfigs: newSizeConfigs };
       }));
     };
     const toggleCustomerColor = (cIdx, colorName) => {
@@ -25712,18 +25722,6 @@
     const grandTotalOrderPieces = (0, import_react10.useMemo)(() => {
       return orderCustomers.reduce((acc, c) => acc + getCustomerTotalPieces(c), 0);
     }, [orderCustomers]);
-    const allAvailableColors = (0, import_react10.useMemo)(() => {
-      const list = [];
-      orderCustomers.forEach((c) => {
-        (c.selectedColors || []).forEach((col) => {
-          if (!list.includes(col)) list.push(col);
-        });
-      });
-      masterColors.forEach((c) => {
-        if (c.name && !list.includes(c.name)) list.push(c.name);
-      });
-      return list;
-    }, [orderCustomers, masterColors]);
     const fabricConsumptionRows = (0, import_react10.useMemo)(() => {
       const rows = [];
       if (addedArticles.length === 0) return rows;
@@ -26205,7 +26203,7 @@
         onChange: (e) => updateFabricField(art.id, fi, "role", autoCapitalizeWords6(e.target.value)),
         onBlur: (e) => updateFabricField(art.id, fi, "role", autoCapitalizeWords6((e.target.value || "").trim()))
       }
-    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-5" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Fabric Quality"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react10.default.createElement(
+    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-8" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Fabric Quality"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react10.default.createElement(
       "select",
       {
         className: "form-select bg-white",
@@ -26229,16 +26227,7 @@
       },
       /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-plus fs-7" }),
       /* @__PURE__ */ import_react10.default.createElement("span", null, "New Fabric")
-    ))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Colour"), /* @__PURE__ */ import_react10.default.createElement(
-      "select",
-      {
-        className: "form-select form-select-sm bg-white",
-        value: fr.color || "",
-        onChange: (e) => updateFabricField(art.id, fi, "color", e.target.value)
-      },
-      /* @__PURE__ */ import_react10.default.createElement("option", { value: "" }, "All Colours"),
-      allAvailableColors.map((col) => /* @__PURE__ */ import_react10.default.createElement("option", { key: col, value: col }, col))
-    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-1 text-end pb-1" }, /* @__PURE__ */ import_react10.default.createElement(
+    ))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-1 text-end pb-1" }, /* @__PURE__ */ import_react10.default.createElement(
       "button",
       {
         type: "button",
@@ -27303,9 +27292,9 @@
         return stored.find((o) => o.id === editMatch[1]) || null;
       }
       const match = routeToCheck.match(/\/orders\/([^/]+)/);
-      if (match && match[1] && match[1] !== "new" && match[1] !== "edit") {
+      if (match && match[1] && match[1] !== "new" && match[1] !== "edit" && match[1] !== "create") {
         const stored = getStoredData("erp_sales_orders_v1", initialSalesOrders);
-        return stored.find((o) => o.id === match[1]) || stored.find((o) => o.id === "RD-2610-0002") || stored[0] || null;
+        return stored.find((o) => o.id === match[1]) || null;
       }
       return null;
     });
@@ -27340,19 +27329,19 @@
             setSelectedOrder(found);
           }
           setViewMode("create");
-        } else if (currentRoute === "/orders/new" || currentRoute === "/orders/create") {
+        } else if (currentRoute.includes("/orders/new") || currentRoute.includes("/orders/create")) {
           setSelectedOrder(null);
           setViewMode("create");
         } else {
           const match = currentRoute.match(/\/orders\/([^/]+)/);
-          if (match && match[1] && match[1] !== "new" && match[1] !== "edit") {
+          if (match && match[1] && match[1] !== "new" && match[1] !== "edit" && match[1] !== "create") {
             const stored = getStoredData("erp_sales_orders_v1", initialSalesOrders);
-            const found = stored.find((o) => o.id === match[1]) || stored[0];
+            const found = stored.find((o) => o.id === match[1]);
             if (found) {
               setSelectedOrder(found);
               setViewMode("detail");
             }
-          } else if (currentRoute === "/orders" || currentRoute === "/orders/" || currentRoute === "/sales") {
+          } else if (currentRoute === "/orders" || currentRoute === "/orders/" || currentRoute === "/sales" || currentRoute.endsWith("/orders")) {
             setSelectedOrder(null);
             setViewMode("list");
           }
