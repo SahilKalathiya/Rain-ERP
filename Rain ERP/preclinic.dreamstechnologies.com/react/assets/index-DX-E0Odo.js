@@ -28937,177 +28937,66 @@
   }
   var parseTasselTypes = (val) => {
     if (Array.isArray(val)) {
-      const cleaned = val.map((v) => typeof v === "string" ? v.trim() : v).filter(Boolean);
-      return cleaned.length > 0 ? cleaned : ["Ready Made"];
+      return val.map((v) => typeof v === "string" ? v.trim() : v).filter(Boolean);
     }
     if (typeof val === "string" && val.trim()) {
-      const list = val.split(",").map((s) => s.trim()).filter(Boolean);
-      return list.length > 0 ? list : ["Ready Made"];
+      return val.split(",").map((s) => s.trim()).filter(Boolean);
     }
-    return ["Ready Made"];
+    return [];
   };
   var hasTasselType = (val, type) => {
     const list = parseTasselTypes(val);
     return list.some((t) => t.toLowerCase() === (type || "").toLowerCase());
   };
   function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
-    const [isOpen, setIsOpen] = (0, import_react14.useState)(false);
-    const containerRef = (0, import_react14.useRef)(null);
     const selectedList = parseTasselTypes(value);
     const options = ["Ready Made", "Job Work"];
-    (0, import_react14.useEffect)(() => {
-      const handleOutsideClick = (e) => {
-        if (containerRef.current && !containerRef.current.contains(e.target)) {
-          setIsOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handleOutsideClick);
-      return () => document.removeEventListener("mousedown", handleOutsideClick);
-    }, []);
     const toggleOption = (opt) => {
+      if (disabled) return;
       let next;
       const isSelected = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
       if (isSelected) {
-        if (selectedList.length === 1) {
-          return;
-        }
         next = selectedList.filter((x) => x.toLowerCase() !== opt.toLowerCase());
       } else {
         next = [...selectedList, opt];
       }
       onChange?.(next);
     };
-    const selectAll = () => {
-      onChange?.([...options]);
-    };
-    return /* @__PURE__ */ import_react14.default.createElement("div", { ref: containerRef, className: "position-relative w-100" }, /* @__PURE__ */ import_react14.default.createElement(
-      "div",
-      {
-        className: "form-control d-flex align-items-center justify-content-between",
-        onClick: () => !disabled && setIsOpen((prev) => !prev),
-        style: {
-          minHeight: "42px",
-          height: "auto",
-          borderRadius: "8px",
-          cursor: disabled ? "not-allowed" : "pointer",
-          padding: "4px 10px",
-          borderColor: isOpen ? "#6366f1" : "#dee2e6",
-          boxShadow: isOpen ? "0 0 0 3px rgba(99, 102, 241, 0.15)" : "none",
-          backgroundColor: disabled ? "#f8fafc" : "#fff",
-          userSelect: "none"
-        }
-      },
-      /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-1", style: { flex: 1, minHeight: "30px" } }, selectedList.map((item) => {
-        const isJW = item.toLowerCase() === "job work";
-        return /* @__PURE__ */ import_react14.default.createElement(
-          "span",
-          {
-            key: item,
-            className: "badge d-inline-flex align-items-center gap-1",
-            style: {
-              backgroundColor: isJW ? "#fef3c7" : "#e0e7ff",
-              color: isJW ? "#92400e" : "#3730a3",
-              fontSize: "12px",
-              fontWeight: 600,
-              padding: "4px 8px",
-              borderRadius: "6px",
-              border: isJW ? "1px solid #fde68a" : "1px solid #c7d2fe"
-            },
-            onClick: (e) => {
-              e.stopPropagation();
-              toggleOption(item);
-            },
-            title: selectedList.length > 1 ? "Click to remove" : ""
-          },
-          item,
-          selectedList.length > 1 && /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-x", style: { fontSize: "11px", cursor: "pointer" } })
-        );
-      })),
-      /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted ms-2 d-flex align-items-center" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: `ti ti-chevron-${isOpen ? "up" : "down"}`, style: { fontSize: "13px" } }))
-    ), isOpen && /* @__PURE__ */ import_react14.default.createElement(
-      "div",
-      {
-        className: "position-absolute bg-white border rounded-3 shadow-lg p-2",
-        style: {
-          top: "calc(100% + 4px)",
-          left: 0,
-          right: 0,
-          zIndex: 1050,
-          minWidth: "220px"
-        }
-      },
-      /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex justify-content-between align-items-center px-2 py-1 mb-1 border-bottom" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "small text-muted fw-semibold", style: { fontSize: "11.5px" } }, "Select Multiple Types:"), /* @__PURE__ */ import_react14.default.createElement(
+    return /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, options.map((opt) => {
+      const isSelected = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
+      return /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
+          key: opt,
           type: "button",
-          className: "btn btn-xs btn-link text-decoration-none p-0 fw-semibold",
-          style: { fontSize: "11px", color: "#6366f1" },
-          onClick: (e) => {
-            e.stopPropagation();
-            selectAll();
+          disabled,
+          onClick: () => toggleOption(opt),
+          className: "btn btn-sm d-inline-flex align-items-center gap-2 fw-semibold shadow-none",
+          style: {
+            minHeight: "40px",
+            padding: "6px 14px",
+            borderRadius: "8px",
+            fontSize: "13px",
+            backgroundColor: isSelected ? "#e0e7ff" : "#ffffff",
+            color: isSelected ? "#3730a3" : "#475569",
+            border: isSelected ? "1.5px solid #6366f1" : "1.5px solid #cbd5e1",
+            cursor: disabled ? "not-allowed" : "pointer",
+            transition: "all 0.15s ease"
           }
         },
-        "Select Both"
-      )),
-      options.map((opt) => {
-        const isChecked = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
-        const isJW = opt.toLowerCase() === "job work";
-        return /* @__PURE__ */ import_react14.default.createElement(
-          "div",
+        /* @__PURE__ */ import_react14.default.createElement(
+          "i",
           {
-            key: opt,
-            className: "d-flex align-items-center justify-content-between px-2 py-2 rounded-2",
+            className: `ti ti-${isSelected ? "square-check-filled" : "square"}`,
             style: {
-              cursor: "pointer",
-              backgroundColor: isChecked ? "#f8fafc" : "transparent",
-              transition: "background 0.15s"
-            },
-            onClick: (e) => {
-              e.stopPropagation();
-              toggleOption(opt);
-            },
-            onMouseEnter: (e) => e.currentTarget.style.backgroundColor = "#f1f5f9",
-            onMouseLeave: (e) => e.currentTarget.style.backgroundColor = isChecked ? "#f8fafc" : "transparent"
-          },
-          /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react14.default.createElement(
-            "input",
-            {
-              type: "checkbox",
-              className: "form-check-input mt-0",
-              checked: isChecked,
-              readOnly: true,
-              style: { cursor: "pointer", width: "16px", height: "16px" }
+              fontSize: "16px",
+              color: isSelected ? "#4f46e5" : "#94a3b8"
             }
-          ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "small fw-semibold text-dark", style: { fontSize: "12.5px" } }, opt)),
-          isChecked && /* @__PURE__ */ import_react14.default.createElement(
-            "span",
-            {
-              className: "badge rounded-pill",
-              style: {
-                fontSize: "10px",
-                backgroundColor: isJW ? "#fef3c7" : "#e0e7ff",
-                color: isJW ? "#92400e" : "#3730a3",
-                border: isJW ? "1px solid #fde68a" : "1px solid #c7d2fe"
-              }
-            },
-            "Selected"
-          )
-        );
-      }),
-      /* @__PURE__ */ import_react14.default.createElement("div", { className: "mt-2 pt-1 border-top text-end" }, /* @__PURE__ */ import_react14.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-xs btn-primary rounded-2 px-3 py-1 fw-semibold",
-          style: { fontSize: "11.5px" },
-          onClick: (e) => {
-            e.stopPropagation();
-            setIsOpen(false);
           }
-        },
-        "Done"
-      ))
-    ));
+        ),
+        /* @__PURE__ */ import_react14.default.createElement("span", null, opt)
+      );
+    }));
   }
   function AccessoriesMasterView({ isInline = false, onSaveInline, onCloseInline }) {
     const [accessories, setAccessories] = (0, import_react14.useState)(() => getStoredAccessoriesMaster());
@@ -29311,8 +29200,9 @@
       defaultShrinkage: "",
       fabricPerMeterLace: "",
       // Tassels
-      tasselType: ["Ready Made"],
-      jobWorkRows: [{ size: "", threadConsumption: "" }],
+      tasselType: [],
+      tasselSizesList: [],
+      jobWorkRows: [],
       // Dori (Section 6.4)
       doriRequiredSize: "",
       doriUnit: "Meter",
@@ -29510,7 +29400,8 @@
         threadPerPiece: acc.threadPerPiece !== void 0 && acc.threadPerPiece !== "" ? acc.threadPerPiece : "",
         processRemarks: acc.processRemarks || "",
         tasselType: parseTasselTypes(acc.tasselType),
-        jobWorkRows: acc.jobWorkRows && acc.jobWorkRows.length > 0 ? acc.jobWorkRows : [{ size: "", threadConsumption: "" }],
+        tasselSizesList: acc.tasselSizesList?.length ? acc.tasselSizesList : acc.tasselSizes ? acc.tasselSizes.split(",").map((s) => s.trim()).filter(Boolean) : acc.sizes?.length ? acc.sizes : acc.size ? acc.size.split(",").map((s) => s.trim()).filter(Boolean) : acc.jobWorkRows?.length ? acc.jobWorkRows.map((r) => r.size).filter(Boolean) : [],
+        jobWorkRows: acc.jobWorkRows && acc.jobWorkRows.length > 0 ? acc.jobWorkRows : [],
         doriRequiredSize: acc.doriRequiredSize || acc.requiredSize || acc.size || "",
         doriUnit: acc.doriUnit || acc.unit || "Meter",
         doriFabricEntries: acc.doriFabricEntries && acc.doriFabricEntries.length > 0 ? acc.doriFabricEntries : acc.category === "Dori" && acc.fabricEntries && acc.fabricEntries.length > 0 ? acc.fabricEntries : [{ fabricQuality: "", widthSizes: [], consumptions: {} }],
@@ -29563,7 +29454,10 @@
         unit: formData.unit === "Other" && formData.unitCustom ? formData.unitCustom : formData.unit || (formData.category === "Beads & Sequins" ? "Gram" : ["Elastic", "Dori", "Thread", "Lace", "Laces"].includes(formData.category) ? "Meter" : "Piece"),
         piecesPerUnit: ["Lace", "Laces", "Button", "Buttons", "Tassel", "Tassels", "Thread", "Dori", "Elastic", "Beads & Sequins"].includes(formData.category) ? void 0 : parseInt(formData.piecesPerUnit, 10) || 1,
         threadPattern: formData.category === "Thread" ? formData.threadPattern || "Stitching" : "",
-        tasselType: formData.category === "Tassel" || formData.category === "Tassels" ? Array.isArray(formData.tasselType) ? formData.tasselType.join(", ") : formData.tasselType || "Ready Made" : "",
+        tasselType: formData.category === "Tassel" || formData.category === "Tassels" ? Array.isArray(formData.tasselType) ? formData.tasselType.join(", ") : formData.tasselType || "" : "",
+        tasselSizesList: formData.category === "Tassel" || formData.category === "Tassels" ? formData.tasselSizesList || [] : [],
+        size: formData.category === "Tassel" || formData.category === "Tassels" ? (formData.tasselSizesList || []).join(", ") || formData.size || "" : formData.size,
+        sizes: formData.category === "Tassel" || formData.category === "Tassels" ? formData.tasselSizesList || [] : formData.sizes || [],
         jobWorkRows: formData.category === "Tassel" || formData.category === "Tassels" ? formData.jobWorkRows || [] : [],
         metersPerMeterStitching: formData.metersPerMeterStitching !== void 0 && formData.metersPerMeterStitching !== "" ? formData.metersPerMeterStitching : "",
         threadPerPiece: formData.category === "Thread" && formData.threadPattern === "Stitching" ? formData.consumptionPerPiece?.[(formData.stitchingArticles || [])[0]] || formData.threadPerPiece || "" : formData.threadPerPiece !== void 0 && formData.threadPerPiece !== "" ? parseFloat(formData.threadPerPiece) || 0 : "",
@@ -29608,7 +29502,10 @@
       const updated = {
         ...selectedAccessory,
         ...sectionFormData,
-        tasselType: selectedAccessory.category === "Tassel" || selectedAccessory.category === "Tassels" ? Array.isArray(sectionFormData.tasselType) ? sectionFormData.tasselType.join(", ") : sectionFormData.tasselType || selectedAccessory.tasselType || "Ready Made" : selectedAccessory.tasselType || "",
+        tasselType: selectedAccessory.category === "Tassel" || selectedAccessory.category === "Tassels" ? Array.isArray(sectionFormData.tasselType) ? sectionFormData.tasselType.join(", ") : sectionFormData.tasselType || selectedAccessory.tasselType || "" : selectedAccessory.tasselType || "",
+        tasselSizesList: selectedAccessory.category === "Tassel" || selectedAccessory.category === "Tassels" ? sectionFormData.tasselSizesList || selectedAccessory.tasselSizesList || [] : selectedAccessory.tasselSizesList || [],
+        size: selectedAccessory.category === "Tassel" || selectedAccessory.category === "Tassels" ? (sectionFormData.tasselSizesList || []).join(", ") || sectionFormData.size || selectedAccessory.size || "" : sectionFormData.size || selectedAccessory.size || "",
+        jobWorkRows: selectedAccessory.category === "Tassel" || selectedAccessory.category === "Tassels" ? sectionFormData.jobWorkRows || selectedAccessory.jobWorkRows || [] : selectedAccessory.jobWorkRows || [],
         buttonSizes: sectionFormData.buttonSizesList ? sectionFormData.buttonSizesList.join(", ") : selectedAccessory.buttonSizes,
         buttonColors: sectionFormData.buttonColorsList ? sectionFormData.buttonColorsList.join(", ") : selectedAccessory.buttonColors,
         buttonSizesList: sectionFormData.buttonSizesList || selectedAccessory.buttonSizesList || [],
@@ -29945,7 +29842,13 @@
           onChange: (e) => setFormData({ ...formData, defaultShrinkage: e.target.value }),
           style: { height: "42px", borderRadius: "8px" }
         }
-      )))), (formData.category === "Tassel" || formData.category === "Tassels") && /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-2 mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-12" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
+      )))), (formData.category === "Tassel" || formData.category === "Tassels") && /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-3 mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-7" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Tassel Type ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
+        TasselTypeMultiSelect,
+        {
+          value: formData.tasselType || [],
+          onChange: (val) => setFormData({ ...formData, tasselType: val })
+        }
+      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Unit"), /* @__PURE__ */ import_react14.default.createElement(
         "select",
         {
           className: "form-select",
@@ -29954,78 +29857,99 @@
           style: { height: "42px", borderRadius: "8px" }
         },
         ACCESSORY_UNITS.map((u) => /* @__PURE__ */ import_react14.default.createElement("option", { key: u, value: u }, u))
-      ))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "row g-2 mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Tassel Type ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
-        TasselTypeMultiSelect,
+      ))), hasTasselType(formData.tasselType, "Ready Made") && /* @__PURE__ */ import_react14.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement(
+        TagInput,
         {
-          value: formData.tasselType || ["Ready Made"],
-          onChange: (val) => setFormData({ ...formData, tasselType: val })
-        }
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Size / Length"), /* @__PURE__ */ import_react14.default.createElement(
-        "input",
-        {
-          type: "text",
-          className: "form-control",
-          placeholder: "e.g. 2 inch, Medium, 5cm",
-          value: formData.size || "",
-          onChange: (e) => setFormData({ ...formData, size: autoCapitalizeWords8(e.target.value) }),
-          style: { height: "42px", borderRadius: "8px" }
-        }
-      ))), hasTasselType(formData.tasselType, "Job Work") && /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-3 bg-light rounded-3 border mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fw-semibold text-dark small" }, "Size & Thread Consumption:"), /* @__PURE__ */ import_react14.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-xs btn-outline-primary rounded-2 px-2 py-1 small fw-semibold",
-          onClick: () => {
-            const cur = formData.jobWorkRows || [];
+          label: "Size / Length (Enter Multiple Sizes)",
+          placeholder: "Type a size (e.g. 2 INCH, 3 INCH, MEDIUM) and press Enter",
+          tags: formData.tasselSizesList?.length ? formData.tasselSizesList : formData.size ? formData.size.split(",").map((s) => s.trim()).filter(Boolean) : [],
+          onChange: (newTags) => {
+            const existingRows = formData.jobWorkRows || [];
+            const updatedRows = newTags.map((sz) => {
+              const found = existingRows.find((r) => (r.size || "").trim().toLowerCase() === sz.trim().toLowerCase());
+              return found ? found : { size: sz, threadConsumption: "" };
+            });
             setFormData({
               ...formData,
-              jobWorkRows: [...cur, { size: "", threadConsumption: "" }]
+              tasselSizesList: newTags,
+              size: newTags.join(", "),
+              sizes: newTags,
+              jobWorkRows: updatedRows
             });
           }
-        },
-        /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-plus me-1" }),
-        " Add Size Row"
-      )), (formData.jobWorkRows && formData.jobWorkRows.length > 0 ? formData.jobWorkRows : [{ size: "", threadConsumption: "" }]).map((r, i) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-center mb-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted fs-11 mb-1" }, "Size / Length"), /* @__PURE__ */ import_react14.default.createElement(
-        "input",
-        {
-          type: "text",
-          className: "form-control form-control-sm bg-white",
-          placeholder: "e.g. 2 inch / Medium",
-          value: r.size || "",
-          onChange: (e) => {
-            const next = [...formData.jobWorkRows || []];
-            if (!next[i]) next[i] = { size: "", threadConsumption: "" };
-            next[i].size = autoCapitalizeWords8(e.target.value);
-            setFormData({ ...formData, jobWorkRows: next });
-          }
         }
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted fs-11 mb-1" }, "Thread Consumption"), /* @__PURE__ */ import_react14.default.createElement(
-        "input",
-        {
-          type: "text",
-          className: "form-control form-control-sm bg-white",
-          placeholder: "e.g. 15m / pc",
-          value: r.threadConsumption || "",
-          onChange: (e) => {
-            const next = [...formData.jobWorkRows || []];
-            if (!next[i]) next[i] = { size: "", threadConsumption: "" };
-            next[i].threadConsumption = e.target.value;
-            setFormData({ ...formData, jobWorkRows: next });
-          }
-        }
-      )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-2 text-end pt-3" }, (formData.jobWorkRows || []).length > 1 && /* @__PURE__ */ import_react14.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-sm btn-light text-danger p-1",
-          onClick: () => {
-            const next = (formData.jobWorkRows || []).filter((_, idx) => idx !== i);
-            setFormData({ ...formData, jobWorkRows: next });
+      ), /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text small text-muted", style: { marginTop: "-8px", fontSize: "11.5px" } }, "Type size and press ", /* @__PURE__ */ import_react14.default.createElement("kbd", null, "Enter"), " or comma. Multiple sizes supported.")), hasTasselType(formData.tasselType, "Job Work") && (() => {
+        const isBoth = hasTasselType(formData.tasselType, "Ready Made");
+        const rows = formData.jobWorkRows && formData.jobWorkRows.length > 0 ? formData.jobWorkRows : [{ size: "", threadConsumption: "" }];
+        return /* @__PURE__ */ import_react14.default.createElement("div", { className: "p-3 bg-light rounded-3 border mb-3" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fw-semibold text-dark small d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-needle-thread text-primary" }), "Job Work - Size & Thread Consumption:"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted fs-11 mt-0.5" }, isBoth ? "Unified: Sizes entered above automatically map here for Thread Consumption." : "Thread consumption required per piece for each size.")), /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-xs btn-outline-primary rounded-2 px-2 py-1 small fw-semibold",
+            onClick: () => {
+              setFormData({
+                ...formData,
+                jobWorkRows: [...rows, { size: "", threadConsumption: "" }]
+              });
+            }
           },
-          title: "Remove row"
-        },
-        /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-trash fs-6" })
-      )))))), formData.category === "Thread" && (() => {
+          /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-plus me-1" }),
+          " Add Size Row"
+        )), rows.map((r, i) => /* @__PURE__ */ import_react14.default.createElement("div", { key: i, className: "row g-2 align-items-center mb-2" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted fs-11 mb-1" }, "Size / Length"), /* @__PURE__ */ import_react14.default.createElement(
+          "input",
+          {
+            type: "text",
+            className: "form-control form-control-sm bg-white",
+            placeholder: "e.g. 2 INCH / MEDIUM",
+            value: r.size || "",
+            onChange: (e) => {
+              const val = autoCapitalizeWords8(e.target.value);
+              const nextRows = [...rows];
+              nextRows[i] = { ...nextRows[i] || {}, size: val };
+              const validSizes = nextRows.map((row) => (row.size || "").trim()).filter(Boolean);
+              setFormData({
+                ...formData,
+                jobWorkRows: nextRows,
+                tasselSizesList: validSizes,
+                size: validSizes.join(", "),
+                sizes: validSizes
+              });
+            }
+          }
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label text-muted fs-11 mb-1" }, "Thread Consumption"), /* @__PURE__ */ import_react14.default.createElement(
+          "input",
+          {
+            type: "text",
+            className: "form-control form-control-sm bg-white",
+            placeholder: "e.g. 15m / pc",
+            value: r.threadConsumption || "",
+            onChange: (e) => {
+              const nextRows = [...rows];
+              nextRows[i] = { ...nextRows[i] || {}, threadConsumption: e.target.value };
+              setFormData({ ...formData, jobWorkRows: nextRows });
+            }
+          }
+        )), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-2 text-end pt-3" }, rows.length > 1 && /* @__PURE__ */ import_react14.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-light text-danger p-1",
+            onClick: () => {
+              const nextRows = rows.filter((_, idx) => idx !== i);
+              const validSizes = nextRows.map((row) => (row.size || "").trim()).filter(Boolean);
+              setFormData({
+                ...formData,
+                jobWorkRows: nextRows,
+                tasselSizesList: validSizes,
+                size: validSizes.join(", "),
+                sizes: validSizes
+              });
+            },
+            title: "Remove row"
+          },
+          /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-trash fs-6" })
+        )))));
+      })(), !hasTasselType(formData.tasselType, "Ready Made") && !hasTasselType(formData.tasselType, "Job Work") && /* @__PURE__ */ import_react14.default.createElement("div", { className: "text-muted small p-3 text-center bg-light rounded-3 border border-dashed mb-3" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-info-circle me-1 text-primary" }), "Please select ", /* @__PURE__ */ import_react14.default.createElement("strong", null, "Ready Made"), ", ", /* @__PURE__ */ import_react14.default.createElement("strong", null, "Job Work"), ", or both to configure specifications.")), formData.category === "Thread" && (() => {
         const isKanthaCouching = formData.threadPattern === "Kantha" || formData.threadPattern === "Couching";
         const isStitching = formData.threadPattern === "Stitching";
         const isProcessOnly = formData.threadPattern === "Button Tacking" || formData.threadPattern === "Handwork";
@@ -39733,7 +39657,7 @@
         "th",
         {
           className: "text-center",
-          style: { padding: "12px 16px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "110px" }
+          style: { padding: "12px 16px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", minWidth: "130px", width: "130px", whiteSpace: "nowrap" }
         },
         "ACTION"
       ))
@@ -39754,35 +39678,36 @@
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "text-secondary" }, d.width ? `${String(d.width).replace(/"/g, "")}"` : '42"', " \xB7 ", d.color || "Raw / Greige")),
         /* @__PURE__ */ import_react25.default.createElement("td", null, /* @__PURE__ */ import_react25.default.createElement("span", { className: "fw-medium text-dark" }, Number(d.qty).toLocaleString(), "m")),
         /* @__PURE__ */ import_react25.default.createElement("td", null, d.status === "OK" || d.status === "Approved" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "OK") : d.status === "Partial OK" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Partial OK") : d.status === "Send for Admin Approval" || d.status === "Admin Approval" || d.status === "Pending Admin Approval" ? qc.adminDecision ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success border-opacity-25 px-2.5 py-1 fs-11 rounded-pill fw-semibold" }, "Approved by Admin") : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Admin Approval") : d.status === "Reject" || d.status === "Rejected" ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-2.5 py-1 fs-11 rounded-pill" }, "Rejected") : isPending && !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning px-2.5 py-1 fs-11 rounded-pill fw-medium d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-alert-triangle text-warning" }), /* @__PURE__ */ import_react25.default.createElement("span", null, "Incomplete Bales")) : /* @__PURE__ */ import_react25.default.createElement("span", { className: "badge px-3 py-1 fs-11 rounded-pill", style: { backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" } }, "Pending")),
-        /* @__PURE__ */ import_react25.default.createElement("td", { className: "text-center", onClick: (e) => e.stopPropagation() }, isPending ? !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement(
+        /* @__PURE__ */ import_react25.default.createElement("td", { className: "text-center text-nowrap", style: { whiteSpace: "nowrap", width: "130px", minWidth: "130px" }, onClick: (e) => e.stopPropagation() }, isPending ? !d.isBaleEntriesComplete ? /* @__PURE__ */ import_react25.default.createElement(
           "button",
           {
             type: "button",
-            className: "btn btn-sm btn-outline-secondary px-3 py-1.5 rounded-2 fs-12 fw-semibold opacity-75 shadow-xs d-inline-flex align-items-center gap-1",
+            className: "btn btn-sm btn-outline-secondary px-2.5 py-1.5 rounded-2 fs-12 fw-semibold opacity-75 shadow-xs d-inline-flex align-items-center justify-content-center gap-1 text-nowrap",
+            style: { whiteSpace: "nowrap", minWidth: "88px", height: "32px", lineHeight: 1 },
             onClick: () => alert(`QC cannot proceed: Total quantity in GRN (${d.declaredQty}m) has incomplete bale entries (${d.baleTotalMeters}m). Please complete all bale entries in GRN before starting QC.`),
             title: `Cannot proceed to QC: Bale entries incomplete (${d.baleTotalMeters}m of ${d.declaredQty}m entered)`
           },
           /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-lock fs-11 text-muted" }),
-          /* @__PURE__ */ import_react25.default.createElement("span", null, "Run QC (Incomplete)")
+          /* @__PURE__ */ import_react25.default.createElement("span", { style: { whiteSpace: "nowrap" } }, "Run QC")
         ) : /* @__PURE__ */ import_react25.default.createElement(
           "button",
           {
             type: "button",
-            className: "btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-sm d-inline-flex align-items-center gap-1",
-            style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb" },
+            className: "btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-xs d-inline-flex align-items-center justify-content-center gap-1.5 text-nowrap",
+            style: { backgroundColor: "#5b47fb", borderColor: "#5b47fb", whiteSpace: "nowrap", minWidth: "88px", height: "32px", lineHeight: 1 },
             onClick: () => onSelectQC && onSelectQC(qc)
           },
-          /* @__PURE__ */ import_react25.default.createElement("span", null, "Run QC"),
-          /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-chevron-right fs-11" })
+          /* @__PURE__ */ import_react25.default.createElement("span", { style: { whiteSpace: "nowrap" } }, "Run QC"),
+          /* @__PURE__ */ import_react25.default.createElement("i", { className: "ti ti-chevron-right fs-11", style: { marginTop: "1px" } })
         ) : /* @__PURE__ */ import_react25.default.createElement(
           "button",
           {
             type: "button",
-            className: "btn btn-sm btn-white border px-3 py-1.5 rounded-2 fs-12 fw-medium text-secondary shadow-sm",
-            style: { backgroundColor: "#ffffff", borderColor: "#cbd5e1", color: "#475569" },
+            className: "btn btn-sm btn-white border px-3 py-1.5 rounded-2 fs-12 fw-medium text-secondary shadow-xs text-nowrap d-inline-flex align-items-center justify-content-center",
+            style: { backgroundColor: "#ffffff", borderColor: "#cbd5e1", color: "#475569", whiteSpace: "nowrap", minWidth: "88px", height: "32px", lineHeight: 1 },
             onClick: () => onSelectQC && onSelectQC(qc)
           },
-          "View"
+          /* @__PURE__ */ import_react25.default.createElement("span", { style: { whiteSpace: "nowrap" } }, "View")
         ))
       );
     }))))));

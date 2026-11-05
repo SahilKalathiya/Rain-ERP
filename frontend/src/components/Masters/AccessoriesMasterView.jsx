@@ -291,14 +291,12 @@ function TagInput({ label, tags = [], onChange, placeholder = 'Type a value, pre
 
 export const parseTasselTypes = (val) => {
   if (Array.isArray(val)) {
-    const cleaned = val.map((v) => (typeof v === 'string' ? v.trim() : v)).filter(Boolean);
-    return cleaned.length > 0 ? cleaned : ['Ready Made'];
+    return val.map((v) => (typeof v === 'string' ? v.trim() : v)).filter(Boolean);
   }
   if (typeof val === 'string' && val.trim()) {
-    const list = val.split(',').map((s) => s.trim()).filter(Boolean);
-    return list.length > 0 ? list : ['Ready Made'];
+    return val.split(',').map((s) => s.trim()).filter(Boolean);
   }
-  return ['Ready Made'];
+  return [];
 };
 
 export const hasTasselType = (val, type) => {
@@ -307,30 +305,14 @@ export const hasTasselType = (val, type) => {
 };
 
 export function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
-
   const selectedList = parseTasselTypes(value);
   const options = ['Ready Made', 'Job Work'];
 
-  useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
-
   const toggleOption = (opt) => {
+    if (disabled) return;
     let next;
     const isSelected = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
     if (isSelected) {
-      if (selectedList.length === 1) {
-        // Keep at least one selected
-        return;
-      }
       next = selectedList.filter((x) => x.toLowerCase() !== opt.toLowerCase());
     } else {
       next = [...selectedList, opt];
@@ -338,151 +320,40 @@ export function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
     onChange?.(next);
   };
 
-  const selectAll = () => {
-    onChange?.([...options]);
-  };
-
   return (
-    <div ref={containerRef} className="position-relative w-100">
-      <div
-        className="form-control d-flex align-items-center justify-content-between"
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        style={{
-          minHeight: '42px',
-          height: 'auto',
-          borderRadius: '8px',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          padding: '4px 10px',
-          borderColor: isOpen ? '#6366f1' : '#dee2e6',
-          boxShadow: isOpen ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
-          backgroundColor: disabled ? '#f8fafc' : '#fff',
-          userSelect: 'none'
-        }}
-      >
-        <div className="d-flex align-items-center flex-wrap gap-1" style={{ flex: 1, minHeight: '30px' }}>
-          {selectedList.map((item) => {
-            const isJW = item.toLowerCase() === 'job work';
-            return (
-              <span
-                key={item}
-                className="badge d-inline-flex align-items-center gap-1"
-                style={{
-                  backgroundColor: isJW ? '#fef3c7' : '#e0e7ff',
-                  color: isJW ? '#92400e' : '#3730a3',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: isJW ? '1px solid #fde68a' : '1px solid #c7d2fe'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleOption(item);
-                }}
-                title={selectedList.length > 1 ? 'Click to remove' : ''}
-              >
-                {item}
-                {selectedList.length > 1 && (
-                  <i className="ti ti-x" style={{ fontSize: '11px', cursor: 'pointer' }}></i>
-                )}
-              </span>
-            );
-          })}
-        </div>
-        <div className="text-muted ms-2 d-flex align-items-center">
-          <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'}`} style={{ fontSize: '13px' }}></i>
-        </div>
-      </div>
-
-      {isOpen && (
-        <div
-          className="position-absolute bg-white border rounded-3 shadow-lg p-2"
-          style={{
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 1050,
-            minWidth: '220px'
-          }}
-        >
-          <div className="d-flex justify-content-between align-items-center px-2 py-1 mb-1 border-bottom">
-            <span className="small text-muted fw-semibold" style={{ fontSize: '11.5px' }}>
-              Select Multiple Types:
-            </span>
-            <button
-              type="button"
-              className="btn btn-xs btn-link text-decoration-none p-0 fw-semibold"
-              style={{ fontSize: '11px', color: '#6366f1' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                selectAll();
+    <div className="d-flex align-items-center gap-2 flex-wrap">
+      {options.map((opt) => {
+        const isSelected = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
+        return (
+          <button
+            key={opt}
+            type="button"
+            disabled={disabled}
+            onClick={() => toggleOption(opt)}
+            className="btn btn-sm d-inline-flex align-items-center gap-2 fw-semibold shadow-none"
+            style={{
+              minHeight: '40px',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              backgroundColor: isSelected ? '#e0e7ff' : '#ffffff',
+              color: isSelected ? '#3730a3' : '#475569',
+              border: isSelected ? '1.5px solid #6366f1' : '1.5px solid #cbd5e1',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <i
+              className={`ti ti-${isSelected ? 'square-check-filled' : 'square'}`}
+              style={{
+                fontSize: '16px',
+                color: isSelected ? '#4f46e5' : '#94a3b8'
               }}
-            >
-              Select Both
-            </button>
-          </div>
-          {options.map((opt) => {
-            const isChecked = selectedList.some((s) => s.toLowerCase() === opt.toLowerCase());
-            const isJW = opt.toLowerCase() === 'job work';
-            return (
-              <div
-                key={opt}
-                className="d-flex align-items-center justify-content-between px-2 py-2 rounded-2"
-                style={{
-                  cursor: 'pointer',
-                  backgroundColor: isChecked ? '#f8fafc' : 'transparent',
-                  transition: 'background 0.15s'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleOption(opt);
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isChecked ? '#f8fafc' : 'transparent')}
-              >
-                <div className="d-flex align-items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="form-check-input mt-0"
-                    checked={isChecked}
-                    readOnly
-                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                  />
-                  <span className="small fw-semibold text-dark" style={{ fontSize: '12.5px' }}>
-                    {opt}
-                  </span>
-                </div>
-                {isChecked && (
-                  <span
-                    className="badge rounded-pill"
-                    style={{
-                      fontSize: '10px',
-                      backgroundColor: isJW ? '#fef3c7' : '#e0e7ff',
-                      color: isJW ? '#92400e' : '#3730a3',
-                      border: isJW ? '1px solid #fde68a' : '1px solid #c7d2fe'
-                    }}
-                  >
-                    Selected
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          <div className="mt-2 pt-1 border-top text-end">
-            <button
-              type="button"
-              className="btn btn-xs btn-primary rounded-2 px-3 py-1 fw-semibold"
-              style={{ fontSize: '11.5px' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(false);
-              }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+            ></i>
+            <span>{opt}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -716,8 +587,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     fabricPerMeterLace: '',
 
     // Tassels
-    tasselType: ['Ready Made'],
-    jobWorkRows: [{ size: '', threadConsumption: '' }],
+    tasselType: [],
+    tasselSizesList: [],
+    jobWorkRows: [],
 
     // Dori (Section 6.4)
     doriRequiredSize: '',
@@ -974,9 +846,12 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       threadPerPiece: acc.threadPerPiece !== undefined && acc.threadPerPiece !== '' ? acc.threadPerPiece : '',
       processRemarks: acc.processRemarks || '',
       tasselType: parseTasselTypes(acc.tasselType),
+      tasselSizesList: acc.tasselSizesList?.length
+        ? acc.tasselSizesList
+        : (acc.tasselSizes ? acc.tasselSizes.split(',').map(s => s.trim()).filter(Boolean) : (acc.sizes?.length ? acc.sizes : (acc.size ? acc.size.split(',').map(s => s.trim()).filter(Boolean) : (acc.jobWorkRows?.length ? acc.jobWorkRows.map(r => r.size).filter(Boolean) : [])))),
       jobWorkRows: (acc.jobWorkRows && acc.jobWorkRows.length > 0)
         ? acc.jobWorkRows
-        : [{ size: '', threadConsumption: '' }],
+        : [],
       doriRequiredSize: acc.doriRequiredSize || acc.requiredSize || acc.size || '',
       doriUnit: acc.doriUnit || acc.unit || 'Meter',
       doriFabricEntries: (acc.doriFabricEntries && acc.doriFabricEntries.length > 0)
@@ -1048,8 +923,15 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(formData.category) ? undefined : (parseInt(formData.piecesPerUnit, 10) || 1),
       threadPattern: (formData.category === 'Thread') ? (formData.threadPattern || 'Stitching') : '',
       tasselType: (formData.category === 'Tassel' || formData.category === 'Tassels')
-        ? (Array.isArray(formData.tasselType) ? formData.tasselType.join(', ') : (formData.tasselType || 'Ready Made'))
+        ? (Array.isArray(formData.tasselType) ? formData.tasselType.join(', ') : (formData.tasselType || ''))
         : '',
+      tasselSizesList: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.tasselSizesList || []) : [],
+      size: (formData.category === 'Tassel' || formData.category === 'Tassels')
+        ? ((formData.tasselSizesList || []).join(', ') || formData.size || '')
+        : formData.size,
+      sizes: (formData.category === 'Tassel' || formData.category === 'Tassels')
+        ? (formData.tasselSizesList || [])
+        : (formData.sizes || []),
       jobWorkRows: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.jobWorkRows || []) : [],
       metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? formData.metersPerMeterStitching : '',
       threadPerPiece: (formData.category === 'Thread' && formData.threadPattern === 'Stitching')
@@ -1115,8 +997,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       tasselType: (selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels')
         ? (Array.isArray(sectionFormData.tasselType)
           ? sectionFormData.tasselType.join(', ')
-          : (sectionFormData.tasselType || selectedAccessory.tasselType || 'Ready Made'))
+          : (sectionFormData.tasselType || selectedAccessory.tasselType || ''))
         : (selectedAccessory.tasselType || ''),
+      tasselSizesList: (selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels')
+        ? (sectionFormData.tasselSizesList || selectedAccessory.tasselSizesList || [])
+        : (selectedAccessory.tasselSizesList || []),
+      size: (selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels')
+        ? ((sectionFormData.tasselSizesList || []).join(', ') || sectionFormData.size || selectedAccessory.size || '')
+        : (sectionFormData.size || selectedAccessory.size || ''),
+      jobWorkRows: (selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels')
+        ? (sectionFormData.jobWorkRows || selectedAccessory.jobWorkRows || [])
+        : (selectedAccessory.jobWorkRows || []),
       buttonSizes: sectionFormData.buttonSizesList ? sectionFormData.buttonSizesList.join(', ') : selectedAccessory.buttonSizes,
       buttonColors: sectionFormData.buttonColorsList ? sectionFormData.buttonColorsList.join(', ') : selectedAccessory.buttonColors,
       buttonSizesList: sectionFormData.buttonSizesList || selectedAccessory.buttonSizesList || [],
@@ -1584,8 +1475,17 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     {/* ============================================================== */}
                     {(formData.category === 'Tassel' || formData.category === 'Tassels') && (
                       <>
-                        <div className="row g-2 mb-3">
-                          <div className="col-12">
+                        <div className="row g-3 mb-3">
+                          <div className="col-md-7">
+                            <label className="form-label fw-semibold text-dark small mb-1.5">
+                              Tassel Type <span className="text-danger">*</span>
+                            </label>
+                            <TasselTypeMultiSelect
+                              value={formData.tasselType || []}
+                              onChange={(val) => setFormData({ ...formData, tasselType: val })}
+                            />
+                          </div>
+                          <div className="col-md-5">
                             <label className="form-label fw-semibold text-dark small mb-1.5">Unit</label>
                             <select
                               className="form-select"
@@ -1600,98 +1500,138 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           </div>
                         </div>
 
-                        <div className="row g-2 mb-3">
-                          <div className="col-md-6">
-                            <label className="form-label fw-semibold text-dark small mb-1.5">
-                              Tassel Type <span className="text-danger">*</span>
-                            </label>
-                            <TasselTypeMultiSelect
-                              value={formData.tasselType || ['Ready Made']}
-                              onChange={(val) => setFormData({ ...formData, tasselType: val })}
+                        {hasTasselType(formData.tasselType, 'Ready Made') && (
+                          <div className="mb-3">
+                            <TagInput
+                              label="Size / Length (Enter Multiple Sizes)"
+                              placeholder="Type a size (e.g. 2 INCH, 3 INCH, MEDIUM) and press Enter"
+                              tags={formData.tasselSizesList?.length ? formData.tasselSizesList : (formData.size ? formData.size.split(',').map(s => s.trim()).filter(Boolean) : [])}
+                              onChange={(newTags) => {
+                                const existingRows = formData.jobWorkRows || [];
+                                const updatedRows = newTags.map((sz) => {
+                                  const found = existingRows.find((r) => (r.size || '').trim().toLowerCase() === sz.trim().toLowerCase());
+                                  return found ? found : { size: sz, threadConsumption: '' };
+                                });
+                                setFormData({
+                                  ...formData,
+                                  tasselSizesList: newTags,
+                                  size: newTags.join(', '),
+                                  sizes: newTags,
+                                  jobWorkRows: updatedRows
+                                });
+                              }}
                             />
-                          </div>
-                          <div className="col-md-6">
-                            <label className="form-label fw-semibold text-dark small mb-1.5">Size / Length</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="e.g. 2 inch, Medium, 5cm"
-                              value={formData.size || ''}
-                              onChange={(e) => setFormData({ ...formData, size: autoCapitalizeWords(e.target.value) })}
-                              style={{ height: '42px', borderRadius: '8px' }}
-                            />
-                          </div>
-                        </div>
-
-                        {hasTasselType(formData.tasselType, 'Job Work') && (
-                          <div className="p-3 bg-light rounded-3 border mb-3">
-                            <div className="d-flex align-items-center justify-content-between mb-2">
-                              <span className="fw-semibold text-dark small">
-                                Size &amp; Thread Consumption:
-                              </span>
-                              <button
-                                type="button"
-                                className="btn btn-xs btn-outline-primary rounded-2 px-2 py-1 small fw-semibold"
-                                onClick={() => {
-                                  const cur = formData.jobWorkRows || [];
-                                  setFormData({
-                                    ...formData,
-                                    jobWorkRows: [...cur, { size: '', threadConsumption: '' }]
-                                  });
-                                }}
-                              >
-                                <i className="ti ti-plus me-1"></i> Add Size Row
-                              </button>
+                            <div className="form-text small text-muted" style={{ marginTop: '-8px', fontSize: '11.5px' }}>
+                              Type size and press <kbd>Enter</kbd> or comma. Multiple sizes supported.
                             </div>
-                            {(formData.jobWorkRows && formData.jobWorkRows.length > 0 ? formData.jobWorkRows : [{ size: '', threadConsumption: '' }]).map((r, i) => (
-                              <div key={i} className="row g-2 align-items-center mb-2">
-                                <div className="col-5">
-                                  <label className="form-label text-muted fs-11 mb-1">Size / Length</label>
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm bg-white"
-                                    placeholder="e.g. 2 inch / Medium"
-                                    value={r.size || ''}
-                                    onChange={(e) => {
-                                      const next = [...(formData.jobWorkRows || [])];
-                                      if (!next[i]) next[i] = { size: '', threadConsumption: '' };
-                                      next[i].size = autoCapitalizeWords(e.target.value);
-                                      setFormData({ ...formData, jobWorkRows: next });
-                                    }}
-                                  />
+                          </div>
+                        )}
+
+                        {hasTasselType(formData.tasselType, 'Job Work') && (() => {
+                          const isBoth = hasTasselType(formData.tasselType, 'Ready Made');
+                          const rows = (formData.jobWorkRows && formData.jobWorkRows.length > 0)
+                            ? formData.jobWorkRows
+                            : [{ size: '', threadConsumption: '' }];
+
+                          return (
+                            <div className="p-3 bg-light rounded-3 border mb-3">
+                              <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                                <div>
+                                  <span className="fw-semibold text-dark small d-flex align-items-center gap-1.5">
+                                    <i className="ti ti-needle-thread text-primary"></i>
+                                    Job Work - Size &amp; Thread Consumption:
+                                  </span>
+                                  <div className="text-muted fs-11 mt-0.5">
+                                    {isBoth
+                                      ? 'Unified: Sizes entered above automatically map here for Thread Consumption.'
+                                      : 'Thread consumption required per piece for each size.'}
+                                  </div>
                                 </div>
-                                <div className="col-5">
-                                  <label className="form-label text-muted fs-11 mb-1">Thread Consumption</label>
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm bg-white"
-                                    placeholder="e.g. 15m / pc"
-                                    value={r.threadConsumption || ''}
-                                    onChange={(e) => {
-                                      const next = [...(formData.jobWorkRows || [])];
-                                      if (!next[i]) next[i] = { size: '', threadConsumption: '' };
-                                      next[i].threadConsumption = e.target.value;
-                                      setFormData({ ...formData, jobWorkRows: next });
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-2 text-end pt-3">
-                                  {(formData.jobWorkRows || []).length > 1 && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-light text-danger p-1"
-                                      onClick={() => {
-                                        const next = (formData.jobWorkRows || []).filter((_, idx) => idx !== i);
-                                        setFormData({ ...formData, jobWorkRows: next });
-                                      }}
-                                      title="Remove row"
-                                    >
-                                      <i className="ti ti-trash fs-6"></i>
-                                    </button>
-                                  )}
-                                </div>
+                                <button
+                                  type="button"
+                                  className="btn btn-xs btn-outline-primary rounded-2 px-2 py-1 small fw-semibold"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      jobWorkRows: [...rows, { size: '', threadConsumption: '' }]
+                                    });
+                                  }}
+                                >
+                                  <i className="ti ti-plus me-1"></i> Add Size Row
+                                </button>
                               </div>
-                            ))}
+
+                              {rows.map((r, i) => (
+                                <div key={i} className="row g-2 align-items-center mb-2">
+                                  <div className="col-5">
+                                    <label className="form-label text-muted fs-11 mb-1">Size / Length</label>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm bg-white"
+                                      placeholder="e.g. 2 INCH / MEDIUM"
+                                      value={r.size || ''}
+                                      onChange={(e) => {
+                                        const val = autoCapitalizeWords(e.target.value);
+                                        const nextRows = [...rows];
+                                        nextRows[i] = { ...(nextRows[i] || {}), size: val };
+                                        
+                                        const validSizes = nextRows.map(row => (row.size || '').trim()).filter(Boolean);
+                                        setFormData({
+                                          ...formData,
+                                          jobWorkRows: nextRows,
+                                          tasselSizesList: validSizes,
+                                          size: validSizes.join(', '),
+                                          sizes: validSizes
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="col-5">
+                                    <label className="form-label text-muted fs-11 mb-1">Thread Consumption</label>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm bg-white"
+                                      placeholder="e.g. 15m / pc"
+                                      value={r.threadConsumption || ''}
+                                      onChange={(e) => {
+                                        const nextRows = [...rows];
+                                        nextRows[i] = { ...(nextRows[i] || {}), threadConsumption: e.target.value };
+                                        setFormData({ ...formData, jobWorkRows: nextRows });
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="col-2 text-end pt-3">
+                                    {rows.length > 1 && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-light text-danger p-1"
+                                        onClick={() => {
+                                          const nextRows = rows.filter((_, idx) => idx !== i);
+                                          const validSizes = nextRows.map(row => (row.size || '').trim()).filter(Boolean);
+                                          setFormData({
+                                            ...formData,
+                                            jobWorkRows: nextRows,
+                                            tasselSizesList: validSizes,
+                                            size: validSizes.join(', '),
+                                            sizes: validSizes
+                                          });
+                                        }}
+                                        title="Remove row"
+                                      >
+                                        <i className="ti ti-trash fs-6"></i>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
+                        {!hasTasselType(formData.tasselType, 'Ready Made') && !hasTasselType(formData.tasselType, 'Job Work') && (
+                          <div className="text-muted small p-3 text-center bg-light rounded-3 border border-dashed mb-3">
+                            <i className="ti ti-info-circle me-1 text-primary"></i>
+                            Please select <strong>Ready Made</strong>, <strong>Job Work</strong>, or both to configure specifications.
                           </div>
                         )}
                       </>
@@ -3352,6 +3292,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                               setSectionFormData({
                                 ...selectedAccessory,
                                 tasselType: parseTasselTypes(selectedAccessory.tasselType),
+                                tasselSizesList: selectedAccessory.tasselSizesList?.length
+                                  ? selectedAccessory.tasselSizesList
+                                  : (selectedAccessory.tasselSizes ? selectedAccessory.tasselSizes.split(',').map(s => s.trim()).filter(Boolean) : (selectedAccessory.sizes?.length ? selectedAccessory.sizes : (selectedAccessory.size ? selectedAccessory.size.split(',').map(s => s.trim()).filter(Boolean) : (selectedAccessory.jobWorkRows?.length ? selectedAccessory.jobWorkRows.map(r => r.size).filter(Boolean) : [])))),
                                 stitchingArticles: sArt,
                                 consumptionPerPiece: sPerPiece,
                                 threadPerPiece: sPerPiece[sArt[0]] || selectedAccessory.threadPerPiece || ''
@@ -3511,84 +3454,137 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         {(selectedAccessory.category === 'Tassel' || selectedAccessory.category === 'Tassels') && (
                           editingSection === 'category' ? (
                             <div className="d-flex flex-column gap-3">
-                              <div className="row g-2">
-                                <div className="col-md-6">
-                                  <label className="form-label small fw-semibold text-muted">Tassel Type <span className="text-danger">*</span></label>
-                                  <TasselTypeMultiSelect
-                                    value={sectionFormData.tasselType || ['Ready Made']}
-                                    onChange={(val) => setSectionFormData({ ...sectionFormData, tasselType: val })}
-                                  />
-                                </div>
-                                <div className="col-md-6">
-                                  <label className="form-label small fw-semibold text-muted">Size / Length</label>
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm"
-                                    placeholder="e.g. 2 inch / Medium"
-                                    value={sectionFormData.size || ''}
-                                    onChange={(e) => setSectionFormData({ ...sectionFormData, size: e.target.value })}
-                                  />
-                                </div>
+                              <div>
+                                <label className="form-label small fw-semibold text-muted mb-1.5">Tassel Type <span className="text-danger">*</span></label>
+                                <TasselTypeMultiSelect
+                                  value={sectionFormData.tasselType || []}
+                                  onChange={(val) => setSectionFormData({ ...sectionFormData, tasselType: val })}
+                                />
                               </div>
-                              {hasTasselType(sectionFormData.tasselType, 'Job Work') && (
-                                <div className="p-2.5 bg-light rounded-3 border">
-                                  <div className="d-flex justify-content-between align-items-center mb-2">
-                                    <span className="small fw-semibold text-dark">Size &amp; Thread Consumption</span>
-                                    <button
-                                      type="button"
-                                      className="btn btn-xs btn-outline-primary rounded-2 px-2 py-0.5 small fw-semibold"
-                                      onClick={() => {
-                                        const cur = sectionFormData.jobWorkRows || [];
-                                        setSectionFormData({ ...sectionFormData, jobWorkRows: [...cur, { size: '', threadConsumption: '' }] });
-                                      }}
-                                    >
-                                      + Add Size Row
-                                    </button>
-                                  </div>
-                                  {(sectionFormData.jobWorkRows || []).map((r, i) => (
-                                    <div key={i} className="row g-1 mb-1.5 align-items-center">
-                                      <div className="col-5">
-                                        <input
-                                          type="text"
-                                          placeholder="Size (e.g. 2 inch)"
-                                          className="form-control form-control-sm bg-white"
-                                          value={r.size || ''}
-                                          onChange={(e) => {
-                                            const next = [...(sectionFormData.jobWorkRows || [])];
-                                            if (!next[i]) next[i] = { size: '', threadConsumption: '' };
-                                            next[i].size = e.target.value;
-                                            setSectionFormData({ ...sectionFormData, jobWorkRows: next });
-                                          }}
-                                        />
+
+                              {hasTasselType(sectionFormData.tasselType, 'Ready Made') && (
+                                <TagInput
+                                  label="Size / Length (Enter Multiple Sizes)"
+                                  placeholder="Type a size (e.g. 2 INCH, 3 INCH) and press Enter"
+                                  tags={sectionFormData.tasselSizesList?.length ? sectionFormData.tasselSizesList : (sectionFormData.size ? sectionFormData.size.split(',').map(s => s.trim()).filter(Boolean) : [])}
+                                  onChange={(newTags) => {
+                                    const existingRows = sectionFormData.jobWorkRows || [];
+                                    const updatedRows = newTags.map((sz) => {
+                                      const found = existingRows.find((r) => (r.size || '').trim().toLowerCase() === sz.trim().toLowerCase());
+                                      return found ? found : { size: sz, threadConsumption: '' };
+                                    });
+                                    setSectionFormData({
+                                      ...sectionFormData,
+                                      tasselSizesList: newTags,
+                                      size: newTags.join(', '),
+                                      sizes: newTags,
+                                      jobWorkRows: updatedRows
+                                    });
+                                  }}
+                                />
+                              )}
+
+                              {hasTasselType(sectionFormData.tasselType, 'Job Work') && (() => {
+                                const isBoth = hasTasselType(sectionFormData.tasselType, 'Ready Made');
+                                const rows = (sectionFormData.jobWorkRows && sectionFormData.jobWorkRows.length > 0)
+                                  ? sectionFormData.jobWorkRows
+                                  : [{ size: '', threadConsumption: '' }];
+
+                                return (
+                                  <div className="p-2.5 bg-light rounded-3 border">
+                                    <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                      <div>
+                                        <span className="small fw-semibold text-dark d-flex align-items-center gap-1.5">
+                                          <i className="ti ti-needle-thread text-primary"></i>
+                                          Job Work - Size &amp; Thread Consumption
+                                        </span>
+                                        <div className="text-muted fs-11 mt-0.5">
+                                          {isBoth
+                                            ? 'Unified: Sizes entered above automatically map here for Thread Consumption.'
+                                            : 'Thread consumption required per piece for each size.'}
+                                        </div>
                                       </div>
-                                      <div className="col-5">
-                                        <input
-                                          type="text"
-                                          placeholder="Thread consumption"
-                                          className="form-control form-control-sm bg-white"
-                                          value={r.threadConsumption || ''}
-                                          onChange={(e) => {
-                                            const next = [...(sectionFormData.jobWorkRows || [])];
-                                            if (!next[i]) next[i] = { size: '', threadConsumption: '' };
-                                            next[i].threadConsumption = e.target.value;
-                                            setSectionFormData({ ...sectionFormData, jobWorkRows: next });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="col-2 text-end">
-                                        <button
-                                          type="button"
-                                          className="btn btn-xs btn-light text-danger p-1"
-                                          onClick={() => {
-                                            const next = (sectionFormData.jobWorkRows || []).filter((_, idx) => idx !== i);
-                                            setSectionFormData({ ...sectionFormData, jobWorkRows: next });
-                                          }}
-                                        >
-                                          <i className="ti ti-trash"></i>
-                                        </button>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline-primary rounded-2 px-2 py-0.5 small fw-semibold"
+                                        onClick={() => {
+                                          setSectionFormData({
+                                            ...sectionFormData,
+                                            jobWorkRows: [...rows, { size: '', threadConsumption: '' }]
+                                          });
+                                        }}
+                                      >
+                                        + Add Size Row
+                                      </button>
                                     </div>
-                                  ))}
+
+                                    {rows.map((r, i) => (
+                                      <div key={i} className="row g-1 mb-1.5 align-items-center">
+                                        <div className="col-5">
+                                          <input
+                                            type="text"
+                                            placeholder="Size (e.g. 2 INCH)"
+                                            className="form-control form-control-sm bg-white"
+                                            value={r.size || ''}
+                                            onChange={(e) => {
+                                              const val = autoCapitalizeWords(e.target.value);
+                                              const nextRows = [...rows];
+                                              nextRows[i] = { ...(nextRows[i] || {}), size: val };
+                                              const validSizes = nextRows.map(row => (row.size || '').trim()).filter(Boolean);
+                                              setSectionFormData({
+                                                ...sectionFormData,
+                                                jobWorkRows: nextRows,
+                                                tasselSizesList: validSizes,
+                                                size: validSizes.join(', '),
+                                                sizes: validSizes
+                                              });
+                                            }}
+                                          />
+                                        </div>
+                                        <div className="col-5">
+                                          <input
+                                            type="text"
+                                            placeholder="Thread consumption"
+                                            className="form-control form-control-sm bg-white"
+                                            value={r.threadConsumption || ''}
+                                            onChange={(e) => {
+                                              const nextRows = [...rows];
+                                              nextRows[i] = { ...(nextRows[i] || {}), threadConsumption: e.target.value };
+                                              setSectionFormData({ ...sectionFormData, jobWorkRows: nextRows });
+                                            }}
+                                          />
+                                        </div>
+                                        <div className="col-2 text-end">
+                                          {rows.length > 1 && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-xs btn-light text-danger p-1"
+                                              onClick={() => {
+                                                const nextRows = rows.filter((_, idx) => idx !== i);
+                                                const validSizes = nextRows.map(row => (row.size || '').trim()).filter(Boolean);
+                                                setSectionFormData({
+                                                  ...sectionFormData,
+                                                  jobWorkRows: nextRows,
+                                                  tasselSizesList: validSizes,
+                                                  size: validSizes.join(', '),
+                                                  sizes: validSizes
+                                                });
+                                              }}
+                                            >
+                                              <i className="ti ti-trash"></i>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
+                              {!hasTasselType(sectionFormData.tasselType, 'Ready Made') && !hasTasselType(sectionFormData.tasselType, 'Job Work') && (
+                                <div className="text-muted small p-2.5 text-center bg-light rounded-3 border border-dashed">
+                                  <i className="ti ti-info-circle me-1 text-primary"></i>
+                                  Please select <strong>Ready Made</strong>, <strong>Job Work</strong>, or both.
                                 </div>
                               )}
                             </div>
@@ -3603,9 +3599,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                         key={t}
                                         className="badge rounded-2"
                                         style={{
-                                          backgroundColor: t.toLowerCase() === 'job work' ? '#fef3c7' : '#e0e7ff',
-                                          color: t.toLowerCase() === 'job work' ? '#92400e' : '#3730a3',
-                                          border: t.toLowerCase() === 'job work' ? '1px solid #fde68a' : '1px solid #c7d2fe',
+                                          backgroundColor: '#e0e7ff',
+                                          color: '#3730a3',
+                                          border: '1px solid #c7d2fe',
                                           fontSize: '11.5px',
                                           padding: '4px 8px'
                                         }}
@@ -3615,10 +3611,29 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                     ))}
                                   </div>
                                 </div>
-                                {selectedAccessory.size && (
+                                {((selectedAccessory.tasselSizesList && selectedAccessory.tasselSizesList.length > 0) || selectedAccessory.size) && (
                                   <div className="col-md-6">
-                                    <div className="text-muted small">Size / Length</div>
-                                    <div className="fw-bold text-dark">{selectedAccessory.size}</div>
+                                    <div className="text-muted small">Sizes / Lengths</div>
+                                    <div className="d-flex flex-wrap gap-1 mt-1">
+                                      {(selectedAccessory.tasselSizesList?.length
+                                        ? selectedAccessory.tasselSizesList
+                                        : (selectedAccessory.size ? selectedAccessory.size.split(',').map(s => s.trim()).filter(Boolean) : [])
+                                      ).map((sz, i) => (
+                                        <span
+                                          key={i}
+                                          className="badge rounded-2"
+                                          style={{
+                                            backgroundColor: '#eef2ff',
+                                            color: '#4338ca',
+                                            border: '1px solid #c7d2fe',
+                                            fontSize: '11.5px',
+                                            padding: '4px 8px'
+                                          }}
+                                        >
+                                          {sz}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                               </div>

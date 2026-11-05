@@ -249,11 +249,11 @@ export default function VendorMasterView({
       localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
       window.dispatchEvent(new Event('raindrop_vendors_updated'));
       window.dispatchEvent(new Event('storage'));
-    } catch (err) {}
+    } catch (err) { }
     if (api && api.deleteVendor) {
       try {
         api.deleteVendor(id);
-      } catch (err) {}
+      } catch (err) { }
     }
     if (onDeleteVendor) {
       onDeleteVendor(id);
@@ -417,11 +417,10 @@ export default function VendorMasterView({
                         </td>
                         <td>
                           <span
-                            className={`badge px-2 py-1 ${
-                              v.active
+                            className={`badge px-2 py-1 ${v.active
                                 ? 'bg-success-subtle text-success'
                                 : 'bg-secondary-subtle text-secondary'
-                            }`}
+                              }`}
                           >
                             {v.active ? 'Active' : 'Inactive'}
                           </span>
@@ -560,9 +559,8 @@ export default function VendorMasterView({
                             required
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm text-uppercase ${
-                              formErrors.name ? 'is-invalid' : ''
-                            }`}
+                            className={`form-control form-control-sm text-uppercase ${formErrors.name ? 'is-invalid' : ''
+                              }`}
                             placeholder="e.g. Sahil Textile Mill"
                             value={formData.name || ''}
                             onChange={(e) => handleTextChange('name', e.target.value, true)}
@@ -578,9 +576,8 @@ export default function VendorMasterView({
                         <div className="col-6">
                           <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
                           <select
-                            className={`form-select form-select-sm ${
-                              formErrors.type ? 'is-invalid' : ''
-                            }`}
+                            className={`form-select form-select-sm ${formErrors.type ? 'is-invalid' : ''
+                              }`}
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
                             value={formData.type || ''}
@@ -607,9 +604,8 @@ export default function VendorMasterView({
                                 type="text"
                                 disabled={!isModalEditMode}
                                 style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                                className={`form-control form-control-sm text-uppercase ${
-                                  formErrors.type ? 'is-invalid' : ''
-                                }`}
+                                className={`form-control form-control-sm text-uppercase ${formErrors.type ? 'is-invalid' : ''
+                                  }`}
                                 placeholder="Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)"
                                 value={formData.customType || ''}
                                 onChange={(e) => handleTextChange('customType', e.target.value, true)}
@@ -691,9 +687,8 @@ export default function VendorMasterView({
                             placeholder="e.g. 9876543210"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm ${
-                              formErrors.phone ? 'is-invalid' : ''
-                            }`}
+                            className={`form-control form-control-sm ${formErrors.phone ? 'is-invalid' : ''
+                              }`}
                             value={formData.phone || ''}
                             onChange={(e) => handleTextChange('phone', e.target.value.replace(/\D/g, ''))}
                           />
@@ -722,9 +717,8 @@ export default function VendorMasterView({
                             placeholder="e.g. contact@supplier.com"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm ${
-                              formErrors.email ? 'is-invalid' : ''
-                            }`}
+                            className={`form-control form-control-sm ${formErrors.email ? 'is-invalid' : ''
+                              }`}
                             value={formData.email || ''}
                             onChange={(e) => handleTextChange('email', e.target.value)}
                           />
@@ -807,9 +801,8 @@ export default function VendorMasterView({
                             placeholder="e.g. 24AFQPA0986G1ZA"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm font-monospace text-uppercase ${
-                              formErrors.gstin ? 'is-invalid' : ''
-                            }`}
+                            className={`form-control form-control-sm font-monospace text-uppercase ${formErrors.gstin ? 'is-invalid' : ''
+                              }`}
                             value={formData.gstin || ''}
                             onChange={(e) => handleTextChange('gstin', e.target.value.toUpperCase())}
                           />

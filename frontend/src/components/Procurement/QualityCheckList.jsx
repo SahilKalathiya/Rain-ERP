@@ -486,7 +486,7 @@ function parseDateForSort(d, id) {
                 </th>
                 <th
                   className="text-center"
-                  style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '110px' }}
+                  style={{ padding: '12px 16px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', minWidth: '130px', width: '130px', whiteSpace: 'nowrap' }}
                 >
                   ACTION
                 </th>
@@ -580,37 +580,38 @@ function parseDateForSort(d, id) {
                       </td>
 
                       {/* ACTION */}
-                      <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="text-center text-nowrap" style={{ whiteSpace: 'nowrap', width: '130px', minWidth: '130px' }} onClick={(e) => e.stopPropagation()}>
                         {isPending ? (
                           !d.isBaleEntriesComplete ? (
                             <button
                               type="button"
-                              className="btn btn-sm btn-outline-secondary px-3 py-1.5 rounded-2 fs-12 fw-semibold opacity-75 shadow-xs d-inline-flex align-items-center gap-1"
+                              className="btn btn-sm btn-outline-secondary px-2.5 py-1.5 rounded-2 fs-12 fw-semibold opacity-75 shadow-xs d-inline-flex align-items-center justify-content-center gap-1 text-nowrap"
+                              style={{ whiteSpace: 'nowrap', minWidth: '88px', height: '32px', lineHeight: 1 }}
                               onClick={() => alert(`QC cannot proceed: Total quantity in GRN (${d.declaredQty}m) has incomplete bale entries (${d.baleTotalMeters}m). Please complete all bale entries in GRN before starting QC.`)}
                               title={`Cannot proceed to QC: Bale entries incomplete (${d.baleTotalMeters}m of ${d.declaredQty}m entered)`}
                             >
                               <i className="ti ti-lock fs-11 text-muted"></i>
-                              <span>Run QC (Incomplete)</span>
+                              <span style={{ whiteSpace: 'nowrap' }}>Run QC</span>
                             </button>
                           ) : (
                             <button
                               type="button"
-                              className="btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-sm d-inline-flex align-items-center gap-1"
-                              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb' }}
+                              className="btn btn-sm btn-primary px-3 py-1.5 rounded-2 fs-12 fw-semibold text-white shadow-xs d-inline-flex align-items-center justify-content-center gap-1.5 text-nowrap"
+                              style={{ backgroundColor: '#5b47fb', borderColor: '#5b47fb', whiteSpace: 'nowrap', minWidth: '88px', height: '32px', lineHeight: 1 }}
                               onClick={() => onSelectQC && onSelectQC(qc)}
                             >
-                              <span>Run QC</span>
-                              <i className="ti ti-chevron-right fs-11"></i>
+                              <span style={{ whiteSpace: 'nowrap' }}>Run QC</span>
+                              <i className="ti ti-chevron-right fs-11" style={{ marginTop: '1px' }}></i>
                             </button>
                           )
                         ) : (
                           <button
                             type="button"
-                            className="btn btn-sm btn-white border px-3 py-1.5 rounded-2 fs-12 fw-medium text-secondary shadow-sm"
-                            style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#475569' }}
+                            className="btn btn-sm btn-white border px-3 py-1.5 rounded-2 fs-12 fw-medium text-secondary shadow-xs text-nowrap d-inline-flex align-items-center justify-content-center"
+                            style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#475569', whiteSpace: 'nowrap', minWidth: '88px', height: '32px', lineHeight: 1 }}
                             onClick={() => onSelectQC && onSelectQC(qc)}
                           >
-                            View
+                            <span style={{ whiteSpace: 'nowrap' }}>View</span>
                           </button>
                         )}
                       </td>
