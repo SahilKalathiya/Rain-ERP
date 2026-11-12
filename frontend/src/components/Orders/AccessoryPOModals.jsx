@@ -1,16 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { vendorMatchesType } from '../../utils/vendorUtils';
 
 /**
  * Default accessory suppliers for PO generation if not already in vendor master
  */
 export const DEFAULT_ACCESSORY_VENDORS = [
-  { id: 'VEND-ACC-01', name: 'Shree Mahavir Trims & Buttons', type: 'Accessories Supplier', city: 'Surat', phone: '9825112233' },
-  { id: 'VEND-ACC-02', name: 'Rajesh Lace & Trimmings', type: 'Accessories Supplier', city: 'Surat', phone: '9825223344' },
-  { id: 'VEND-ACC-03', name: 'Vardhman Yarns & Threads Ltd', type: 'Thread Supplier', city: 'Ludhiana', phone: '9814033445' },
-  { id: 'VEND-ACC-04', name: 'Surat Fancy Tassels & Latkan', type: 'Accessories Supplier', city: 'Surat', phone: '9879044556' },
-  { id: 'VEND-ACC-05', name: 'Royal Elastic & Narrow Fabrics', type: 'Accessories Supplier', city: 'Ahmedabad', phone: '9898055667' },
-  { id: 'VEND-ACC-06', name: 'Pooja Beads & Sequins Emporium', type: 'Accessories Supplier', city: 'Jaipur', phone: '9829066778' },
-  { id: 'VEND-ACC-07', name: 'Apex Dori & Cording Works', type: 'Accessories Supplier', city: 'Surat', phone: '9824077889' }
+  { id: 'VEND-ACC-01', name: 'Shree Mahavir Trims & Buttons', type: 'Buttons, Trims & Accessories', types: ['Buttons', 'Trims & Accessories'], city: 'Surat', phone: '9825112233' },
+  { id: 'VEND-ACC-02', name: 'Rajesh Lace & Trimmings', type: 'Lace, Trims & Accessories', types: ['Lace', 'Trims & Accessories'], city: 'Surat', phone: '9825223344' },
+  { id: 'VEND-ACC-03', name: 'Vardhman Yarns & Threads Ltd', type: 'Thread', types: ['Thread'], city: 'Ludhiana', phone: '9814033445' },
+  { id: 'VEND-ACC-04', name: 'Surat Fancy Tassels & Latkan', type: 'Tassels, Trims & Accessories', types: ['Tassels', 'Trims & Accessories'], city: 'Surat', phone: '9879044556' },
+  { id: 'VEND-ACC-05', name: 'Royal Elastic & Narrow Fabrics', type: 'Elastic, Trims & Accessories', types: ['Elastic', 'Trims & Accessories'], city: 'Ahmedabad', phone: '9898055667' },
+  { id: 'VEND-ACC-06', name: 'Pooja Beads & Sequins Emporium', type: 'Beads & Sequins, Trims & Accessories', types: ['Beads & Sequins', 'Trims & Accessories'], city: 'Jaipur', phone: '9829066778' },
+  { id: 'VEND-ACC-07', name: 'Apex Dori & Cording Works', type: 'Dori, Trims & Accessories', types: ['Dori', 'Trims & Accessories'], city: 'Surat', phone: '9824077889' }
 ];
 
 /**
@@ -230,6 +231,18 @@ export function GenericAccessoryPOModal({
     });
     return list;
   }, [vendors]);
+
+  const [showAllVendors, setShowAllVendors] = useState(false);
+  const targetCategoryType = config.categoryName; // e.g. "Buttons", "Lace", etc.
+
+  // Requirement 2: Filter vendors strictly by PO Category (e.g. Buttons PO -> only Buttons vendors)
+  const displayedVendors = useMemo(() => {
+    if (showAllVendors) return allVendors;
+    const filtered = allVendors.filter(v =>
+      vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
+    );
+    return filtered.length > 0 ? filtered : allVendors;
+  }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
 
   // Extract order articles
   const orderArticles = useMemo(() => {
@@ -655,11 +668,10 @@ export function GenericAccessoryPOModal({
           {/* Alert Message */}
           {alertMsg && (
             <div
-              className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-                alertMsg.type === 'success'
+              className={`p-3 rounded-lg text-sm flex items-center gap-2 ${alertMsg.type === 'success'
                   ? 'bg-green-50 text-green-700 border border-green-200'
                   : 'bg-red-50 text-red-700 border border-red-200'
-              }`}
+                }`}
               style={{
                 padding: '12px 16px',
                 borderRadius: '8px',
@@ -689,9 +701,26 @@ export function GenericAccessoryPOModal({
             }}
           >
             <div className="flex-1 min-w-[280px]" style={{ flex: 1, minWidth: '280px' }}>
-              <label className="block text-xs font-semibold text-gray-700 mb-1" style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                Vendor *
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label className="block text-xs font-semibold text-gray-700" style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', margin: 0 }}>
+                  Vendor ({config.categoryName} Suppliers) *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAllVendors(prev => !prev)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4f46e5',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showAllVendors ? `Show only ${config.categoryName} vendors` : `Show all vendors (${allVendors.length})`}
+                </button>
+              </div>
               <select
                 value={selectedVendorId}
                 onChange={e => setSelectedVendorId(e.target.value)}
@@ -707,8 +736,8 @@ export function GenericAccessoryPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">Select vendor...</option>
-                {allVendors.map(v => (
+                <option value="">-- Select {config.categoryName} Vendor --</option>
+                {displayedVendors.map(v => (
                   <option key={v.id} value={v.id}>
                     {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
                   </option>
@@ -719,11 +748,10 @@ export function GenericAccessoryPOModal({
             <button
               type="button"
               onClick={() => setCombineArticles(prev => !prev)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl border transition-all ${
-                combineArticles
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl border transition-all ${combineArticles
                   ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                   : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1170,6 +1198,17 @@ export function TasselPOModal({
     return list;
   }, [vendors]);
 
+  const [showAllVendors, setShowAllVendors] = useState(false);
+  const targetCategoryType = config.categoryName;
+
+  const displayedVendors = useMemo(() => {
+    if (showAllVendors) return allVendors;
+    const filtered = allVendors.filter(v =>
+      vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
+    );
+    return filtered.length > 0 ? filtered : allVendors;
+  }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
+
   const orderArticles = useMemo(() => {
     if (Array.isArray(order?.articles) && order.articles.length > 0) {
       return order.articles.map((a, idx) => ({
@@ -1436,11 +1475,10 @@ export function TasselPOModal({
           <button
             type="button"
             onClick={() => setProcurementType('READY_MADE')}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
-              procurementType === 'READY_MADE'
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${procurementType === 'READY_MADE'
                 ? 'border-amber-600 text-amber-700 bg-amber-50/50 rounded-t-lg'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
+              }`}
             style={{
               padding: '8px 16px',
               fontSize: '13.5px',
@@ -1459,11 +1497,10 @@ export function TasselPOModal({
           <button
             type="button"
             onClick={() => setProcurementType('HANDMADE_JOBWORK')}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
-              procurementType === 'HANDMADE_JOBWORK'
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${procurementType === 'HANDMADE_JOBWORK'
                 ? 'border-amber-600 text-amber-700 bg-amber-50/50 rounded-t-lg'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
+              }`}
             style={{
               padding: '8px 16px',
               fontSize: '13.5px',
@@ -1506,9 +1543,26 @@ export function TasselPOModal({
           {/* Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
             <div style={{ flex: 1, minWidth: '280px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                Vendor *
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', margin: 0 }}>
+                  Vendor ({config.categoryName} Suppliers) *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAllVendors(prev => !prev)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4f46e5',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showAllVendors ? `Show only ${config.categoryName} vendors` : `Show all vendors (${allVendors.length})`}
+                </button>
+              </div>
               <select
                 value={selectedVendorId}
                 onChange={e => setSelectedVendorId(e.target.value)}
@@ -1523,8 +1577,8 @@ export function TasselPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">Select vendor...</option>
-                {allVendors.map(v => (
+                <option value="">-- Select {config.categoryName} Vendor --</option>
+                {displayedVendors.map(v => (
                   <option key={v.id} value={v.id}>
                     {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
                   </option>
@@ -1719,6 +1773,17 @@ export function ThreadPOModal({
     });
     return list;
   }, [vendors]);
+
+  const [showAllVendors, setShowAllVendors] = useState(false);
+  const targetCategoryType = config.categoryName;
+
+  const displayedVendors = useMemo(() => {
+    if (showAllVendors) return allVendors;
+    const filtered = allVendors.filter(v =>
+      vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
+    );
+    return filtered.length > 0 ? filtered : allVendors;
+  }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
 
   const orderArticles = useMemo(() => {
     if (Array.isArray(order?.articles) && order.articles.length > 0) {
@@ -2000,9 +2065,26 @@ export function ThreadPOModal({
           {/* Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
             <div style={{ flex: 1, minWidth: '280px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                Vendor *
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', margin: 0 }}>
+                  Vendor ({config.categoryName} Suppliers) *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAllVendors(prev => !prev)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4f46e5',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showAllVendors ? `Show only ${config.categoryName} vendors` : `Show all vendors (${allVendors.length})`}
+                </button>
+              </div>
               <select
                 value={selectedVendorId}
                 onChange={e => setSelectedVendorId(e.target.value)}
@@ -2017,8 +2099,8 @@ export function ThreadPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">Select vendor...</option>
-                {allVendors.map(v => (
+                <option value="">-- Select {config.categoryName} Vendor --</option>
+                {displayedVendors.map(v => (
                   <option key={v.id} value={v.id}>
                     {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
                   </option>
@@ -2258,14 +2340,14 @@ export function OrderPurchaseOrdersCard({
           const status = (po.status_display || po.status || 'DRAFT').toUpperCase();
           const badgeBg =
             status === 'DRAFT' ? '#f1f5f9' :
-            status === 'SENT' ? '#eff6ff' :
-            status === 'RECEIVED' ? '#f0fdf4' :
-            status === 'CANCELLED' ? '#fef2f2' : '#fef3c7';
+              status === 'SENT' ? '#eff6ff' :
+                status === 'RECEIVED' ? '#f0fdf4' :
+                  status === 'CANCELLED' ? '#fef2f2' : '#fef3c7';
           const badgeColor =
             status === 'DRAFT' ? '#475569' :
-            status === 'SENT' ? '#1d4ed8' :
-            status === 'RECEIVED' ? '#15803d' :
-            status === 'CANCELLED' ? '#b91c1c' : '#b45309';
+              status === 'SENT' ? '#1d4ed8' :
+                status === 'RECEIVED' ? '#15803d' :
+                  status === 'CANCELLED' ? '#b91c1c' : '#b45309';
 
           return (
             <div

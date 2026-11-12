@@ -914,24 +914,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
       laceSize: (formData.laceSizesList && formData.laceSizesList.length > 0)
         ? formData.laceSizesList.join(', ')
         : (formData.laceSizeValue ? `${formData.laceSizeValue} ${formData.laceSizeUnit || 'mm'}` : (formData.laceSize || '')),
-      sizes: (formData.laceSizesList && formData.laceSizesList.length > 0)
-        ? formData.laceSizesList
-        : (formData.sizes || []),
-      threadSize: formData.threadSize === 'Other' && formData.threadSizeCustom ? formData.threadSizeCustom : (formData.threadSize || ''),
-      threadSizeCustom: formData.threadSizeCustom || '',
-      unit: formData.unit === 'Other' && formData.unitCustom ? formData.unitCustom : (formData.unit || (formData.category === 'Beads & Sequins' ? 'Gram' : (['Elastic', 'Dori', 'Thread', 'Lace', 'Laces'].includes(formData.category) ? 'Meter' : 'Piece'))),
-      piecesPerUnit: ['Lace', 'Laces', 'Button', 'Buttons', 'Tassel', 'Tassels', 'Thread', 'Dori', 'Elastic', 'Beads & Sequins'].includes(formData.category) ? undefined : (parseInt(formData.piecesPerUnit, 10) || 1),
-      threadPattern: (formData.category === 'Thread') ? (formData.threadPattern || 'Stitching') : '',
-      tasselType: (formData.category === 'Tassel' || formData.category === 'Tassels')
-        ? (Array.isArray(formData.tasselType) ? formData.tasselType.join(', ') : (formData.tasselType || ''))
-        : '',
-      tasselSizesList: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.tasselSizesList || []) : [],
-      size: (formData.category === 'Tassel' || formData.category === 'Tassels')
-        ? ((formData.tasselSizesList || []).join(', ') || formData.size || '')
-        : formData.size,
       sizes: (formData.category === 'Tassel' || formData.category === 'Tassels')
         ? (formData.tasselSizesList || [])
-        : (formData.sizes || []),
+        : ((formData.laceSizesList && formData.laceSizesList.length > 0) ? formData.laceSizesList : (formData.sizes || [])),
       jobWorkRows: (formData.category === 'Tassel' || formData.category === 'Tassels') ? (formData.jobWorkRows || []) : [],
       metersPerMeterStitching: (formData.metersPerMeterStitching !== undefined && formData.metersPerMeterStitching !== '') ? formData.metersPerMeterStitching : '',
       threadPerPiece: (formData.category === 'Thread' && formData.threadPattern === 'Stitching')

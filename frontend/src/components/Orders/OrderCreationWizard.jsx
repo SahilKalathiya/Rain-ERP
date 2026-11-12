@@ -315,7 +315,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         customerName: c.customerName || '',
         assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
         selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
-        sizeConfigs: c.sizeConfigs || {}
+        jointCards: c.jointCards || {},
+        sizeConfigs: c.sizeConfigs ? JSON.parse(JSON.stringify(c.sizeConfigs)) : {}
       }));
     }
     return [];
@@ -366,7 +367,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           customerName: c.customerName || '',
           assignedArticleIds: Array.isArray(c.assignedArticleIds) ? c.assignedArticleIds : [],
           selectedColors: Array.isArray(c.selectedColors) ? c.selectedColors : [],
-          sizeConfigs: c.sizeConfigs || {}
+          jointCards: c.jointCards || {},
+          sizeConfigs: c.sizeConfigs ? JSON.parse(JSON.stringify(c.sizeConfigs)) : {}
         })));
         setExpandedCustomerIdx(0);
       }
@@ -560,6 +562,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         customerId: '',
         assignedArticleIds: [], // Start empty: do not auto-select articles
         selectedColors: [],
+        jointArticles: {},
         sizeConfigs: {}
       });
     }
@@ -601,7 +604,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           Object.entries(newSizeConfigs).filter(([key]) => !key.startsWith(`${artId}_`))
         );
       }
-      return { ...c, assignedArticleIds: updated, sizeConfigs: newSizeConfigs };
+      let newJointCards = { ...(c.jointCards || {}) };
+      if (isAssigned) {
+        // Clean up any cards referencing this unassigned article
+        newJointCards = Object.fromEntries(
+          Object.entries(newJointCards).filter(([sourceKey, targetKey]) =>
+            !sourceKey.startsWith(`${artId}_`) && !targetKey.startsWith(`${artId}_`)
+          )
+        );
+      }
+      // Strictly NO auto pre-fill! Every article starts independent unless explicitly checked by user.
+      return { ...c, assignedArticleIds: updated, jointCards: newJointCards, jointArticles: {}, sizeConfigs: newSizeConfigs };
     }));
   };
 
@@ -609,9 +622,146 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
       const cur = c.selectedColors || [];
-      const updated = cur.includes(colorName) ? cur.filter(col => col !== colorName) : [...cur, colorName];
-      return { ...c, selectedColors: updated };
+      const isSelected = cur.includes(colorName);
+      const updated = isSelected ? cur.filter(col => col !== colorName) : [...cur, colorName];
+      let newJointCards = { ...(c.jointCards || {}) };
+      if (isSelected) {
+        // If unselecting color, clean up any jointCards referencing this color
+        newJointCards = Object.fromEntries(
+          Object.entries(newJointCards).filter(([sourceKey, targetKey]) =>
+            !sourceKey.endsWith(`_${colorName}`) && !targetKey.endsWith(`_${colorName}`)
+          )
+        );
+      }
+      return { ...c, selectedColors: updated, jointCards: newJointCards };
     }));
+  };
+
+  // --- Article Pairing & Card Joint Helpers (Direct Checkbox Jodi / Pairing) ---
+  const getRootCardKey = (cust, cardKey) => {
+    if (!cust || !cardKey) return cardKey;
+    const jointCards = cust.jointCards || {};
+    let cur = cardKey;
+    let visited = new Set();
+    while (jointCards[cur] && !visited.has(cur)) {
+      visited.add(cur);
+      cur = jointCards[cur];
+    }
+    return cur;
+  };
+
+  const areCardsJointed = (cust, keyA, keyB) => {
+    if (!cust || !keyA || !keyB || keyA === keyB) return false;
+    const jointCards = cust.jointCards || {};
+    const rootA = getRootCardKey(cust, keyA);
+    const rootB = getRootCardKey(cust, keyB);
+    if (rootA === rootB) {
+      return Boolean(jointCards[keyA] || jointCards[keyB] || (rootA !== keyA && rootB !== keyB));
+    }
+    return false;
+  };
+
+  const getSyncedCardKeys = (cust, cardKey) => {
+    // Return strictly the card being edited.
+    // Articles stay jointed as a combo/set in cust.jointCards,
+    // but the user enters quantities & values independently for each article.
+    return cardKey ? [cardKey] : [];
+  };
+
+  const toggleArticleJointInColor = (cIdx, colorName, artIdA, artIdB) => {
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const keyA = getSizeConfigKey(artIdA, colorName);
+      const keyB = getSizeConfigKey(artIdB, colorName);
+      const nextJoint = { ...(c.jointCards || {}) };
+
+      const currentlyJointed = areCardsJointed(c, keyA, keyB);
+
+      if (currentlyJointed) {
+        // Unlink: delete the connection
+        if (nextJoint[keyB]) {
+          delete nextJoint[keyB];
+        } else if (nextJoint[keyA]) {
+          delete nextJoint[keyA];
+        } else {
+          delete nextJoint[keyB];
+          delete nextJoint[keyA];
+        }
+      } else {
+        // Link: join them together in jointCards without overwriting values
+        const rootA = getRootCardKey(c, keyA);
+        const rootB = getRootCardKey(c, keyB);
+
+        let finalRoot = rootA;
+        let child = keyB;
+
+        nextJoint[child] = finalRoot;
+      }
+
+      return {
+        ...c,
+        jointCards: nextJoint
+      };
+    }));
+  };
+
+  const getCardJointTarget = (cust, cardKey) => {
+    return cust?.jointCards?.[cardKey] || null;
+  };
+
+  const toggleJointCard = (cIdx, cardKey, targetCardKey) => {
+    // Compatibility adapter
+    if (!targetCardKey) {
+      setOrderCustomers(prev => prev.map((c, idx) => {
+        if (idx !== cIdx) return c;
+        const nextJoint = { ...(c.jointCards || {}) };
+        delete nextJoint[cardKey];
+        return { ...c, jointCards: nextJoint };
+      }));
+    }
+  };
+
+  const setJointCardTarget = (cIdx, cardKey, newTargetCardKey) => {
+    // Compatibility adapter
+  };
+
+  // Legacy fallback helpers for compatibility
+  const getCustomerArticleGroups = (cust) => {
+    const assigned = (cust?.assignedArticleIds || []).filter(id => addedArticles.some(a => a.id === id));
+    return assigned.map(id => ({
+      groupId: id,
+      isLinkedGroup: Boolean((cust?.jointArticles || {})[id]),
+      leadArtId: (cust?.jointArticles || {})[id] || id,
+      articleIds: [id],
+      isCustomAddon: false
+    }));
+  };
+
+  const getJointedArticleIds = (cust, artId) => {
+    return [artId];
+  };
+
+  const toggleJointArticle = (cIdx, artId, targetArtId) => {
+    // Adapter to toggle first color card
+    const cust = orderCustomers[cIdx];
+    if (cust && cust.selectedColors && cust.selectedColors.length > 0) {
+      cust.selectedColors.forEach(col => {
+        const cardKey = getSizeConfigKey(artId, col);
+        const targetKey = targetArtId ? getSizeConfigKey(targetArtId, col) : null;
+        toggleJointCard(cIdx, cardKey, targetKey);
+      });
+    }
+  };
+
+  const setJointTarget = (cIdx, artId, newTargetArtId) => {
+    const cust = orderCustomers[cIdx];
+    if (cust && cust.selectedColors && cust.selectedColors.length > 0) {
+      cust.selectedColors.forEach(col => {
+        const cardKey = getSizeConfigKey(artId, col);
+        const targetKey = getSizeConfigKey(newTargetArtId, col);
+        setJointCardTarget(cIdx, cardKey, targetKey);
+      });
+    }
   };
 
   // --- Sizes & Quantities Config per (Article, Color) ---
@@ -693,17 +843,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         sizeQtys: {}
       };
       const updatedList = [...curList, newSeriesEntry];
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -719,17 +869,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         const scId = (sc.seriesId || '').toLowerCase();
         return scId !== cleanTarget && scClean !== cleanTarget;
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -784,17 +934,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           sizeQtys: newQtys
         };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -856,17 +1006,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           sizeQtys: newQtys
         };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -905,17 +1055,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           sizeQtys: newQtys
         };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -929,17 +1079,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         return { ...sc, uniform: isUniform };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -961,17 +1111,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           sizeQtys: newQtys
         };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
-          }
-        }
-      };
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
@@ -991,28 +1141,365 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           }
         };
       });
-      return {
-        ...c,
-        sizeConfigs: {
-          ...c.sizeConfigs,
-          [key]: {
-            ...c.sizeConfigs?.[key],
-            seriesConfigs: updatedList,
-            sizeQtys: computeCombinedSizeQtys(updatedList)
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const syncedCardKeys = getSyncedCardKeys(c, key);
+      syncedCardKeys.forEach(k => {
+        nextConfigs[k] = {
+          ...nextConfigs[k],
+          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+          sizeQtys: { ...combinedQtys }
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  // Group-aware series and size manipulators (works for 1 article or N linked articles)
+  const addSeriesToGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const cleanName = getCleanSeriesName(seriesObj);
+      const cleanLower = cleanName.toLowerCase();
+      const seriesNameLower = (seriesObj?.name || '').toLowerCase();
+      if (curList.some(sc => {
+        const scClean = (sc.seriesName || '').toLowerCase();
+        const scId = (sc.seriesId || '').toLowerCase();
+        return scClean === cleanLower || scClean === seriesNameLower || scId === cleanLower || scId === seriesNameLower || scId === (seriesObj.id || '').toLowerCase();
+      })) {
+        return c;
+      }
+      const fullDef = masterSizeSeries.find(s => 
+        (s.id && seriesObj.id && s.id === seriesObj.id) ||
+        (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
+        getCleanSeriesName(s).toLowerCase() === cleanLower ||
+        (s.id || '').toLowerCase() === (seriesObj.id || '').toLowerCase()
+      ) || initialSizeSeries.find(s => 
+        (s.id && seriesObj.id && s.id === seriesObj.id) ||
+        (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
+        getCleanSeriesName(s).toLowerCase() === cleanLower
+      ) || seriesObj;
+
+      const resolvedSizes = (Array.isArray(fullDef?.sizes) && fullDef.sizes.length > 0)
+        ? fullDef.sizes
+        : (Array.isArray(fullDef?.sizeRecords) && fullDef.sizeRecords.length > 0)
+          ? fullDef.sizeRecords.map(r => r.sizeName).filter(Boolean)
+          : (seriesObj.sizes || []);
+
+      const newSeriesEntry = {
+        seriesId: seriesObj.id || `SER-${(seriesObj.name || cleanName).toUpperCase().replace(/\s+/g, '')}`,
+        seriesName: seriesObj.name || cleanName,
+        sizes: resolvedSizes,
+        selectedSizes: [],
+        uniform: null,
+        uniformQty: '',
+        sizeQtys: {}
+      };
+      const updatedList = [...curList, newSeriesEntry];
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const removeSeriesFromGroup = (cIdx, groupArtIds, colorName, seriesId) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const cleanTarget = (seriesId || '').toLowerCase();
+      const updatedList = curList.filter(sc => {
+        const scClean = (sc.seriesName || '').toLowerCase();
+        const scId = (sc.seriesId || '').toLowerCase();
+        return scId !== cleanTarget && scClean !== cleanTarget;
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const toggleSeriesInGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+    const cust = orderCustomers[cIdx];
+    const leadArtId = groupArtIds[0];
+    const curList = getPairSeriesConfigs(cust, leadArtId, colorName);
+    const cleanName = getCleanSeriesName(seriesObj);
+    const cleanLower = cleanName.toLowerCase();
+    const seriesNameLower = (seriesObj?.name || '').toLowerCase();
+    const existing = curList.find(sc => {
+      const scClean = (sc.seriesName || '').toLowerCase();
+      const scId = (sc.seriesId || '').toLowerCase();
+      return scClean === cleanLower ||
+             scClean === seriesNameLower ||
+             scId === cleanLower ||
+             scId === seriesNameLower ||
+             scId === (seriesObj.id || '').toLowerCase();
+    });
+    if (existing) {
+      removeSeriesFromGroup(cIdx, groupArtIds, colorName, existing.seriesId);
+    } else {
+      addSeriesToGroup(cIdx, groupArtIds, colorName, seriesObj);
+    }
+  };
+
+  const toggleSizeInGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const curSizes = sc.selectedSizes || [];
+        const isSelected = curSizes.includes(sz);
+        const updatedSizes = isSelected ? curSizes.filter(s => s !== sz) : [...curSizes, sz];
+        const newQtys = { ...(sc.sizeQtys || {}) };
+        if (!isSelected) {
+          newQtys[sz] = sc.uniform && sc.uniformQty ? sc.uniformQty : '';
+        } else {
+          delete newQtys[sz];
+        }
+        let newUniform = sc.uniform;
+        if (updatedSizes.length < 2) {
+          newUniform = null;
+        }
+        return {
+          ...sc,
+          selectedSizes: updatedSizes,
+          uniform: newUniform,
+          sizeQtys: newQtys
+        };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const setRatioModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioUsed) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const selectedSizes = sc.selectedSizes || [];
+        const ratioStr = sc.ratioString || '';
+        const baseQty = sc.baseSetQty || '';
+        let newQtys = { ...(sc.sizeQtys || {}) };
+        if (ratioUsed && ratioStr) {
+          const parts = ratioStr.split(':').map(p => p.trim());
+          if (parts.length === selectedSizes.length && parts.every(p => !isNaN(parseInt(p, 10)))) {
+            const baseNum = parseInt(baseQty, 10);
+            if (!isNaN(baseNum) && baseNum > 0) {
+              newQtys = {};
+              selectedSizes.forEach((sz, sIdx) => {
+                newQtys[sz] = String(baseNum * (parseInt(parts[sIdx], 10) || 1));
+              });
+            }
           }
         }
-      };
+        return {
+          ...sc,
+          ratioUsed: Boolean(ratioUsed),
+          ratioString: ratioStr,
+          baseSetQty: baseQty,
+          uniform: ratioUsed ? false : sc.uniform,
+          sizeQtys: newQtys
+        };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
     }));
+  };
+
+  const updateRatioCalculationForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioStr, baseQty, userEdited = false) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const cleanRatio = ratioStr !== undefined ? ratioStr : (sc.ratioString || '');
+        const cleanBase = baseQty !== undefined ? String(baseQty) : (sc.baseSetQty || '');
+        const parts = cleanRatio.split(':').map(p => p.trim());
+        const selectedSizes = sc.selectedSizes || [];
+        let newQtys = { ...(sc.sizeQtys || {}) };
+        if (parts.length === selectedSizes.length && parts.every(p => p !== '' && !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0)) {
+          const baseNum = parseInt(cleanBase, 10);
+          if (!isNaN(baseNum) && baseNum > 0) {
+            newQtys = {};
+            selectedSizes.forEach((sz, sIdx) => {
+              const mult = parseInt(parts[sIdx], 10) || 0;
+              newQtys[sz] = String(baseNum * mult);
+            });
+          } else {
+            newQtys = {};
+          }
+        }
+        return {
+          ...sc,
+          ratioString: cleanRatio,
+          baseSetQty: cleanBase,
+          _userEditedBase: userEdited || Boolean(cleanBase),
+          sizeQtys: newQtys
+        };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const setUniformModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, isUniform) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        return { ...sc, uniform: isUniform };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const updateUniformQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, qty) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        const newQtys = {};
+        (sc.selectedSizes || []).forEach(sz => {
+          newQtys[sz] = qty;
+        });
+        return { ...sc, uniformQty: qty, sizeQtys: newQtys };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const updateIndividualSizeQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz, qty) => {
+    const leadArtId = groupArtIds[0];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const updatedList = curList.map(sc => {
+        if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+        return {
+          ...sc,
+          sizeQtys: {
+            ...(sc.sizeQtys || {}),
+            [sz]: qty
+          }
+        };
+      });
+      const combinedQtys = computeCombinedSizeQtys(updatedList);
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      groupArtIds.forEach(aId => {
+        const key = getSizeConfigKey(aId, colorName);
+        nextConfigs[key] = {
+          ...nextConfigs[key],
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const openCopySizesForGroup = (cIdx, groupArtIds, sourceColor) => {
+    const cust = orderCustomers[cIdx];
+    const leadArtId = groupArtIds[0];
+    const sourceCfg = cust?.sizeConfigs?.[getSizeConfigKey(leadArtId, sourceColor)];
+    if (!sourceCfg) return;
+    const targetColors = (cust.selectedColors || []).filter(c => c !== sourceColor);
+    setCopySizesModal({
+      custIdx: cIdx,
+      articleIds: groupArtIds,
+      articleId: leadArtId,
+      sourceColor,
+      targetColors,
+      sourceConfig: sourceCfg
+    });
   };
 
   // --- Copy sizes to other colours modal handler ---
   const openCopySizesDialog = (cIdx, artId, sourceColor) => {
     const cust = orderCustomers[cIdx];
-    const sourceCfg = cust?.sizeConfigs?.[getSizeConfigKey(artId, sourceColor)];
+    const sourceCardKey = getSizeConfigKey(artId, sourceColor);
+    const sourceCfg = cust?.sizeConfigs?.[sourceCardKey];
     if (!sourceCfg) return;
     const targetColors = (cust.selectedColors || []).filter(c => c !== sourceColor);
+    const syncedCardKeys = getSyncedCardKeys(cust, sourceCardKey);
+    const groupArtIds = Array.from(new Set(syncedCardKeys.map(k => k.split('_')[0])));
     setCopySizesModal({
       custIdx: cIdx,
+      articleIds: groupArtIds,
       articleId: artId,
       sourceColor,
       targetColors,
@@ -1025,15 +1512,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       setCopySizesModal(null);
       return;
     }
-    const { custIdx, articleId, sourceConfig } = copySizesModal;
+    const { custIdx, articleId, articleIds, sourceConfig } = copySizesModal;
+    const targetArtIds = Array.isArray(articleIds) && articleIds.length > 0 ? articleIds : [articleId];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== custIdx) return c;
       const updatedConfigs = { ...(c.sizeConfigs || {}) };
+      const updatedJoint = { ...(c.jointCards || {}) };
       selectedTargetColors.forEach(tCol => {
-        const key = getSizeConfigKey(articleId, tCol);
-        updatedConfigs[key] = JSON.parse(JSON.stringify(sourceConfig));
+        targetArtIds.forEach(aId => {
+          updatedConfigs[getSizeConfigKey(aId, tCol)] = JSON.parse(JSON.stringify(sourceConfig));
+        });
+        if (targetArtIds.length > 1) {
+          const leadArt = articleId || targetArtIds[0];
+          const leadTargetKey = getSizeConfigKey(leadArt, tCol);
+          targetArtIds.forEach(aId => {
+            if (aId !== leadArt) {
+              updatedJoint[getSizeConfigKey(aId, tCol)] = leadTargetKey;
+            }
+          });
+        }
       });
-      return { ...c, sizeConfigs: updatedConfigs };
+      return { ...c, sizeConfigs: updatedConfigs, jointCards: updatedJoint };
     }));
     setCopySizesModal(null);
   };
@@ -1124,6 +1623,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     if (addedArticles.length === 0) return rows;
 
     addedArticles.forEach(art => {
+      const artTotalPcs = getPiecesForArticle(art.id, art.name);
+      if (artTotalPcs <= 0 && grandTotalOrderPieces > 0) return;
       (art.fabrics || []).forEach((fr, frIdx) => {
         const fab = fabrics.find(f => f.id === fr.fabricId) || fabrics[0];
         const isGreige = fr.source === 'Greige Fabric' || !fr.source || String(fr.source).includes('Greige');
@@ -1169,12 +1670,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
 
         colorsToIterate.forEach(colName => {
           const articlePcs = usedColors.size > 0 ? getPiecesForArticleColor(art.id, colName) : 0;
-          // Skip if 0 pieces ordered for this color across the entire article
-          if (articlePcs <= 0 && usedColors.size > 0) return;
-
-          // Main fabric gets article pieces; secondary fabrics (frIdx > 0 or role !== 'Main') do not auto-inherit
           const isMainFabric = frIdx === 0 || (fr.role || '').toLowerCase() === 'main';
-          const pcs = isMainFabric ? articlePcs : (parseInt(fr.pcs, 10) || 0);
+          // All fabrics of an article inherit article ordered pieces unless explicitly specified
+          const pcs = (fr.pcs !== undefined && fr.pcs !== null && fr.pcs !== '')
+            ? (parseInt(fr.pcs, 10) || 0)
+            : articlePcs;
+          // Skip if 0 pieces ordered
+          if (pcs <= 0) return;
 
           const colorObj = masterColors.find(c => c.name === colName) || { hex: '#94a3b8' };
           const widthVal = fr.width || art.width || '';
@@ -1384,7 +1886,13 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       totalGarments: grandTotalOrderPieces || 0,
       totalFabricGreige: parseFloat(totalGreigeFabric) || 0,
       totalFabricDyed: parseFloat(totalDyedFabric) || 0,
-      articles: finalArticles.map(art => {
+      articles: finalArticles
+        .filter(art => {
+          const artPieces = getPiecesForArticle(art.id, art.name);
+          const hasAnyPieces = finalArticles.some(a => getPiecesForArticle(a.id, a.name) > 0);
+          return hasAnyPieces ? artPieces > 0 : true;
+        })
+        .map(art => {
         const firstFabId = art.fabrics?.[0]?.fabricId;
         const matchingFab = fabrics.find(f => f.id === firstFabId);
         const fabQuality = matchingFab?.qualityName || matchingFab?.quality || matchingFab?.name || art.fabrics?.[0]?.fabricQuality || '';
@@ -1393,7 +1901,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         return {
           ...art,
           name: autoCapitalizeWords(art.name || primaryArticleName),
-          totalPieces: artPieces > 0 ? artPieces : Math.round((grandTotalOrderPieces || 0) / (finalArticles.length || 1)),
+          totalPieces: artPieces || 0,
           fabricQuality: fabQuality,
           fabrics: (art.fabrics || []).map(f => {
             const fMatch = fabrics.find(fx => fx.id === f.fabricId);
@@ -2234,518 +2742,405 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                 });
                               }
 
+                              const activeSeriesList = getPairSeriesConfigs(cust, artId, colName);
+
+                              // Other articles in the same color for this customer
+                              const otherArticlesInColor = (cust.assignedArticleIds || [])
+                                .filter(aId => aId !== artId)
+                                .map(aId => addedArticles.find(a => a.id === aId))
+                                .filter(Boolean);
+
+                              // Which other articles in this color are currently jointed with this card
+                              const jointedOtherArticles = otherArticlesInColor.filter(oArt => 
+                                areCardsJointed(cust, key, getSizeConfigKey(oArt.id, colName))
+                              );
+                              const isJointed = jointedOtherArticles.length > 0;
+
                               return (
                                 <div
                                   key={key}
                                   className="p-4 rounded-4 mb-4 bg-white shadow-xs"
                                   style={{
-                                    border: '1.5px solid #c7d2fe',
+                                    border: isJointed ? '1.5px solid #818cf8' : '1.5px solid #c7d2fe',
                                     backgroundColor: '#ffffff',
                                     borderRadius: '14px',
                                     boxShadow: '0 2px 10px rgba(46, 55, 164, 0.04)'
                                   }}
                                 >
-                                  <div className="d-flex justify-content-between align-items-center mb-3">
-                                    <div className="d-flex align-items-center gap-2">
+                                  {/* Card Header */}
+                                  <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                    <div className="d-flex align-items-center gap-2 flex-wrap">
                                       <span
                                         className="rounded-circle border"
-                                        style={{ width: '12px', height: '12px', backgroundColor: colorObj.hex }}
+                                        style={{ width: '13px', height: '13px', backgroundColor: colorObj.hex }}
                                       ></span>
                                       <span className="fw-bold text-dark" style={{ fontSize: '15px' }}>
                                         {artObj.name} &mdash; {colName}
                                       </span>
+
+                                      {/* Checkboxes for Joint / Pair with other articles in this color */}
+                                      {otherArticlesInColor.length > 0 && (
+                                        <div className="d-inline-flex align-items-center gap-1.5 ms-2 flex-wrap">
+                                          <span className="text-secondary fw-semibold" style={{ fontSize: '12px' }}>
+                                            Joint with:
+                                          </span>
+                                          {otherArticlesInColor.map(otherArt => {
+                                            const otherKey = getSizeConfigKey(otherArt.id, colName);
+                                            const isChecked = areCardsJointed(cust, key, otherKey);
+                                            return (
+                                              <label
+                                                key={otherArt.id}
+                                                className="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill border transition-all user-select-none"
+                                                style={{
+                                                  backgroundColor: isChecked ? '#eef2ff' : '#f8fafc',
+                                                  borderColor: isChecked ? '#6366f1' : '#cbd5e1',
+                                                  cursor: 'pointer',
+                                                  boxShadow: isChecked ? '0 1px 3px rgba(99,102,241,0.2)' : 'none'
+                                                }}
+                                                title={isChecked ? `Click to unjoint ${otherArt.name}` : `Click to joint with ${otherArt.name} (shares sizes & quantities)`}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  className="form-check-input m-0 cursor-pointer"
+                                                  checked={isChecked}
+                                                  onChange={() => toggleArticleJointInColor(ci, colName, artId, otherArt.id)}
+                                                  style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+                                                />
+                                                <span
+                                                  className="fw-semibold"
+                                                  style={{
+                                                    fontSize: '12px',
+                                                    color: isChecked ? '#2e37a4' : '#475569'
+                                                  }}
+                                                >
+                                                  {otherArt.name}
+                                                </span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
                                     </div>
 
-
+                                    <div className="d-flex align-items-center gap-2">
+                                      <span
+                                        className="badge rounded-pill px-3 py-1.5 font-monospace fw-bold"
+                                        style={{
+                                          fontSize: '12px',
+                                          backgroundColor: pairTotalPieces > 0 ? '#eef2ff' : '#f1f5f9',
+                                          color: pairTotalPieces > 0 ? '#2e37a4' : '#64748b',
+                                          border: '1px solid',
+                                          borderColor: pairTotalPieces > 0 ? '#c7d2fe' : '#e2e8f0'
+                                        }}
+                                      >
+                                        {pairTotalPieces} pcs
+                                      </span>
+                                    </div>
                                   </div>
 
-                                  {/* Series Configuration Section */}
-                                  {(() => {
-                                    const activeSeriesList = getPairSeriesConfigs(cust, artId, colName);
-                                    let pairTotalPieces = 0;
-                                    activeSeriesList.forEach(sc => {
-                                      Object.values(sc.sizeQtys || {}).forEach(q => {
-                                        pairTotalPieces += parseInt(q, 10) || 0;
-                                      });
-                                    });
-
-                                    return (
-                                      <div className="mt-2">
-                                        {/* Always show "Pick a size series:" with Alpha, Numeric, Mix Sizes buttons */}
-                                        <div className="mb-3">
-                                          <div className="small text-muted mb-2 fw-medium" style={{ fontSize: '13px' }}>
-                                            Pick a size series:
-                                          </div>
-                                          <div className="d-flex flex-wrap align-items-center" style={{ gap: '12px' }}>
-                                            {normalizedMasterSizeSeries.map((series) => {
-                                              const cleanSeries = getCleanSeriesName(series).toLowerCase();
-                                              const seriesNameLower = (series.name || '').toLowerCase();
-                                              const isOpen = activeSeriesList.some(sc => {
-                                                const scClean = (sc.seriesName || '').toLowerCase();
-                                                const scId = (sc.seriesId || '').toLowerCase();
-                                                return scClean === cleanSeries || 
-                                                       scClean === seriesNameLower || 
-                                                       scId === cleanSeries || 
-                                                       scId === seriesNameLower || 
-                                                       scId === (series.id || '').toLowerCase();
-                                              });
-
-                                              return (
-                                                <button
-                                                  key={series.id || series.name}
-                                                  type="button"
-                                                  className={`btn rounded-3 px-4 py-2 transition ${
-                                                    isOpen ? 'text-white fw-bold shadow-sm' : 'btn-white border text-dark fw-medium shadow-xs'
-                                                  }`}
-                                                  style={{
-                                                    borderColor: isOpen ? '#2e37a4' : '#cbd5e1',
-                                                    backgroundColor: isOpen ? '#2e37a4' : '#ffffff',
-                                                    color: isOpen ? '#ffffff' : '#1e293b',
-                                                    minWidth: '105px',
-                                                    height: '38px',
-                                                    fontSize: '13px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    boxShadow: isOpen ? '0 2px 6px rgba(46, 55, 164, 0.2)' : 'none'
-                                                  }}
-                                                  onClick={() => toggleSeriesInPair(ci, artId, colName, series)}
-                                                >
-                                                  <span>{series.displayName || series.name}</span>
-                                                  {isOpen && <i className="ti ti-check ms-1.5 small"></i>}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
+                                  {/* Card Body - ALWAYS direct and fully editable */}
+                                  <div>
+                                    {/* Notice banner if jointed */}
+                                    {jointedOtherArticles.length > 0 && (
+                                      <div
+                                        className="d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border"
+                                        style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', fontSize: '12px', fontWeight: 500 }}
+                                      >
+                                        <i className="ti ti-link"></i>
+                                        <span>
+                                          Jointed with <strong>{jointedOtherArticles.map(a => a.name).join(', ')}</strong> &mdash; linked as matching combo set.
+                                        </span>
+                                      </div>
+                                    )}
+                                      {/* Pick a size series */}
+                                      <div className="mb-3">
+                                        <div className="text-muted small mb-2 fw-medium">Pick a size series:</div>
+                                        <div className="d-flex flex-wrap gap-2">
+                                          {(normalizedMasterSizeSeries || []).map((series) => {
+                                            const isOpen = activeSeriesList.some(sc => {
+                                              const scClean = (sc.seriesName || '').toLowerCase();
+                                              const scId = (sc.seriesId || '').toLowerCase();
+                                              const sName = (series.name || '').toLowerCase();
+                                              const sClean = getCleanSeriesName(series).toLowerCase();
+                                              const sId = (series.id || '').toLowerCase();
+                                              return scClean === sName || scClean === sClean || scId === sId || scId === sName;
+                                            });
+                                            return (
+                                              <button
+                                                key={series.id || series.name}
+                                                type="button"
+                                                className={`btn btn-sm rounded-pill transition-all ${
+                                                  isOpen ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                                }`}
+                                                style={{
+                                                  minWidth: '90px',
+                                                  height: '36px',
+                                                  padding: '6px 14px',
+                                                  fontSize: '13px',
+                                                  fontWeight: isOpen ? 600 : 500,
+                                                  backgroundColor: isOpen ? '#2e37a4' : '#ffffff',
+                                                  borderColor: isOpen ? '#2e37a4' : '#e2e8f0',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  boxShadow: isOpen ? '0 2px 6px rgba(46, 55, 164, 0.2)' : 'none'
+                                                }}
+                                                onClick={() => toggleSeriesInPair(ci, artId, colName, series)}
+                                              >
+                                                <span>{series.displayName || series.name}</span>
+                                                {isOpen && <i className="ti ti-check ms-1.5 small"></i>}
+                                              </button>
+                                            );
+                                          })}
                                         </div>
+                                      </div>
 
-                                        {/* Series Content */}
-                                        {activeSeriesList.length === 0 ? (
-                                          <div
-                                            className="p-3 rounded-3 text-center border border-dashed bg-light text-muted"
-                                            style={{ fontSize: '13px' }}
-                                          >
-                                            Click a size series above to open it and enter quantities.
-                                          </div>
-                                        ) : (
-                                          <div className="d-flex flex-column gap-3">
-                                            {activeSeriesList.map((sc, scIdx) => {
-                                              const cleanScName = getCleanSeriesName({ name: sc.seriesName || sc.seriesId });
-                                              const scNameLower = (sc.seriesName || '').toLowerCase();
-                                              const defSeries = masterSizeSeries.find(s => 
-                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
-                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
-                                                getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase() ||
-                                                s.id === sc.seriesId || s.name === sc.seriesId
-                                              ) || initialSizeSeries.find(s => 
-                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
-                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
-                                                getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()
-                                              ) || {
-                                                name: sc.seriesName || cleanScName,
-                                                sizes: sc.sizes || []
-                                              };
-                                              const seriesName = sc.seriesName || defSeries.name || cleanScName || sc.seriesId;
-                                              const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0)
-                                                ? defSeries.sizes
-                                                : (defSeries.sizeRecords && defSeries.sizeRecords.length > 0)
-                                                  ? defSeries.sizeRecords.map(r => r.sizeName).filter(Boolean)
-                                                  : (sc.sizes || []);
+                                      {/* Series Content */}
+                                      {activeSeriesList.length === 0 ? (
+                                        <div
+                                          className="p-3 rounded-3 text-center border border-dashed bg-light text-muted"
+                                          style={{ fontSize: '13px' }}
+                                        >
+                                          Click a size series above to open it and enter quantities.
+                                        </div>
+                                      ) : (
+                                        <div className="d-flex flex-column gap-3">
+                                          {activeSeriesList.map((sc, scIdx) => {
+                                            const cleanScName = getCleanSeriesName({ name: sc.seriesName || sc.seriesId });
+                                            const scNameLower = (sc.seriesName || '').toLowerCase();
+                                            const defSeries = masterSizeSeries.find(s => 
+                                              (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                              (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
+                                              getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase() ||
+                                              s.id === sc.seriesId || s.name === sc.seriesId
+                                            ) || initialSizeSeries.find(s => 
+                                              (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                              (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
+                                              getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()
+                                            ) || {
+                                              name: sc.seriesName || cleanScName,
+                                              sizes: sc.sizes || []
+                                            };
+                                            const seriesName = sc.seriesName || defSeries.name || cleanScName || sc.seriesId;
+                                            const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0)
+                                              ? defSeries.sizes
+                                              : (defSeries.sizeRecords && defSeries.sizeRecords.length > 0)
+                                                ? defSeries.sizeRecords.map(r => r.sizeName).filter(Boolean)
+                                                : (sc.sizes || []);
 
-                                              return (
-                                                <div
-                                                  key={`${sc.seriesId}_${scIdx}`}
-                                                  className="bg-white rounded-3 shadow-xs"
-                                                  style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', backgroundColor: '#fcfdff', padding: '16px 20px' }}
-                                                >
-                                                  <div className="d-flex justify-content-between align-items-center mb-3">
-                                                    <span
-                                                      className="badge rounded-pill px-3 py-1.5 fw-semibold"
-                                                      style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}
-                                                    >
-                                                      {seriesName}
-                                                    </span>
-                                                    <button
-                                                      type="button"
-                                                      className="btn btn-link text-danger p-0 small text-decoration-none fw-medium"
-                                                      onClick={() => removeSeriesFromPair(ci, artId, colName, sc.seriesId)}
-                                                    >
-                                                      Remove series
-                                                    </button>
-                                                  </div>
+                                            return (
+                                              <div
+                                                key={`${sc.seriesId}_${scIdx}`}
+                                                className="bg-white rounded-3 shadow-xs"
+                                                style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', backgroundColor: '#fcfdff', padding: '16px 20px' }}
+                                              >
+                                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                                  <span
+                                                    className="badge rounded-pill px-3 py-1.5 fw-semibold"
+                                                    style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}
+                                                  >
+                                                    {seriesName}
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-link text-danger p-0 small text-decoration-none fw-medium"
+                                                    onClick={() => removeSeriesFromPair(ci, artId, colName, sc.seriesId)}
+                                                  >
+                                                    Remove series
+                                                  </button>
+                                                </div>
 
-                                                  <div className="small text-muted mb-2.5 fw-medium" style={{ fontSize: '13px' }}>Tap the sizes needed:</div>
-                                                  <div className="d-flex flex-wrap gap-2 mb-2.5">
-                                                    {seriesSizes.map((sz) => {
-                                                      const isSzSelected = (sc.selectedSizes || []).includes(sz);
-                                                      return (
-                                                        <button
-                                                          key={sz}
-                                                          type="button"
-                                                          className={`btn btn-sm rounded-pill transition ${
-                                                            isSzSelected ? 'fw-bold shadow-xs' : 'text-dark border bg-white shadow-xs'
-                                                          }`}
-                                                          style={{
-                                                            minWidth: '46px',
-                                                            height: '34px',
-                                                            padding: '4px 12px',
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: isSzSelected ? '#2e37a4' : '#ffffff',
-                                                            borderColor: isSzSelected ? '#2e37a4' : '#e2e8f0',
-                                                            color: isSzSelected ? '#ffffff' : '#334155',
-                                                            fontSize: '13px'
-                                                          }}
-                                                          onClick={() => toggleSizeInPairSeries(ci, artId, colName, sc.seriesId, sz)}
-                                                        >
-                                                          {sz} {isSzSelected && <i className="ti ti-check small text-white ms-1"></i>}
-                                                        </button>
-                                                      );
-                                                    })}
-                                                  </div>
+                                                <div className="small text-muted mb-2.5 fw-medium" style={{ fontSize: '13px' }}>Tap the sizes needed:</div>
+                                                <div className="d-flex flex-wrap gap-2 mb-2.5">
+                                                  {seriesSizes.map((sz) => {
+                                                    const isSzSelected = (sc.selectedSizes || []).includes(sz);
+                                                    return (
+                                                      <button
+                                                        key={sz}
+                                                        type="button"
+                                                        className={`btn btn-sm rounded-pill transition ${
+                                                          isSzSelected ? 'fw-bold shadow-xs' : 'text-dark border bg-white shadow-xs'
+                                                        }`}
+                                                        style={{
+                                                          minWidth: '46px',
+                                                          height: '34px',
+                                                          padding: '4px 12px',
+                                                          display: 'inline-flex',
+                                                          alignItems: 'center',
+                                                          justifyContent: 'center',
+                                                          backgroundColor: isSzSelected ? '#2e37a4' : '#ffffff',
+                                                          borderColor: isSzSelected ? '#2e37a4' : '#e2e8f0',
+                                                          color: isSzSelected ? '#ffffff' : '#334155',
+                                                          fontSize: '13px'
+                                                        }}
+                                                        onClick={() => toggleSizeInPairSeries(ci, artId, colName, sc.seriesId, sz)}
+                                                      >
+                                                        {sz} {isSzSelected && <i className="ti ti-check small text-white ms-1"></i>}
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
 
-                                                  {/* Section 7: Size Series, Ratio & Quantity Matrix (PDF Page 13-14 & 24) */}
-                                                  {(sc.selectedSizes || []).length >= 1 ? (
-                                                    <div>
-                                                      {/* Quantity Method Switcher (Ratio vs Uniform vs Manual) */}
-                                                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 p-2 rounded-3 bg-white border" style={{ borderColor: '#e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                                        <div className="d-flex align-items-center gap-2 flex-wrap">
-                                                          <span className="small fw-semibold text-muted" style={{ fontSize: '12px' }}>
-                                                            Quantity Method:
-                                                          </span>
-                                                          <div className="btn-group btn-group-sm" role="group">
+                                                {/* Quantity Method Switcher */}
+                                                {(sc.selectedSizes || []).length >= 1 ? (
+                                                  <div>
+                                                    <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 p-2 rounded-3 bg-white border" style={{ borderColor: '#e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span className="small fw-semibold text-muted" style={{ fontSize: '12px' }}>
+                                                          Quantity Method:
+                                                        </span>
+                                                        <div className="btn-group btn-group-sm" role="group">
+                                                          <button
+                                                            type="button"
+                                                            className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
+                                                            style={{
+                                                              fontSize: '12px',
+                                                              fontWeight: 600,
+                                                              backgroundColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#ffffff',
+                                                              color: (!sc.ratioUsed && sc.uniform !== true) ? '#ffffff' : '#475569',
+                                                              borderColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#cbd5e1',
+                                                              boxShadow: (!sc.ratioUsed && sc.uniform !== true) ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                            }}
+                                                            onClick={() => {
+                                                              setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                              setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                            }}
+                                                          >
+                                                            <span>✍️</span>
+                                                            <span>Manual Entry</span>
+                                                          </button>
+
+                                                          <button
+                                                            type="button"
+                                                            className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
+                                                            style={{
+                                                              fontSize: '12px',
+                                                              fontWeight: 600,
+                                                              backgroundColor: sc.ratioUsed ? '#2e37a4' : '#ffffff',
+                                                              color: sc.ratioUsed ? '#ffffff' : '#475569',
+                                                              borderColor: sc.ratioUsed ? '#2e37a4' : '#cbd5e1',
+                                                              boxShadow: sc.ratioUsed ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                            }}
+                                                            onClick={() => {
+                                                              setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                                                            }}
+                                                          >
+                                                            <span>⚡</span>
+                                                            <span>Set Ratio (e.g. 1:2:2:1)</span>
+                                                          </button>
+
+                                                          {(sc.selectedSizes || []).length >= 2 && (
                                                             <button
                                                               type="button"
                                                               className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
                                                               style={{
                                                                 fontSize: '12px',
                                                                 fontWeight: 600,
-                                                                backgroundColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#ffffff',
-                                                                color: (!sc.ratioUsed && sc.uniform !== true) ? '#ffffff' : '#475569',
-                                                                borderColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#cbd5e1',
-                                                                boxShadow: (!sc.ratioUsed && sc.uniform !== true) ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                                backgroundColor: sc.uniform === true ? '#2e37a4' : '#ffffff',
+                                                                color: sc.uniform === true ? '#ffffff' : '#475569',
+                                                                borderColor: sc.uniform === true ? '#2e37a4' : '#cbd5e1',
+                                                                boxShadow: sc.uniform === true ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
                                                               }}
                                                               onClick={() => {
                                                                 setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                                                                setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                                                                setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true);
                                                               }}
                                                             >
-                                                              <span>✍️</span>
-                                                              <span>Manual Entry</span>
+                                                              <span>🔢</span>
+                                                              <span>Uniform Qty (All sizes same)</span>
                                                             </button>
-
-                                                            <button
-                                                              type="button"
-                                                              className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
-                                                              style={{
-                                                                fontSize: '12px',
-                                                                fontWeight: 600,
-                                                                backgroundColor: sc.ratioUsed ? '#2e37a4' : '#ffffff',
-                                                                color: sc.ratioUsed ? '#ffffff' : '#475569',
-                                                                borderColor: sc.ratioUsed ? '#2e37a4' : '#cbd5e1',
-                                                                boxShadow: sc.ratioUsed ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
-                                                              }}
-                                                              onClick={() => {
-                                                                setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, true);
-                                                              }}
-                                                            >
-                                                              <span>⚡</span>
-                                                              <span>Set Ratio (e.g. 1:2:2:1)</span>
-                                                            </button>
-
-                                                            {(sc.selectedSizes || []).length >= 2 && (
-                                                              <button
-                                                                type="button"
-                                                                className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
-                                                                style={{
-                                                                  fontSize: '12px',
-                                                                  fontWeight: 600,
-                                                                  backgroundColor: (sc.uniform === true && !sc.ratioUsed) ? '#2e37a4' : '#ffffff',
-                                                                  color: (sc.uniform === true && !sc.ratioUsed) ? '#ffffff' : '#475569',
-                                                                  borderColor: (sc.uniform === true && !sc.ratioUsed) ? '#2e37a4' : '#cbd5e1',
-                                                                  boxShadow: (sc.uniform === true && !sc.ratioUsed) ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
-                                                                }}
-                                                                onClick={() => {
-                                                                  setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                                                                  setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true);
-                                                                }}
-                                                              >
-                                                                <span>🟰</span>
-                                                                <span>Uniform (Same for All)</span>
-                                                              </button>
-                                                            )}
-                                                          </div>
+                                                          )}
                                                         </div>
-                                                      </div>
-
-                                                      {/* Set Ratio Calculator Card */}
-                                                      {sc.ratioUsed && (
-                                                        <div
-                                                          className="p-3.5 rounded-3 mb-3 shadow-xs"
-                                                          style={{
-                                                            backgroundColor: '#f8faff',
-                                                            border: '1.5px solid #c7d2fe',
-                                                            borderRadius: '10px'
-                                                          }}
-                                                        >
-                                                          <div className="d-flex align-items-center justify-content-between mb-2.5 flex-wrap gap-2">
-                                                            <div className="d-flex align-items-center gap-2">
-                                                              <div
-                                                                className="rounded-2 d-flex align-items-center justify-content-center"
-                                                                style={{ width: '28px', height: '28px', backgroundColor: '#eef2ff', color: '#2e37a4' }}
-                                                              >
-                                                                <i className="ti ti-calculator" style={{ fontSize: '16px' }}></i>
-                                                              </div>
-                                                              <div>
-                                                                <span className="fw-bold d-block" style={{ fontSize: '13.5px', color: '#1e293b' }}>
-                                                                  Set Ratio Calculator
-                                                                </span>
-                                                                <span className="text-muted" style={{ fontSize: '11px' }}>
-                                                                  Distribute set quantities across selected sizes using ratio
-                                                                </span>
-                                                              </div>
-                                                            </div>
-                                                            <span
-                                                              className="badge rounded-pill fw-semibold px-2.5 py-1"
-                                                              style={{ fontSize: '11.5px', backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe' }}
-                                                            >
-                                                              {(sc.selectedSizes || []).length} Sizes Selected
-                                                            </span>
-                                                          </div>
-
-                                                          <div className="row g-2.5 align-items-end">
-                                                            {/* Ratio String Input */}
-                                                            <div className="col-md-6">
-                                                              <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
-                                                                Ratio (Numbers only, e.g. {(sc.selectedSizes || []).map((_, i) => i === 1 || i === 2 ? '2' : '1').join(':')})
-                                                              </label>
-                                                              <input
-                                                                type="text"
-                                                                className="form-control form-control-sm font-monospace fw-bold"
-                                                                placeholder={`Type numbers (e.g. ${(sc.selectedSizes || []).map((_, i) => i === 1 || i === 2 ? '2' : '1').join('')})`}
-                                                                value={sc.ratioString ?? ''}
-                                                                onChange={(e) => {
-                                                                  const formatted = formatRatioInput(e.target.value, sc.ratioString || '', (sc.selectedSizes || []).length);
-                                                                  updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, formatted, sc.baseSetQty);
-                                                                }}
-                                                                style={{ fontSize: '13px', borderColor: '#cbd5e1', borderRadius: '7px', height: '36px', letterSpacing: '1px' }}
-                                                              />
-                                                            </div>
-
-                                                            {/* Base Set Quantity */}
-                                                            <div className="col-md-6">
-                                                              <label className="form-label small fw-semibold text-dark mb-1" style={{ fontSize: '12px' }}>
-                                                                Base Set Quantity (Multiplier)
-                                                              </label>
-                                                              <input
-                                                                type="number"
-                                                                min="1"
-                                                                className="form-control form-control-sm fw-bold"
-                                                                placeholder="e.g. 50"
-                                                                value={sc.baseSetQty || ''}
-                                                                onChange={(e) => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true)}
-                                                                style={{ fontSize: '13px', borderColor: '#cbd5e1', borderRadius: '7px', height: '36px' }}
-                                                              />
-                                                            </div>
-                                                          </div>
-
-                                                          {/* Quick Ratio Presets */}
-                                                          <div className="d-flex align-items-center gap-1.5 mt-2 flex-wrap">
-                                                            <span className="text-muted small fw-semibold" style={{ fontSize: '11px' }}>Quick Presets:</span>
-                                                            {[
-                                                              (sc.selectedSizes || []).map(() => '1').join(':'),
-                                                              (sc.selectedSizes || []).map((_, i) => (i === 1 || i === 2) ? '2' : '1').join(':')
-                                                            ].filter((v, idx, arr) => v && arr.indexOf(v) === idx).map(preset => (
-                                                              <button
-                                                                key={preset}
-                                                                type="button"
-                                                                className="btn btn-xs py-0.5 px-2 rounded-2 fw-semibold border transition-all"
-                                                                style={{
-                                                                  fontSize: '11px',
-                                                                  backgroundColor: sc.ratioString === preset ? '#eef2ff' : '#ffffff',
-                                                                  color: sc.ratioString === preset ? '#2e37a4' : '#64748b',
-                                                                  borderColor: sc.ratioString === preset ? '#818cf8' : '#e2e8f0'
-                                                                }}
-                                                                onClick={() => updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, preset, sc.baseSetQty)}
-                                                              >
-                                                                {preset}
-                                                              </button>
-                                                            ))}
-                                                          </div>
-
-                                                          {/* Validation & Ratio Preview */}
-                                                          {(() => {
-                                                            const parts = (sc.ratioString || '').split(':').map(p => p.trim()).filter(Boolean);
-                                                            const selectedSizes = sc.selectedSizes || [];
-                                                            const hasTyped = Boolean(sc.ratioString && sc.ratioString.trim().length > 0);
-                                                            const isCountMatch = parts.length === selectedSizes.length;
-                                                            const isValidNums = parts.every(p => !isNaN(parseInt(p, 10)) && parseInt(p, 10) >= 0);
-
-                                                            if (!hasTyped) {
-                                                              return (
-                                                                <div className="mt-2 text-muted small d-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-                                                                  <i className="ti ti-info-circle text-primary"></i>
-                                                                  <span>Type numbers only (e.g. {selectedSizes.map((_, i) => i === 1 || i === 2 ? '2' : '1').join('')}). Colons (:) will be added automatically.</span>
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            if (!isCountMatch || !isValidNums) {
-                                                              return (
-                                                                <div className="mt-2 text-danger small fw-medium d-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-                                                                  <i className="ti ti-alert-triangle"></i>
-                                                                  <span>
-                                                                    Ratio requires exactly {selectedSizes.length} numbers (currently {parts.length}) for sizes [{selectedSizes.join(', ')}].
-                                                                  </span>
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            const baseNum = parseInt(sc.baseSetQty, 10);
-                                                            const hasBase = !isNaN(baseNum) && baseNum > 0;
-                                                            const totalMultiplier = parts.reduce((acc, p) => acc + (parseInt(p, 10) || 0), 0);
-
-                                                            if (!hasBase) {
-                                                              return (
-                                                                <div className="mt-3 pt-2.5 border-top" style={{ borderColor: '#e2e8f0', fontSize: '12px' }}>
-                                                                  <div className="d-flex align-items-center justify-content-between mb-2">
-                                                                    <span className="text-muted fw-semibold">
-                                                                      Size Ratio ({totalMultiplier} pcs/set):
-                                                                    </span>
-                                                                    <span className="badge bg-secondary-subtle text-secondary fw-semibold px-2 py-1" style={{ fontSize: '11px' }}>
-                                                                      Enter Base Set Quantity to calculate pieces
-                                                                    </span>
-                                                                  </div>
-                                                                  <div className="d-flex flex-wrap align-items-center gap-2">
-                                                                    {selectedSizes.map((sz, idx) => {
-                                                                      const mult = parseInt(parts[idx], 10) || 0;
-                                                                      return (
-                                                                        <span
-                                                                          key={sz}
-                                                                          className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1"
-                                                                          style={{ borderColor: '#cbd5e1', borderRadius: '6px', fontSize: '12px' }}
-                                                                        >
-                                                                          <span className="fw-bold text-dark">{sz}:</span>
-                                                                          <span className="text-muted">{mult} ratio</span>
-                                                                        </span>
-                                                                      );
-                                                                    })}
-                                                                  </div>
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            const totalOrderPieces = totalMultiplier * baseNum;
-
-                                                            return (
-                                                              <div className="mt-3 pt-2.5 border-top" style={{ borderColor: '#e2e8f0', fontSize: '12px' }}>
-                                                                <div className="d-flex align-items-center justify-content-between mb-2">
-                                                                  <span className="text-muted fw-semibold">
-                                                                    Size Ratio Breakdown ({totalMultiplier} pcs/set):
-                                                                  </span>
-                                                                  <span className="badge bg-primary-subtle text-primary fw-bold px-2 py-1">
-                                                                    Total: {totalOrderPieces.toLocaleString()} Pieces ({baseNum} Sets)
-                                                                  </span>
-                                                                </div>
-                                                                <div className="d-flex flex-wrap align-items-center gap-2">
-                                                                  {selectedSizes.map((sz, idx) => {
-                                                                    const mult = parseInt(parts[idx], 10) || 0;
-                                                                    const res = baseNum * mult;
-                                                                    return (
-                                                                      <span
-                                                                        key={sz}
-                                                                        className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs d-inline-flex align-items-center gap-1"
-                                                                        style={{ borderColor: '#cbd5e1', borderRadius: '6px', fontSize: '12px' }}
-                                                                      >
-                                                                        <span className="fw-bold text-dark">{sz}:</span>
-                                                                        <span className="text-muted">{mult} &times; {baseNum} =</span>
-                                                                        <span className="fw-bold" style={{ color: '#2e37a4' }}>{res} pcs</span>
-                                                                      </span>
-                                                                    );
-                                                                  })}
-                                                                </div>
-                                                              </div>
-                                                            );
-                                                          })()}
-                                                        </div>
-                                                      )}
-
-                                                      {/* Uniform Quantity Input */}
-                                                      {sc.uniform === true && !sc.ratioUsed && (
-                                                        <div className="d-flex align-items-center gap-3 mb-2.5 p-3 rounded-3 bg-light border" style={{ borderColor: '#e2e8f0' }}>
-                                                          <div style={{ maxWidth: '240px' }}>
-                                                            <label className="form-label small text-muted mb-1 fw-semibold">Quantity for all selected sizes</label>
-                                                            <input
-                                                              type="number"
-                                                              className="form-control form-control-sm"
-                                                              placeholder="e.g. 100"
-                                                              value={sc.uniformQty || ''}
-                                                              onChange={(e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)}
-                                                            />
-                                                          </div>
-                                                          <div className="small text-muted pt-3">
-                                                            Auto-fills {sc.uniformQty || 0} pieces across all {(sc.selectedSizes || []).length} sizes.
-                                                          </div>
-                                                        </div>
-                                                      )}
-
-                                                      {/* Pieces Grid: Size Quantity Inputs */}
-                                                      <div className="d-flex flex-wrap gap-2 pt-2 border-top" style={{ borderColor: '#f1f5f9' }}>
-                                                        {(sc.selectedSizes || []).map((sz, sIdx) => {
-                                                          const parts = (sc.ratioString || '').split(':').map(p => p.trim());
-                                                          const ratioPart = sc.ratioUsed && parts[sIdx] !== undefined ? parts[sIdx] : null;
-
-                                                          return (
-                                                            <div
-                                                              key={sz}
-                                                              className="d-flex flex-column align-items-center p-2 rounded-3 border bg-white shadow-2xs"
-                                                              style={{ borderColor: '#e2e8f0', minWidth: '78px' }}
-                                                            >
-                                                              <span className="small fw-bold text-dark" style={{ fontSize: '13px' }}>{sz}</span>
-                                                              {ratioPart !== null && (
-                                                                <span
-                                                                  className="badge rounded-pill fw-semibold border px-1.5 py-0.5"
-                                                                  style={{ fontSize: '10px', marginTop: '2px', backgroundColor: '#eef2ff', color: '#2e37a4', borderColor: '#c7d2fe' }}
-                                                                >
-                                                                  &times;{ratioPart}
-                                                                </span>
-                                                              )}
-                                                              <input
-                                                                type="number"
-                                                                className="form-control form-control-sm text-center bg-white mt-1.5 fw-bold"
-                                                                style={{ width: '68px', height: '32px', borderColor: '#cbd5e1', borderRadius: '6px' }}
-                                                                placeholder="0"
-                                                                value={sc.sizeQtys?.[sz] ?? ''}
-                                                                onChange={(e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)}
-                                                              />
-                                                            </div>
-                                                          );
-                                                        })}
                                                       </div>
                                                     </div>
-                                                  ) : (
-                                                    <div className="text-muted small pt-1" style={{ fontSize: '13px', color: '#64748b' }}>Select at least one size above to enter quantities.</div>
-                                                  )}
-                                                </div>
-                                              );
-                                            })}
 
-                                            <div className="d-flex justify-content-end pt-3 border-top" style={{ borderColor: '#f1f5f9' }}>
-                                              <span
-                                                className="badge rounded-pill p-2 px-3 fw-bold shadow-xs"
-                                                style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '13px' }}
-                                              >
-                                                Total: {pairTotalPieces} pcs
-                                              </span>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              );
+                                                    {/* Ratio inputs */}
+                                                    {sc.ratioUsed ? (
+                                                      <div className="p-3 mb-3 rounded-3 border" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                                                        <div className="d-flex align-items-center gap-2 mb-2">
+                                                          <i className="ti ti-percentage text-success fs-5"></i>
+                                                          <span className="fw-bold text-success-emphasis" style={{ fontSize: '13px' }}>
+                                                            Set Ratio Multiplication Mode
+                                                          </span>
+                                                        </div>
+                                                        <div className="row g-2 align-items-center">
+                                                          <div className="col-auto">
+                                                            <label className="form-label small text-muted mb-1">Ratio ({(sc.selectedSizes || []).join(':')}):</label>
+                                                            <input
+                                                              type="text"
+                                                              className="form-control form-control-sm font-monospace text-center fw-bold"
+                                                              style={{ width: '130px', fontSize: '13px' }}
+                                                              placeholder={(sc.selectedSizes || []).map(() => '1').join(':')}
+                                                              value={sc.ratioString || ''}
+                                                              onChange={(e) => {
+                                                                const formatted = formatRatioInput(e.target.value, sc.ratioString, (sc.selectedSizes || []).length);
+                                                                updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, formatted, sc.baseSetQty, true);
+                                                              }}
+                                                            />
+                                                          </div>
+                                                          <div className="col-auto">
+                                                            <label className="form-label small text-muted mb-1">Base Set Qty:</label>
+                                                            <input
+                                                              type="number"
+                                                              min="1"
+                                                              className="form-control form-control-sm font-monospace text-center fw-bold"
+                                                              style={{ width: '100px', fontSize: '13px' }}
+                                                              placeholder="100"
+                                                              value={sc.baseSetQty || ''}
+                                                              onChange={(e) => {
+                                                                updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true);
+                                                              }}
+                                                            />
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    ) : sc.uniform === true ? (
+                                                      <div className="p-3 mb-3 rounded-3 border bg-light" style={{ borderColor: '#e2e8f0' }}>
+                                                        <div className="d-flex align-items-center gap-2">
+                                                          <span className="small text-muted fw-semibold">Uniform quantity for all {(sc.selectedSizes || []).length} sizes:</span>
+                                                          <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="form-control form-control-sm text-center font-monospace fw-bold"
+                                                            style={{ width: '90px' }}
+                                                            placeholder="0"
+                                                            value={sc.uniformQty || ''}
+                                                            onChange={(e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)}
+                                                          />
+                                                          <span className="small text-muted">pcs / size</span>
+                                                        </div>
+                                                      </div>
+                                                    ) : null}
+
+                                                    {/* Individual Size Inputs */}
+                                                    <div className="d-flex flex-wrap gap-2.5">
+                                                      {(sc.selectedSizes || []).map((sz) => (
+                                                        <div key={sz} className="d-flex flex-column align-items-center">
+                                                          <span className="badge bg-light text-dark border mb-1 px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                                            {sz}
+                                                          </span>
+                                                          <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="form-control form-control-sm text-center font-monospace fw-semibold"
+                                                            style={{ width: '70px', height: '32px', fontSize: '13px' }}
+                                                            placeholder="0"
+                                                            value={sc.sizeQtys?.[sz] !== undefined ? sc.sizeQtys[sz] : ''}
+                                                            onChange={(e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)}
+                                                          />
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                ) : null}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
                             });
                           })}
                         </div>

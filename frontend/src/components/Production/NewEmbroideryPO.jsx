@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   sampleOrders,
   sampleEmbroideryVendors,
@@ -6,14 +6,35 @@ import {
   sampleColors,
   sampleCutStock
 } from '../../data/initialData';
+import { vendorMatchesType } from '../../utils/vendorUtils';
 
 /**
  * NewEmbroideryPO - Form to create a new Embroidery PO
  * Matches Screenshot 2: New Embroidery-After-Cut PO
  */
 export default function NewEmbroideryPO({ onBack, onSave }) {
+  // Read master vendors from localStorage filtered by Embroidery
+  const embroideryVendorList = useMemo(() => {
+    try {
+      const s = localStorage.getItem('raindrop_vendors_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const matched = parsed
+            .filter((v) => vendorMatchesType(v, 'Embroidery'))
+            .map((v) => v.name || v.vendorName)
+            .filter(Boolean);
+          if (matched.length > 0) {
+            return Array.from(new Set([...matched, ...sampleEmbroideryVendors]));
+          }
+        }
+      }
+    } catch (e) {}
+    return sampleEmbroideryVendors;
+  }, []);
+
   const [order, setOrder] = useState(sampleOrders[0]);
-  const [vendor, setVendor] = useState(sampleEmbroideryVendors[0]);
+  const [vendor, setVendor] = useState(() => embroideryVendorList[0] || sampleEmbroideryVendors[0]);
   const [embType, setEmbType] = useState('Computer Embroidery');
   const [designName, setDesignName] = useState('');
   const [poDate, setPoDate] = useState('01-10-2026');
@@ -135,7 +156,7 @@ export default function NewEmbroideryPO({ onBack, onSave }) {
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
           >
-            {sampleEmbroideryVendors.map((v) => (
+            {embroideryVendorList.map((v) => (
               <option key={v} value={v}>
                 {v}
               </option>

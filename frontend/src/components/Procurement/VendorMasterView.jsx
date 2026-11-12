@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
+import { STANDARD_VENDOR_TYPES, getVendorTypes, vendorMatchesType } from '../../utils/vendorUtils';
 
 export const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -11,16 +12,7 @@ export const INDIAN_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 
-export const STANDARD_VENDOR_TYPES = [
-  'Fabric Supplier',
-  'Job Worker',
-  'Dyeing & Printing',
-  'Embroidery',
-  'Washing',
-  'Trims & Accessories',
-  'Packaging Supplier',
-  'Other'
-];
+export { STANDARD_VENDOR_TYPES };
 
 /**
  * VendorMasterView - 3.1 Vendor Master
@@ -32,7 +24,8 @@ export default function VendorMasterView({
   onSaveVendor,
   onDeleteVendor,
   isInline = false,
-  onCloseInline
+  onCloseInline,
+  defaultTypes = []
 }) {
   const [vendorList, setVendorList] = useState(vendors);
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -59,14 +52,23 @@ export default function VendorMasterView({
     status: ''
   });
 
+  const getInitialTypes = () => {
+    if (Array.isArray(defaultTypes) && defaultTypes.length > 0) {
+      return [...defaultTypes];
+    }
+    return [];
+  };
+
   // Form State
   const [formData, setFormData] = useState(() => {
+    const initTypes = getInitialTypes();
     if (isInline) {
       return {
         id: `VEND-${String(vendors.length + 1).padStart(4, '0')}`,
         name: '',
-        type: '',
-        customType: '',
+        types: initTypes,
+        type: initTypes.join(', '),
+        customTypeInput: '',
         contactPerson: '',
         phone: '',
         alternatePhone: '',
@@ -85,8 +87,9 @@ export default function VendorMasterView({
     return {
       id: '',
       name: '',
-      type: '',
-      customType: '',
+      types: initTypes,
+      type: initTypes.join(', '),
+      customTypeInput: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
@@ -106,11 +109,13 @@ export default function VendorMasterView({
   const [formErrors, setFormErrors] = useState({});
 
   const handleOpenNew = () => {
+    const initTypes = getInitialTypes();
     setFormData({
       id: `VEND-${String(vendorList.length + 1).padStart(4, '0')}`,
       name: '',
-      type: '',
-      customType: '',
+      types: initTypes,
+      type: initTypes.join(', '),
+      customTypeInput: '',
       contactPerson: '',
       phone: '',
       alternatePhone: '',
@@ -135,12 +140,12 @@ export default function VendorMasterView({
 
   const handleSelectVendor = (vendor, editDirectly = false) => {
     setSelectedVendor(vendor);
-    const standardOptions = STANDARD_VENDOR_TYPES.filter(t => t !== 'Other');
-    const isStandard = standardOptions.includes(vendor.type);
+    const vendorTypes = getVendorTypes(vendor);
     setFormData({
       ...vendor,
-      type: isStandard ? vendor.type : (vendor.type ? 'Other' : ''),
-      customType: isStandard ? '' : (vendor.type || '')
+      types: vendorTypes,
+      type: vendorTypes.join(', '),
+      customTypeInput: ''
     });
     setFormErrors({});
     setIsCreatingNew(false);
@@ -173,13 +178,74 @@ export default function VendorMasterView({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Multi-select Vendor Type helpers
+  const toggleVendorType = (typeItem) => {
+    if (!isModalEditMode) return;
+    setFormData((prev) => {
+      const cur = Array.isArray(prev.types) ? [...prev.types] : (prev.type ? getVendorTypes(prev) : []);
+      const exists = cur.some((t) => t.toLowerCase() === typeItem.toLowerCase());
+      let updated;
+      if (exists) {
+        updated = cur.filter((t) => t.toLowerCase() !== typeItem.toLowerCase());
+      } else {
+        updated = [...cur, typeItem];
+      }
+      return {
+        ...prev,
+        types: updated,
+        type: updated.join(', ')
+      };
+    });
+    if (formErrors.type) {
+      setFormErrors((prev) => ({ ...prev, type: null }));
+    }
+  };
+
+  const handleRemoveType = (typeItem) => {
+    if (!isModalEditMode) return;
+    setFormData((prev) => {
+      const cur = Array.isArray(prev.types) ? [...prev.types] : (prev.type ? getVendorTypes(prev) : []);
+      const updated = cur.filter((t) => t.toLowerCase() !== typeItem.toLowerCase());
+      return {
+        ...prev,
+        types: updated,
+        type: updated.join(', ')
+      };
+    });
+  };
+
+  const handleAddCustomType = () => {
+    if (!isModalEditMode) return;
+    const val = (formData.customTypeInput || '').trim();
+    if (!val) return;
+    const capped = capitalizeWords(val);
+    setFormData((prev) => {
+      const cur = Array.isArray(prev.types) ? [...prev.types] : (prev.type ? getVendorTypes(prev) : []);
+      if (!cur.some((t) => t.toLowerCase() === capped.toLowerCase())) {
+        cur.push(capped);
+      }
+      return {
+        ...prev,
+        types: cur,
+        type: cur.join(', '),
+        customTypeInput: ''
+      };
+    });
+    if (formErrors.type) {
+      setFormErrors((prev) => ({ ...prev, type: null }));
+    }
+  };
+
   const validateForm = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'Vendor Name is mandatory';
-    if (!formData.type) {
-      errors.type = 'Vendor Type is mandatory';
-    } else if (formData.type === 'Other' && !formData.customType?.trim()) {
-      errors.type = 'Please specify custom Vendor Type';
+    
+    const curTypes = Array.isArray(formData.types) && formData.types.length > 0
+      ? formData.types
+      : (formData.type ? getVendorTypes(formData) : []);
+
+    if (curTypes.length === 0) {
+      errors.type = 'At least one Vendor Type must be selected';
     }
     if (formData.phone && formData.phone.length < 10)
       errors.phone = 'Phone Number must be 10 digits';
@@ -196,15 +262,16 @@ export default function VendorMasterView({
     if (e) e.preventDefault();
     if (!validateForm()) return;
 
-    const isOtherType = formData.type === 'Other';
-    const finalVendorType = isOtherType
-      ? (formData.customType ? capitalizeWords(formData.customType.trim()) : 'Other')
-      : (formData.type?.trim() || '');
+    const curTypes = Array.isArray(formData.types) && formData.types.length > 0
+      ? formData.types
+      : (formData.type ? getVendorTypes(formData) : ['Other']);
+    const finalTypeString = curTypes.join(', ');
 
     const updatedVendor = {
       ...formData,
       name: capitalizeWords((formData.name || '').trim()),
-      type: finalVendorType,
+      type: finalTypeString,
+      types: curTypes,
       contactPerson: capitalizeWords((formData.contactPerson || '').trim()),
       address: (formData.address || '').trim(),
       city: capitalizeWords((formData.city || '').trim()),
@@ -224,6 +291,12 @@ export default function VendorMasterView({
     setIsEditing(false);
     setIsCreatingNew(false);
     setIsModalEditMode(false);
+
+    try {
+      localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('raindrop_vendors_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err) {}
 
     if (onSaveVendor) {
       onSaveVendor(updatedVendor);
@@ -262,10 +335,15 @@ export default function VendorMasterView({
 
   // Filtered List
   const filteredVendors = vendorList.filter((v) => {
+    const vTypes = getVendorTypes(v);
+    const matchesType = !colFilters.type ||
+      vTypes.some((t) => t.toLowerCase() === colFilters.type.toLowerCase()) ||
+      (v.type || '').toLowerCase().includes(colFilters.type.toLowerCase());
+
     return (
       v.id.toLowerCase().includes(colFilters.id.toLowerCase()) &&
       v.name.toLowerCase().includes(colFilters.name.toLowerCase()) &&
-      (colFilters.type === '' || v.type === colFilters.type) &&
+      matchesType &&
       v.phone.includes(colFilters.phone) &&
       v.city.toLowerCase().includes(colFilters.city.toLowerCase()) &&
       (v.gstin || '').toLowerCase().includes(colFilters.gstin.toLowerCase()) &&
@@ -338,7 +416,10 @@ export default function VendorMasterView({
                         onChange={(e) => setColFilters({ ...colFilters, type: e.target.value })}
                       >
                         <option value="">All Types</option>
-                        {Array.from(new Set(vendorList.map((v) => v.type).filter(Boolean))).map((t) => (
+                        {Array.from(new Set([
+                          ...STANDARD_VENDOR_TYPES.filter(t => t !== 'Other'),
+                          ...vendorList.flatMap(v => getVendorTypes(v))
+                        ])).map((t) => (
                           <option key={t} value={t}>{t}</option>
                         ))}
                       </select>
@@ -407,7 +488,16 @@ export default function VendorMasterView({
                       >
                         <td className="fw-medium text-dark">{v.name}</td>
                         <td>
-                          <span className="badge bg-light text-secondary border">{v.type}</span>
+                          <div className="d-flex flex-wrap gap-1">
+                            {getVendorTypes(v).map((t, idx) => (
+                              <span key={idx} className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-medium">
+                                {t}
+                              </span>
+                            ))}
+                            {getVendorTypes(v).length === 0 && (
+                              <span className="text-muted fs-11">—</span>
+                            )}
+                          </div>
                         </td>
                         <td>{v.phone}</td>
                         <td className="font-monospace fs-12">{v.gstin || '-'}</td>
@@ -573,48 +663,124 @@ export default function VendorMasterView({
                           )}
                         </div>
 
-                        <div className="col-6">
-                          <label className="form-label fs-12 fw-semibold mb-1">Vendor Type *</label>
-                          <select
-                            className={`form-select form-select-sm ${formErrors.type ? 'is-invalid' : ''
-                              }`}
-                            disabled={!isModalEditMode}
-                            style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            value={formData.type || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormData(prev => ({
-                                ...prev,
-                                type: val,
-                                customType: val === 'Other' ? prev.customType : ''
-                              }));
-                              if (formErrors.type) {
-                                setFormErrors(prev => ({ ...prev, type: null }));
-                              }
+                        <div className="col-12">
+                          <div className="d-flex align-items-center justify-content-between mb-1">
+                            <label className="form-label fs-12 fw-semibold mb-0">
+                              Vendor Types * <span className="text-muted fw-normal fs-11">(Multi-select: select all that apply)</span>
+                            </label>
+                            {isModalEditMode && (
+                              <span className="badge bg-light text-primary border fs-11">
+                                {(formData.types || []).length} selected
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Selected Types Badges */}
+                          <div
+                            className="p-2 border rounded-3 mb-2"
+                            style={{
+                              backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc',
+                              minHeight: '38px',
+                              borderColor: formErrors.type ? '#dc3545' : '#cbd5e1'
                             }}
                           >
-                            <option value="">Select Vendor Type...</option>
-                            {STANDARD_VENDOR_TYPES.map((t) => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          {formData.type === 'Other' && (
-                            <div className="mt-1.5">
-                              <input
-                                type="text"
-                                disabled={!isModalEditMode}
-                                style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                                className={`form-control form-control-sm text-uppercase ${formErrors.type ? 'is-invalid' : ''
-                                  }`}
-                                placeholder="Enter custom vendor type (e.g. Yarn Supplier, Machine Maintenance)"
-                                value={formData.customType || ''}
-                                onChange={(e) => handleTextChange('customType', e.target.value, true)}
-                                autoFocus={isModalEditMode}
-                              />
+                            <div className="d-flex flex-wrap gap-1.5 align-items-center">
+                              {(formData.types && formData.types.length > 0) ? (
+                                formData.types.map((t) => (
+                                  <span
+                                    key={t}
+                                    className={`badge d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill fs-12 ${
+                                      isModalEditMode
+                                        ? 'bg-primary text-white shadow-xs'
+                                        : 'bg-primary-subtle text-primary border border-primary-subtle'
+                                    }`}
+                                  >
+                                    <span>{t}</span>
+                                    {isModalEditMode && (
+                                      <span
+                                        role="button"
+                                        className="btn-close btn-close-white p-0 ms-1"
+                                        style={{ fontSize: '8px', cursor: 'pointer' }}
+                                        title={`Remove ${t}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveType(t);
+                                        }}
+                                      />
+                                    )}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-muted fs-12 fst-italic">
+                                  {isModalEditMode ? 'No vendor types selected. Click options below to add.' : '—'}
+                                </span>
+                              )}
                             </div>
-                          )}
+                          </div>
+
                           {formErrors.type && (
-                            <div className="invalid-feedback fs-11 d-block">{formErrors.type}</div>
+                            <div className="invalid-feedback fs-11 d-block mb-2">{formErrors.type}</div>
+                          )}
+
+                          {/* Interactive Toggle Pills & Custom Type Input */}
+                          {isModalEditMode && (
+                            <div className="p-2.5 bg-light rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
+                              <div className="text-secondary fs-11 fw-semibold text-uppercase tracking-wider mb-1.5">
+                                Click to Add / Remove Types:
+                              </div>
+                              <div className="d-flex flex-wrap gap-1.5 mb-2.5">
+                                {STANDARD_VENDOR_TYPES.filter((t) => t !== 'Other').map((t) => {
+                                  const isSelected = (formData.types || []).some(
+                                    (cur) => cur.toLowerCase() === t.toLowerCase()
+                                  );
+                                  return (
+                                    <button
+                                      key={t}
+                                      type="button"
+                                      className={`btn btn-sm rounded-pill px-2.5 py-1 fs-11 fw-medium transition-all ${
+                                        isSelected
+                                          ? 'btn-primary text-white shadow-xs'
+                                          : 'btn-white bg-white text-dark border'
+                                      }`}
+                                      style={{
+                                        boxShadow: isSelected ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                                        borderColor: isSelected ? 'transparent' : '#cbd5e1'
+                                      }}
+                                      onClick={() => toggleVendorType(t)}
+                                    >
+                                      {isSelected ? '✓ ' : '+ '}
+                                      {t}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Add Custom Type Row */}
+                              <div className="input-group input-group-sm">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm text-uppercase bg-white"
+                                  placeholder="Or type a custom type (e.g. DIGITAL PRINTING, SCREEN PRINTING)..."
+                                  value={formData.customTypeInput || ''}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({ ...prev, customTypeInput: e.target.value }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleAddCustomType();
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-primary px-3 fw-semibold"
+                                  onClick={handleAddCustomType}
+                                >
+                                  + Add Type
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
 

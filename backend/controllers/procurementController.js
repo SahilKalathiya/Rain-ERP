@@ -7,17 +7,18 @@ const { pool } = require('../config/db');
 const saveVendor = async (req, res) => {
   try {
     const v = req.body;
+    const vendorType = Array.isArray(v.types) ? v.types.join(', ') : (v.type || 'Fabric Supplier');
     const [existing] = await pool.query('SELECT id FROM vendors WHERE id = ?', [v.id]);
 
     if (existing.length > 0) {
       await pool.query(
         'UPDATE vendors SET name=?, type=?, contact_person=?, phone=?, alternate_phone=?, email=?, address=?, city=?, state=?, gstin=?, rating=?, active=? WHERE id=?',
-        [v.name, v.type, v.contactPerson || '', v.phone, v.alternatePhone, v.email, v.address, v.city, v.state, v.gstin, v.rating, v.active ? 1 : 0, v.id]
+        [v.name, vendorType, v.contactPerson || '', v.phone, v.alternatePhone, v.email, v.address, v.city, v.state, v.gstin, v.rating, v.active ? 1 : 0, v.id]
       );
     } else {
       await pool.query(
         'INSERT INTO vendors (id, name, type, contact_person, phone, alternate_phone, email, address, city, state, gstin, rating, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [v.id, v.name, v.type, v.contactPerson || '', v.phone, v.alternatePhone, v.email, v.address, v.city, v.state, v.gstin, v.rating || 5, v.active ? 1 : 0]
+        [v.id, v.name, vendorType, v.contactPerson || '', v.phone, v.alternatePhone, v.email, v.address, v.city, v.state, v.gstin, v.rating || 5, v.active ? 1 : 0]
       );
     }
     res.json({ success: true, message: 'Vendor saved successfully', data: v });

@@ -48,12 +48,21 @@ export default function OrderDetailView({
   const getCustomerPcs = useCallback((artName, colName) => {
     let sum = 0;
     if (Array.isArray(order?.customerOrders)) {
+      const matchingArt = (order?.articles || []).find(a => 
+        (a.name || '').trim().toLowerCase() === (artName || '').trim().toLowerCase() ||
+        (a.id || '').trim().toLowerCase() === (artName || '').trim().toLowerCase()
+      );
+      const artId = matchingArt?.id || '';
+
       order.customerOrders.forEach(cust => {
         Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
           const kLow = key.toLowerCase();
           const aLow = (artName || '').toLowerCase();
           const cLow = (colName || '').toLowerCase();
-          if (kLow.includes(aLow) && (cLow === '' || kLow.includes(cLow))) {
+          const matchesArt = (artId && key.startsWith(`${artId}_`)) || (aLow && kLow.includes(aLow));
+          const matchesCol = (cLow === '' || kLow.endsWith(`_${cLow}`) || kLow.includes(cLow));
+
+          if (matchesArt && matchesCol) {
             if (Array.isArray(cfg?.seriesConfigs)) {
               cfg.seriesConfigs.forEach(sc => {
                 Object.values(sc.sizeQtys || {}).forEach(q => {
@@ -891,7 +900,7 @@ export default function OrderDetailView({
     const fallbackColors = colors.length > 0 ? colors : (order?.id ? ['Standard'] : ['Charcoal', 'Green']);
     const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
       (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+    const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
     const qtyPerColor = fallbackColors.length > 0 ? Math.round(totalArtQty / fallbackColors.length) : 0;
 
     return fallbackColors.map(c => ({
@@ -905,7 +914,7 @@ export default function OrderDetailView({
     const colorOpts = getArticleColorOptions(articleName);
     const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
       (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-    const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+    const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
     const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
     const defaultBuffer = getAccessoryMasterBuffer(item, articleName);
@@ -1069,7 +1078,7 @@ export default function OrderDetailView({
       const colorOpts = getArticleColorOptions(articleName);
       const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase()) ||
         (order?.articles || []).find(a => (a.name || '').toLowerCase() === (articleName || '').toLowerCase());
-      const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+      const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
       const totalAllQty = colorOpts.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
       const updatedRows = currentRows.map((r, rIdx) => {
@@ -1425,7 +1434,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -1725,7 +1734,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -1886,7 +1895,7 @@ export default function OrderDetailView({
                 const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
                 const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                   (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
                 const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
                 return rows.map((row, rIdx) => {
@@ -2060,7 +2069,7 @@ export default function OrderDetailView({
               const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
               const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
                 (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-              const totalArtQty = artObj?.totalPieces || order?.totalGarments || 0;
+              const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
               const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
 
               return rows.map((row, rIdx) => {
@@ -2353,17 +2362,91 @@ export default function OrderDetailView({
       return clean ? `${clean}"` : '';
     };
 
-    const getFabricDefaultWidth = (fq, artFab) => {
-      const fromFab = resolveWidth(artFab?.width);
-      if (fromFab) return fromFab;
-      return '';
-    };
-
     const isMockSample = !order || (!order.id && !order.styleName && (!order.articles || order.articles.length === 0));
 
-    // If order already has saved fabricConsumptions, initialize from them
+    const colorHexMap = {
+      'Charcoal': '#333333',
+      'Green': '#228B22',
+      'Ivory': '#FFFFF0',
+      'Maroon': '#800000',
+      'Navy Blue': '#000080',
+      'Rust': '#B7410E',
+      'Pastel Red': '#FF6961',
+      'Rama Green': '#20B2AA',
+      'Sea Green': '#2E8B57',
+      'Teal': '#008080',
+      'Wine': '#722F37',
+      'Yellow': '#FFD700',
+      'Standard': '#94a3b8'
+    };
+
+    const getCustomerPcs = (artName, colName) => {
+      let sum = 0;
+      if (Array.isArray(order?.customerOrders)) {
+        const matchingArt = (order?.articles || []).find(a => 
+          (a.name || '').trim().toLowerCase() === (artName || '').trim().toLowerCase() ||
+          (a.id || '').trim().toLowerCase() === (artName || '').trim().toLowerCase()
+        );
+        const artId = matchingArt?.id || '';
+
+        order.customerOrders.forEach(cust => {
+          Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
+            const kLow = key.toLowerCase();
+            const aLow = (artName || '').toLowerCase();
+            const cLow = (colName || '').toLowerCase();
+            const matchesArt = (artId && key.startsWith(`${artId}_`)) || (aLow && kLow.includes(aLow));
+            const matchesCol = (cLow === '' || kLow.endsWith(`_${cLow}`) || kLow.includes(cLow));
+
+            if (matchesArt && matchesCol) {
+              if (Array.isArray(cfg?.seriesConfigs)) {
+                cfg.seriesConfigs.forEach(sc => {
+                  Object.values(sc.sizeQtys || {}).forEach(q => {
+                    sum += parseInt(q, 10) || 0;
+                  });
+                });
+              } else if (cfg?.sizeQtys) {
+                Object.values(cfg.sizeQtys || {}).forEach(q => {
+                  sum += parseInt(q, 10) || 0;
+                });
+              }
+            }
+          });
+        });
+      }
+      return sum;
+    };
+
+    const articles = (order?.articles && order.articles.length > 0)
+      ? order.articles
+      : (isMockSample ? [
+        { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
+        { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
+        { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
+      ] : []);
+
+    // Colors list from customer orders
+    let colors = [];
+    if (order?.customerOrders && order.customerOrders.length > 0) {
+      order.customerOrders.forEach(c => {
+        (c.selectedColors || []).forEach(col => {
+          if (!colors.includes(col)) colors.push(col);
+        });
+      });
+    }
+    if (colors.length === 0 && Array.isArray(order?.colors) && order.colors.length > 0) {
+      colors = [...order.colors];
+    }
+    if (colors.length === 0) {
+      colors = isMockSample ? ['Charcoal', 'Green'] : ['Standard'];
+    }
+
+    // If order already has saved fabricConsumptions, initialize from them AND ensure all article fabrics are included
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
-      return order.fabricConsumptions
+      const existingRows = order.fabricConsumptions
+        .filter(fc => {
+          const p = parseInt(fc.pcs !== undefined ? fc.pcs : fc.pieces, 10);
+          return !isNaN(p) && p > 0;
+        })
         .map((fc, idx) => {
           const artName = fc.articleName || fc.article || (order?.articles?.[idx]?.name) || (idx === 0 ? 'Kurta' : idx === 1 ? 'Pant' : 'Dupatta');
           const artIdx = fc.articleIndex !== undefined
@@ -2373,7 +2456,6 @@ export default function OrderDetailView({
           const artFab = (art.fabrics || []).find(f => (f.fabricQuality || f.fabricName || '').toLowerCase() === (fc.fabricQuality || '').toLowerCase()) || art.fabrics?.[0] || {};
           const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || '';
 
-          // Priority for starting width: do NOT default to 44" unless user selected or explicitly specified
           let initialWidth = '';
           if (fc._userSelectedWidth) {
             initialWidth = resolveWidth(fc.width);
@@ -2392,17 +2474,17 @@ export default function OrderDetailView({
 
           const rawPcs = fc.pcs !== undefined ? fc.pcs : fc.pieces;
           const parsedPcs = rawPcs !== undefined && rawPcs !== null && rawPcs !== '' ? parseInt(rawPcs, 10) : NaN;
-          // If secondary fabric and not explicitly edited by user, do not auto-fill article pieces
+          
           let finalPcs = 0;
-          if (fc._userEditedPcs) {
-            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
-          } else if (isMain) {
-            finalPcs = !isNaN(parsedPcs) ? parsedPcs : 0;
+          if (fc._userEditedPcs && !isNaN(parsedPcs)) {
+            finalPcs = parsedPcs;
+          } else if (!isNaN(parsedPcs) && parsedPcs > 0) {
+            finalPcs = parsedPcs;
           } else {
-            finalPcs = 0;
+            const custPcs = getCustomerPcs(artName, fc.colorName);
+            finalPcs = custPcs > 0 ? custPcs : (art.totalPieces || 0);
           }
 
-          // Dyed Rate: do NOT pre-fill dummy 1.5, 2.5, 3.0 unless explicitly edited by user
           let rawDyed = '';
           if (fc._userEditedDyed) {
             rawDyed = fc.dyedRate;
@@ -2441,75 +2523,91 @@ export default function OrderDetailView({
             _userEditedPcs: Boolean(fc._userEditedPcs)
           };
         });
-    }
 
-    // Otherwise, generate rows from order.articles and customer orders or default matching Prototype Demo (Kurta, Pant, Dupatta)
-    const articles = (order?.articles && order.articles.length > 0)
-      ? order.articles
-      : (isMockSample ? [
-        { name: 'Kurta', fabricQuality: '100/100 Mulmul', width: '44"', shrinkage: 4, bufferPercent: 10, totalPieces: 700, icon: '👘', consumption: 1.5 },
-        { name: 'Pant', fabricQuality: '2.40/20s CF', width: '47"', shrinkage: 3.5, bufferPercent: 8, totalPieces: 700, icon: '👖', consumption: 3.0, sourcing: 'Dyed' },
-        { name: 'Dupatta', fabricQuality: '60os Cambryc', width: '', shrinkage: 6, bufferPercent: 10, totalPieces: 400, icon: '🎀', consumption: 0.0 }
-      ] : []);
+      // Synchronize: check if any fabric requirement in order.articles is missing from existingRows
+      articles.forEach((art, aIdx) => {
+        const artName = art.name || (aIdx === 0 ? 'Kurta' : aIdx === 1 ? 'Pant' : 'Dupatta');
+        const artFabrics = Array.isArray(art.fabrics) ? art.fabrics : [];
+        if (artFabrics.length > 0) {
+          artFabrics.forEach((artFab, fIdx) => {
+            const fabName = artFab.fabricQuality || artFab.fabricName || artFab.quality || '';
+            const role = autoCapitalizeWords(artFab.pieceLabel || artFab.role || (fIdx === 0 ? 'Main' : 'Outer'));
 
-    // Colors list from customer orders
-    let colors = [];
-    if (order?.customerOrders && order.customerOrders.length > 0) {
-      order.customerOrders.forEach(c => {
-        (c.selectedColors || []).forEach(col => {
-          if (!colors.includes(col)) colors.push(col);
-        });
-      });
-    }
-    if (colors.length === 0 && Array.isArray(order?.colors) && order.colors.length > 0) {
-      colors = [...order.colors];
-    }
-    if (colors.length === 0) {
-      colors = isMockSample ? ['Charcoal', 'Green'] : ['Standard'];
-    }
+            const hasFabricRow = existingRows.some(r =>
+              (r.articleName || '').toLowerCase() === artName.toLowerCase() &&
+              (
+                ((r.fabricQuality || '').toLowerCase() === fabName.toLowerCase() && fabName !== '') ||
+                ((r.role || '').toLowerCase() === role.toLowerCase() && fIdx === 0)
+              )
+            );
 
-    const colorHexMap = {
-      'Charcoal': '#333333',
-      'Green': '#228B22',
-      'Ivory': '#FFFFF0',
-      'Maroon': '#800000',
-      'Navy Blue': '#000080',
-      'Rust': '#B7410E',
-      'Pastel Red': '#FF6961',
-      'Rama Green': '#20B2AA',
-      'Sea Green': '#2E8B57',
-      'Teal': '#008080',
-      'Wine': '#722F37',
-      'Yellow': '#FFD700',
-      'Standard': '#94a3b8'
-    };
+            if (!hasFabricRow && fabName) {
+              const existingArtRows = existingRows.filter(r => (r.articleName || '').toLowerCase() === artName.toLowerCase());
+              const colsToUse = existingArtRows.length > 0
+                ? Array.from(new Set(existingArtRows.map(r => r.colorName))).map(cName => {
+                    const found = existingArtRows.find(r => r.colorName === cName);
+                    return { colorName: cName, colorHex: found?.colorHex || colorHexMap[cName] || '#94a3b8' };
+                  })
+                : [{ colorName: 'Standard', colorHex: '#94a3b8' }];
 
-    const getCustomerPcs = (artName, colName) => {
-      let sum = 0;
-      if (Array.isArray(order?.customerOrders)) {
-        order.customerOrders.forEach(cust => {
-          Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
-            const kLow = key.toLowerCase();
-            const aLow = (artName || '').toLowerCase();
-            const cLow = (colName || '').toLowerCase();
-            if (kLow.includes(aLow) && (cLow === '' || kLow.includes(cLow))) {
-              if (Array.isArray(cfg?.seriesConfigs)) {
-                cfg.seriesConfigs.forEach(sc => {
-                  Object.values(sc.sizeQtys || {}).forEach(q => {
-                    sum += parseInt(q, 10) || 0;
+              colsToUse.forEach((cObj, cIdx) => {
+                const custPcs = getCustomerPcs(artName, cObj.colorName);
+                const pcsVal = (artFab.pcs !== undefined && artFab.pcs !== null && artFab.pcs !== '')
+                  ? (parseInt(artFab.pcs, 10) || 0)
+                  : (custPcs > 0 ? custPcs : (art.totalPieces || 0));
+
+                if (pcsVal > 0) {
+                  const masterShrink = getFabricMasterShrinkage(fabName);
+                  const buf = parseFloat(artFab.maxBuffer || artFab.bufferPercent || artFab.bufferPct || 2);
+                  const defaultDyed = (artFab.consumption !== undefined && artFab.consumption !== null && artFab.consumption !== '' && artFab.consumption !== 1.5 && artFab.consumption !== '1.5')
+                    ? artFab.consumption
+                    : (art.consumption !== undefined && art.consumption !== null && art.consumption !== '' && art.consumption !== 1.5 && art.consumption !== '1.5' ? art.consumption : '');
+
+                  existingRows.push({
+                    key: `${artName}_${fabName}_${role}_${cObj.colorName}_${fIdx}_${cIdx}_synth`,
+                    articleIndex: aIdx,
+                    articleName: artName,
+                    articleCode: artName.toUpperCase(),
+                    articleIcon: art.icon || art.emoji || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+                    role: role,
+                    fabricQuality: fabName,
+                    source: artFab.source || art.sourcing || (artName.toLowerCase().includes('pant') ? 'Dyed Fabric' : 'Greige Fabric'),
+                    width: resolveWidth(artFab.width) || '',
+                    colorName: cObj.colorName,
+                    colorHex: cObj.colorHex,
+                    dyedRate: defaultDyed,
+                    shrinkPct: masterShrink,
+                    bufferPct: buf,
+                    pcs: pcsVal,
+                    isMainFabric: fIdx === 0 || role.toLowerCase() === 'main',
+                    locked: false,
+                    _userSelectedWidth: Boolean(resolveWidth(artFab.width)),
+                    _userEditedDyed: Boolean(defaultDyed !== ''),
+                    _userEditedPcs: false
                   });
-                });
-              } else if (cfg?.sizeQtys) {
-                Object.values(cfg.sizeQtys || {}).forEach(q => {
-                  sum += parseInt(q, 10) || 0;
-                });
-              }
+                }
+              });
             }
           });
-        });
-      }
-      return sum;
-    };
+        }
+      });
+
+      // Sort rows so fabrics belonging to the same article stay together in order of order.articles
+      const artOrderMap = new Map();
+      articles.forEach((a, i) => artOrderMap.set((a.name || '').toLowerCase(), i));
+
+      existingRows.sort((a, b) => {
+        const aIdx = artOrderMap.has((a.articleName || '').toLowerCase()) ? artOrderMap.get((a.articleName || '').toLowerCase()) : 999;
+        const bIdx = artOrderMap.has((b.articleName || '').toLowerCase()) ? artOrderMap.get((b.articleName || '').toLowerCase()) : 999;
+        if (aIdx !== bIdx) return aIdx - bIdx;
+        const aIsMain = a.isMainFabric ? 0 : 1;
+        const bIsMain = b.isMainFabric ? 0 : 1;
+        if (aIsMain !== bIsMain) return aIsMain - bIsMain;
+        return (a.articleIndex || 0) - (b.articleIndex || 0);
+      });
+
+      return existingRows;
+    }
 
     const rows = [];
     articles.forEach((art, aIdx) => {
@@ -2550,7 +2648,9 @@ export default function OrderDetailView({
           const custPcs = getCustomerPcs(artName, col);
           if (custPcs <= 0 && colorsForThisFab.length > 0) return;
           const isMainFabric = fIdx === 0 || (role || '').toLowerCase() === 'main';
-          const pcsVal = isMainFabric ? (custPcs > 0 ? custPcs : 0) : (parseInt(artFab.pcs, 10) || 0);
+          const pcsVal = (artFab.pcs !== undefined && artFab.pcs !== null && artFab.pcs !== '')
+            ? (parseInt(artFab.pcs, 10) || 0)
+            : (custPcs > 0 ? custPcs : (art.totalPieces || 0));
 
           rows.push({
             key: `${artName}_${fabName}_${role}_${col}_${fIdx}_${cIdx}`,
@@ -2639,38 +2739,49 @@ export default function OrderDetailView({
         seen.add(name.toLowerCase());
 
         let finalPieces = 0;
+        let piecesDetermined = false;
 
-        // 1. Authoritative: check item.totalPieces from order.articles
-        const rawPieces = parseInt(item.totalPieces, 10);
-        if (!isNaN(rawPieces) && rawPieces > 0) {
-          finalPieces = rawPieces;
-        }
-
-        // 2. Compute from customerOrders sizeConfigs
-        if (finalPieces <= 0 && Array.isArray(order?.customerOrders)) {
+        // 1. Authoritative: Compute directly from customerOrders sizeConfigs if available
+        if (Array.isArray(order?.customerOrders) && order.customerOrders.some(c => c.sizeConfigs && Object.keys(c.sizeConfigs).length > 0)) {
+          let sumCfg = 0;
+          let hasMatchingCfg = false;
           order.customerOrders.forEach(cust => {
             Object.entries(cust.sizeConfigs || {}).forEach(([key, cfg]) => {
               const matchesArt = (item.id && key.startsWith(`${item.id}_`)) ||
                 (name && key.toLowerCase().includes(name.toLowerCase()));
               if (matchesArt && cfg) {
+                hasMatchingCfg = true;
                 if (Array.isArray(cfg?.seriesConfigs)) {
                   cfg.seriesConfigs.forEach(sc => {
                     Object.values(sc.sizeQtys || {}).forEach(q => {
-                      finalPieces += parseInt(q, 10) || 0;
+                      sumCfg += parseInt(q, 10) || 0;
                     });
                   });
                 } else if (cfg?.sizeQtys) {
                   Object.values(cfg.sizeQtys || {}).forEach(q => {
-                    finalPieces += parseInt(q, 10) || 0;
+                    sumCfg += parseInt(q, 10) || 0;
                   });
                 }
               }
             });
           });
+          if (hasMatchingCfg) {
+            finalPieces = sumCfg;
+            piecesDetermined = true;
+          }
         }
 
-        // 3. Compute from fabricConsumptions GROUPED BY COLOR (never sum across multiple fabrics!)
-        if (finalPieces <= 0 && Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
+        // 2. Authoritative: check item.totalPieces from order.articles if defined
+        if (!piecesDetermined && item.totalPieces !== undefined && item.totalPieces !== null) {
+          const rawPieces = parseInt(item.totalPieces, 10);
+          if (!isNaN(rawPieces)) {
+            finalPieces = rawPieces;
+            piecesDetermined = true;
+          }
+        }
+
+        // 3. Compute from fabricConsumptions GROUPED BY COLOR
+        if (!piecesDetermined && Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
           const matchingFc = order.fabricConsumptions.filter(
             fc => (fc.articleName || fc.article || '').toLowerCase().trim() === name.toLowerCase()
           );
@@ -2683,13 +2794,13 @@ export default function OrderDetailView({
               }
             });
             finalPieces = Array.from(colorMap.values()).reduce((sum, p) => sum + p, 0);
+            piecesDetermined = true;
           }
         }
 
-        // 4. Fallback: divide totalOrderGarments equally among articles
-        if (finalPieces <= 0) {
-          const artCount = rawArticles.length || 1;
-          finalPieces = totalOrderGarments > 0 ? Math.round(totalOrderGarments / artCount) : 0;
+        // 4. Fallback: ONLY for single-article legacy orders
+        if (!piecesDetermined && rawArticles.length === 1 && totalOrderGarments > 0) {
+          finalPieces = totalOrderGarments;
         }
 
         list.push({
@@ -2716,7 +2827,9 @@ export default function OrderDetailView({
       add({ name: 'Kurta', fabricQuality: '', avgGarmentLength: '', totalPieces: 0 });
       add({ name: 'Dupatta', fabricQuality: '', avgGarmentLength: '', totalPieces: 0 });
     }
-    return list;
+    // Only display articles with actual quantities (> 0 pcs)
+    const withPieces = list.filter(art => (parseInt(art.totalPieces, 10) || 0) > 0);
+    return withPieces.length > 0 ? withPieces : list;
   }, [order, consumptionRows]);
 
   const articlesCount = articlesList.length;
@@ -2770,6 +2883,7 @@ export default function OrderDetailView({
     const updatedOrder = {
       ...order,
       fabricConsumptions: consumptionRows,
+      widthDyedRates,
       accessories: addedAccessories,
       totalFabricGreige: parseFloat(totalGreigeCalculated.toFixed(1)) || order.totalFabricGreige || 0,
       totalFabricDyed: parseFloat(totalDyedCalculated.toFixed(1)) || order.totalFabricDyed || 0,
@@ -2805,6 +2919,9 @@ export default function OrderDetailView({
     if (Array.isArray(order?.fabricConsumptions) && order.fabricConsumptions.length > 0) {
       setConsumptionRows([...order.fabricConsumptions]);
     }
+    if (order?.widthDyedRates && typeof order.widthDyedRates === 'object') {
+      setWidthDyedRates({ ...order.widthDyedRates });
+    }
     setIsConsumptionEditing(false);
     setShowRateCalculation(false);
     setToastMessage('Changes cancelled.');
@@ -2813,15 +2930,16 @@ export default function OrderDetailView({
   };
 
   const handleToggleArticleSourcing = (artName, mode, fabricQuality, role) => {
-    const groupKey = `${artName}___${fabricQuality}___${role || ''}`;
-    const fabricKey = `${artName}_${fabricQuality}`;
-
     setArticleSourcing(prev => {
       const next = { ...prev };
-      next[groupKey] = mode;
-      next[fabricKey] = mode;
-      // Do NOT set [artName]: mode so that different fabrics of the same article (e.g. Kurta Main vs Kurta Outer) stay completely independent
-      delete next[artName];
+      if (fabricQuality) {
+        const groupKey = `${artName}___${fabricQuality}___${role || ''}`;
+        const fabricKey = `${artName}_${fabricQuality}`;
+        next[groupKey] = mode;
+        next[fabricKey] = mode;
+      } else {
+        next[artName] = mode;
+      }
       return next;
     });
 
@@ -2839,16 +2957,70 @@ export default function OrderDetailView({
     }));
   };
 
-  const handleUpdateArticleWidth = (artName, newWidth, fabricQuality, role) => {
+  // Multi-width and width-specific dyed rate storage
+  const [widthDyedRates, setWidthDyedRates] = useState(() => {
+    const initial = {};
+    if (order?.widthDyedRates && typeof order.widthDyedRates === 'object') {
+      Object.assign(initial, order.widthDyedRates);
+    }
+    const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
+    rows.forEach(r => {
+      if (r.articleName && r.width && r.dyedRate !== undefined && r.dyedRate !== null) {
+        const k = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}___${r.width}`;
+        if (initial[k] === undefined) {
+          initial[k] = r.dyedRate;
+        }
+      }
+    });
+    return initial;
+  });
+
+  const handleSelectWidthForGroup = (artName, newWidth, fabricQuality, role) => {
+    const cleanWidth = newWidth === '—' ? '' : newWidth;
+    const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${cleanWidth}`;
+    const storedRate = widthDyedRates[rateKey];
+
+    // Strictly use stored rate for this width - do NOT copy from another width
+    const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '') ? (parseFloat(storedRate) || 0) : 0;
+
     setConsumptionRows(prev => prev.map(r => {
       const matchArt = r.articleName === artName;
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
-        return { ...r, width: newWidth === '—' ? '' : newWidth, _userSelectedWidth: true };
+        return {
+          ...r,
+          width: cleanWidth,
+          dyedRate: nextDyed,
+          _userSelectedWidth: true
+        };
       }
       return r;
     }));
+  };
+
+  const handleUpdateWidthDyedRate = (artName, fabricQuality, role, width, val) => {
+    const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${width}`;
+    // Store val directly in widthDyedRates so user can type decimals without reset
+    setWidthDyedRates(prev => ({ ...prev, [rateKey]: val }));
+
+    const num = val === '' ? 0 : (parseFloat(val) || 0);
+    setConsumptionRows(prev => prev.map(r => {
+      const matchArt = r.articleName === artName;
+      const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+      const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+      if (matchArt && matchFab && matchRole) {
+        const currentActiveWidth = r.width || width;
+        if (currentActiveWidth === width) {
+          return { ...r, width: width, dyedRate: num, _userEditedDyed: true };
+        }
+      }
+      return r;
+    }));
+  };
+
+  const handleUpdateArticleWidth = (artName, newWidth, fabricQuality, role) => {
+    handleSelectWidthForGroup(artName, newWidth, fabricQuality, role);
   };
 
   // Sourced directly from Fabric Master (Section 3.2 & Order Consumption)
@@ -2938,6 +3110,8 @@ export default function OrderDetailView({
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
+        const k = `${artName}___${fabricQuality || ''}___${role || ''}___${r.width || ''}`;
+        setWidthDyedRates(p => ({ ...p, [k]: num }));
         return { ...r, dyedRate: num, _userEditedDyed: true };
       }
       return r;
@@ -2969,48 +3143,98 @@ export default function OrderDetailView({
   const [showRateCalculation, setShowRateCalculation] = useState(false);
   const [customMarketRates, setCustomMarketRates] = useState({});
 
-  // Group consumption rows by Article + Fabric Quality + Role for layout (Rowspan per article fabric requirement)
-  const articleGroups = useMemo(() => {
-    const map = new Map();
+  // Group consumption rows hierarchically by Article -> Fabric Quality/Role -> Color rows
+  const articleSections = useMemo(() => {
+    const articleMap = new Map();
+
+    // Preserve order of articles from order.articles
+    const orderArticles = Array.isArray(order?.articles) ? order.articles : [];
+    orderArticles.forEach((art, aIdx) => {
+      const aName = art.name || (aIdx === 0 ? 'Kurta' : aIdx === 1 ? 'Pant' : 'Dupatta');
+      if (!articleMap.has(aName)) {
+        articleMap.set(aName, {
+          articleName: aName,
+          articleCode: (art.code || aName).toUpperCase(),
+          articleIndex: aIdx,
+          icon: art.icon || art.emoji || (aName.toLowerCase().includes('kurta') ? '👘' : aName.toLowerCase().includes('pant') ? '👖' : aName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+          fabricMap: new Map()
+        });
+      }
+    });
+
     consumptionRows.forEach((row, rIdx) => {
       const artName = row.articleName || 'Article';
+      if (!articleMap.has(artName)) {
+        articleMap.set(artName, {
+          articleName: artName,
+          articleCode: (row.articleCode || artName).toUpperCase(),
+          articleIndex: row.articleIndex !== undefined ? row.articleIndex : articleMap.size,
+          icon: row.articleIcon || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
+          fabricMap: new Map()
+        });
+      }
+
+      const artEntry = articleMap.get(artName);
       const fabQuality = row.fabricQuality || '';
       const role = row.role || '';
-      const groupKey = `${artName}___${fabQuality}___${role}`;
+      const fabKey = `${fabQuality}___${role}`;
 
-      if (!map.has(groupKey)) {
+      if (!artEntry.fabricMap.has(fabKey)) {
+        const groupKey = `${artName}___${fabQuality}___${role}`;
         const sourcingKey = `${artName}_${fabQuality}`;
-        // Prioritize independent fabric/role sourcing mode, then row.source, then Greige (DO NOT fall back to artName)
         const sourcingMode = (
           articleSourcing[groupKey] ||
           articleSourcing[sourcingKey] ||
+          articleSourcing[artName] ||
           row.source ||
           'Greige'
         ).toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
 
-        // Sourced directly from Fabric Master (or genuine industry standard)
         const masterShrink = getFabricMasterShrinkage(fabQuality);
-        const shrinkPct = masterShrink;
 
-        map.set(groupKey, {
+        artEntry.fabricMap.set(fabKey, {
           key: groupKey,
           articleName: artName,
-          articleCode: (row.articleCode || artName).toUpperCase(),
-          articleIndex: row.articleIndex !== undefined ? row.articleIndex : map.size,
-          icon: row.articleIcon || (artName.toLowerCase().includes('kurta') ? '👘' : artName.toLowerCase().includes('pant') ? '👖' : artName.toLowerCase().includes('dupatta') ? '🎀' : '👕'),
           fabricQuality: fabQuality,
           role: role,
           width: row.width || '',
           sourcing: sourcingMode,
-          shrinkPct: shrinkPct,
+          shrinkPct: masterShrink,
           dyedRate: row.dyedRate,
           rows: []
         });
       }
-      map.get(groupKey).rows.push({ ...row, originalIndex: rIdx });
+
+      artEntry.fabricMap.get(fabKey).rows.push({ ...row, originalIndex: rIdx });
     });
-    return Array.from(map.values()).filter(g => g.rows.length > 0);
-  }, [consumptionRows, articleSourcing, masterFabricsList]);
+
+    const sections = [];
+    articleMap.forEach(artEntry => {
+      const fabricGroups = Array.from(artEntry.fabricMap.values()).filter(fg => fg.rows.length > 0);
+      const totalArticlePcs = fabricGroups.reduce((sum, fg) => {
+        return sum + fg.rows.reduce((rSum, r) => rSum + (parseInt(r.pcs, 10) || 0), 0);
+      }, 0);
+
+      const totalRows = fabricGroups.reduce((sum, fg) => sum + fg.rows.length, 0);
+
+      if (totalRows > 0 && totalArticlePcs > 0) {
+        const artSourcing = (
+          articleSourcing[artEntry.articleName] ||
+          (fabricGroups[0] && fabricGroups[0].sourcing) ||
+          'Greige'
+        );
+
+        sections.push({
+          ...artEntry,
+          sourcing: artSourcing,
+          totalRows: totalRows,
+          fabricGroups: fabricGroups
+        });
+      }
+    });
+
+    return sections;
+  }, [consumptionRows, articleSourcing, masterFabricsList, order]);
 
   // Group subtotals for bottom summary rows matching Image 4
   const fabricSummaryRows = useMemo(() => {
@@ -3808,6 +4032,135 @@ export default function OrderDetailView({
       </div>
 
       {/* =========================================================================
+      {/* Deliverable Finished Sets & Article Balance Summary Card */}
+      {(() => {
+        const rawCusts = order?.customerOrders || order?.customers;
+        if (!Array.isArray(rawCusts) || rawCusts.length === 0 || articlesList.length < 2) return null;
+
+        let allBreakdowns = [];
+        let grandTotalFullSets = 0;
+        let grandTotalGarmentPcs = 0;
+
+        rawCusts.forEach((cust, ci) => {
+          (cust.selectedColors || []).forEach(colName => {
+            const articleCounts = articlesList.map(art => {
+              let pcs = 0;
+              const key = `${art.id}_${colName}`;
+              const cfg = cust.sizeConfigs?.[key];
+              if (cfg?.sizeQtys) {
+                Object.values(cfg.sizeQtys).forEach(q => { pcs += parseInt(q, 10) || 0; });
+              }
+              return { name: art.name, pcs };
+            });
+
+            if (articleCounts.every(a => a.pcs === 0)) return;
+
+            const min = Math.min(...articleCounts.map(a => a.pcs));
+            const max = Math.max(...articleCounts.map(a => a.pcs));
+            const sumPcs = articleCounts.reduce((acc, a) => acc + a.pcs, 0);
+            grandTotalFullSets += min;
+            grandTotalGarmentPcs += sumPcs;
+
+            allBreakdowns.push({
+              customerName: cust.customerName || `Customer ${ci + 1}`,
+              colorName: colName,
+              articleCounts,
+              min,
+              max,
+              sumPcs,
+              isBalanced: min === max
+            });
+          });
+        });
+
+        if (allBreakdowns.length === 0) return null;
+
+        return (
+          <div
+            className="card border-0 shadow-sm rounded-4 bg-white mb-4"
+            style={{
+              border: '1.5px solid #c7d2fe',
+              padding: '22px',
+              borderRadius: '14px',
+              backgroundColor: '#ffffff'
+            }}
+          >
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+              <div className="d-flex align-items-center gap-2.5">
+                <div
+                  className="rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
+                  style={{ width: '38px', height: '38px', backgroundColor: '#2e37a4', borderRadius: '10px' }}
+                >
+                  <i className="ti ti-packages" style={{ fontSize: '20px', lineHeight: 1 }}></i>
+                </div>
+                <div>
+                  <h6 className="fw-bold text-dark mb-0.5" style={{ fontSize: '16px' }}>
+                    Deliverable Finished Sets Composition
+                  </h6>
+                  <span className="text-muted small" style={{ fontSize: '12px' }}>
+                    Article pairing, set balance, and finished garment unit count
+                  </span>
+                </div>
+              </div>
+
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge rounded-pill px-3 py-1.5 fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '13px' }}>
+                  {grandTotalFullSets} Complete Sets
+                </span>
+                <span className="badge rounded-pill px-3 py-1.5 fw-bold bg-light text-secondary border" style={{ fontSize: '13px' }}>
+                  {grandTotalGarmentPcs} Garment Pieces
+                </span>
+              </div>
+            </div>
+
+            <div className="d-flex flex-column gap-2.5">
+              {allBreakdowns.map((bd, bIdx) => (
+                <div
+                  key={bIdx}
+                  className="p-3 rounded-3 border d-flex justify-content-between align-items-center flex-wrap gap-2"
+                  style={{
+                    backgroundColor: bd.isBalanced ? '#f0fdf4' : '#fffbeb',
+                    borderColor: bd.isBalanced ? '#bbf7d0' : '#fde68a'
+                  }}
+                >
+                  <div>
+                    <div className="d-flex align-items-center gap-2 mb-1">
+                      <span className="fw-bold text-dark" style={{ fontSize: '13.5px' }}>
+                        {bd.customerName} &mdash; {bd.colorName}
+                      </span>
+                      {bd.isBalanced ? (
+                        <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style={{ fontSize: '11px' }}>
+                          ✓ 1:1 Complete Sets
+                        </span>
+                      ) : (
+                        <span className="badge bg-warning text-dark border border-warning rounded-pill px-2 py-0.5" style={{ fontSize: '11px' }}>
+                          Split / Partial Quantities
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted small" style={{ fontSize: '12px' }}>
+                      {bd.articleCounts.map(a => `${a.name}: ${a.pcs} pcs`).join(' • ')}
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs fw-semibold" style={{ fontSize: '12px' }}>
+                      {bd.min} Complete {articlesList.length}-Pc Sets
+                    </span>
+                    {!bd.isBalanced && (
+                      <span className="badge bg-white text-warning-emphasis border border-warning-subtle px-2.5 py-1.5 shadow-2xs fw-semibold" style={{ fontSize: '12px' }}>
+                        +{bd.max - bd.min} Extra Pieces
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* =========================================================================
        * 6. ARTICLES (N) CARD
        * ========================================================================= */}
       <div
@@ -3866,7 +4219,7 @@ export default function OrderDetailView({
                       <i className="ti ti-box" style={{ fontSize: '14px', lineHeight: 1 }}></i> Quantity
                     </span>
                     <span className="fw-bold" style={{ color: '#2563eb', fontSize: '15px' }}>
-                      {art.totalPieces || order?.totalGarments || 0} pcs
+                      {art.totalPieces !== undefined && art.totalPieces !== null ? art.totalPieces : (order?.totalGarments || 0)} pcs
                     </span>
                   </div>
                   <i className={`ti ti-chevron-${isExpanded ? 'up' : 'down'} text-muted`} style={{ fontSize: '18px', lineHeight: 1 }}></i>
@@ -4381,100 +4734,108 @@ export default function OrderDetailView({
               </tr>
             </thead>
             <tbody>
-              {articleGroups.map((group) => {
-                const isDyedSourced = group.sourcing === 'Dyed';
-                const dyedVal = parseFloat(group.dyedRate) || 0;
-                const hasDyedVal = dyedVal > 0;
-                const shrinkPct = isDyedSourced ? 0 : (group.shrinkPct || 0);
+              {articleSections.map((section) => {
+                let isFirstRowOfArticle = true;
 
-                const widthOptions = getFabricMasterWidths(group.fabricQuality, group.width);
+                return section.fabricGroups.map((group, gIdx) => {
+                  const isDyedSourced = group.sourcing === 'Dyed';
+                  const dyedVal = parseFloat(group.dyedRate) || 0;
+                  const hasDyedVal = dyedVal > 0;
+                  const shrinkPct = isDyedSourced ? 0 : (group.shrinkPct || 0);
 
-                return group.rows.map((row, rIdx) => {
-                  const isFirstRow = rIdx === 0;
-                  const pcs = parseInt(row.pcs, 10) || 0;
-                  const greigePerPc = hasDyedVal ? (isDyedSourced ? dyedVal : dyedVal * (1 + shrinkPct / 100)) : null;
-                  const totalDyed = (hasDyedVal && pcs > 0) ? dyedVal * pcs : null;
-                  const totalGreige = (greigePerPc !== null && pcs > 0) ? greigePerPc * pcs : null;
+                  const widthOptions = getFabricMasterWidths(group.fabricQuality, group.width);
 
-                  return (
-                    <tr
-                      key={row.key || `${group.articleName}_${rIdx}`}
-                      style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        verticalAlign: 'middle',
-                        backgroundColor: '#ffffff'
-                      }}
-                    >
-                      {/* ARTICLE (Rowspan per article) */}
-                      {isFirstRow && (
-                        <td
-                          rowSpan={group.rows.length}
-                          style={{
-                            verticalAlign: 'middle',
-                            padding: '12px 14px',
-                            borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <div className="d-flex align-items-center gap-2 mb-1.5">
-                            <span className="fs-5">{group.icon}</span>
-                            <div>
-                              <div className="fw-bold text-dark fs-14" style={{ lineHeight: 1.2 }}>
-                                {group.articleName}
-                              </div>
-                              <div className="text-muted text-uppercase" style={{ fontSize: '10px', letterSpacing: '0.04em' }}>
-                                {group.articleCode}
+                  return group.rows.map((row, rIdx) => {
+                    const isFirstRow = rIdx === 0;
+                    const pcs = parseInt(row.pcs, 10) || 0;
+                    const greigePerPc = hasDyedVal ? (isDyedSourced ? dyedVal : dyedVal * (1 + shrinkPct / 100)) : null;
+                    const totalDyed = (hasDyedVal && pcs > 0) ? dyedVal * pcs : null;
+                    const totalGreige = (greigePerPc !== null && pcs > 0) ? greigePerPc * pcs : null;
+
+                    const renderArticleCell = isFirstRowOfArticle;
+                    if (isFirstRowOfArticle) {
+                      isFirstRowOfArticle = false;
+                    }
+
+                    return (
+                      <tr
+                        key={row.key || `${section.articleName}_${gIdx}_${rIdx}`}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          verticalAlign: 'middle',
+                          backgroundColor: '#ffffff'
+                        }}
+                      >
+                        {/* ARTICLE (Rowspan per entire article across all its fabrics) */}
+                        {renderArticleCell && (
+                          <td
+                            rowSpan={section.totalRows}
+                            style={{
+                              verticalAlign: 'middle',
+                              padding: '12px 14px',
+                              borderRight: '1px solid #f1f5f9',
+                              borderBottom: '1px solid #e2e8f0'
+                            }}
+                          >
+                            <div className="d-flex align-items-center gap-2 mb-1.5">
+                              <span className="fs-5">{section.icon}</span>
+                              <div>
+                                <div className="fw-bold text-dark fs-14" style={{ lineHeight: 1.2 }}>
+                                  {section.articleName}
+                                </div>
+                                <div className="text-muted text-uppercase" style={{ fontSize: '10px', letterSpacing: '0.04em' }}>
+                                  {section.articleCode}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Toggle Buttons: [ Greige ] [ Dyed ] */}
-                          {isConsumptionEditing ? (
-                            <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
-                              <button
-                                type="button"
-                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${!isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                  }`}
+                            {/* Toggle Buttons: [ Greige ] [ Dyed ] */}
+                            {isConsumptionEditing ? (
+                              <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
+                                <button
+                                  type="button"
+                                  className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${section.sourcing !== 'Dyed' ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                    }`}
+                                  style={{
+                                    fontSize: '11px',
+                                    backgroundColor: section.sourcing !== 'Dyed' ? '#4361ee' : 'transparent',
+                                    border: 'none'
+                                  }}
+                                  onClick={() => handleToggleArticleSourcing(section.articleName, 'Greige')}
+                                  title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
+                                >
+                                  Greige
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${section.sourcing === 'Dyed' ? 'text-white shadow-xs' : 'text-muted bg-transparent'
+                                    }`}
+                                  style={{
+                                    fontSize: '11px',
+                                    backgroundColor: section.sourcing === 'Dyed' ? '#0284c7' : 'transparent',
+                                    border: 'none'
+                                  }}
+                                  onClick={() => handleToggleArticleSourcing(section.articleName, 'Dyed')}
+                                  title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
+                                >
+                                  Dyed
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className="badge px-2.5 py-1 rounded-2 fw-semibold"
                                 style={{
                                   fontSize: '11px',
-                                  backgroundColor: !isDyedSourced ? '#4361ee' : 'transparent',
-                                  border: 'none'
+                                  backgroundColor: section.sourcing === 'Dyed' ? '#e0f2fe' : '#eef2ff',
+                                  color: section.sourcing === 'Dyed' ? '#0284c7' : '#4361ee',
+                                  border: section.sourcing === 'Dyed' ? '1px solid #bae6fd' : '1px solid #c7d2fe'
                                 }}
-                                onClick={() => handleToggleArticleSourcing(group.articleName, 'Greige', group.fabricQuality, group.role)}
-                                title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
                               >
-                                Greige
-                              </button>
-                              <button
-                                type="button"
-                                className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${isDyedSourced ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                  }`}
-                                style={{
-                                  fontSize: '11px',
-                                  backgroundColor: isDyedSourced ? '#0284c7' : 'transparent',
-                                  border: 'none'
-                                }}
-                                onClick={() => handleToggleArticleSourcing(group.articleName, 'Dyed', group.fabricQuality, group.role)}
-                                title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
-                              >
-                                Dyed
-                              </button>
-                            </div>
-                          ) : (
-                            <span
-                              className="badge px-2.5 py-1 rounded-2 fw-semibold"
-                              style={{
-                                fontSize: '11px',
-                                backgroundColor: isDyedSourced ? '#e0f2fe' : '#eef2ff',
-                                color: isDyedSourced ? '#0284c7' : '#4361ee',
-                                border: isDyedSourced ? '1px solid #bae6fd' : '1px solid #c7d2fe'
-                              }}
-                            >
-                              {isDyedSourced ? 'Dyed' : 'Greige'}
-                            </span>
-                          )}
-                        </td>
-                      )}
+                                {section.sourcing === 'Dyed' ? 'Dyed' : 'Greige'}
+                              </span>
+                            )}
+                          </td>
+                        )}
 
                       {/* FABRIC (Rowspan per article-fabric requirement) */}
                       {isFirstRow && (
@@ -4498,7 +4859,7 @@ export default function OrderDetailView({
                         </td>
                       )}
 
-                      {/* WIDTH (IN) (Rowspan per article fabric - comes from selected fabric) */}
+                      {/* WIDTH (IN) (Rowspan per article fabric - all available widths rendered as stacked boxes) */}
                       {isFirstRow && (
                         <td
                           rowSpan={group.rows.length}
@@ -4510,136 +4871,60 @@ export default function OrderDetailView({
                             borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          {isConsumptionEditing ? (
-                            <div className="position-relative d-inline-block">
-                              <button
-                                type="button"
-                                className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1.5 fw-semibold transition-all shadow-none"
-                                style={{
-                                  minWidth: '66px',
-                                  height: '30px',
-                                  padding: '2px 8px',
-                                  fontSize: '12.5px',
-                                  fontWeight: 600,
-                                  color: group.width && group.width !== '—' ? '#4361ee' : '#64748b',
-                                  backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#ffffff',
-                                  border: activeWidthDropdown === group.key
-                                    ? '1.5px solid #4361ee'
-                                    : (group.width && group.width !== '—' ? '1.5px solid #c7d2fe' : '1.5px solid #cbd5e1'),
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  boxShadow: activeWidthDropdown === group.key
-                                    ? '0 0 0 3px rgba(67, 97, 238, 0.15)'
-                                    : 'none'
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveWidthDropdown(activeWidthDropdown === group.key ? null : group.key);
-                                }}
-                                title="Select fabric width from Fabric Master"
-                              >
-                                <span>{group.width || '—'}</span>
-                                <i
-                                  className={`ti ti-chevron-${activeWidthDropdown === group.key ? 'up' : 'down'}`}
-                                  style={{ fontSize: '11px', color: '#4361ee', transition: 'transform 0.15s ease' }}
-                                ></i>
-                              </button>
-
-                              {activeWidthDropdown === group.key && (
-                                <div
-                                  className="position-absolute bg-white rounded-3 border py-1 animate__animated animate__fadeIn"
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
+                            {widthOptions.map((w) => {
+                              const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
+                              return isConsumptionEditing ? (
+                                <button
+                                  key={w}
+                                  type="button"
+                                  className="btn btn-sm d-inline-flex align-items-center justify-content-center transition-all shadow-none"
                                   style={{
-                                    top: 'calc(100% + 4px)',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    zIndex: 1060,
-                                    minWidth: '95px',
-                                    borderColor: '#c7d2fe',
-                                    boxShadow: '0 10px 25px -5px rgba(67, 97, 238, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.06)',
-                                    borderRadius: '8px'
+                                    minWidth: '66px',
+                                    height: '32px',
+                                    padding: '2px 8px',
+                                    fontSize: '12.5px',
+                                    fontFamily: 'monospace',
+                                    fontWeight: isSelected ? 700 : 600,
+                                    color: isSelected ? '#4361ee' : '#64748b',
+                                    backgroundColor: isSelected ? '#eef2ff' : '#ffffff',
+                                    border: isSelected ? '1.5px solid #4361ee' : '1.5px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: isSelected ? '0 0 0 2px rgba(67, 97, 238, 0.15)' : 'none'
                                   }}
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={() => handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role)}
+                                  title={`Click to select ${w} width`}
                                 >
-                                  <div
-                                    className="px-2.5 py-1 border-bottom mb-1 fw-bold"
-                                    style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6366f1' }}
-                                  >
-                                    Fabric Width
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
-                                    style={{
-                                      fontSize: '12.5px',
-                                      color: (!group.width || group.width === '—') ? '#4361ee' : '#64748b',
-                                      backgroundColor: (!group.width || group.width === '—') ? '#eef2ff' : 'transparent',
-                                      cursor: 'pointer'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = '#f8fafc';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (group.width && group.width !== '—') e.currentTarget.style.backgroundColor = 'transparent';
-                                    }}
-                                    onClick={() => {
-                                      handleUpdateArticleWidth(group.articleName, '', group.fabricQuality, group.role);
-                                      setActiveWidthDropdown(null);
-                                    }}
-                                  >
-                                    <span>—</span>
-                                    {(!group.width || group.width === '—') && (
-                                      <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
-                                    )}
-                                  </button>
-                                  {widthOptions.map((w) => {
-                                    const isSelected = group.width === w;
-                                    return (
-                                      <button
-                                        key={w}
-                                        type="button"
-                                        className="w-100 border-0 bg-transparent px-3 py-1.5 d-flex align-items-center justify-content-between text-start fw-semibold transition-all"
-                                        style={{
-                                          fontSize: '12.5px',
-                                          color: isSelected ? '#4361ee' : '#334155',
-                                          backgroundColor: isSelected ? '#eef2ff' : 'transparent',
-                                          cursor: 'pointer'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                                        }}
-                                        onClick={() => {
-                                          handleUpdateArticleWidth(group.articleName, w, group.fabricQuality, group.role);
-                                          setActiveWidthDropdown(null);
-                                        }}
-                                      >
-                                        <span>{w}</span>
-                                        {isSelected && (
-                                          <i className="ti ti-check" style={{ fontSize: '12px', color: '#4361ee' }}></i>
-                                        )}
-                                      </button>
-                                    );
-                                  })}
+                                  <span>{w}</span>
+                                  {isSelected && (
+                                    <i className="ti ti-check ms-1" style={{ fontSize: '11px', color: '#4361ee' }}></i>
+                                  )}
+                                </button>
+                              ) : (
+                                <div
+                                  key={w}
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                  style={{
+                                    minWidth: '64px',
+                                    height: '30px',
+                                    padding: '2px 8px',
+                                    fontSize: '12px',
+                                    fontWeight: isSelected ? 700 : 500,
+                                    color: isSelected ? '#4361ee' : '#94a3b8',
+                                    backgroundColor: isSelected ? '#eef2ff' : '#f8fafc',
+                                    border: isSelected ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  <span>{w}</span>
+                                  {isSelected && (
+                                    <i className="ti ti-check ms-1" style={{ fontSize: '10px', color: '#4361ee' }}></i>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span
-                              className="badge fw-semibold font-monospace"
-                              style={{
-                                fontSize: '12px',
-                                padding: '4px 8px',
-                                color: group.width && group.width !== '—' ? '#4361ee' : '#94a3b8',
-                                backgroundColor: group.width && group.width !== '—' ? '#eef2ff' : '#f1f5f9',
-                                border: '1px solid',
-                                borderColor: group.width && group.width !== '—' ? '#c7d2fe' : '#e2e8f0'
-                              }}
-                            >
-                              {group.width || '—'}
-                            </span>
-                          )}
+                              );
+                            })}
+                          </div>
                         </td>
                       )}
 
@@ -4661,7 +4946,7 @@ export default function OrderDetailView({
                         </div>
                       </td>
 
-                      {/* DYED (M/PC) (Rowspan per article) */}
+                      {/* DYED (M/PC) (Rowspan per article - stacked boxes corresponding to each width) */}
                       {isFirstRow && (
                         <td
                           rowSpan={group.rows.length}
@@ -4673,43 +4958,68 @@ export default function OrderDetailView({
                             borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          {isConsumptionEditing ? (
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              className="form-control form-control-sm text-center font-monospace"
-                              style={{
-                                width: '78px',
-                                height: '32px',
-                                margin: '0 auto',
-                                border: '1.5px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: '#1e293b',
-                                transition: 'all 0.15s ease'
-                              }}
-                              onFocus={(e) => {
-                                e.currentTarget.style.borderColor = '#4361ee';
-                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(67, 97, 238, 0.15)';
-                              }}
-                              onBlur={(e) => {
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.boxShadow = 'none';
-                              }}
-                              placeholder="0.000"
-                              value={group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' ? group.dyedRate : ''}
-                              onChange={(e) => handleUpdateArticleDyedRate(group.articleName, e.target.value, group.fabricQuality, group.role)}
-                            />
-                          ) : (
-                            <span className="font-monospace fw-bold text-dark fs-13">
-                              {group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== '' && parseFloat(group.dyedRate) > 0
-                                ? parseFloat(group.dyedRate).toFixed(3)
-                                : '—'}
-                            </span>
-                          )}
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
+                            {widthOptions.map((w) => {
+                              const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
+                              const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                              const storedRate = widthDyedRates[rateKey];
+                              // Strictly independent per width: NEVER auto-copy from another width or group.dyedRate
+                              const displayVal = (storedRate !== undefined && storedRate !== null)
+                                ? storedRate
+                                : ((group.width === w && group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== '') ? group.dyedRate : '');
+
+                              return isConsumptionEditing ? (
+                                <input
+                                  key={w}
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  className="form-control form-control-sm text-center font-monospace"
+                                  style={{
+                                    width: '78px',
+                                    height: '32px',
+                                    border: isSelected ? '1.5px solid #4361ee' : '1.5px solid #cbd5e1',
+                                    backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: isSelected ? 700 : 600,
+                                    color: isSelected ? '#1e293b' : '#64748b',
+                                    boxShadow: isSelected ? '0 0 0 2px rgba(67, 97, 238, 0.12)' : 'none',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  placeholder="0.000"
+                                  value={displayVal !== undefined && displayVal !== null ? displayVal : ''}
+                                  onFocus={() => {
+                                    if (!isSelected) {
+                                      handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
+                                    }
+                                  }}
+                                  onChange={(e) => handleUpdateWidthDyedRate(group.articleName, group.fabricQuality, group.role, w, e.target.value)}
+                                  title={`Dyed consumption for ${w} width`}
+                                />
+                              ) : (
+                                <div
+                                  key={w}
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                  style={{
+                                    minWidth: '70px',
+                                    height: '30px',
+                                    padding: '2px 8px',
+                                    fontSize: '12.5px',
+                                    fontWeight: isSelected ? 700 : 500,
+                                    color: isSelected ? '#1e293b' : '#94a3b8',
+                                    backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
+                                    border: isSelected ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  {displayVal !== undefined && displayVal !== null && displayVal !== '' && parseFloat(displayVal) > 0
+                                    ? parseFloat(displayVal).toFixed(3)
+                                    : '—'}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </td>
                       )}
 
@@ -4753,26 +5063,49 @@ export default function OrderDetailView({
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        <div className="d-flex justify-content-center">
-                          <div
-                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
-                            style={{
-                              minWidth: '68px',
-                              height: '30px',
-                              padding: '0 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#f8fafc',
-                              color: greigePerPc !== null && greigePerPc > 0 ? '#1e293b' : '#94a3b8',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '12.5px'
-                            }}
-                          >
-                            {greigePerPc !== null && greigePerPc > 0 ? greigePerPc.toFixed(3) : '0.000'}
-                          </div>
+                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
+                          {widthOptions.map((w) => {
+                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
+                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                            const storedRate = widthDyedRates[rateKey];
+                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                              ? parseFloat(storedRate)
+                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
+                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                            const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
+
+                            return (
+                              <div
+                                key={w}
+                                className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                style={{
+                                  minWidth: '68px',
+                                  height: '32px',
+                                  padding: '0 8px',
+                                  borderRadius: '6px',
+                                  backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
+                                  color: isSelected ? (wGreigePerPc > 0 ? '#1e293b' : '#94a3b8') : (wGreigePerPc > 0 ? '#64748b' : '#94a3b8'),
+                                  border: isSelected ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
+                                  fontSize: '12.5px',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onClick={() => {
+                                  if (isConsumptionEditing && !isSelected) {
+                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
+                                  }
+                                }}
+                                title={`Greige per piece for ${w} width`}
+                              >
+                                {wGreigePerPc > 0 ? wGreigePerPc.toFixed(3) : '0.000'}
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
 
-                      {/* PCS */}
+                      {/* PCS (Rendered from order sizes & quantities, read-only) */}
                       <td
                         style={{
                           padding: '8px 6px',
@@ -4780,45 +5113,26 @@ export default function OrderDetailView({
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        {isConsumptionEditing ? (
-                          <input
-                            type="number"
-                            min="0"
-                            className="form-control form-control-sm text-center font-monospace"
+                        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '32px' }}>
+                          <div
+                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
                             style={{
-                              width: '74px',
+                              minWidth: '68px',
                               height: '32px',
-                              margin: '0 auto',
-                              border: '1.5px solid #cbd5e1',
-                              backgroundColor: '#ffffff',
+                              padding: '0 8px',
                               borderRadius: '6px',
+                              backgroundColor: '#ffffff',
+                              color: pcs > 0 ? '#1e293b' : '#94a3b8',
+                              border: '1.5px solid #cbd5e1',
                               fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#1e293b'
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                              userSelect: 'none'
                             }}
-                            value={row.pcs !== undefined && row.pcs !== null ? row.pcs : ''}
-                            placeholder="0"
-                            onChange={(e) => handleUpdateRowPcs(row.key, e.target.value)}
-                          />
-                        ) : (
-                          <div className="d-flex justify-content-center">
-                            <div
-                              className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
-                              style={{
-                                minWidth: '64px',
-                                height: '30px',
-                                padding: '0 8px',
-                                borderRadius: '6px',
-                                backgroundColor: '#f8fafc',
-                                color: pcs > 0 ? '#1e293b' : '#94a3b8',
-                                border: '1px solid #cbd5e1',
-                                fontSize: '12.5px'
-                              }}
-                            >
-                              {pcs > 0 ? pcs : '0'}
-                            </div>
+                            title="Ordered pieces from Customer Sizes & Quantities"
+                          >
+                            {pcs > 0 ? pcs : '0'}
                           </div>
-                        )}
+                        </div>
                       </td>
 
                       {/* TOTAL DYED */}
@@ -4829,22 +5143,46 @@ export default function OrderDetailView({
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        <div className="d-flex justify-content-center">
-                          <div
-                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
-                            style={{
-                              minWidth: '78px',
-                              height: '30px',
-                              padding: '0 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#eef2ff',
-                              color: '#1d4ed8',
-                              border: '1px solid #c7d2fe',
-                              fontSize: '12px'
-                            }}
-                          >
-                            {totalDyed !== null && totalDyed > 0 ? `${totalDyed.toFixed(2)}m` : '0.00m'}
-                          </div>
+                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
+                          {widthOptions.map((w) => {
+                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
+                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                            const storedRate = widthDyedRates[rateKey];
+                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                              ? parseFloat(storedRate)
+                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
+                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                            const wTotalDyed = (wDyedVal > 0 && pcs > 0) ? (wDyedVal * pcs) : 0;
+
+                            return (
+                              <div
+                                key={w}
+                                className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                style={{
+                                  minWidth: '78px',
+                                  height: '32px',
+                                  padding: '0 8px',
+                                  borderRadius: '6px',
+                                  backgroundColor: isSelected ? '#eef2ff' : '#f8fafc',
+                                  color: isSelected ? '#1d4ed8' : '#64748b',
+                                  border: isSelected ? '1.5px solid #818cf8' : '1px solid #e2e8f0',
+                                  fontSize: '12px',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  boxShadow: isSelected ? '0 0 0 1px rgba(99, 102, 241, 0.15)' : 'none',
+                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onClick={() => {
+                                  if (isConsumptionEditing && !isSelected) {
+                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
+                                  }
+                                }}
+                                title={`Total dyed for ${w} width`}
+                              >
+                                {wTotalDyed > 0 ? `${wTotalDyed.toFixed(2)}m` : '0.00m'}
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
 
@@ -4856,22 +5194,47 @@ export default function OrderDetailView({
                           borderBottom: '1px solid #f1f5f9'
                         }}
                       >
-                        <div className="d-flex justify-content-center">
-                          <div
-                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
-                            style={{
-                              minWidth: '78px',
-                              height: '30px',
-                              padding: '0 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#faf5ff',
-                              color: '#7e22ce',
-                              border: '1px solid #e9d5ff',
-                              fontSize: '12px'
-                            }}
-                          >
-                            {totalGreige !== null && totalGreige > 0 ? `${totalGreige.toFixed(2)}m` : '0.00m'}
-                          </div>
+                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
+                          {widthOptions.map((w) => {
+                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
+                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                            const storedRate = widthDyedRates[rateKey];
+                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                              ? parseFloat(storedRate)
+                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
+                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                            const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
+                            const wTotalGreige = (wGreigePerPc > 0 && pcs > 0) ? (wGreigePerPc * pcs) : 0;
+
+                            return (
+                              <div
+                                key={w}
+                                className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                style={{
+                                  minWidth: '78px',
+                                  height: '32px',
+                                  padding: '0 8px',
+                                  borderRadius: '6px',
+                                  backgroundColor: isSelected ? '#faf5ff' : '#f8fafc',
+                                  color: isSelected ? '#7e22ce' : '#64748b',
+                                  border: isSelected ? '1.5px solid #c084fc' : '1px solid #e2e8f0',
+                                  fontSize: '12px',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  boxShadow: isSelected ? '0 0 0 1px rgba(192, 132, 252, 0.15)' : 'none',
+                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onClick={() => {
+                                  if (isConsumptionEditing && !isSelected) {
+                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
+                                  }
+                                }}
+                                title={`Total greige for ${w} width`}
+                              >
+                                {wTotalGreige > 0 ? `${wTotalGreige.toFixed(2)}m` : '0.00m'}
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
 
@@ -4898,7 +5261,8 @@ export default function OrderDetailView({
                     </tr>
                   );
                 });
-              })}
+              });
+            })}
 
               {/* GRAND TOTAL ROW */}
               {consumptionRows.length > 0 && (
@@ -4936,7 +5300,22 @@ export default function OrderDetailView({
                           fontSize: '13px'
                         }}
                       >
-                        {order?.totalPcs || order?.orderQuantity || fabricSummaryRows.reduce((sum, fs) => sum + (parseInt(fs.pcs, 10) || 0), 0)} pcs
+                        {(() => {
+                          if (order?.totalGarments && order.totalGarments > 0) return order.totalGarments;
+                          if (order?.totalPcs && order.totalPcs > 0) return order.totalPcs;
+                          if (order?.orderQuantity && order.orderQuantity > 0) return order.orderQuantity;
+                          const artColorMap = new Map();
+                          consumptionRows.forEach(r => {
+                            const key = `${r.articleName}___${r.colorName}`;
+                            const pcs = parseInt(r.pcs, 10) || 0;
+                            if (!artColorMap.has(key) || r.isMainFabric) {
+                              artColorMap.set(key, pcs);
+                            }
+                          });
+                          let sum = 0;
+                          artColorMap.forEach(p => { sum += p; });
+                          return sum;
+                        })()} pcs
                       </div>
                     </div>
                   </td>

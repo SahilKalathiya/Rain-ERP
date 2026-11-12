@@ -6,6 +6,7 @@ import AddColorModal from './AddColorModal';
 import { initialColors } from '../../data/procurementData';
 import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
 import { getMetersForPoFromGrn, getPoFulfillmentData, calculatePoFabricFulfillment } from '../../utils/procurementUtils';
+import { vendorMatchesType } from '../../utils/vendorUtils';
 
 /**
  * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
@@ -757,6 +758,22 @@ export default function PurchaseOrderForm({
         }
       ]
   }));
+
+  const [showAllVendors, setShowAllVendors] = useState(false);
+
+  // Requirement 2: Filter vendors strictly based on PO Type (Fabric Supplier for Fabric PO)
+  const displayedVendors = useMemo(() => {
+    if (showAllVendors) {
+      return vendors.filter((v) => v.active !== false || v.id === formData.vendorId);
+    }
+    const filtered = vendors.filter((v) =>
+      (v.active !== false || v.id === formData.vendorId) &&
+      (vendorMatchesType(v, ['Fabric Supplier', 'Fabric']) || v.id === formData.vendorId)
+    );
+    return filtered.length > 0
+      ? filtered
+      : vendors.filter((v) => v.active !== false || v.id === formData.vendorId);
+  }, [vendors, showAllVendors, formData.vendorId]);
 
   // Requirement 15: Once a Purchase Order is sent to the vendor and its GRN process has started, the Purchase Order should no longer be editable.
   const poNumbersToCheck = [
@@ -1512,21 +1529,33 @@ export default function PurchaseOrderForm({
             )}
           </div>
 
-          {/* Vendor * */}
+          {/* Vendor (Fabric Supplier) * */}
           <div className="col-12 col-md-4">
             <div className="d-flex align-items-center justify-content-between mb-1">
               <label className="form-label fs-12 fw-semibold text-secondary mb-0">
-                Vendor <span className="text-danger">*</span>
+                Vendor (Fabric Supplier) <span className="text-danger">*</span>
               </label>
-              {isEditing && (
-                <button
-                  type="button"
-                  className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
-                  onClick={() => setShowInlineVendorModal(true)}
-                >
-                  + New
-                </button>
-              )}
+              <div className="d-flex align-items-center gap-2">
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-decoration-none fs-11 text-muted"
+                    onClick={() => setShowAllVendors((prev) => !prev)}
+                    title={showAllVendors ? 'Switch back to Fabric suppliers' : 'Show all vendors'}
+                  >
+                    {showAllVendors ? 'Filter Fabric' : `Show all (${vendors.length})`}
+                  </button>
+                )}
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
+                    onClick={() => setShowInlineVendorModal(true)}
+                  >
+                    + New
+                  </button>
+                )}
+              </div>
             </div>
             {isEditing ? (
               <select
@@ -1535,15 +1564,13 @@ export default function PurchaseOrderForm({
                 value={formData.vendorId}
                 onChange={(e) => handleVendorChange(e.target.value)}
               >
-                <option value="">Select a vendor...</option>
-                {vendors
-                  .filter((v) => v.active !== false || v.id === formData.vendorId)
-                  .map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} {v.city ? `(${v.city})` : ''}
-                    </option>
-                  ))}
-                {formData.vendorId && !vendors.some((v) => v.id === formData.vendorId) && (
+                <option value="">Select Fabric Supplier...</option>
+                {displayedVendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} {v.city ? `(${v.city})` : ''}
+                  </option>
+                ))}
+                {formData.vendorId && !displayedVendors.some((v) => v.id === formData.vendorId) && (
                   <option value={formData.vendorId}>
                     {formData.vendorName || formData.vendorId}
                   </option>
@@ -2496,6 +2523,7 @@ export default function PurchaseOrderForm({
         <VendorMasterView
           vendors={vendors}
           isInline={true}
+          defaultTypes={['Fabric Supplier']}
           onSaveVendor={(newVendor) => {
             if (onSaveVendor) onSaveVendor(newVendor);
             if (newVendor) handleVendorChange(newVendor.id, newVendor);

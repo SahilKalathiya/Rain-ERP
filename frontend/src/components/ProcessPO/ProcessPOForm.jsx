@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { initialVendors } from '../../data/procurementData';
 import { initialArticles, getStoredColorsMaster, getStoredData } from '../../data/salesOrderData';
+import { vendorMatchesType } from '../../utils/vendorUtils';
 import VendorMasterView from '../Procurement/VendorMasterView';
 import FabricMasterView from '../Procurement/FabricMasterView';
 import AddColorModal from '../Procurement/AddColorModal';
@@ -325,8 +326,23 @@ export default function ProcessPOForm({
   const [issueDate, setIssueDate] = useState(
     initialPO?.issue_date || initialPO?.date || new Date().toISOString().split('T')[0]
   );
+  const [processType, setProcessType] = useState(
+    initialPO?.process_type || initialPO?.processType || 'Dyeing'
+  );
+  const [showAllVendors, setShowAllVendors] = useState(false);
   const [vendorId, setVendorId] = useState(initialPO?.vendor_id || '');
   const [vendorName, setVendorName] = useState(initialPO?.vendor_name || '');
+
+  // Requirement 2: Filter vendors strictly based on selected Purchase Order / Process Type
+  const displayedVendors = React.useMemo(() => {
+    if (showAllVendors || !processType || processType === 'All') return vendorList;
+    const filtered = vendorList.filter((v) =>
+      vendorMatchesType(v, processType) ||
+      (v.name || v.vendorName) === vendorName ||
+      v.id === vendorId
+    );
+    return filtered.length > 0 ? filtered : vendorList;
+  }, [vendorList, processType, showAllVendors, vendorName, vendorId]);
 
   // Order Linkage
   const [isOrderLinked, setIsOrderLinked] = useState(
@@ -616,6 +632,7 @@ export default function ProcessPOForm({
     const payload = {
       id: initialPO?.id || `PPO-${poNumber}`,
       po_number: poNumber,
+      process_type: processType,
       date: date,
       issue_date: issueDate,
       vendor_id: vendorId,
@@ -767,8 +784,43 @@ export default function ProcessPOForm({
 
         <div className="p-4">
           <div className="row g-3">
+            {/* Process Type */}
+            <div className="col-md-2">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                Process Type <span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select form-select-sm bg-white fw-bold text-primary fs-13"
+                style={{ borderColor: '#cbd5e1', height: '36px' }}
+                value={processType}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setProcessType(newType);
+                  // If current selected vendor doesn't support the new process type, clear selection
+                  if (vendorName) {
+                    const currentMatched = vendorList.find(
+                      (v) => (v.name || v.vendorName) === vendorName
+                    );
+                    if (currentMatched && !vendorMatchesType(currentMatched, newType)) {
+                      setVendorName('');
+                      setVendorId('');
+                    }
+                  }
+                }}
+              >
+                <option value="Dyeing">Dyeing</option>
+                <option value="Printing">Printing</option>
+                <option value="Processing">Processing</option>
+                <option value="Embroidery">Embroidery</option>
+                <option value="Washing">Washing</option>
+                <option value="Stitching / Job Worker">Stitching / Job Worker</option>
+                <option value="All">All Processes</option>
+              </select>
+            </div>
+
             {/* PO Number */}
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                 Process PO Number <span className="text-danger">*</span>
               </label>
@@ -786,7 +838,7 @@ export default function ProcessPOForm({
             </div>
 
             {/* Date */}
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                 PO Date <span className="text-danger">*</span>
               </label>
@@ -800,21 +852,31 @@ export default function ProcessPOForm({
               />
             </div>
 
-            {/* Job Work Vendor */}
-            <div className="col-md-3">
+            {/* Job Work Vendor - Filtered based on Process Type */}
+            <div className="col-md-4">
               <div className="d-flex align-items-center justify-content-between mb-1">
                 <label className="form-label fs-12 fw-semibold text-secondary mb-0">
-                  Dyeing / Processing Vendor <span className="text-danger">*</span>
+                  {processType === 'All' ? 'Process Vendor' : `${processType} Vendor`} <span className="text-danger">*</span>
                 </label>
-                {isSectionEditable('header') && (
+                <div className="d-flex align-items-center gap-2">
                   <button
                     type="button"
-                    className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
-                    onClick={() => setShowInlineVendorModal(true)}
+                    className="btn btn-link btn-sm p-0 text-decoration-none fs-11 text-muted"
+                    onClick={() => setShowAllVendors((prev) => !prev)}
+                    title={showAllVendors ? 'Switch back to filtered' : 'Show all vendors'}
                   >
-                    + New Vendor
+                    {showAllVendors ? `Filter ${processType}` : `Show all (${vendorList.length})`}
                   </button>
-                )}
+                  {isSectionEditable('header') && (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
+                      onClick={() => setShowInlineVendorModal(true)}
+                    >
+                      + New
+                    </button>
+                  )}
+                </div>
               </div>
               <select
                 className="form-select form-select-sm bg-white fs-13"
@@ -823,21 +885,21 @@ export default function ProcessPOForm({
                 disabled={!isSectionEditable('header')}
                 onChange={(e) => {
                   setVendorName(e.target.value);
-                  const matched = vendorList.find(v => (v.name || v.vendorName) === e.target.value);
+                  const matched = vendorList.find((v) => (v.name || v.vendorName) === e.target.value);
                   if (matched) setVendorId(matched.id || '');
                 }}
               >
-                <option value="">-- Select Dyeing Vendor --</option>
-                {vendorList.map(v => (
+                <option value="">-- Select {processType === 'All' ? 'Vendor' : `${processType} Vendor`} --</option>
+                {displayedVendors.map((v) => (
                   <option key={v.id || v.name} value={v.name || v.vendorName}>
-                    {v.name || v.vendorName}
+                    {v.name || v.vendorName} {v.city ? `(${v.city})` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             {/* Delivery Date */}
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label className="form-label fs-12 fw-semibold text-secondary mb-1">Target Delivery Date</label>
               <input
                 type="date"
@@ -1682,6 +1744,7 @@ export default function ProcessPOForm({
       {showInlineVendorModal && (
         <VendorMasterView
           isInline={true}
+          defaultTypes={processType && processType !== 'All' ? [processType] : ['Dyeing']}
           onCloseInline={() => setShowInlineVendorModal(false)}
           onSaveVendor={(newVendor) => {
             const updated = [newVendor, ...vendorList];

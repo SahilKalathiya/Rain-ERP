@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS vendors (
   id VARCHAR(30) PRIMARY KEY, -- e.g. VEND-0001
   name VARCHAR(150) NOT NULL,
-  type VARCHAR(50) DEFAULT 'Fabric Supplier',
+  type VARCHAR(255) DEFAULT 'Fabric Supplier',
   contact_person VARCHAR(100),
   phone VARCHAR(20),
   alternate_phone VARCHAR(20),

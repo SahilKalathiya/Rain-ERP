@@ -95,8 +95,18 @@ export default function App() {
     };
   });
 
-  // Default route is always /dashboard on page reload / initial load
-  const [currentRoute, setCurrentRoute] = useState('/dashboard');
+  // Persist and restore active route so reload doesn't reset to /dashboard
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('erp_active_route');
+      if (saved) return saved;
+      if (typeof window !== 'undefined' && window.location.pathname) {
+        const p = window.location.pathname.replace(/^\/react/, '');
+        if (p && p !== '/' && p !== '') return p;
+      }
+    } catch (e) { }
+    return '/orders';
+  });
   const [sidebarClickCount, setSidebarClickCount] = useState(0);
   const [routeExtraData, setRouteExtraData] = useState(() => {
     try {
@@ -106,12 +116,16 @@ export default function App() {
     return null;
   });
 
-  // On initial page load / refresh, always land on Dashboard
+  // On initial page load / refresh, restore active route
   useEffect(() => {
-    setCurrentRoute('/dashboard');
-    if (typeof window !== 'undefined' && window.history?.replaceState) {
-      window.history.replaceState(null, '', '/react/dashboard');
-    }
+    try {
+      const saved = sessionStorage.getItem('erp_active_route');
+      const target = saved || (typeof window !== 'undefined' && window.location.pathname.replace(/^\/react/, '')) || '/orders';
+      setCurrentRoute(target);
+      if (typeof window !== 'undefined' && window.history?.replaceState) {
+        window.history.replaceState(null, '', `/react${target}`);
+      }
+    } catch (e) { }
   }, []);
 
   // Sync route with browser navigation (Back / Forward)
@@ -131,6 +145,7 @@ export default function App() {
     setCurrentRoute(route);
     setRouteExtraData(null);
     try {
+      sessionStorage.setItem('erp_active_route', route);
       sessionStorage.removeItem('erp_route_extra_data');
     } catch (e) { }
     setSidebarClickCount((prev) => prev + 1);
@@ -144,6 +159,7 @@ export default function App() {
     setCurrentRoute(route);
     setRouteExtraData(extraData || null);
     try {
+      sessionStorage.setItem('erp_active_route', route);
       if (extraData) {
         sessionStorage.setItem('erp_route_extra_data', JSON.stringify(extraData));
       } else {
