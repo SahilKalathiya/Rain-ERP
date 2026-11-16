@@ -1426,642 +1426,7 @@ export default function OrderDetailView({
       }
     }
 
-    if (!cat || cat.id === 'Buttons' || !['Lace', 'Tassels', 'Thread', 'Dori'].includes(cat.id)) {
-      return (
-        <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="table table-borderless align-middle mb-0" style={{ fontSize: '13px' }}>
-            <thead>
-              <tr className="text-muted text-uppercase" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                <th style={{ padding: '8px 10px' }}>Article</th>
-                <th style={{ padding: '8px 10px' }}>Article Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Quantity</th>
-                <th style={{ padding: '8px 10px' }}>Placement</th>
-                <th style={{ padding: '8px 10px' }}>Accessory Colour</th>
-                <th style={{ padding: '8px 10px' }}>Size</th>
-                <th style={{ padding: '8px 10px' }}>Source</th>
-                <th style={{ padding: '8px 10px' }}>Fabric Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Pack</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {articlesToRender.map((currentArticle) => {
-                const rows = getCardArticleRows(item, currentArticle);
-                const colorOptions = getArticleColorOptions(currentArticle);
-                const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
-                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
-                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
-                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
-
-                return rows.map((row, rIdx) => {
-                  const isAllColours = row.articleColor === 'All colours';
-                  const reqVal = parseFloat(row.reqPerPc) || 0;
-                  const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
-                  const packNum = parseFloat(packInput);
-                  const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
-                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
-                    ? (parseFloat(row.bufferPct) || 0)
-                    : 0;
-                  const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
-                  const reqQty = artPcs * reqVal;
-                  const packQty = artPcs * packVal;
-                  const baseCalc = reqQty + packQty;
-                  const bufQty = (baseCalc * bufVal) / 100;
-                  const liveTotalNum = baseCalc + bufQty;
-                  const liveTotal = liveTotalNum % 1 === 0 ? liveTotalNum.toFixed(0) : liveTotalNum.toFixed(1);
-                  const isJobWork = /job/i.test(row.source || '');
-
-                  return (
-                    <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ minWidth: '110px', verticalAlign: 'middle', padding: '6px 8px' }}>
-                        <div className="d-flex align-items-center gap-1.5 fw-semibold text-dark" style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
-                          <span>{isBottom ? '👖' : '🎽'}</span>
-                          <span>{currentArticle}</span>
-                          {isAllColours && (
-                            <span
-                              className="badge ms-1.5"
-                              style={{
-                                backgroundColor: '#fef3c7',
-                                color: '#b45309',
-                                fontSize: '9.5px',
-                                fontWeight: 800,
-                                padding: '2px 5px',
-                                lineHeight: 1.1,
-                                borderRadius: '4px',
-                                border: '1px solid #fde68a'
-                              }}
-                            >
-                              FILLS<br />ALL
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td style={{ minWidth: '165px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <select
-                            className="form-select form-select-sm"
-                            value={row.articleColor || ''}
-                            onChange={(e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value)}
-                            style={selectStyle}
-                          >
-                            <option value="All colours">All colours</option>
-                            {colorOptions.map((co, cIdx) => (
-                              <option key={cIdx} value={co.display}>{co.display}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
-                            {row.articleColor || '—'}
-                          </span>
-                        )}
-                      </td>
-
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
-                        </span>
-                      </td>
-
-                      <td style={{ minWidth: '130px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Front.."
-                            value={row.placement ?? ''}
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '135px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          getItemAvailableColors(item).length > 0 ? (
-                            <select
-                              className="form-select form-select-sm"
-                              value={row.accessoryColor ?? ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
-                              style={selectStyle}
-                            >
-                              <option value="">Select Color</option>
-                              {getItemAvailableColors(item).map((c, cIdx) => (
-                                <option key={cIdx} value={c}>{c}</option>
-                              ))}
-                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
-                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              className="form-control form-control-sm"
-                              placeholder="e.g. Pearl Wh"
-                              value={row.accessoryColor ?? ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
-                              style={inputStyle}
-                            />
-                          )
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '120px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          getItemAvailableSizes(item).length > 0 ? (
-                            <select
-                              className="form-select form-select-sm"
-                              value={row.size ?? ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
-                              style={selectStyle}
-                            >
-                              <option value="">Select Size</option>
-                              {getItemAvailableSizes(item).map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
-                              {row.size && !getItemAvailableSizes(item).includes(row.size) && (
-                                <option value={row.size}>{row.size}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              className="form-control form-control-sm"
-                              placeholder="Size"
-                              value={row.size ?? ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
-                              style={inputStyle}
-                            />
-                          )
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '130px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <select
-                            className="form-select form-select-sm"
-                            value={row.source ?? ''}
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'source', e.target.value)}
-                            style={selectStyle}
-                          >
-                            <option value="">Select...</option>
-                            <option value="Ready Made">Ready Made</option>
-                            <option value="Job Work">Job Work</option>
-                            <option value="In-House">In-House</option>
-                            <option value="Vendor / Mill">Vendor / Mill</option>
-                          </select>
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.source || '—'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          isJobWork ? (
-                            <input
-                              type="text"
-                              className="form-control form-control-sm"
-                              placeholder="e.g., Maroon"
-                              value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
-                              style={inputStyle}
-                            />
-                          ) : (
-                            <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
-                          )
-                        ) : (
-                          <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
-                            {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
-                          </span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '70px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            className="form-control form-control-sm text-center"
-                            value={row.reqPerPc ?? ''}
-                            placeholder="0"
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'reqPerPc', e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.reqPerPc || '0'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '75px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            className="form-control form-control-sm text-center"
-                            value={row.extraPerPack ?? ''}
-                            placeholder="0"
-                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'extraPerPack', e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.extraPerPack || '0'}</span>
-                        )}
-                      </td>
-
-                      <td style={{ minWidth: '80px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <div className="d-flex flex-column align-items-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={defaultBuf ?? 100}
-                              step="0.5"
-                              className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
-                              placeholder=""
-                              onKeyDown={(e) => {
-                                if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                  e.preventDefault();
-                                }
-                              }}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
-                              style={inputStyle}
-                            />
-                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                              {bufVal > 0 ? `${bufVal}%` : '0%'}
-                            </span>
-                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        )}
-                      </td>
-
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {liveTotal} PCS
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
-    if (cat.id === 'Lace') {
-      return (
-        <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="table table-borderless align-middle mb-0" style={{ fontSize: '13px' }}>
-            <thead>
-              <tr className="text-muted text-uppercase" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                <th style={{ padding: '8px 10px' }}>Article</th>
-                <th style={{ padding: '8px 10px' }}>Article Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Quantity</th>
-                <th style={{ padding: '8px 10px' }}>Placement</th>
-                <th style={{ padding: '8px 10px' }}>Accessory Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Dyed mtr/pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Shrink%</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Greige/Pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {articlesToRender.map((currentArticle) => {
-                const rows = getCardArticleRows(item, currentArticle);
-                const colorOptions = getArticleColorOptions(currentArticle);
-                const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
-                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
-                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
-                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
-
-                return rows.map((row, rIdx) => {
-                  const isAllColours = row.articleColor === 'All colours';
-                  const dyedVal = parseFloat(row.dyedRate) || 0;
-                  const shrinkVal = parseFloat(row.shrinkPct) || 0;
-                  const greigeVal = dyedVal * (1 + shrinkVal / 100);
-                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
-                    ? (parseFloat(row.bufferPct) || 0)
-                    : 0;
-                  const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
-                  const totalValNum = (greigeVal * qtyVal * (1 + bufferVal / 100));
-                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
-
-                  return (
-                    <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ minWidth: '110px', verticalAlign: 'middle', padding: '6px 8px' }}>
-                        <div className="d-flex align-items-center gap-1.5 fw-semibold text-dark" style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
-                          <span>{isBottom ? '👖' : '🎽'}</span>
-                          <span>{currentArticle}</span>
-                          {isAllColours && (
-                            <span className="badge ms-1.5" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '9.5px', fontWeight: 800, padding: '2px 5px', lineHeight: 1.1, borderRadius: '4px', border: '1px solid #fde68a' }}>FILLS<br />ALL</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ minWidth: '165px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <select className="form-select form-select-sm" value={row.articleColor || ''} onChange={(e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value)} style={selectStyle}>
-                            <option value="All colours">All colours</option>
-                            {colorOptions.map((co, cIdx) => (
-                              <option key={cIdx} value={co.display}>{co.display}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>{row.articleColor || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
-                        </span>
-                      </td>
-                      <td style={{ minWidth: '130px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '135px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          getItemAvailableColors(item).length > 0 ? (
-                            <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
-                              <option value="">Select Color</option>
-                              {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
-                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
-                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
-                          )
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '90px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input type="number" step="0.01" min="0" className="form-control form-control-sm text-center" value={row.dyedRate ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'dyedRate', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.dyedRate || '0'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '75px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input type="number" min="0" className="form-control form-control-sm text-center" value={row.shrinkPct ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'shrinkPct', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.shrinkPct ? row.shrinkPct + '%' : '0'}</span>
-                        )}
-                      </td>
-                      <td className="text-center font-monospace" style={{ minWidth: '85px', padding: '6px 8px', fontSize: '13px' }}>
-                        {greigeVal.toFixed(2)}
-                      </td>
-                      <td style={{ minWidth: '80px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <div className="d-flex flex-column align-items-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={defaultBuf ?? 100}
-                              step="0.5"
-                              className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
-                              placeholder=""
-                              onKeyDown={(e) => {
-                                if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                  e.preventDefault();
-                                }
-                              }}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
-                              style={inputStyle}
-                            />
-                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                              {bufferVal > 0 ? `${bufferVal}%` : '0%'}
-                            </span>
-                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {totalVal} m
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
-    if (cat.id === 'Tassels') {
-      return (
-        <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="table table-borderless align-middle mb-0" style={{ fontSize: '13px' }}>
-            <thead>
-              <tr className="text-muted text-uppercase" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                <th style={{ padding: '8px 10px' }}>Article</th>
-                <th style={{ padding: '8px 10px' }}>Article Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Quantity</th>
-                <th style={{ padding: '8px 10px' }}>Placement</th>
-                <th style={{ padding: '8px 10px' }}>Accessory Colour</th>
-                <th style={{ padding: '8px 10px' }}>Source</th>
-                <th style={{ padding: '8px 10px' }}>Fabric Colour</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Size</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Thread Req. (mts)</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
-                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {articlesToRender.map((currentArticle) => {
-                const rows = getCardArticleRows(item, currentArticle);
-                const colorOptions = getArticleColorOptions(currentArticle);
-                const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(currentArticle || '');
-                const artObj = (orderArticles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase()) ||
-                  (order?.articles || []).find(a => (a.name || '').toLowerCase() === (currentArticle || '').toLowerCase());
-                const totalArtQty = (artObj?.totalPieces !== undefined && artObj?.totalPieces !== null) ? Number(artObj.totalPieces) : (Number(order?.totalGarments) || 0);
-                const totalAllQty = colorOptions.reduce((sum, co) => sum + (parseFloat(co.qty) || 0), 0) || totalArtQty;
-
-                return rows.map((row, rIdx) => {
-                  const isAllColours = row.articleColor === 'All colours';
-                  const reqVal = parseFloat(row.reqPerPc) || 0;
-                  const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                  const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
-                    ? (parseFloat(row.bufferPct) || 0)
-                    : 0;
-                  const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
-                  const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
-                  const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : Math.ceil(totalValNum).toFixed(0);
-                  const isJobWork = /job/i.test(row.source || '');
-
-                  return (
-                    <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ minWidth: '110px', verticalAlign: 'middle', padding: '6px 8px' }}>
-                        <div className="d-flex align-items-center gap-1.5 fw-semibold text-dark" style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
-                          <span>{isBottom ? '👖' : '🎽'}</span>
-                          <span>{currentArticle}</span>
-                          {isAllColours && (
-                            <span className="badge ms-1.5" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '9.5px', fontWeight: 800, padding: '2px 5px', lineHeight: 1.1, borderRadius: '4px', border: '1px solid #fde68a' }}>FILLS<br />ALL</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ minWidth: '165px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <select className="form-select form-select-sm" value={row.articleColor || ''} onChange={(e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value)} style={selectStyle}>
-                            <option value="All colours">All colours</option>
-                            {colorOptions.map((co, cIdx) => (
-                              <option key={cIdx} value={co.display}>{co.display}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>{row.articleColor || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
-                        </span>
-                      </td>
-                      <td style={{ minWidth: '130px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '135px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          getItemAvailableColors(item).length > 0 ? (
-                            <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
-                              <option value="">Select Color</option>
-                              {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
-                              {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
-                                <option value={row.accessoryColor}>{row.accessoryColor}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
-                          )
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '130px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <select className="form-select form-select-sm" value={row.source ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'source', e.target.value)} style={selectStyle}>
-                            <option value="">Select...</option>
-                            <option value="Ready Made">Ready Made</option>
-                            <option value="Job Work">Job Work</option>
-                          </select>
-                        ) : (
-                          <span className="text-dark" style={{ fontSize: '13px' }}>{row.source || '—'}</span>
-                        )}
-                      </td>
-                      <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          isJobWork ? (
-                            <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
-                          ) : (
-                            <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
-                          )
-                        ) : (
-                          <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
-                            {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="text-center text-muted" style={{ minWidth: '70px', padding: '6px 8px' }}>—</td>
-                      <td style={{ minWidth: '75px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <input type="number" min="0" className="form-control form-control-sm text-center" value={row.reqPerPc ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'reqPerPc', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.reqPerPc || '0'}</span>
-                        )}
-                      </td>
-                      <td className="text-center text-muted" style={{ minWidth: '95px', padding: '6px 8px' }}>—</td>
-                      <td style={{ minWidth: '80px', padding: '6px 8px' }}>
-                        {isEditing ? (
-                          <div className="d-flex flex-column align-items-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={defaultBuf ?? 100}
-                              step="0.5"
-                              className="form-control form-control-sm text-center"
-                              value={row.bufferPct !== undefined && row.bufferPct !== null ? row.bufferPct : ''}
-                              placeholder=""
-                              onKeyDown={(e) => {
-                                if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                  e.preventDefault();
-                                }
-                              }}
-                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'bufferPct', e.target.value)}
-                              style={inputStyle}
-                            />
-                            <div className="text-muted text-center mt-1" style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="d-flex flex-column align-items-center">
-                            <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                              {bufferVal > 0 ? `${bufferVal}%` : '0%'}
-                            </span>
-                            <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                              max {defaultBuf}%
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                        <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                          {totalVal} PCS
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
+    const unitLabel = item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? 'MTR' : 'PCS');
 
     return (
       <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -2070,15 +1435,14 @@ export default function OrderDetailView({
             <tr className="text-muted text-uppercase" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>
               <th style={{ padding: '8px 10px' }}>Article</th>
               <th style={{ padding: '8px 10px' }}>Article Colour</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Quantity</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Garment Pcs</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req / Pc</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Req Qty</th>
               <th style={{ padding: '8px 10px' }}>Placement</th>
               <th style={{ padding: '8px 10px' }}>Accessory Colour</th>
               <th style={{ padding: '8px 10px' }}>Size</th>
               <th style={{ padding: '8px 10px' }}>Source</th>
-              <th style={{ padding: '8px 10px' }}>Fabric Colour</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req/Pc</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2e37a4' }}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -2094,71 +1458,163 @@ export default function OrderDetailView({
               return rows.map((row, rIdx) => {
                 const isAllColours = row.articleColor === 'All colours';
                 const reqVal = parseFloat(row.reqPerPc) || 0;
+                const packInput = row.extraPerPack !== undefined && row.extraPerPack !== null ? String(row.extraPerPack).trim() : '';
+                const packNum = parseFloat(packInput);
+                const packVal = (!isNaN(packNum) && packNum >= 0) ? packNum : 0;
                 const defaultBuf = getAccessoryMasterBuffer(item, currentArticle);
-                const bufferVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
+                const bufVal = (row.bufferPct !== undefined && row.bufferPct !== null && row.bufferPct !== '')
                   ? (parseFloat(row.bufferPct) || 0)
                   : 0;
-                const qtyVal = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
-                const totalValNum = (reqVal * qtyVal * (1 + bufferVal / 100));
-                const totalVal = totalValNum % 1 === 0 ? totalValNum.toFixed(0) : totalValNum.toFixed(1);
+                const artPcs = parseFloat(row.totalQty) || (isAllColours ? totalAllQty : 0);
+                const reqQty = artPcs * reqVal;
+                const packQty = artPcs * packVal;
+                const baseCalc = reqQty + packQty;
+                const bufQty = (baseCalc * bufVal) / 100;
+                const liveTotalNum = baseCalc + bufQty;
+                const liveTotal = liveTotalNum % 1 === 0 ? liveTotalNum.toFixed(0) : liveTotalNum.toFixed(1);
                 const isJobWork = /job/i.test(row.source || '');
 
                 return (
                   <tr key={`${currentArticle}_${row.id || rIdx}`} style={{ borderBottom: '1px solid #f8fafc' }}>
+                    {/* 1. Article */}
                     <td style={{ minWidth: '110px', verticalAlign: 'middle', padding: '6px 8px' }}>
                       <div className="d-flex align-items-center gap-1.5 fw-semibold text-dark" style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        <span>{isBottom ? '👖' : '🎽'}</span>
+                        <span>{isBottom ? '👖' : '👘'}</span>
                         <span>{currentArticle}</span>
                         {isAllColours && (
-                          <span className="badge ms-1.5" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '9.5px', fontWeight: 800, padding: '2px 5px', lineHeight: 1.1, borderRadius: '4px', border: '1px solid #fde68a' }}>FILLS<br />ALL</span>
+                          <span
+                            className="badge ms-1.5"
+                            style={{
+                              backgroundColor: '#fef3c7',
+                              color: '#b45309',
+                              fontSize: '9.5px',
+                              fontWeight: 800,
+                              padding: '2px 5px',
+                              lineHeight: 1.1,
+                              borderRadius: '4px',
+                              border: '1px solid #fde68a'
+                            }}
+                          >
+                            FILLS ALL
+                          </span>
                         )}
                       </div>
                     </td>
-                    <td style={{ minWidth: '165px', padding: '6px 8px' }}>
+
+                    {/* 2. Article Colour */}
+                    <td style={{ minWidth: '150px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <select className="form-select form-select-sm" value={row.articleColor || ''} onChange={(e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value)} style={selectStyle}>
+                        <select
+                          className="form-select form-select-sm"
+                          value={row.articleColor || ''}
+                          onChange={(e) => handleUpdateCardRowArticleColor(item.id, currentArticle, rIdx, e.target.value)}
+                          style={selectStyle}
+                        >
                           <option value="All colours">All colours</option>
                           {colorOptions.map((co, cIdx) => (
                             <option key={cIdx} value={co.display}>{co.display}</option>
                           ))}
                         </select>
                       ) : (
-                        <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>{row.articleColor || '—'}</span>
+                        <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
+                          {row.articleColor || '—'}
+                        </span>
                       )}
                     </td>
+
+                    {/* 3. Garment Pcs */}
                     <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
                       <span className="badge fw-semibold" style={{ backgroundColor: '#e0f2fe', color: '#0284c7', fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}>
-                        {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)}
+                        {isAllColours ? (row.totalQty && row.totalQty !== '—' ? row.totalQty : totalAllQty) : (row.totalQty || 0)} pcs
                       </span>
                     </td>
+
+                    {/* 4. Req / Pc */}
+                    <td style={{ minWidth: '90px', padding: '6px 8px' }}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step={['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? '0.1' : '1'}
+                          className="form-control form-control-sm text-center fw-bold"
+                          value={row.reqPerPc ?? ''}
+                          placeholder="0"
+                          onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'reqPerPc', e.target.value)}
+                          style={{ ...inputStyle, borderColor: '#818cf8', backgroundColor: '#ffffff' }}
+                        />
+                      ) : (
+                        <span className="d-block text-center text-dark fw-bold" style={{ fontSize: '13px' }}>
+                          {row.reqPerPc || '0'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 5. Total Req Qty */}
+                    <td style={{ textAlign: 'center', minWidth: '105px', padding: '6px 8px' }}>
+                      <span className="badge fw-bold shadow-xs" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                        {liveTotal} {unitLabel}
+                      </span>
+                    </td>
+
+                    {/* 6. Placement */}
                     <td style={{ minWidth: '130px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <input type="text" className="form-control form-control-sm" placeholder="Placement" value={row.placement ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)} style={inputStyle} />
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="e.g. Front Placket"
+                          value={row.placement ?? ''}
+                          onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'placement', e.target.value)}
+                          style={inputStyle}
+                        />
                       ) : (
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.placement || '—'}</span>
                       )}
                     </td>
+
+                    {/* 7. Accessory Colour */}
                     <td style={{ minWidth: '135px', padding: '6px 8px' }}>
                       {isEditing ? (
                         getItemAvailableColors(item).length > 0 ? (
-                          <select className="form-select form-select-sm" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={selectStyle}>
+                          <select
+                            className="form-select form-select-sm"
+                            value={row.accessoryColor ?? ''}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
+                            style={selectStyle}
+                          >
                             <option value="">Select Color</option>
-                            {getItemAvailableColors(item).map((c, cIdx) => <option key={cIdx} value={c}>{c}</option>)}
+                            {getItemAvailableColors(item).map((c, cIdx) => (
+                              <option key={cIdx} value={c}>{c}</option>
+                            ))}
                             {row.accessoryColor && !getItemAvailableColors(item).includes(row.accessoryColor) && (
                               <option value={row.accessoryColor}>{row.accessoryColor}</option>
                             )}
                           </select>
                         ) : (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g. Pearl Wh" value={row.accessoryColor ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)} style={inputStyle} />
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="e.g. Matching / White"
+                            value={row.accessoryColor ?? ''}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'accessoryColor', e.target.value)}
+                            style={inputStyle}
+                          />
                         )
                       ) : (
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.accessoryColor || '—'}</span>
                       )}
                     </td>
+
+                    {/* 8. Size */}
                     <td style={{ minWidth: '110px', padding: '6px 8px' }}>
                       {isEditing ? (
                         getItemAvailableSizes(item).length > 0 ? (
-                          <select className="form-select form-select-sm" value={row.size ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)} style={selectStyle}>
+                          <select
+                            className="form-select form-select-sm"
+                            value={row.size ?? ''}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
+                            style={selectStyle}
+                          >
                             <option value="">Select Size</option>
                             {getItemAvailableSizes(item).map((s, sIdx) => <option key={sIdx} value={s}>{s}</option>)}
                             {row.size && !getItemAvailableSizes(item).includes(row.size) && (
@@ -2169,7 +1625,7 @@ export default function OrderDetailView({
                           <input
                             type="text"
                             className="form-control form-control-sm"
-                            placeholder="Size"
+                            placeholder="e.g. 18L"
                             value={row.size ?? ''}
                             onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'size', e.target.value)}
                             style={inputStyle}
@@ -2179,9 +1635,16 @@ export default function OrderDetailView({
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.size || '—'}</span>
                       )}
                     </td>
-                    <td style={{ minWidth: '130px', padding: '6px 8px' }}>
+
+                    {/* 9. Source */}
+                    <td style={{ minWidth: '125px', padding: '6px 8px' }}>
                       {isEditing ? (
-                        <select className="form-select form-select-sm" value={row.source ?? ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'source', e.target.value)} style={selectStyle}>
+                        <select
+                          className="form-select form-select-sm"
+                          value={row.source ?? ''}
+                          onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'source', e.target.value)}
+                          style={selectStyle}
+                        >
                           <option value="">Select...</option>
                           <option value="Ready Made">Ready Made</option>
                           <option value="Job Work">Job Work</option>
@@ -2191,27 +1654,27 @@ export default function OrderDetailView({
                       ) : (
                         <span className="text-dark" style={{ fontSize: '13px' }}>{row.source || '—'}</span>
                       )}
-                    </td>
-                    <td style={{ minWidth: '125px', padding: '6px 8px' }}>
-                      {isEditing ? (
-                        isJobWork ? (
-                          <input type="text" className="form-control form-control-sm" placeholder="e.g., Maroon" value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''} onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)} style={inputStyle} />
-                        ) : (
-                          <span className="text-muted d-block text-center" style={{ fontSize: '13px' }}>—</span>
-                        )
-                      ) : (
-                        <span className={isJobWork ? "text-dark" : "text-muted d-block text-center"} style={{ fontSize: '13px' }}>
-                          {isJobWork ? (row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : '—') : '—'}
-                        </span>
+                      {isJobWork && (
+                        <div className="mt-1">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Fabric Colour..."
+                              value={row.fabricColor && row.fabricColor !== '—' ? row.fabricColor : ''}
+                              onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'fabricColor', e.target.value)}
+                              style={{ ...inputStyle, height: '28px', fontSize: '11px' }}
+                            />
+                          ) : (
+                            <small className="text-muted" style={{ fontSize: '11px' }}>
+                              Fab Col: {row.fabricColor || '—'}
+                            </small>
+                          )}
+                        </div>
                       )}
                     </td>
-                    <td style={{ minWidth: '70px', padding: '6px 8px' }}>
-                      {isEditing ? (
-                        <input type="number" min="0" className="form-control form-control-sm text-center" value={row.reqPerPc ?? ''} placeholder="0" onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'reqPerPc', e.target.value)} style={inputStyle} />
-                      ) : (
-                        <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>{row.reqPerPc || '0'}</span>
-                      )}
-                    </td>
+
+                    {/* 10. Buffer % */}
                     <td style={{ minWidth: '80px', padding: '6px 8px' }}>
                       {isEditing ? (
                         <div className="d-flex flex-column align-items-center">
@@ -2238,18 +1701,13 @@ export default function OrderDetailView({
                       ) : (
                         <div className="d-flex flex-column align-items-center">
                           <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
-                            {bufferVal > 0 ? `${bufferVal}%` : '0%'}
+                            {bufVal > 0 ? `${bufVal}%` : '0%'}
                           </span>
                           <div className="text-muted text-center mt-0.5" style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
                             max {defaultBuf}%
                           </div>
                         </div>
                       )}
-                    </td>
-                    <td style={{ textAlign: 'center', minWidth: '95px', padding: '6px 8px' }}>
-                      <span className="badge fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                        {totalVal} PCS
-                      </span>
                     </td>
                   </tr>
                 );
@@ -3025,6 +2483,7 @@ export default function OrderDetailView({
 
   // State to manage which fabric group has its width multi-select popover open
   const [activeWidthDropdownKey, setActiveWidthDropdownKey] = useState(null);
+  const [customWidthMap, setCustomWidthMap] = useState({});
 
   const getSelectedWidthsForGroup = (grp, options) => {
     const k = `${grp.articleName}___${grp.fabricQuality || ''}___${grp.role || ''}`;
@@ -3053,16 +2512,14 @@ export default function OrderDetailView({
         nextList = [...currentList, cleanWidth];
       }
 
-      const primaryW = nextList[0] || '';
-      const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${primaryW}`;
-      const storedRate = widthDyedRates[rateKey];
-      const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '') ? (parseFloat(storedRate) || 0) : 0;
-
       setConsumptionRows(prevRows => prevRows.map(r => {
         const matchArt = r.articleName === artName;
         const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
         const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
         if (matchArt && matchFab && matchRole) {
+          const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+            ? (parseFloat(storedRate) || 0)
+            : (parseFloat(r.dyedRate) || 0);
           return {
             ...r,
             width: primaryW,
@@ -3082,7 +2539,6 @@ export default function OrderDetailView({
     const k = `${artName}___${fabricQuality || ''}___${role || ''}`;
     const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${cleanWidth}`;
     const storedRate = widthDyedRates[rateKey];
-    const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '') ? (parseFloat(storedRate) || 0) : 0;
 
     setGroupSelectedWidths(prev => ({
       ...prev,
@@ -3094,6 +2550,9 @@ export default function OrderDetailView({
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
+        const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+          ? (parseFloat(storedRate) || 0)
+          : (parseFloat(r.dyedRate) || 0);
         return {
           ...r,
           width: cleanWidth,
@@ -3368,7 +2827,11 @@ export default function OrderDetailView({
       const isDyed = artSourcing.includes('dyed');
       const masterShrink = getFabricMasterShrinkage(fabName);
       const shrink = isDyed ? 0 : masterShrink;
-      const dyed = parseFloat(r.dyedRate) || 0;
+      const rateKey = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}___${width}`;
+      const storedRate = widthDyedRates[rateKey];
+      const dyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+        ? (parseFloat(storedRate) || 0)
+        : (parseFloat(r.dyedRate) || 0);
       const greigePerPc = dyed > 0 ? (isDyed ? dyed : dyed * (1 + shrink / 100)) : 0;
       const totalDyed = dyed > 0 ? dyed * pcs : 0;
       const totalGreige = greigePerPc > 0 ? greigePerPc * pcs : 0;
@@ -3389,10 +2852,10 @@ export default function OrderDetailView({
       cur.pcs += pcs;
       cur.totalDyed += totalDyed;
       cur.totalGreige += totalGreige;
-      if (r.dyedRate !== undefined && r.dyedRate !== null && r.dyedRate !== '') {
-        cur.dyedRates.push(r.dyedRate);
+      if (dyed > 0) {
+        cur.dyedRates.push(dyed);
+        cur.hasValues = true;
       }
-      if (dyed > 0) cur.hasValues = true;
     });
     return Array.from(map.values()).map(cur => {
       const avgDyed = cur.dyedRates.length > 0 ? cur.dyedRates[0] : '';
@@ -3404,53 +2867,130 @@ export default function OrderDetailView({
         avgGreige
       };
     });
-  }, [consumptionRows, articleSourcing, masterFabricsList]);
+  }, [consumptionRows, articleSourcing, masterFabricsList, widthDyedRates]);
 
-  // Section 8 Rate Calculations & Intelligent Recommendation Engine (Calculates across ALL available widths)
+  // Section 8 Rate Calculations & Intelligent Recommendation Engine (Calculates across ALL available widths, separated by Article and Fabric)
   const rateCalculations = useMemo(() => {
-    // Group fabricSummaryRows by fabricQuality name
-    const fabricsInOrder = new Map();
-    fabricSummaryRows.forEach(fs => {
-      const fName = fs.fabricName || 'Fabric';
-      if (!fabricsInOrder.has(fName)) {
-        fabricsInOrder.set(fName, []);
+    // Group consumption rows by Article AND Fabric Quality (e.g. Kurta - Grey, Pant - Cotton 100*100, Dupatta - Grey)
+    const groups = new Map();
+
+    consumptionRows.forEach((r, rIdx) => {
+      const pcs = parseInt(r.pcs, 10) || 0;
+      if (pcs <= 0) return; // Exclude 0 pcs rows
+      const artName = r.articleName || 'Article';
+      const fabName = r.fabricQuality || 'Fabric';
+      const role = r.role || '';
+      const groupKey = `${artName}___${fabName}___${role}`;
+
+      if (!groups.has(groupKey)) {
+        const sourcingKey = `${artName}_${fabName}`;
+        const artSourcing = (
+          articleSourcing[artName] ||
+          articleSourcing[groupKey] ||
+          articleSourcing[sourcingKey] ||
+          r.source ||
+          'Greige'
+        ).toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
+
+        const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(artName);
+        const isDupatta = /dupatta|chunri|scarf|stole/i.test(artName);
+        const artIcon = r.articleIcon || (isBottom ? '👖' : isDupatta ? '🎀' : '👘');
+
+        groups.set(groupKey, {
+          groupKey,
+          articleName: artName,
+          articleIcon: artIcon,
+          articleIndex: r.articleIndex !== undefined ? r.articleIndex : rIdx,
+          fabricName: fabName,
+          role: role,
+          sourcing: artSourcing,
+          isDyed: artSourcing === 'Dyed',
+          selectedWidth: r.width && r.width !== '—' ? r.width : '44"',
+          rows: []
+        });
       }
-      fabricsInOrder.get(fName).push(fs);
+
+      groups.get(groupKey).rows.push(r);
     });
 
     const results = [];
 
-    fabricsInOrder.forEach((summaryList, fabricName) => {
-      const matchingRows = consumptionRows.filter(r => (r.fabricQuality || '').toLowerCase() === fabricName.toLowerCase());
-      const isDyed = matchingRows.some(r => {
-        const groupKey = `${r.articleName}___${r.fabricQuality}___${r.role}`;
-        const sourcingKey = `${r.articleName}_${r.fabricQuality}`;
-        return (articleSourcing[groupKey] || articleSourcing[sourcingKey] || r.source || '').toLowerCase().includes('dyed');
+    // Sort groups to match order of articles
+    const sortedGroups = Array.from(groups.values()).sort((a, b) => a.articleIndex - b.articleIndex);
+
+    sortedGroups.forEach((grp) => {
+      const pcs = grp.rows.reduce((sum, r) => sum + (parseInt(r.pcs, 10) || 0), 0);
+      const currentSelectedWidth = grp.selectedWidth || '44"';
+      const currentWidthInches = parseFloat(String(currentSelectedWidth).replace(/"/g, '')) || 44;
+
+      // Calculate base metres for this article and fabric for the selected width
+      let currentBaseMetres = 0;
+      grp.rows.forEach(r => {
+        const rPcs = parseInt(r.pcs, 10) || 0;
+        const rateKey = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}___${currentSelectedWidth}`;
+        const storedRate = widthDyedRates[rateKey];
+        const dyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+          ? (parseFloat(storedRate) || 0)
+          : (parseFloat(r.dyedRate) || 0);
+        const shrink = grp.isDyed ? 0 : getFabricMasterShrinkage(grp.fabricName);
+        const greigePerPc = grp.isDyed ? dyed : (dyed > 0 ? dyed * (1 + shrink / 100) : 0);
+        currentBaseMetres += ((grp.isDyed ? dyed : greigePerPc) * rPcs);
       });
 
-      // Identify currently selected width in order for this fabric
-      const primarySummary = summaryList[0] || { pcs: 0, totalDyed: 0, totalGreige: 0, width: '58"' };
-      const currentSelectedWidth = primarySummary.width || '58"';
-      const currentBaseMetres = isDyed ? primarySummary.totalDyed : primarySummary.totalGreige;
-      const pcs = primarySummary.pcs || 0;
-
       // Fetch ALL available widths for this fabric quality from Fabric Master
-      const allWidths = getFabricMasterWidths(fabricName, currentSelectedWidth);
-      const currentWidthInches = parseFloat(String(currentSelectedWidth).replace(/"/g, '')) || 58;
+      const allWidths = getFabricMasterWidths(grp.fabricName, currentSelectedWidth);
+
+      // Ensure widths configured by user in groupSelectedWidths are included
+      const userSelected = groupSelectedWidths[grp.groupKey];
+      if (Array.isArray(userSelected)) {
+        userSelected.forEach(uw => {
+          if (uw && !allWidths.includes(uw)) {
+            allWidths.push(uw);
+          }
+        });
+      }
 
       allWidths.forEach(w => {
         const isSelected = w === currentSelectedWidth;
         const targetWidthInches = parseFloat(String(w).replace(/"/g, '')) || 44;
 
-        // In marker nesting & cutting, metres needed is inversely proportional to width:
-        // totalMetres = baseMetres * (currentWidthInches / targetWidthInches)
-        let totalMetres = currentBaseMetres;
-        if (!isSelected && targetWidthInches > 0 && currentWidthInches > 0) {
-          totalMetres = currentBaseMetres * (currentWidthInches / targetWidthInches);
+        // Check if user has entered specific consumption rate for this width 'w' across matching rows:
+        let hasCustomWidthRate = false;
+        let calculatedMetresForWidth = 0;
+        const isUserConfiguredWidth = Array.isArray(userSelected) && userSelected.includes(w);
+
+        if (isUserConfiguredWidth) {
+          grp.rows.forEach(r => {
+            const rateKey = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}___${w}`;
+            const storedRate = widthDyedRates[rateKey];
+            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+              ? parseFloat(storedRate)
+              : ((r.width === w && r.dyedRate) ? parseFloat(r.dyedRate) : 0);
+
+            if (!isNaN(wVal) && wVal > 0) {
+              hasCustomWidthRate = true;
+              const rPcs = parseInt(r.pcs, 10) || 0;
+              const shrink = grp.isDyed ? 0 : getFabricMasterShrinkage(grp.fabricName);
+              const greigePerPc = grp.isDyed ? wVal : (wVal * (1 + shrink / 100));
+              calculatedMetresForWidth += ((grp.isDyed ? wVal : greigePerPc) * rPcs);
+            }
+          });
         }
 
-        const rateKey = `${fabricName}_${w}`;
-        const userTypedRate = customMarketRates[rateKey];
+        let totalMetres = 0;
+        if (currentBaseMetres > 0) {
+          if (hasCustomWidthRate && calculatedMetresForWidth > 0) {
+            totalMetres = calculatedMetresForWidth;
+          } else if (isSelected) {
+            totalMetres = currentBaseMetres;
+          } else if (targetWidthInches > 0 && currentWidthInches > 0) {
+            totalMetres = currentBaseMetres * (currentWidthInches / targetWidthInches);
+          }
+        }
+
+        const rateKey = `${grp.articleName}_${grp.fabricName}_${w}`;
+        const fallbackFabricRateKey = `${grp.fabricName}_${w}`;
+        const userTypedRate = customMarketRates[rateKey] ?? customMarketRates[fallbackFabricRateKey];
         const hasCustomRate = userTypedRate !== undefined && userTypedRate !== '' && !isNaN(parseFloat(userTypedRate));
         const effectiveRate = hasCustomRate ? (parseFloat(userTypedRate) || 0) : 0;
 
@@ -3458,12 +2998,14 @@ export default function OrderDetailView({
         const costPerGarment = (pcs > 0 && totalCost > 0) ? (totalCost / pcs) : 0;
 
         results.push({
-          fabricName,
+          articleName: grp.articleName,
+          articleIcon: grp.articleIcon,
+          fabricName: grp.fabricName,
+          role: grp.role,
           width: w,
           isSelected,
-          isDyed,
+          isDyed: grp.isDyed,
           rateKey,
-          defaultCalculatedRate: 0,
           ratePerMetre: effectiveRate,
           totalMetres,
           totalCost,
@@ -3474,7 +3016,7 @@ export default function OrderDetailView({
     });
 
     return results;
-  }, [fabricSummaryRows, consumptionRows, articleSourcing, masterFabricsList, customMarketRates]);
+  }, [consumptionRows, articleSourcing, masterFabricsList, customMarketRates, widthDyedRates, groupSelectedWidths]);
 
   const rateTotals = useMemo(() => {
     // Totals for the currently SELECTED widths in the order
@@ -3966,135 +3508,6 @@ export default function OrderDetailView({
       </div>
 
       {/* =========================================================================
-      {/* Deliverable Finished Sets & Article Balance Summary Card */}
-      {(() => {
-        const rawCusts = order?.customerOrders || order?.customers;
-        if (!Array.isArray(rawCusts) || rawCusts.length === 0 || articlesList.length < 2) return null;
-
-        let allBreakdowns = [];
-        let grandTotalFullSets = 0;
-        let grandTotalGarmentPcs = 0;
-
-        rawCusts.forEach((cust, ci) => {
-          (cust.selectedColors || []).forEach(colName => {
-            const articleCounts = articlesList.map(art => {
-              let pcs = 0;
-              const key = `${art.id}_${colName}`;
-              const cfg = cust.sizeConfigs?.[key];
-              if (cfg?.sizeQtys) {
-                Object.values(cfg.sizeQtys).forEach(q => { pcs += parseInt(q, 10) || 0; });
-              }
-              return { name: art.name, pcs };
-            });
-
-            if (articleCounts.every(a => a.pcs === 0)) return;
-
-            const min = Math.min(...articleCounts.map(a => a.pcs));
-            const max = Math.max(...articleCounts.map(a => a.pcs));
-            const sumPcs = articleCounts.reduce((acc, a) => acc + a.pcs, 0);
-            grandTotalFullSets += min;
-            grandTotalGarmentPcs += sumPcs;
-
-            allBreakdowns.push({
-              customerName: cust.customerName || `Customer ${ci + 1}`,
-              colorName: colName,
-              articleCounts,
-              min,
-              max,
-              sumPcs,
-              isBalanced: min === max
-            });
-          });
-        });
-
-        if (allBreakdowns.length === 0) return null;
-
-        return (
-          <div
-            className="card border-0 shadow-sm rounded-4 bg-white mb-4"
-            style={{
-              border: '1.5px solid #c7d2fe',
-              padding: '22px',
-              borderRadius: '14px',
-              backgroundColor: '#ffffff'
-            }}
-          >
-            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-              <div className="d-flex align-items-center gap-2.5">
-                <div
-                  className="rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-                  style={{ width: '38px', height: '38px', backgroundColor: '#2e37a4', borderRadius: '10px' }}
-                >
-                  <i className="ti ti-packages" style={{ fontSize: '20px', lineHeight: 1 }}></i>
-                </div>
-                <div>
-                  <h6 className="fw-bold text-dark mb-0.5" style={{ fontSize: '16px' }}>
-                    Deliverable Finished Sets Composition
-                  </h6>
-                  <span className="text-muted small" style={{ fontSize: '12px' }}>
-                    Article pairing, set balance, and finished garment unit count
-                  </span>
-                </div>
-              </div>
-
-              <div className="d-flex align-items-center gap-2">
-                <span className="badge rounded-pill px-3 py-1.5 fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '13px' }}>
-                  {grandTotalFullSets} Complete Sets
-                </span>
-                <span className="badge rounded-pill px-3 py-1.5 fw-bold bg-light text-secondary border" style={{ fontSize: '13px' }}>
-                  {grandTotalGarmentPcs} Garment Pieces
-                </span>
-              </div>
-            </div>
-
-            <div className="d-flex flex-column gap-2.5">
-              {allBreakdowns.map((bd, bIdx) => (
-                <div
-                  key={bIdx}
-                  className="p-3 rounded-3 border d-flex justify-content-between align-items-center flex-wrap gap-2"
-                  style={{
-                    backgroundColor: bd.isBalanced ? '#f0fdf4' : '#fffbeb',
-                    borderColor: bd.isBalanced ? '#bbf7d0' : '#fde68a'
-                  }}
-                >
-                  <div>
-                    <div className="d-flex align-items-center gap-2 mb-1">
-                      <span className="fw-bold text-dark" style={{ fontSize: '13.5px' }}>
-                        {bd.customerName} &mdash; {bd.colorName}
-                      </span>
-                      {bd.isBalanced ? (
-                        <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style={{ fontSize: '11px' }}>
-                          ✓ 1:1 Complete Sets
-                        </span>
-                      ) : (
-                        <span className="badge bg-warning text-dark border border-warning rounded-pill px-2 py-0.5" style={{ fontSize: '11px' }}>
-                          Split / Partial Quantities
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-muted small" style={{ fontSize: '12px' }}>
-                      {bd.articleCounts.map(a => `${a.name}: ${a.pcs} pcs`).join(' • ')}
-                    </div>
-                  </div>
-
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="badge bg-white text-dark border px-2.5 py-1.5 shadow-2xs fw-semibold" style={{ fontSize: '12px' }}>
-                      {bd.min} Complete {articlesList.length}-Pc Sets
-                    </span>
-                    {!bd.isBalanced && (
-                      <span className="badge bg-white text-warning-emphasis border border-warning-subtle px-2.5 py-1.5 shadow-2xs fw-semibold" style={{ fontSize: '12px' }}>
-                        +{bd.max - bd.min} Extra Pieces
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* =========================================================================
        * 6. ARTICLES (N) CARD
        * ========================================================================= */}
       <div
@@ -4261,94 +3674,6 @@ export default function OrderDetailView({
             </div>
           );
         })}
-      </div>
-
-      {/* =========================================================================
-       * 7. PRODUCTION PIPELINE CARD
-       * ========================================================================= */}
-      <div
-        className="card border-0 shadow-sm rounded-4 bg-white"
-        style={{
-          border: '1px solid #e2e8f0',
-          padding: '24px',
-          marginBottom: '24px',
-          borderRadius: '14px',
-          backgroundColor: '#ffffff'
-        }}
-      >
-        <div style={{ marginBottom: '20px' }}>
-          <h6 className="fw-bold text-dark mb-1" style={{ fontSize: '16px' }}>Production Pipeline</h6>
-          <p className="text-muted small mb-0">
-            Current stage: 1/11 &bull; Cut pieces: 0 &bull; Garments: 0 &bull; QC passed: 0 &bull; Dispatched: 0
-          </p>
-        </div>
-
-        <div className="border rounded-4 overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
-          {[
-            { stage: 'Stage 3 · Procurement', icon: 'ti ti-shopping-cart', btn: '+ New PO', action: 'Create PO' },
-            { stage: 'Stage 4 · Processing', icon: 'ti ti-ticket', btn: '+ New Processing PO', action: 'Send to Process' },
-            { stage: 'Stage 5 · Cutting', icon: 'ti ti-cut', btn: '+ New Cutting PO', action: 'Cutting PO' },
-            { stage: 'Stage 6 · After-Cut', icon: 'ti ti-shirt', btn: '+ New Embroidery PO', action: 'Embroidery PO' },
-            { stage: 'Stage 7 · Stitching', icon: 'ti ti-needle-thread', btn: '+ New Stitching Job', action: 'Stitching Job' },
-            { stage: 'Stage 9 · Finishing', icon: 'ti ti-box', btn: '+ New Finishing Batch', action: 'Finishing Batch' },
-            { stage: 'Stage 10 · QC', icon: 'ti ti-shield-check', btn: '+ New QC Batch', action: 'QC Batch' },
-            { stage: 'Stage 11 · Dispatch', icon: 'ti ti-truck-delivery', btn: '+ New Dispatch', action: 'Dispatch' }
-          ].map((item, idx, arr) => (
-            <div
-              key={idx}
-              className="p-3 d-flex justify-content-between align-items-center bg-white transition hover-light"
-              style={{ borderBottom: idx < arr.length - 1 ? '1px solid #f1f5f9' : 'none' }}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-3 d-flex align-items-center justify-content-center text-muted bg-light flex-shrink-0"
-                  style={{ width: '38px', height: '38px', border: '1px solid #e2e8f0', color: '#64748b' }}
-                >
-                  <i className={item.icon} style={{ fontSize: '18px', lineHeight: 1 }}></i>
-                </div>
-                <div>
-                  <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '14px' }}>{item.stage}</h6>
-                  <span className="text-muted small" style={{ fontSize: '12px' }}>No records yet</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-sm rounded-3 fw-semibold px-3 transition"
-                style={{
-                  border: '1px solid #c7d2fe',
-                  color: '#4f46e5',
-                  backgroundColor: '#ffffff'
-                }}
-                onClick={() => {
-                  if (item.action === 'Create PO') {
-                    if (onNavigateToProcurement) {
-                      onNavigateToProcurement('/procurement-pos', order);
-                    } else if (onTriggerProcurement) {
-                      onTriggerProcurement('Create PO', order);
-                    }
-                  } else if (item.action === 'Send to Process') {
-                    if (onNavigateToProcurement) {
-                      onNavigateToProcurement('/process-po', order);
-                    }
-                  } else if (item.action === 'QC Batch') {
-                    if (onNavigateToProcurement) {
-                      onNavigateToProcurement('/quality-batches', order);
-                    } else if (onTriggerProcurement) {
-                      onTriggerProcurement('QC Batch', order);
-                    }
-                  } else {
-                    setToastMessage(`${item.stage} is under development`);
-                    setShowToast(true);
-                    setTimeout(() => setShowToast(false), 3000);
-                  }
-                }}
-              >
-                {item.btn}
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* =========================================================================
@@ -4899,143 +4224,58 @@ export default function OrderDetailView({
                             >
                               <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
                                 {isConsumptionEditing ? (
-                                  selectedWidths.length === 0 ? (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace"
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace"
+                                    style={{
+                                      minWidth: '68px',
+                                      height: '28px',
+                                      padding: '2px 8px',
+                                      fontSize: selectedWidths.length > 0 ? '12px' : '11px',
+                                      fontWeight: selectedWidths.length > 0 ? 700 : 600,
+                                      borderColor: activeWidthDropdownKey === groupKey ? '#1d4ed8' : (selectedWidths.length > 0 ? '#2563eb' : '#cbd5e1'),
+                                      backgroundColor: selectedWidths.length > 0 ? '#eff6ff' : '#f8fafc',
+                                      color: selectedWidths.length > 0 ? '#1d4ed8' : '#64748b',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      boxShadow: activeWidthDropdownKey === groupKey ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : 'none',
+                                      borderWidth: '1.5px',
+                                      borderStyle: selectedWidths.length > 0 ? 'solid' : 'dashed',
+                                      gap: '6px'
+                                    }}
+                                    onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                    title="Click to select or change fabric width"
+                                  >
+                                    <span>{selectedWidths.length > 0 ? selectedWidths[0] : 'Select'}</span>
+                                    <i
+                                      className={`ti ti-chevron-${activeWidthDropdownKey === groupKey ? 'up' : 'down'}`}
                                       style={{
-                                        minWidth: '66px',
-                                        height: '26px',
-                                        padding: '2px 7px',
                                         fontSize: '11px',
-                                        fontWeight: 600,
-                                        borderColor: '#cbd5e1',
-                                        backgroundColor: '#f8fafc',
-                                        color: '#64748b',
-                                        borderRadius: '2px',
-                                        cursor: 'pointer',
-                                        boxShadow: 'none',
-                                        borderWidth: '1.5px',
-                                        borderStyle: 'dashed',
-                                        gap: '4px'
+                                        color: selectedWidths.length > 0 ? '#2563eb' : '#94a3b8'
                                       }}
-                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
-                                      title="Click to select width"
-                                    >
-                                      <span>Select ▾</span>
-                                    </button>
-                                  ) : selectedWidths.length === 1 ? (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
-                                      style={{
-                                        minWidth: '66px',
-                                        height: '26px',
-                                        padding: '2px 7px',
-                                        fontSize: '12px',
-                                        borderColor: '#2563eb',
-                                        backgroundColor: '#eff6ff',
-                                        color: '#1d4ed8',
-                                        borderRadius: '2px',
-                                        cursor: 'pointer',
-                                        boxShadow: 'none',
-                                        borderWidth: '1.5px',
-                                        borderStyle: 'solid',
-                                        gap: '4px'
-                                      }}
-                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
-                                      title="Click to select or add widths"
-                                    >
-                                      <span>{selectedWidths[0]}</span>
-                                      <i className="ti ti-chevron-down" style={{ fontSize: '11px', color: '#2563eb' }} />
-                                    </button>
-                                  ) : (
-                                    selectedWidths.map((w) => (
-                                      <div
-                                        key={w}
-                                        className="d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
-                                        style={{
-                                          minWidth: '66px',
-                                          height: '26px',
-                                          padding: '2px 5px',
-                                          fontSize: '12px',
-                                          color: '#1d4ed8',
-                                          backgroundColor: '#eff6ff',
-                                          border: '1.5px solid #2563eb',
-                                          borderRadius: '2px',
-                                          gap: '3px'
-                                        }}
-                                      >
-                                        <span
-                                          style={{ cursor: 'pointer' }}
-                                          onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
-                                          title="Click to select or add widths"
-                                        >
-                                          {w}
-                                        </span>
-                                        <div className="d-flex align-items-center gap-1">
-                                          <button
-                                            type="button"
-                                            className="btn p-0 border-0 bg-transparent text-primary"
-                                            style={{ fontSize: '10px', lineHeight: 1 }}
-                                            onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
-                                            title="Open width options"
-                                          >
-                                            <i className="ti ti-chevron-down" style={{ fontSize: '10px' }} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center"
-                                            style={{ width: '12px', height: '12px', lineHeight: 1 }}
-                                            title={`Remove ${w}`}
-                                            onClick={() => handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions)}
-                                          >
-                                            <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))
-                                  )
+                                    />
+                                  </button>
                                 ) : (
-                                  selectedWidths.length === 0 ? (
-                                    <div
-                                      className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                      style={{
-                                        minWidth: '58px',
-                                        height: '26px',
-                                        padding: '1px 6px',
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        color: '#94a3b8'
-                                      }}
-                                    >
-                                      <span>—</span>
-                                    </div>
-                                  ) : (
-                                    selectedWidths.map((w) => (
-                                      <div
-                                        key={w}
-                                        className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                        style={{
-                                          minWidth: '58px',
-                                          height: '26px',
-                                          padding: '1px 6px',
-                                          fontSize: '12px',
-                                          fontWeight: 700,
-                                          color: '#1d4ed8',
-                                          backgroundColor: '#eff6ff',
-                                          border: '1.5px solid #2563eb',
-                                          borderRadius: '2px'
-                                        }}
-                                      >
-                                        <span>{w}</span>
-                                      </div>
-                                    ))
-                                  )
+                                  <div
+                                    className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                    style={{
+                                      minWidth: '58px',
+                                      height: '26px',
+                                      padding: '1px 6px',
+                                      fontSize: '12px',
+                                      fontWeight: selectedWidths.length > 0 ? 700 : 600,
+                                      color: selectedWidths.length > 0 ? '#1d4ed8' : '#94a3b8',
+                                      backgroundColor: selectedWidths.length > 0 ? '#eff6ff' : 'transparent',
+                                      border: selectedWidths.length > 0 ? '1.5px solid #2563eb' : 'none',
+                                      borderRadius: '2px'
+                                    }}
+                                  >
+                                    <span>{selectedWidths.length > 0 ? selectedWidths[0] : '—'}</span>
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Floating Popover - opens right next to the width button */}
+                              {/* Clean Dropdown Menu - Drops down directly beneath the button */}
                               {isConsumptionEditing && activeWidthDropdownKey === groupKey && (
                                 <>
                                   {/* Full-screen invisible backdrop to dismiss on click outside */}
@@ -5046,7 +4286,7 @@ export default function OrderDetailView({
                                       left: 0,
                                       right: 0,
                                       bottom: 0,
-                                      zIndex: 1040
+                                      zIndex: 1050
                                     }}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -5054,37 +4294,35 @@ export default function OrderDetailView({
                                     }}
                                   />
 
-                                  {/* Popover Box */}
+                                  {/* Dropdown Menu Container */}
                                   <div
-                                    className="card shadow"
+                                    className="card shadow-lg"
                                     style={{
                                       position: 'absolute',
-                                      top: '50%',
-                                      left: '100%',
-                                      transform: 'translateY(-50%)',
-                                      marginLeft: '6px',
-                                      minWidth: '160px',
-                                      zIndex: 1050,
-                                      borderRadius: '4px',
+                                      top: 'calc(100% + 4px)',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      minWidth: '150px',
+                                      maxWidth: '185px',
+                                      zIndex: 1060,
+                                      borderRadius: '6px',
                                       border: '1.5px solid #2563eb',
                                       backgroundColor: '#ffffff',
                                       padding: '0',
                                       overflow: 'hidden',
                                       textAlign: 'left',
-                                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)'
+                                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
+                                    {/* Dropdown Header */}
                                     <div
-                                      className="d-flex align-items-center justify-content-between px-2 py-1.5 border-bottom"
+                                      className="d-flex align-items-center justify-content-between px-2.5 py-1.5 border-bottom"
                                       style={{ backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe' }}
                                     >
-                                      <div className="d-flex align-items-center gap-1">
-                                        <i className="ti ti-arrows-horizontal text-primary" style={{ fontSize: '12px' }} />
-                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', letterSpacing: '0.02em' }}>
-                                          Select Widths
-                                        </span>
-                                      </div>
+                                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', letterSpacing: '0.02em' }}>
+                                        Select Width
+                                      </span>
                                       <button
                                         type="button"
                                         className="btn-close"
@@ -5094,69 +4332,105 @@ export default function OrderDetailView({
                                       />
                                     </div>
 
+                                    {/* Width Options List */}
                                     <div style={{ maxHeight: '180px', overflowY: 'auto', padding: '4px' }}>
                                       {widthOptions.map(opt => {
-                                        const isChecked = selectedWidths.includes(opt);
+                                        const isSelected = selectedWidths.includes(opt) || (!selectedWidths.length && opt === group.width);
                                         return (
                                           <div
                                             key={opt}
-                                            className="d-flex align-items-center justify-content-between px-2 py-1.5 rounded"
+                                            className="d-flex align-items-center justify-content-between px-2.5 py-1.5 rounded transition"
                                             style={{
                                               cursor: 'pointer',
                                               userSelect: 'none',
-                                              backgroundColor: isChecked ? '#eff6ff' : 'transparent',
-                                              margin: '2px 0'
+                                              backgroundColor: isSelected ? '#eff6ff' : 'transparent',
+                                              margin: '2px 0',
+                                              color: isSelected ? '#1d4ed8' : '#334155',
+                                              fontWeight: isSelected ? 700 : 500,
+                                              fontSize: '12px'
                                             }}
                                             onClick={() => {
-                                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
+                                              handleSelectWidthForGroup(group.articleName, opt, group.fabricQuality, group.role);
+                                              setActiveWidthDropdownKey(null);
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              if (!isSelected) e.currentTarget.style.backgroundColor = '#f1f5f9';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                                             }}
                                           >
-                                            <div className="d-flex align-items-center gap-2">
-                                              <input
-                                                type="checkbox"
-                                                className="form-check-input m-0"
-                                                style={{
-                                                  cursor: 'pointer',
-                                                  width: '14px',
-                                                  height: '14px',
-                                                  accentColor: '#2563eb'
-                                                }}
-                                                checked={isChecked}
-                                                onChange={() => {}}
-                                              />
-                                              <span
-                                                className="font-monospace fw-bold"
-                                                style={{
-                                                  fontSize: '12px',
-                                                  color: isChecked ? '#1d4ed8' : '#334155'
-                                                }}
-                                              >
-                                                {opt}
-                                              </span>
-                                            </div>
-                                            {isChecked ? (
+                                            <span className="font-monospace fw-bold">{opt}</span>
+                                            {isSelected ? (
                                               <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                                                Active
+                                                <i className="ti ti-check me-0.5"></i> Active
                                               </span>
                                             ) : (
                                               <span className="text-muted" style={{ fontSize: '10px' }}>
-                                                + Add
+                                                Select
                                               </span>
                                             )}
                                           </div>
                                         );
                                       })}
+
+                                      {/* Clear / Reset Option */}
+                                      {selectedWidths.length > 0 && (
+                                        <div
+                                          className="d-flex align-items-center justify-content-between px-2.5 py-1.5 rounded border-top mt-1 pt-1 text-secondary"
+                                          style={{
+                                            cursor: 'pointer',
+                                            userSelect: 'none',
+                                            fontSize: '11px',
+                                            fontWeight: 500
+                                          }}
+                                          onClick={() => {
+                                            handleSelectWidthForGroup(group.articleName, '', group.fabricQuality, group.role);
+                                            setActiveWidthDropdownKey(null);
+                                          }}
+                                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.color = '#dc2626'; }}
+                                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#64748b'; }}
+                                        >
+                                          <span>Clear width (—)</span>
+                                          <i className="ti ti-x" style={{ fontSize: '10px' }} />
+                                        </div>
+                                      )}
                                     </div>
 
-                                    <div className="border-top p-1 text-center" style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm btn-primary w-100 py-1"
-                                        style={{ fontSize: '11px', fontWeight: 600, borderRadius: '3px' }}
-                                        onClick={() => setActiveWidthDropdownKey(null)}
+                                    {/* Custom Width Input */}
+                                    <div className="border-top p-1.5" style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                                      <form
+                                        onSubmit={(e) => {
+                                          e.preventDefault();
+                                          const val = (customWidthMap[groupKey] || '').trim();
+                                          if (val) {
+                                            const clean = val.replace(/"/g, '') + '"';
+                                            handleSelectWidthForGroup(group.articleName, clean, group.fabricQuality, group.role);
+                                            setCustomWidthMap(prev => ({ ...prev, [groupKey]: '' }));
+                                            setActiveWidthDropdownKey(null);
+                                          }
+                                        }}
+                                        className="d-flex gap-1"
                                       >
-                                        Done
-                                      </button>
+                                        <input
+                                          type="text"
+                                          className="form-control form-control-sm font-monospace py-0 px-2"
+                                          placeholder="Custom (e.g. 48)"
+                                          style={{ fontSize: '11px', height: '24px' }}
+                                          value={customWidthMap[groupKey] || ''}
+                                          onChange={(e) => {
+                                            const v = e.target.value;
+                                            setCustomWidthMap(prev => ({ ...prev, [groupKey]: v }));
+                                          }}
+                                        />
+                                        <button
+                                          type="submit"
+                                          className="btn btn-sm btn-primary py-0 px-2"
+                                          style={{ fontSize: '10px', height: '24px', fontWeight: 600, whiteSpace: 'nowrap' }}
+                                        >
+                                          + Add
+                                        </button>
+                                      </form>
                                     </div>
                                   </div>
                                 </>
@@ -5669,6 +4943,7 @@ export default function OrderDetailView({
               <table className="table table-sm align-middle mb-0" style={{ fontSize: '13px' }}>
                 <thead className="bg-light">
                   <tr>
+                    <th className="py-2.5 px-3">Article</th>
                     <th className="py-2.5 px-3">Fabric Quality</th>
                     <th className="py-2.5 px-3 text-center">Width</th>
                     <th className="py-2.5 px-3 text-center">Sourcing Path</th>
@@ -5679,94 +4954,110 @@ export default function OrderDetailView({
                   </tr>
                 </thead>
                 <tbody>
-                  {rateCalculations.map((rc, idx) => (
-                    <tr
-                      key={idx}
-                      style={{
-                        backgroundColor: rc.isSelected ? '#ffffff' : '#fcfcfd'
-                      }}
-                    >
-                      <td className="py-2.5 px-3 fw-semibold text-dark">
-                        {rc.fabricName}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <div className="d-inline-flex align-items-center gap-1.5">
-                          <span className="fw-bold font-monospace">{rc.width}</span>
-                          {rc.isSelected ? (
-                            <span
-                              className="badge rounded-pill fw-semibold px-2 py-0.5 text-white shadow-2xs"
-                              style={{ backgroundColor: '#2e37a4', fontSize: '10px' }}
-                            >
-                              Selected
-                            </span>
-                          ) : (
-                            <span
-                              className="badge rounded-pill fw-medium px-2 py-0.5 bg-light text-muted border"
-                              style={{ fontSize: '10px' }}
-                            >
-                              Alternative
+                  {rateCalculations.map((rc, idx) => {
+                    const isNewArticle = idx > 0 && rateCalculations[idx - 1].articleName !== rc.articleName;
+                    const isFirstInArticle = idx === 0 || isNewArticle;
+
+                    return (
+                      <tr
+                        key={idx}
+                        style={{
+                          backgroundColor: rc.isSelected ? '#ffffff' : '#fcfcfd',
+                          borderTop: isNewArticle ? '2px solid #cbd5e1' : undefined
+                        }}
+                      >
+                        <td className="py-2.5 px-3 fw-bold text-dark" style={{ width: '130px' }}>
+                          <span className="me-1.5">{rc.articleIcon}</span>
+                          <span>{rc.articleName}</span>
+                        </td>
+                        <td className="py-2.5 px-3 fw-semibold text-dark">
+                          <span>{rc.fabricName}</span>
+                          {rc.role && (
+                            <span className="badge bg-light text-muted border ms-1.5" style={{ fontSize: '10px' }}>
+                              {rc.role}
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`badge ${rc.isDyed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'} px-2 py-1`}>
-                          {rc.isDyed ? 'Dyed / Stock' : 'Greige + Dyeing'}
-                        </span>
-                      </td>
-                      <td className="py-1.5 px-2 text-end" style={{ width: '145px' }}>
-                        <div
-                          className="input-group input-group-sm ms-auto rounded-2 overflow-hidden shadow-2xs"
-                          style={{
-                            maxWidth: '135px',
-                            border: '1.5px solid #cbd5e1',
-                            backgroundColor: '#ffffff'
-                          }}
-                        >
-                          <span
-                            className="input-group-text px-2 py-0 bg-light text-dark fw-bold border-0"
-                            style={{ fontSize: '12.5px', color: '#334155' }}
-                          >
-                            ₹
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="d-inline-flex align-items-center gap-1.5">
+                            <span className="fw-bold font-monospace">{rc.width}</span>
+                            {rc.isSelected ? (
+                              <span
+                                className="badge rounded-pill fw-semibold px-2 py-0.5 text-white shadow-2xs"
+                                style={{ backgroundColor: '#2e37a4', fontSize: '10px' }}
+                              >
+                                Selected
+                              </span>
+                            ) : (
+                              <span
+                                className="badge rounded-pill fw-medium px-2 py-0.5 bg-light text-muted border"
+                                style={{ fontSize: '10px' }}
+                              >
+                                Alternative
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={`badge ${rc.isDyed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'} px-2 py-1`}>
+                            {rc.isDyed ? 'Dyed / Stock' : 'Greige + Dyeing'}
                           </span>
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="form-control form-control-sm text-end fw-bold font-monospace bg-white border-0 ps-1 pe-2 shadow-none"
-                            style={{ fontSize: '13px', height: '32px', color: '#0f172a' }}
-                            placeholder="0.00"
-                            value={customMarketRates[rc.rateKey] ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCustomMarketRates(prev => ({
-                                ...prev,
-                                [rc.rateKey]: val
-                              }));
+                        </td>
+                        <td className="py-1.5 px-2 text-end" style={{ width: '145px' }}>
+                          <div
+                            className="input-group input-group-sm ms-auto rounded-2 overflow-hidden shadow-2xs"
+                            style={{
+                              maxWidth: '135px',
+                              border: '1.5px solid #cbd5e1',
+                              backgroundColor: '#ffffff'
                             }}
-                          />
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-end font-monospace fw-semibold">
-                        {rc.totalMetres.toFixed(1)}m
-                      </td>
-                      <td className={`py-2.5 px-3 text-end font-monospace fw-bold ${rc.isSelected ? 'text-dark' : 'text-secondary'}`}>
-                        {rc.totalCost > 0
-                          ? `₹${rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : '₹0.00'}
-                      </td>
-                      <td
-                        className="py-2.5 px-3 text-end font-monospace fw-semibold"
-                        style={{ color: rc.isSelected ? '#2e37a4' : '#64748b' }}
-                      >
-                        {rc.costPerGarment > 0 ? `₹${rc.costPerGarment.toFixed(2)}` : '₹0.00'}
-                      </td>
-                    </tr>
-                  ))}
+                          >
+                            <span
+                              className="input-group-text px-2 py-0 bg-light text-dark fw-bold border-0"
+                              style={{ fontSize: '12.5px', color: '#334155' }}
+                            >
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              className="form-control form-control-sm text-end fw-bold font-monospace bg-white border-0 ps-1 pe-2 shadow-none"
+                              style={{ fontSize: '13px', height: '32px', color: '#0f172a' }}
+                              placeholder="0.00"
+                              value={customMarketRates[rc.rateKey] ?? customMarketRates[`${rc.fabricName}_${rc.width}`] ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCustomMarketRates(prev => ({
+                                  ...prev,
+                                  [rc.rateKey]: val,
+                                  [`${rc.fabricName}_${rc.width}`]: val
+                                }));
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-end font-monospace fw-semibold">
+                          {rc.totalMetres.toFixed(1)}m
+                        </td>
+                        <td className={`py-2.5 px-3 text-end font-monospace fw-bold ${rc.isSelected ? 'text-dark' : 'text-secondary'}`}>
+                          {rc.totalCost > 0
+                            ? `₹${rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : '₹0.00'}
+                        </td>
+                        <td
+                          className="py-2.5 px-3 text-end font-monospace fw-semibold"
+                          style={{ color: rc.isSelected ? '#2e37a4' : '#64748b' }}
+                        >
+                          {rc.costPerGarment > 0 ? `₹${rc.costPerGarment.toFixed(2)}` : '₹0.00'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-light fw-bold">
                   <tr>
-                    <td colSpan={4} className="py-2.5 px-3 text-dark">
+                    <td colSpan={5} className="py-2.5 px-3 text-dark">
                       Total Order Procurement Cost (Active Selected Widths)
                     </td>
                     <td className="py-2.5 px-3 text-end font-monospace">{rateTotals.totalMetres.toFixed(1)}m</td>
@@ -5787,7 +5078,7 @@ export default function OrderDetailView({
 
 
       {/* =========================================================================
-       * 11. ACCESSORIES BOM CARD (Matching Screenshots 1, 3, 4)
+       * 11. ACCESSORIES BOM CARD
        * ========================================================================= */}
       <div
         className="card border-0 shadow-sm rounded-4 bg-white"
@@ -5810,7 +5101,7 @@ export default function OrderDetailView({
             </div>
             <div>
               <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '16px' }}>
-                Accessories BOM — {bomCustomerName}
+                Accessories BOM &mdash; {bomCustomerName}
               </h6>
               <div className="text-muted small" style={{ fontSize: '12px', marginTop: '2px' }}>
                 Select accessories for each article
@@ -5868,7 +5159,7 @@ export default function OrderDetailView({
           </div>
         </div>
 
-        {/* 1. Category Buttons Grid (Evenly spaced, responsive columns) */}
+        {/* 1. Category Buttons Grid */}
         <div
           style={{
             display: 'grid',
@@ -5885,8 +5176,7 @@ export default function OrderDetailView({
               <button
                 key={cat.id}
                 type="button"
-                className={`btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs ${isActive ? 'fw-bold' : ''
-                  }`}
+                className={`btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs ${isActive ? 'fw-bold' : ''}`}
                 style={{
                   width: '100%',
                   height: '76px',
@@ -5914,6 +5204,19 @@ export default function OrderDetailView({
                 <span style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '100%' }}>
                   {cat.name}
                 </span>
+                {categoryItems.length > 0 && (
+                  <span
+                    className="badge rounded-pill mt-0.5"
+                    style={{
+                      fontSize: '10px',
+                      padding: '1px 6px',
+                      backgroundColor: isActive ? '#2e37a4' : '#f1f5f9',
+                      color: isActive ? '#ffffff' : '#64748b'
+                    }}
+                  >
+                    {categoryItems.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -5937,7 +5240,7 @@ export default function OrderDetailView({
           </div>
         </div>
 
-        {/* 3. Quick Variety Pills — click one to open popover */}
+        {/* 3. Quick Variety Pills */}
         <div className="position-relative d-flex flex-wrap align-items-center mb-4" style={{ gap: '8px' }}>
           {(activeCategoryObj?.varieties || []).length === 0 ? (
             <div className="text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '13px' }}>
@@ -6032,9 +5335,64 @@ export default function OrderDetailView({
           )}
         </div>
 
+        {/* 4. Filter By Article Pills */}
+        {orderArticles.length > 1 && (
+          <div className="d-flex align-items-center flex-wrap gap-2 mb-3 pb-2 border-bottom">
+            <span className="text-muted fw-semibold me-1" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Filter by Article:
+            </span>
+            <button
+              type="button"
+              className={`btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${!selectedBomArticle ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white'}`}
+              style={!selectedBomArticle ? { backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '12px' } : { fontSize: '12px' }}
+              onClick={() => setSelectedBomArticle('')}
+            >
+              All Articles ({addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory))).length})
+            </button>
+            {orderArticles.map(art => {
+              const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
+              const countForArt = addedAccessories.filter(item =>
+                matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)) &&
+                getCardSelectedArticles(item).some(a => a.toLowerCase() === (art.name || '').toLowerCase())
+              ).length;
+              const isSelected = selectedBomArticle === art.name;
+              return (
+                <button
+                  key={art.name}
+                  type="button"
+                  className={`btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${isSelected ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white'}`}
+                  style={isSelected ? { backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '12px' } : { fontSize: '12px' }}
+                  onClick={() => setSelectedBomArticle(isSelected ? '' : art.name)}
+                >
+                  <span>{art.icon || (isBottom ? '👖' : '👘')}</span>
+                  <span className="ms-1">{art.name}</span>
+                  <span className="badge rounded-pill ms-1.5" style={{ backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', fontSize: '10.5px' }}>
+                    {countForArt}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* 5. Configured Accessories List or Empty State */}
         {(() => {
-          const categoryItems = addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)));
+          let categoryItems = addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)));
+
+          if (accessorySearchQuery && accessorySearchQuery.trim()) {
+            const q = accessorySearchQuery.toLowerCase().trim();
+            categoryItems = categoryItems.filter(item =>
+              (item.varietyName && item.varietyName.toLowerCase().includes(q)) ||
+              (item.category && item.category.toLowerCase().includes(q)) ||
+              (item.placement && item.placement.toLowerCase().includes(q))
+            );
+          }
+
+          if (selectedBomArticle) {
+            categoryItems = categoryItems.filter(item =>
+              getCardSelectedArticles(item).some(a => a.toLowerCase() === selectedBomArticle.toLowerCase())
+            );
+          }
 
           if (categoryItems.length === 0) {
             return (
@@ -6047,7 +5405,9 @@ export default function OrderDetailView({
                 }}
               >
                 <div className="small fw-medium">
-                  No accessories configured yet — pick a category and click a variety above to add.
+                  {selectedBomArticle
+                    ? `No ${activeCategoryObj?.name || activeCategory} configured for ${selectedBomArticle} yet. Click a variety above to add.`
+                    : `No accessories configured yet — pick a category and click a variety above to add.`}
                 </div>
               </div>
             );
@@ -6134,7 +5494,7 @@ export default function OrderDetailView({
                       {renderCategoryCardTable(activeCategoryObj, item, selectedArticles, isEditing)}
                     </div>
 
-                    {/* Card Bottom Actions: Edit/Save & Delete */}
+                    {/* Card Bottom Actions: Edit/Save & Delete (Neatly at bottom right) */}
                     <div className="d-flex align-items-center justify-content-end gap-2 mt-3 pt-2.5" style={{ borderTop: '1px solid #f1f5f9' }}>
                       {isEditing ? (
                         <button

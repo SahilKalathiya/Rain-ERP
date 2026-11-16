@@ -27,7 +27,17 @@ export default function VendorMasterView({
   onCloseInline,
   defaultTypes = []
 }) {
-  const [vendorList, setVendorList] = useState(vendors);
+  const [vendorList, setVendorList] = useState(() => {
+    if (Array.isArray(vendors) && vendors.length > 0) return vendors;
+    try {
+      const stored = localStorage.getItem('raindrop_vendors_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [isEditing, setIsEditing] = useState(isInline);
   const [activeSection, setActiveSection] = useState(isInline ? 'all' : 'none'); // 'all', 'basic', 'contact', 'tax', 'bank'
@@ -49,7 +59,7 @@ export default function VendorMasterView({
   });
 
   React.useEffect(() => {
-    if (vendors && vendors.length > 0) {
+    if (Array.isArray(vendors) && vendors.length > 0) {
       setVendorList(vendors);
     }
   }, [vendors]);
@@ -95,9 +105,27 @@ export default function VendorMasterView({
   // Form State
   const [formData, setFormData] = useState(() => {
     const initTypes = getInitialTypes();
+    const currentList = (Array.isArray(vendors) && vendors.length > 0)
+      ? vendors
+      : (() => {
+          try {
+            const s = localStorage.getItem('raindrop_vendors_v1');
+            if (s) {
+              const p = JSON.parse(s);
+              if (Array.isArray(p)) return p;
+            }
+          } catch (e) {}
+          return [];
+        })();
+    const maxNum = currentList.reduce((max, v) => {
+      const match = (v.id || '').match(/\d+/);
+      return match ? Math.max(max, parseInt(match[0], 10)) : max;
+    }, 0);
+    const nextId = `VEND-${String(maxNum + 1).padStart(4, '0')}`;
+
     if (isInline) {
       return {
-        id: `VEND-${String(vendors.length + 1).padStart(4, '0')}`,
+        id: nextId,
         name: '',
         types: initTypes,
         type: initTypes.join(', '),
@@ -376,6 +404,14 @@ export default function VendorMasterView({
     setIsCreatingNew(false);
     setIsModalEditMode(false);
 
+    if (api && api.saveVendor) {
+      try {
+        api.saveVendor(updatedVendor).catch((err) => {
+          console.warn('API saveVendor error (falling back to localStorage):', err);
+        });
+      } catch (err) {}
+    }
+
     try {
       localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updatedList));
       if (curTypes && curTypes.length > 0) {
@@ -480,7 +516,8 @@ export default function VendorMasterView({
       {/* Main View Area */}
       <div className="row g-4">
         {/* Table listing vendors with column filters */}
-        <div className="col-12">
+        {!isInline && (
+          <div className="col-12">
           <div className="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <div className="d-flex align-items-center justify-content-between mb-3">
               <h5 className="fw-bold text-dark mb-0 fs-16">Registered Vendors</h5>
@@ -645,10 +682,11 @@ export default function VendorMasterView({
             </div>
           </div>
         </div>
+      )}
 
         {/* POPUP MODAL: View / Edit / Create Vendor Dialog */}
         {(selectedVendor || isCreatingNew) && (
-          <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060 }}>
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1060, backdropFilter: 'blur(3px)' }}>
             <div className="modal-dialog modal-dialog-centered modal-lg">
               <div className="modal-content border-0 shadow-lg rounded-4 p-4 bg-white">
                 <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">

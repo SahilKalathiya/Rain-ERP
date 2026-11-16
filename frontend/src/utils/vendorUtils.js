@@ -37,36 +37,50 @@ export function getVendorTypes(vendor) {
   if (!vendor) return [];
   let types = [];
 
-  if (Array.isArray(vendor.types) && vendor.types.length > 0) {
-    types = vendor.types.map((t) => String(t).trim()).filter(Boolean);
-  } else if (Array.isArray(vendor.type)) {
-    types = vendor.type.map((t) => String(t).trim()).filter(Boolean);
-  } else if (typeof vendor.type === 'string' && vendor.type.trim()) {
-    const raw = vendor.type.trim();
-    if (raw.includes(',')) {
-      types = raw.split(',').map((s) => s.trim()).filter(Boolean);
-    } else if (raw.toLowerCase() === 'dyeing & printing' || raw.toLowerCase() === 'dyeing and printing') {
-      types = ['Dyeing', 'Printing'];
-    } else {
-      types = [raw];
+  const parseItem = (item) => {
+    if (!item) return [];
+    if (Array.isArray(item)) {
+      return item.flatMap(parseItem);
     }
-  }
+    if (typeof item === 'object') {
+      return [item.name || item.type || item.value || ''].filter(Boolean);
+    }
+    if (typeof item === 'string') {
+      const s = item.trim();
+      if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+        try {
+          const parsed = JSON.parse(s);
+          return parseItem(parsed);
+        } catch (e) {}
+      }
+      if (s.includes(',')) {
+        return s.split(',').map((x) => x.trim()).filter(Boolean);
+      }
+      if (s.toLowerCase() === 'dyeing & printing' || s.toLowerCase() === 'dyeing and printing') {
+        return ['Dyeing', 'Printing'];
+      }
+      return [s];
+    }
+    return [String(item)];
+  };
 
-  if (vendor.customType && typeof vendor.customType === 'string' && vendor.customType.trim()) {
-    const cust = vendor.customType.trim();
-    if (!types.some((t) => t.toLowerCase() === cust.toLowerCase())) {
-      types.push(cust);
-    }
-  }
+  if (vendor.types) types.push(...parseItem(vendor.types));
+  if (vendor.type) types.push(...parseItem(vendor.type));
+  if (vendor.vendor_type) types.push(...parseItem(vendor.vendor_type));
+  if (vendor.vendorType) types.push(...parseItem(vendor.vendorType));
+  if (vendor.customType) types.push(...parseItem(vendor.customType));
+  if (vendor.category) types.push(...parseItem(vendor.category));
 
   // Deduplicate
   const seen = new Set();
   const deduped = [];
   for (const t of types) {
-    const lower = t.toLowerCase();
+    const clean = String(t).trim();
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
     if (!seen.has(lower)) {
       seen.add(lower);
-      deduped.push(t);
+      deduped.push(clean);
     }
   }
 
@@ -95,7 +109,7 @@ export function vendorMatchesType(vendor, targetType) {
 
   if (targets.length === 0) return true;
 
-  return vendorTypes.some((vt) => {
+  const matchedByType = vendorTypes.some((vt) => {
     const vLower = String(vt).toLowerCase().trim();
 
     return targets.some((target) => {
@@ -181,44 +195,103 @@ export function vendorMatchesType(vendor, targetType) {
         );
       }
 
-      if (target === 'dyeing') {
+      if (target === 'dyeing' || target === 'dye') {
         return (
           vLower.includes('dye') ||
           vLower.includes('processing') ||
-          vLower.includes('process')
+          vLower.includes('process') ||
+          vLower.includes('color') ||
+          vLower.includes('colour')
         );
       }
 
-      if (target === 'printing') {
-        return vLower.includes('print');
+      if (target === 'printing' || target === 'print') {
+        return (
+          vLower.includes('print') ||
+          vLower.includes('digital') ||
+          vLower.includes('screen')
+        );
       }
 
-      if (target === 'processing') {
+      if (target === 'processing' || target === 'process') {
         return (
           vLower.includes('process') ||
           vLower.includes('dye') ||
-          vLower.includes('print')
+          vLower.includes('print') ||
+          vLower.includes('finish')
         );
       }
 
-      if (target === 'embroidery') {
+      if (target === 'embroidery' || target === 'embroid') {
         return (
           vLower.includes('embroid') ||
           vLower.includes('aari') ||
-          vLower.includes('chikankari')
+          vLower.includes('chikankari') ||
+          vLower.includes('thread work') ||
+          vLower.includes('sequin')
         );
       }
 
-      if (target === 'washing') {
-        return vLower.includes('wash') || vLower.includes('laundry');
+      if (target === 'washing' || target === 'wash') {
+        return (
+          vLower.includes('wash') ||
+          vLower.includes('laundry') ||
+          vLower.includes('softener')
+        );
       }
 
-      if (target === 'job worker' || target === 'stitching' || target === 'stitching / job worker') {
-        return vLower.includes('stitch') || vLower.includes('job worker') || vLower.includes('tailor');
+      if (
+        target === 'job worker' ||
+        target === 'stitching' ||
+        target === 'stitching / job worker' ||
+        target === 'stitch'
+      ) {
+        return (
+          vLower.includes('stitch') ||
+          vLower.includes('job worker') ||
+          vLower.includes('job work') ||
+          vLower.includes('tailor') ||
+          vLower.includes('fabricator') ||
+          vLower.includes('cmt')
+        );
       }
 
       return false;
     });
+  });
+
+  if (matchedByType) return true;
+
+  // Fallback: Check vendor name, category, or remarks if vendor explicitly has trade in its name
+  const nameStr = String(vendor.name || vendor.vendorName || '').toLowerCase();
+  const categoryStr = String(vendor.category || vendor.vendor_category || '').toLowerCase();
+  const combinedInfo = `${nameStr} ${categoryStr}`;
+
+  return targets.some((target) => {
+    if (target === 'dyeing' || target === 'dye') {
+      return combinedInfo.includes('dye') || combinedInfo.includes('processing');
+    }
+    if (target === 'printing' || target === 'print') {
+      return combinedInfo.includes('print');
+    }
+    if (target === 'processing' || target === 'process') {
+      return combinedInfo.includes('process') || combinedInfo.includes('dye') || combinedInfo.includes('print');
+    }
+    if (target === 'embroidery' || target === 'embroid') {
+      return combinedInfo.includes('embroid') || combinedInfo.includes('aari') || combinedInfo.includes('chikankari');
+    }
+    if (target === 'washing' || target === 'wash') {
+      return combinedInfo.includes('wash') || combinedInfo.includes('laundry');
+    }
+    if (
+      target === 'stitching' ||
+      target === 'job worker' ||
+      target === 'stitching / job worker' ||
+      target === 'stitch'
+    ) {
+      return combinedInfo.includes('stitch') || combinedInfo.includes('job work') || combinedInfo.includes('tailor');
+    }
+    return combinedInfo.includes(target);
   });
 }
 

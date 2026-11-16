@@ -67,7 +67,7 @@ export default function ProcessChallanForm({
 
   // Emergency Dispatch (Challan without PO, Section 4.3)
   const [isEmergencyDispatch, setIsEmergencyDispatch] = useState(
-    initialChallan ? initialChallan.po_link_status === 'Pending PO Link' : false
+    initialChallan ? (initialChallan.po_link_status === 'Pending PO Link' || Boolean(initialChallan.admin_alert_triggered)) : false
   );
 
   // Multi-PO selection (e.g. PO #7611, #7612, #7613)
@@ -228,7 +228,9 @@ export default function ProcessChallanForm({
   const grandTotalMeters = items.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
 
   // Status
-  const poLinkStatus = isEmergencyDispatch || selectedPOs.length === 0 ? 'Pending PO Link' : 'Linked';
+  const poLinkStatus = isEmergencyDispatch
+    ? 'Pending PO Link'
+    : (selectedPOs.length > 0 ? 'Linked' : 'Draft');
 
   const handleSubmit = (e, andRecordReturn = false) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -267,7 +269,7 @@ export default function ProcessChallanForm({
       styles_info: stylesInfo,
       customer_brand: customerBrand,
       po_link_status: poLinkStatus,
-      admin_alert_triggered: poLinkStatus === 'Pending PO Link',
+      admin_alert_triggered: isEmergencyDispatch,
       folding_notation: foldingNotation,
       total_bales: 1,
       total_pieces: items.length,
@@ -309,13 +311,22 @@ export default function ProcessChallanForm({
               <h5 className="card-title mb-0 fw-bold text-dark fs-18">
                 {isEditing ? (isReadOnly ? `Process Challan #${challanNumber} (View Mode)` : `Edit Challan #${challanNumber}`) : 'Create Process Dispatch Challan'}
               </h5>
-              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${isLocked
+              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${
+                isLocked
                   ? 'bg-secondary text-white border border-secondary shadow-xs'
-                  : (poLinkStatus === 'Linked'
-                    ? 'bg-success-subtle text-success border border-success-subtle'
-                    : 'bg-danger text-white border border-danger shadow-xs')
-                }`}>
-                {isLocked ? '🔒 Locked (GRN Inwarded)' : (poLinkStatus === 'Linked' ? '● PO Linked' : '⚠ Pending PO Link (Emergency)')}
+                  : isEmergencyDispatch
+                    ? 'bg-danger text-white border border-danger shadow-xs'
+                    : selectedPOs.length > 0
+                      ? 'bg-success-subtle text-success border border-success-subtle'
+                      : 'bg-light text-secondary border'
+              }`}>
+                {isLocked
+                  ? '🔒 Locked (GRN Inwarded)'
+                  : isEmergencyDispatch
+                    ? '⚠ Pending PO Link (Emergency)'
+                    : selectedPOs.length > 0
+                      ? '● PO Linked'
+                      : 'Draft (Select PO)'}
               </span>
             </div>
             <div className="text-muted fs-12 mt-0.5 d-flex align-items-center gap-2">
@@ -407,8 +418,8 @@ export default function ProcessChallanForm({
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4" style={{ background: '#f8fafc' }}>
 
-          {/* Section 4.3: Persistent Red Banner for Emergency Dispatch without PO */}
-          {poLinkStatus === 'Pending PO Link' && (
+          {/* Section 4.3: Persistent Red Banner ONLY for Emergency Dispatch without PO */}
+          {isEmergencyDispatch && (
             <div className="alert alert-danger border-danger shadow-xs py-2.5 px-3 mb-4 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
               <div className="d-flex align-items-center gap-2">
                 <i className="ti ti-alert-triangle-filled fs-18 text-danger"></i>

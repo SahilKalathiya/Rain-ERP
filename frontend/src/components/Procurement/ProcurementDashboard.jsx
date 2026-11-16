@@ -290,11 +290,22 @@ export default function ProcurementDashboard({ initialSubmodule = 'overview', on
     const handleSyncOrders = () => {
       setSalesOrders(getStoredData('erp_sales_orders_v1', initialSalesOrders));
     };
+    const handleSyncVendors = () => {
+      try {
+        const s = localStorage.getItem('raindrop_vendors_v1');
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed) && parsed.length > 0) setVendors(parsed);
+        }
+      } catch (e) {}
+    };
     window.addEventListener('storage', handleSyncOrders);
     window.addEventListener('erp_sales_order_updated', handleSyncOrders);
+    window.addEventListener('raindrop_vendors_updated', handleSyncVendors);
     return () => {
       window.removeEventListener('storage', handleSyncOrders);
       window.removeEventListener('erp_sales_order_updated', handleSyncOrders);
+      window.removeEventListener('raindrop_vendors_updated', handleSyncVendors);
     };
   }, []);
 

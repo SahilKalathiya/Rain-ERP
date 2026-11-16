@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { initialVendors } from '../../data/procurementData';
 import { initialArticles, getStoredColorsMaster, getStoredData } from '../../data/salesOrderData';
-import { vendorMatchesType } from '../../utils/vendorUtils';
+import { vendorMatchesType, getVendorTypes } from '../../utils/vendorUtils';
 import VendorMasterView from '../Procurement/VendorMasterView';
 import FabricMasterView from '../Procurement/FabricMasterView';
 import AddColorModal from '../Procurement/AddColorModal';
@@ -327,7 +327,7 @@ export default function ProcessPOForm({
     initialPO?.issue_date || initialPO?.date || new Date().toISOString().split('T')[0]
   );
   const [processType, setProcessType] = useState(
-    initialPO?.process_type || initialPO?.processType || 'Dyeing'
+    initialPO?.process_type || initialPO?.processType || ''
   );
   const [showAllVendors, setShowAllVendors] = useState(false);
   const [vendorId, setVendorId] = useState(initialPO?.vendor_id || '');
@@ -336,12 +336,11 @@ export default function ProcessPOForm({
   // Requirement 2: Filter vendors strictly based on selected Purchase Order / Process Type
   const displayedVendors = React.useMemo(() => {
     if (showAllVendors || !processType || processType === 'All') return vendorList;
-    const filtered = vendorList.filter((v) =>
+    return vendorList.filter((v) =>
       vendorMatchesType(v, processType) ||
       (v.name || v.vendorName) === vendorName ||
       v.id === vendorId
     );
-    return filtered.length > 0 ? filtered : vendorList;
   }, [vendorList, processType, showAllVendors, vendorName, vendorId]);
 
   // Order Linkage
@@ -620,6 +619,10 @@ export default function ProcessPOForm({
   const handleSubmit = (andCreateChallan = false) => {
     if (isLocked) return;
 
+    if (!processType) {
+      alert('Please select a Process Type.');
+      return;
+    }
     if (!vendorName) {
       alert('Please select or specify a Job Work Vendor.');
       return;
@@ -758,7 +761,7 @@ export default function ProcessPOForm({
             </div>
             <div>
               <h6 className="mb-0 fw-bold text-dark fs-14">Basic Details &amp; Process Type</h6>
-              <p className="text-muted fs-11 mb-0">Header information, Job Work Dyeing Vendor &amp; optional Sales Order Link</p>
+              <p className="text-muted fs-11 mb-0">Header information, Job Work {processType && processType !== 'All' ? `${processType} ` : ''}Vendor &amp; optional Sales Order Link</p>
             </div>
           </div>
 
@@ -790,32 +793,34 @@ export default function ProcessPOForm({
                 Process Type <span className="text-danger">*</span>
               </label>
               <select
-                className="form-select form-select-sm bg-white fw-bold text-primary fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px' }}
+                className="form-select form-select-sm bg-white fw-semibold text-dark fs-13"
+                style={{ borderColor: '#cbd5e1', height: '36px', color: '#0f172a' }}
                 value={processType}
                 disabled={!isSectionEditable('header')}
                 onChange={(e) => {
                   const newType = e.target.value;
                   setProcessType(newType);
+                  setShowAllVendors(false);
                   // If current selected vendor doesn't support the new process type, clear selection
                   if (vendorName) {
                     const currentMatched = vendorList.find(
                       (v) => (v.name || v.vendorName) === vendorName
                     );
-                    if (currentMatched && !vendorMatchesType(currentMatched, newType)) {
+                    if (currentMatched && newType && newType !== 'All' && !vendorMatchesType(currentMatched, newType)) {
                       setVendorName('');
                       setVendorId('');
                     }
                   }
                 }}
               >
-                <option value="Dyeing">Dyeing</option>
-                <option value="Printing">Printing</option>
-                <option value="Processing">Processing</option>
-                <option value="Embroidery">Embroidery</option>
-                <option value="Washing">Washing</option>
-                <option value="Stitching / Job Worker">Stitching / Job Worker</option>
-                <option value="All">All Processes</option>
+                <option value="" style={{ color: '#0f172a' }}>-- Select Process Type --</option>
+                <option value="Dyeing" style={{ color: '#0f172a' }}>Dyeing</option>
+                <option value="Printing" style={{ color: '#0f172a' }}>Printing</option>
+                <option value="Processing" style={{ color: '#0f172a' }}>Processing</option>
+                <option value="Embroidery" style={{ color: '#0f172a' }}>Embroidery</option>
+                <option value="Washing" style={{ color: '#0f172a' }}>Washing</option>
+                <option value="Stitching / Job Worker" style={{ color: '#0f172a' }}>Stitching / Job Worker</option>
+                <option value="All" style={{ color: '#0f172a' }}>All Processes</option>
               </select>
             </div>
 
@@ -856,17 +861,20 @@ export default function ProcessPOForm({
             <div className="col-md-4">
               <div className="d-flex align-items-center justify-content-between mb-1">
                 <label className="form-label fs-12 fw-semibold text-secondary mb-0">
-                  {processType === 'All' ? 'Process Vendor' : `${processType} Vendor`} <span className="text-danger">*</span>
+                  {(!processType || processType === 'All') ? 'Process Vendor' : `${processType} Vendor`} <span className="text-danger">*</span>
                 </label>
                 <div className="d-flex align-items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm p-0 text-decoration-none fs-11 text-muted"
-                    onClick={() => setShowAllVendors((prev) => !prev)}
-                    title={showAllVendors ? 'Switch back to filtered' : 'Show all vendors'}
-                  >
-                    {showAllVendors ? `Filter ${processType}` : `Show all (${vendorList.length})`}
-                  </button>
+                  {processType && processType !== 'All' && (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-decoration-none fs-11"
+                      style={{ color: showAllVendors ? '#4f46e5' : '#64748b' }}
+                      onClick={() => setShowAllVendors((prev) => !prev)}
+                      title={showAllVendors ? `Filter by ${processType}` : 'Show all vendors'}
+                    >
+                      {showAllVendors ? `Filter ${processType} (${displayedVendors.length})` : `Show all (${vendorList.length})`}
+                    </button>
+                  )}
                   {isSectionEditable('header') && (
                     <button
                       type="button"
@@ -880,7 +888,7 @@ export default function ProcessPOForm({
               </div>
               <select
                 className="form-select form-select-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px' }}
+                style={{ borderColor: '#cbd5e1', height: '36px', color: '#0f172a' }}
                 value={vendorName}
                 disabled={!isSectionEditable('header')}
                 onChange={(e) => {
@@ -889,12 +897,25 @@ export default function ProcessPOForm({
                   if (matched) setVendorId(matched.id || '');
                 }}
               >
-                <option value="">-- Select {processType === 'All' ? 'Vendor' : `${processType} Vendor`} --</option>
-                {displayedVendors.map((v) => (
-                  <option key={v.id || v.name} value={v.name || v.vendorName}>
-                    {v.name || v.vendorName} {v.city ? `(${v.city})` : ''}
+                <option value="" style={{ color: '#0f172a' }}>
+                  -- Select {(!processType || processType === 'All') ? 'Vendor' : `${processType} Vendor`} --
+                </option>
+                {displayedVendors.length === 0 && processType && processType !== 'All' ? (
+                  <option value="" disabled style={{ color: '#dc2626' }}>
+                    No {processType} vendors found in Master (click "+ New" to add)
                   </option>
-                ))}
+                ) : (
+                  displayedVendors.map((v) => {
+                    const vTypes = getVendorTypes(v);
+                    const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
+                    const cityText = v.city ? ` (${v.city})` : '';
+                    return (
+                      <option key={v.id || v.name} value={v.name || v.vendorName} style={{ color: '#0f172a' }}>
+                        {v.name || v.vendorName}{typeBadge}{cityText}
+                      </option>
+                    );
+                  })
+                )}
               </select>
             </div>
 
@@ -1744,11 +1765,19 @@ export default function ProcessPOForm({
       {showInlineVendorModal && (
         <VendorMasterView
           isInline={true}
-          defaultTypes={processType && processType !== 'All' ? [processType] : ['Dyeing']}
+          vendors={vendorList}
+          defaultTypes={processType && processType !== 'All' ? [processType] : []}
           onCloseInline={() => setShowInlineVendorModal(false)}
           onSaveVendor={(newVendor) => {
-            const updated = [newVendor, ...vendorList];
+            const updated = [newVendor, ...vendorList.filter(v => v.id !== newVendor.id)];
             setVendorList(updated);
+            try {
+              localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
+              window.dispatchEvent(new Event('raindrop_vendors_updated'));
+            } catch (e) {}
+            if (api && api.saveVendor) {
+              api.saveVendor(newVendor).catch(() => {});
+            }
             setVendorId(newVendor.id);
             setVendorName(newVendor.name || newVendor.vendorName);
             setShowInlineVendorModal(false);
