@@ -69,10 +69,11 @@ export function formatBoxSizeLabel(bs) {
 export const autoCapitalizeWords = (text) => {
   if (!text) return '';
   return String(text)
-    .toUpperCase()
-    .replace(/(\d+)\s*L\b/g, '$1L')
-    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, (char) => char.toUpperCase())
+    .replace(/(\d+)\s*L\b/gi, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/gi, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/gi, '$1 CM');
 };
 
 // ---- Helpers ----
@@ -868,7 +869,7 @@ export default function ThreadMasterView() {
 
                 {/* Brand Name */}
                 <div className="mb-3 p-3 bg-light rounded-3">
-                  <label className="form-label fs-12 fw-bold text-uppercase text-secondary mb-1">Brand Name <span className="text-danger">*</span></label>
+                  <label className="form-label fs-12 fw-bold  text-secondary mb-1">Brand Name <span className="text-danger">*</span></label>
                   <input
                     type="text"
                     className={`form-control bg-white fs-13 text-uppercase ${brandFormErr.brandName ? 'is-invalid' : ''}`}

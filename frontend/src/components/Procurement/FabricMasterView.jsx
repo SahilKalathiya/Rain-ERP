@@ -344,10 +344,11 @@ export default function FabricMasterView({
   const capitalizeWords = (str) => {
     if (!str) return '';
     return String(str)
-      .toUpperCase()
-      .replace(/(\d+)\s*L\b/g, '$1L')
-      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+      .toLowerCase()
+      .replace(/(?:^|\s)\S/g, (char) => char.toUpperCase())
+      .replace(/(\d+)\s*L\b/gi, '$1L')
+      .replace(/(\d+(?:\.\d+)?)\s*MM\b/gi, '$1 MM')
+      .replace(/(\d+(?:\.\d+)?)\s*CM\b/gi, '$1 CM');
   };
 
   const validate = () => {
@@ -937,7 +938,7 @@ export default function FabricMasterView({
                           required
                           disabled={!isEditing}
                           placeholder="e.g. Suh Cotton / Rayon 14kg"
-                          className={`form-control form-control-sm text-uppercase ${
+                          className={`form-control form-control-sm  ${
                             formErrors.qualityName ? 'is-invalid' : ''
                           }`}
                           style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
@@ -946,7 +947,7 @@ export default function FabricMasterView({
                             setFormData({ ...formData, qualityName: capitalizeWords(e.target.value) })
                           }
                         />
-                        <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
+                        <div className="form-text small text-muted">Title Case (e.g. Suh Cotton)</div>
                         {formErrors.qualityName && (
                           <div className="invalid-feedback fs-11">{formErrors.qualityName}</div>
                         )}
@@ -960,7 +961,7 @@ export default function FabricMasterView({
                               <input
                                 type="text"
                                 disabled={!isEditing}
-                                className={`form-control form-control-sm text-uppercase ${formErrors.fabricType ? 'is-invalid' : ''}`}
+                                className={`form-control form-control-sm  ${formErrors.fabricType ? 'is-invalid' : ''}`}
                                 style={{ backgroundColor: isEditing ? '#ffffff' : '#f8fafc' }}
                                 placeholder="Type custom fabric type..."
                                 autoFocus={isEditing}

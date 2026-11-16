@@ -34,11 +34,44 @@ export default function VendorMasterView({
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
   const [isModalEditMode, setIsModalEditMode] = useState(isInline);
 
+  // Available Vendor Types for "Click to Add" (persisted in localStorage, empty by default)
+  const [availableTypes, setAvailableTypes] = useState(() => {
+    try {
+      const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+
   React.useEffect(() => {
     if (vendors && vendors.length > 0) {
       setVendorList(vendors);
     }
   }, [vendors]);
+
+  // Sync available vendor types across tabs/instances
+  React.useEffect(() => {
+    const syncTypes = () => {
+      try {
+        const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
+        if (stored !== null) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setAvailableTypes(parsed);
+        }
+      } catch (err) {}
+    };
+    window.addEventListener('storage', syncTypes);
+    window.addEventListener('raindrop_vendor_types_updated', syncTypes);
+    return () => {
+      window.removeEventListener('storage', syncTypes);
+      window.removeEventListener('raindrop_vendor_types_updated', syncTypes);
+    };
+  }, []);
 
   // Column Filters
   const [colFilters, setColFilters] = useState({
@@ -109,6 +142,13 @@ export default function VendorMasterView({
   const [formErrors, setFormErrors] = useState({});
 
   const handleOpenNew = () => {
+    try {
+      const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setAvailableTypes(parsed);
+      }
+    } catch (e) {}
     const initTypes = getInitialTypes();
     setFormData({
       id: `VEND-${String(vendorList.length + 1).padStart(4, '0')}`,
@@ -139,6 +179,13 @@ export default function VendorMasterView({
   };
 
   const handleSelectVendor = (vendor, editDirectly = false) => {
+    try {
+      const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setAvailableTypes(parsed);
+      }
+    } catch (e) {}
     setSelectedVendor(vendor);
     const vendorTypes = getVendorTypes(vendor);
     setFormData({
@@ -167,10 +214,11 @@ export default function VendorMasterView({
   const capitalizeWords = (str) => {
     if (!str) return '';
     return String(str)
-      .toUpperCase()
-      .replace(/(\d+)\s*L\b/g, '$1L')
-      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+      .toLowerCase()
+      .replace(/(?:^|\s)\S/g, (char) => char.toUpperCase())
+      .replace(/(\d+)\s*L\b/gi, '$1L')
+      .replace(/(\d+(?:\.\d+)?)\s*MM\b/gi, '$1 MM')
+      .replace(/(\d+(?:\.\d+)?)\s*CM\b/gi, '$1 CM');
   };
 
   const handleTextChange = (field, val, autoCap = false) => {
@@ -214,11 +262,47 @@ export default function VendorMasterView({
     });
   };
 
+  const handleDeleteAvailableType = (typeToDelete) => {
+    setAvailableTypes((prev) => {
+      const updated = prev.filter((t) => t.toLowerCase() !== typeToDelete.toLowerCase());
+      try {
+        localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify(updated));
+        window.dispatchEvent(new Event('raindrop_vendor_types_updated'));
+      } catch (e) {}
+      return updated;
+    });
+    // Also remove from selected vendor types if currently selected
+    handleRemoveType(typeToDelete);
+  };
+
+  const handleResetAvailableTypes = () => {
+    setAvailableTypes([]);
+    try {
+      localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify([]));
+      window.dispatchEvent(new Event('raindrop_vendor_types_updated'));
+    } catch (e) {}
+  };
+
   const handleAddCustomType = () => {
     if (!isModalEditMode) return;
     const val = (formData.customTypeInput || '').trim();
     if (!val) return;
     const capped = capitalizeWords(val);
+
+    // 1. FIRST: Add to Available Types in "Click to Add" list and persist so it is saved permanently
+    setAvailableTypes((prev) => {
+      if (!prev.some((t) => t.toLowerCase() === capped.toLowerCase())) {
+        const updated = [...prev, capped];
+        try {
+          localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify(updated));
+          window.dispatchEvent(new Event('raindrop_vendor_types_updated'));
+        } catch (e) {}
+        return updated;
+      }
+      return prev;
+    });
+
+    // 2. Select it for the current vendor form
     setFormData((prev) => {
       const cur = Array.isArray(prev.types) ? [...prev.types] : (prev.type ? getVendorTypes(prev) : []);
       if (!cur.some((t) => t.toLowerCase() === capped.toLowerCase())) {
@@ -294,6 +378,16 @@ export default function VendorMasterView({
 
     try {
       localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updatedList));
+      if (curTypes && curTypes.length > 0) {
+        setAvailableTypes((prev) => {
+          const combined = Array.from(new Set([...prev, ...curTypes]));
+          try {
+            localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify(combined));
+            window.dispatchEvent(new Event('raindrop_vendor_types_updated'));
+          } catch (e) {}
+          return combined;
+        });
+      }
       window.dispatchEvent(new Event('raindrop_vendors_updated'));
       window.dispatchEvent(new Event('storage'));
     } catch (err) {}
@@ -649,14 +743,14 @@ export default function VendorMasterView({
                             required
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className={`form-control form-control-sm text-uppercase ${formErrors.name ? 'is-invalid' : ''
+                            className={`form-control form-control-sm ${formErrors.name ? 'is-invalid' : ''
                               }`}
                             placeholder="e.g. Sahil Textile Mill"
                             value={formData.name || ''}
                             onChange={(e) => handleTextChange('name', e.target.value, true)}
                           />
                           {isModalEditMode && (
-                            <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
+                            <div className="form-text small text-muted">Title Case (e.g. Sahil Textile Mill)</div>
                           )}
                           {formErrors.name && (
                             <div className="invalid-feedback fs-11 d-block">{formErrors.name}</div>
@@ -669,18 +763,19 @@ export default function VendorMasterView({
                               Vendor Types * <span className="text-muted fw-normal fs-11">(Multi-select: select all that apply)</span>
                             </label>
                             {isModalEditMode && (
-                              <span className="badge bg-light text-primary border fs-11">
+                              <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold">
                                 {(formData.types || []).length} selected
                               </span>
                             )}
                           </div>
 
-                          {/* Selected Types Badges */}
+                          {/* 1. Selected Types Badges */}
                           <div
-                            className="p-2 border rounded-3 mb-2"
+                            className="border rounded-2 mb-2"
                             style={{
                               backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc',
                               minHeight: '38px',
+                              padding: '5px 8px',
                               borderColor: formErrors.type ? '#dc3545' : '#cbd5e1'
                             }}
                           >
@@ -689,29 +784,43 @@ export default function VendorMasterView({
                                 formData.types.map((t) => (
                                   <span
                                     key={t}
-                                    className={`badge d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill fs-12 ${
-                                      isModalEditMode
-                                        ? 'bg-primary text-white shadow-xs'
-                                        : 'bg-primary-subtle text-primary border border-primary-subtle'
-                                    }`}
+                                    className="badge d-inline-flex align-items-center rounded-pill"
+                                    style={{
+                                      backgroundColor: '#eff6ff',
+                                      color: '#1e40af',
+                                      border: '1px solid #bfdbfe',
+                                      fontSize: '11.5px',
+                                      fontWeight: 600,
+                                      padding: '3px 8px 3px 10px',
+                                      gap: '6px'
+                                    }}
                                   >
                                     <span>{t}</span>
                                     {isModalEditMode && (
-                                      <span
-                                        role="button"
-                                        className="btn-close btn-close-white p-0 ms-1"
-                                        style={{ fontSize: '8px', cursor: 'pointer' }}
+                                      <button
+                                        type="button"
+                                        className="btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center"
+                                        style={{
+                                          width: '15px',
+                                          height: '15px',
+                                          borderRadius: '50%',
+                                          backgroundColor: '#fee2e2',
+                                          cursor: 'pointer',
+                                          lineHeight: 1
+                                        }}
                                         title={`Remove ${t}`}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleRemoveType(t);
                                         }}
-                                      />
+                                      >
+                                        <i className="ti ti-x" style={{ fontSize: '9px', fontWeight: 'bold' }}></i>
+                                      </button>
                                     )}
                                   </span>
                                 ))
                               ) : (
-                                <span className="text-muted fs-12 fst-italic">
+                                <span className="text-muted fs-11 fst-italic">
                                   {isModalEditMode ? 'No vendor types selected. Click options below to add.' : '—'}
                                 </span>
                               )}
@@ -719,51 +828,140 @@ export default function VendorMasterView({
                           </div>
 
                           {formErrors.type && (
-                            <div className="invalid-feedback fs-11 d-block mb-2">{formErrors.type}</div>
+                            <div className="invalid-feedback fs-11 d-block mb-1">{formErrors.type}</div>
                           )}
 
-                          {/* Interactive Toggle Pills & Custom Type Input */}
+                          {/* 2. "CLICK TO ADD" Quick Suggestions (Clean, Proper Chips) */}
                           {isModalEditMode && (
-                            <div className="p-2.5 bg-light rounded-3 border" style={{ borderColor: '#e2e8f0' }}>
-                              <div className="text-secondary fs-11 fw-semibold text-uppercase tracking-wider mb-1.5">
-                                Click to Add / Remove Types:
-                              </div>
-                              <div className="d-flex flex-wrap gap-1.5 mb-2.5">
-                                {STANDARD_VENDOR_TYPES.filter((t) => t !== 'Other').map((t) => {
-                                  const isSelected = (formData.types || []).some(
-                                    (cur) => cur.toLowerCase() === t.toLowerCase()
-                                  );
-                                  return (
-                                    <button
-                                      key={t}
-                                      type="button"
-                                      className={`btn btn-sm rounded-pill px-2.5 py-1 fs-11 fw-medium transition-all ${
-                                        isSelected
-                                          ? 'btn-primary text-white shadow-xs'
-                                          : 'btn-white bg-white text-dark border'
-                                      }`}
-                                      style={{
-                                        boxShadow: isSelected ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                                        borderColor: isSelected ? 'transparent' : '#cbd5e1'
-                                      }}
-                                      onClick={() => toggleVendorType(t)}
-                                    >
-                                      {isSelected ? '✓ ' : '+ '}
-                                      {t}
-                                    </button>
-                                  );
-                                })}
+                            <div
+                              className="rounded-3 mb-2 border"
+                              style={{
+                                backgroundColor: '#f8fafc',
+                                borderColor: '#e2e8f0',
+                                padding: '8px 12px'
+                              }}
+                            >
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <div className="d-flex align-items-center gap-1.5">
+                                  <i className="ti ti-hand-click text-primary" style={{ fontSize: '13px' }}></i>
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e293b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                                    Click to Add / Remove:
+                                  </span>
+                                </div>
+                                <div className="d-flex align-items-center gap-2">
+                                  {availableTypes.length > 0 && (
+                                    <>
+                                      <span className="text-muted" style={{ fontSize: '11px' }}>
+                                        Click tag to select | (×) delete
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="btn btn-link p-0 text-muted text-decoration-none d-inline-flex align-items-center gap-1"
+                                        style={{ fontSize: '11px' }}
+                                        onClick={handleResetAvailableTypes}
+                                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; }}
+                                        title="Clear all saved vendor types"
+                                      >
+                                        <i className="ti ti-trash" style={{ fontSize: '11px' }}></i>
+                                        <span>Clear All</span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
 
-                              {/* Add Custom Type Row */}
-                              <div className="input-group input-group-sm">
+                              {availableTypes.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-1.5">
+                                  {availableTypes.map((typeItem) => {
+                                    const isSelected = (formData.types || []).some(
+                                      (t) => t.toLowerCase() === typeItem.toLowerCase()
+                                    );
+
+                                    return (
+                                      <div
+                                        key={typeItem}
+                                        className="d-inline-flex align-items-center transition-all"
+                                        style={{
+                                          fontSize: '12px',
+                                          fontWeight: isSelected ? 600 : 500,
+                                          borderRadius: '16px',
+                                          border: isSelected ? '1.5px solid #3b82f6' : '1px solid #cbd5e1',
+                                          backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                                          color: '#0f172a',
+                                          height: '30px',
+                                          boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                          overflow: 'hidden'
+                                        }}
+                                      >
+                                        <div
+                                          className="d-inline-flex align-items-center py-0 ps-2.5 pe-1"
+                                          style={{ cursor: 'pointer', gap: '5px', height: '100%' }}
+                                          onClick={() => toggleVendorType(typeItem)}
+                                          title={isSelected ? `Click to unselect ${typeItem}` : `Click to select ${typeItem}`}
+                                        >
+                                          <i
+                                            className={isSelected ? "ti ti-check text-primary" : "ti ti-plus text-muted"}
+                                            style={{ fontSize: '11px', fontWeight: 'bold' }}
+                                          />
+                                          <span style={{ color: '#0f172a', fontWeight: isSelected ? 600 : 500 }}>{typeItem}</span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="btn p-0 border-0 bg-transparent d-inline-flex align-items-center justify-content-center"
+                                          style={{
+                                            cursor: 'pointer',
+                                            color: '#94a3b8',
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '50%',
+                                            marginLeft: '4px',
+                                            marginRight: '6px',
+                                            lineHeight: 1,
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#fee2e2';
+                                            e.currentTarget.style.color = '#ef4444';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                            e.currentTarget.style.color = '#94a3b8';
+                                          }}
+                                          title={`Delete "${typeItem}"`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteAvailableType(typeItem);
+                                          }}
+                                        >
+                                          <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }}></i>
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-muted fst-italic py-1 d-flex align-items-center gap-1.5" style={{ fontSize: '11px' }}>
+                                  <i className="ti ti-info-circle text-primary"></i>
+                                  <span>No vendor types yet. Type below and click <strong>+ Add Type</strong> to create.</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* 3. Custom Vendor Type Input + Button */}
+                          {isModalEditMode && (
+                            <div className="mb-2">
+                              <div className="input-group">
                                 <input
                                   type="text"
-                                  className="form-control form-control-sm text-uppercase bg-white"
-                                  placeholder="Or type a custom type (e.g. DIGITAL PRINTING, SCREEN PRINTING)..."
+                                  list="vendorTypesSuggestions"
+                                  className="form-control bg-white shadow-none"
+                                  style={{ fontSize: '12px', height: '35px', color: '#0f172a', borderColor: '#cbd5e1', padding: '4px 12px' }}
+                                  placeholder="Type custom type (e.g. Printing, Dyeing)..."
                                   value={formData.customTypeInput || ''}
                                   onChange={(e) =>
-                                    setFormData((prev) => ({ ...prev, customTypeInput: e.target.value }))
+                                    setFormData((prev) => ({ ...prev, customTypeInput: capitalizeWords(e.target.value) }))
                                   }
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
@@ -772,13 +970,23 @@ export default function VendorMasterView({
                                     }
                                   }}
                                 />
+                                <datalist id="vendorTypesSuggestions">
+                                  {availableTypes.map((t) => (
+                                    <option key={t} value={t} />
+                                  ))}
+                                </datalist>
                                 <button
                                   type="button"
-                                  className="btn btn-outline-primary px-3 fw-semibold"
+                                  className="btn btn-primary px-3 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
+                                  style={{ height: '35px', fontSize: '12px', backgroundColor: '#2563eb', borderColor: '#2563eb' }}
                                   onClick={handleAddCustomType}
                                 >
-                                  + Add Type
+                                  <i className="ti ti-plus" style={{ fontSize: '12px', fontWeight: 'bold' }}></i>
+                                  <span>Add Type</span>
                                 </button>
+                              </div>
+                              <div className="text-muted mt-1" style={{ fontSize: '11px' }}>
+                                Type any vendor type (or choose from suggestions) and click <strong>+ Add Type</strong>.
                               </div>
                             </div>
                           )}
@@ -870,7 +1078,7 @@ export default function VendorMasterView({
                             placeholder="e.g. Rajesh Shah"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm text-uppercase"
+                            className="form-control form-control-sm"
                             value={formData.contactPerson || ''}
                             onChange={(e) => handleTextChange('contactPerson', e.target.value, true)}
                           />
@@ -913,7 +1121,7 @@ export default function VendorMasterView({
                             placeholder="e.g. Surat"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm text-uppercase"
+                            className="form-control form-control-sm"
                             value={formData.city || ''}
                             onChange={(e) => handleTextChange('city', e.target.value, true)}
                           />
@@ -984,7 +1192,7 @@ export default function VendorMasterView({
                             placeholder="e.g. HDFC Bank"
                             disabled={!isModalEditMode}
                             style={{ backgroundColor: isModalEditMode ? '#ffffff' : '#f8fafc' }}
-                            className="form-control form-control-sm text-uppercase"
+                            className="form-control form-control-sm"
                             value={formData.bankName || ''}
                             onChange={(e) => handleTextChange('bankName', e.target.value, true)}
                           />

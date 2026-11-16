@@ -5,10 +5,11 @@ import AddColorModal from '../Procurement/AddColorModal';
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
   return String(text)
-    .toUpperCase()
-    .replace(/(\d+)\s*L\b/g, '$1L')
-    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, (char) => char.toUpperCase())
+    .replace(/(\d+)\s*L\b/gi, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/gi, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/gi, '$1 CM');
 };
 
 /**

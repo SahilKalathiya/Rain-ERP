@@ -811,16 +811,26 @@ export default function OrderDetailView({
   const [cardSelectedArticles, setCardSelectedArticles] = useState({});
 
   const getCardSelectedArticles = (item) => {
+    let raw = [];
     if (cardSelectedArticles[item?.id] && Array.isArray(cardSelectedArticles[item?.id])) {
-      return cardSelectedArticles[item?.id];
+      raw = cardSelectedArticles[item?.id];
+    } else if (Array.isArray(item?.selectedArticles) && item.selectedArticles.length > 0) {
+      raw = item.selectedArticles;
+    } else if (item?.activeArticle) {
+      raw = [item.activeArticle];
+    } else {
+      raw = [orderArticles[0]?.name || 'Kurta'];
     }
-    if (Array.isArray(item?.selectedArticles) && item.selectedArticles.length > 0) {
-      return item.selectedArticles;
+    const seen = new Set();
+    const result = [];
+    for (const art of raw) {
+      const lower = (art || '').trim().toLowerCase();
+      if (lower && !seen.has(lower)) {
+        seen.add(lower);
+        result.push(art);
+      }
     }
-    if (item?.activeArticle) {
-      return [item.activeArticle];
-    }
-    return [orderArticles[0]?.name || 'Kurta'];
+    return result.length > 0 ? result : [orderArticles[0]?.name || 'Kurta'];
   };
 
   const handleToggleCardArticle = (itemId, articleName) => {
@@ -1403,9 +1413,18 @@ export default function OrderDetailView({
       opacity: 1
     };
 
-    const articlesToRender = Array.isArray(selectedArticles)
+    const rawArticlesToRender = Array.isArray(selectedArticles)
       ? (selectedArticles.length > 0 ? selectedArticles : [orderArticles[0]?.name || 'Kurta'])
       : [selectedArticles || orderArticles[0]?.name || 'Kurta'];
+    const seenArticles = new Set();
+    const articlesToRender = [];
+    for (const art of rawArticlesToRender) {
+      const lower = (art || '').trim().toLowerCase();
+      if (lower && !seenArticles.has(lower)) {
+        seenArticles.add(lower);
+        articlesToRender.push(art);
+      }
+    }
 
     if (!cat || cat.id === 'Buttons' || !['Lace', 'Tassels', 'Thread', 'Dori'].includes(cat.id)) {
       return (
@@ -1817,7 +1836,7 @@ export default function OrderDetailView({
                         )}
                       </td>
                       <td className="text-center font-monospace" style={{ minWidth: '85px', padding: '6px 8px', fontSize: '13px' }}>
-                        {greigeVal.toFixed(3)}
+                        {greigeVal.toFixed(2)}
                       </td>
                       <td style={{ minWidth: '80px', padding: '6px 8px' }}>
                         {isEditing ? (
@@ -2884,6 +2903,7 @@ export default function OrderDetailView({
       ...order,
       fabricConsumptions: consumptionRows,
       widthDyedRates,
+      groupSelectedWidths,
       accessories: addedAccessories,
       totalFabricGreige: parseFloat(totalGreigeCalculated.toFixed(1)) || order.totalFabricGreige || 0,
       totalFabricDyed: parseFloat(totalDyedCalculated.toFixed(1)) || order.totalFabricDyed || 0,
@@ -2922,6 +2942,9 @@ export default function OrderDetailView({
     if (order?.widthDyedRates && typeof order.widthDyedRates === 'object') {
       setWidthDyedRates({ ...order.widthDyedRates });
     }
+    if (order?.groupSelectedWidths && typeof order.groupSelectedWidths === 'object') {
+      setGroupSelectedWidths({ ...order.groupSelectedWidths });
+    }
     setIsConsumptionEditing(false);
     setShowRateCalculation(false);
     setToastMessage('Changes cancelled.');
@@ -2939,12 +2962,17 @@ export default function OrderDetailView({
         next[fabricKey] = mode;
       } else {
         next[artName] = mode;
+        Object.keys(next).forEach(k => {
+          if (k === artName || k.startsWith(`${artName}___`) || k.startsWith(`${artName}_`)) {
+            next[k] = mode;
+          }
+        });
       }
       return next;
     });
 
     setConsumptionRows(prev => prev.map(r => {
-      const matchArt = r.articleName === artName;
+      const matchArt = (r.articleName || '').toLowerCase() === (artName || '').toLowerCase();
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
@@ -2975,13 +3003,91 @@ export default function OrderDetailView({
     return initial;
   });
 
+  // Multi-select width storage per article fabric group
+  const [groupSelectedWidths, setGroupSelectedWidths] = useState(() => {
+    const initial = {};
+    if (order?.groupSelectedWidths && typeof order.groupSelectedWidths === 'object') {
+      Object.assign(initial, order.groupSelectedWidths);
+    }
+    const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
+    rows.forEach(r => {
+      if (r.articleName && r.width && (r._userSelectedWidth || order?.groupSelectedWidths)) {
+        const k = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}`;
+        if (!initial[k]) {
+          initial[k] = [r.width];
+        } else if (!initial[k].includes(r.width)) {
+          initial[k].push(r.width);
+        }
+      }
+    });
+    return initial;
+  });
+
+  // State to manage which fabric group has its width multi-select popover open
+  const [activeWidthDropdownKey, setActiveWidthDropdownKey] = useState(null);
+
+  const getSelectedWidthsForGroup = (grp, options) => {
+    const k = `${grp.articleName}___${grp.fabricQuality || ''}___${grp.role || ''}`;
+    const stored = groupSelectedWidths[k];
+    if (Array.isArray(stored)) {
+      return stored;
+    }
+    if (grp.width && options.includes(grp.width) && grp._userSelectedWidth) {
+      return [grp.width];
+    }
+    return []; // No default pre-fill!
+  };
+
+  const handleToggleGroupWidth = (artName, fabricQuality, role, targetWidth, options) => {
+    const cleanWidth = targetWidth === '—' ? '' : targetWidth;
+    const k = `${artName}___${fabricQuality || ''}___${role || ''}`;
+    setGroupSelectedWidths(prev => {
+      const currentList = (prev[k] && Array.isArray(prev[k]))
+        ? [...prev[k]]
+        : [];
+
+      let nextList;
+      if (currentList.includes(cleanWidth)) {
+        nextList = currentList.filter(x => x !== cleanWidth);
+      } else {
+        nextList = [...currentList, cleanWidth];
+      }
+
+      const primaryW = nextList[0] || '';
+      const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${primaryW}`;
+      const storedRate = widthDyedRates[rateKey];
+      const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '') ? (parseFloat(storedRate) || 0) : 0;
+
+      setConsumptionRows(prevRows => prevRows.map(r => {
+        const matchArt = r.articleName === artName;
+        const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+        const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+        if (matchArt && matchFab && matchRole) {
+          return {
+            ...r,
+            width: primaryW,
+            dyedRate: nextDyed,
+            _userSelectedWidth: Boolean(primaryW)
+          };
+        }
+        return r;
+      }));
+
+      return { ...prev, [k]: nextList };
+    });
+  };
+
   const handleSelectWidthForGroup = (artName, newWidth, fabricQuality, role) => {
     const cleanWidth = newWidth === '—' ? '' : newWidth;
+    const k = `${artName}___${fabricQuality || ''}___${role || ''}`;
     const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${cleanWidth}`;
     const storedRate = widthDyedRates[rateKey];
-
-    // Strictly use stored rate for this width - do NOT copy from another width
     const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '') ? (parseFloat(storedRate) || 0) : 0;
+
+    setGroupSelectedWidths(prev => ({
+      ...prev,
+      [k]: cleanWidth ? [cleanWidth] : []
+    }));
 
     setConsumptionRows(prev => prev.map(r => {
       const matchArt = r.articleName === artName;
@@ -2992,7 +3098,7 @@ export default function OrderDetailView({
           ...r,
           width: cleanWidth,
           dyedRate: nextDyed,
-          _userSelectedWidth: true
+          _userSelectedWidth: Boolean(cleanWidth)
         };
       }
       return r;
@@ -3183,9 +3289,9 @@ export default function OrderDetailView({
         const groupKey = `${artName}___${fabQuality}___${role}`;
         const sourcingKey = `${artName}_${fabQuality}`;
         const sourcingMode = (
+          articleSourcing[artName] ||
           articleSourcing[groupKey] ||
           articleSourcing[sourcingKey] ||
-          articleSourcing[artName] ||
           row.source ||
           'Greige'
         ).toLowerCase().includes('dyed') ? 'Dyed' : 'Greige';
@@ -3235,6 +3341,17 @@ export default function OrderDetailView({
 
     return sections;
   }, [consumptionRows, articleSourcing, masterFabricsList, order]);
+
+  // Determines if Shrink % column should be visible (hidden when all articles/fabrics are Dyed, visible when any article/fabric is Greige)
+  const showShrinkColumn = useMemo(() => {
+    if (articleSections && articleSections.length > 0) {
+      return articleSections.some(sec => {
+        if (sec.sourcing !== 'Dyed') return true;
+        return (sec.fabricGroups || []).some(fg => fg.sourcing !== 'Dyed');
+      });
+    }
+    return consumptionRows.some(r => !(r.source || '').toLowerCase().includes('dyed'));
+  }, [articleSections, consumptionRows]);
 
   // Group subtotals for bottom summary rows matching Image 4
   const fabricSummaryRows = useMemo(() => {
@@ -3311,20 +3428,6 @@ export default function OrderDetailView({
         return (articleSourcing[groupKey] || articleSourcing[sourcingKey] || r.source || '').toLowerCase().includes('dyed');
       });
 
-      let baseGreigeRate = 145;
-      let dyeingCost = 35;
-      const fn = fabricName.toLowerCase();
-      if (fn.includes('rayon') || fn.includes('liva') || fn.includes('2.40')) {
-        baseGreigeRate = 165;
-        dyeingCost = 45;
-      } else if (fn.includes('silk') || fn.includes('tussar')) {
-        baseGreigeRate = 280;
-        dyeingCost = 60;
-      } else if (fn.includes('cambryc') || fn.includes('cambric')) {
-        baseGreigeRate = 125;
-        dyeingCost = 35;
-      }
-
       // Identify currently selected width in order for this fabric
       const primarySummary = summaryList[0] || { pcs: 0, totalDyed: 0, totalGreige: 0, width: '58"' };
       const currentSelectedWidth = primarySummary.width || '58"';
@@ -3346,25 +3449,13 @@ export default function OrderDetailView({
           totalMetres = currentBaseMetres * (currentWidthInches / targetWidthInches);
         }
 
-        // Market rate adjustments: wider widths have higher linear rate per metre
-        let widthRateAdj = 0;
-        if (targetWidthInches >= 56) {
-          widthRateAdj = 15;
-        } else if (targetWidthInches <= 44) {
-          widthRateAdj = -5;
-        }
-
-        const defaultRate = isDyed
-          ? (baseGreigeRate + dyeingCost + 15 + widthRateAdj)
-          : (baseGreigeRate + dyeingCost + widthRateAdj);
-
         const rateKey = `${fabricName}_${w}`;
         const userTypedRate = customMarketRates[rateKey];
-        const hasCustomRate = userTypedRate !== undefined && userTypedRate !== '';
-        const effectiveRate = hasCustomRate ? (parseFloat(userTypedRate) || 0) : defaultRate;
+        const hasCustomRate = userTypedRate !== undefined && userTypedRate !== '' && !isNaN(parseFloat(userTypedRate));
+        const effectiveRate = hasCustomRate ? (parseFloat(userTypedRate) || 0) : 0;
 
-        const totalCost = totalMetres * effectiveRate;
-        const costPerGarment = pcs > 0 ? totalCost / pcs : 0;
+        const totalCost = effectiveRate > 0 ? (totalMetres * effectiveRate) : 0;
+        const costPerGarment = (pcs > 0 && totalCost > 0) ? (totalCost / pcs) : 0;
 
         results.push({
           fabricName,
@@ -3372,7 +3463,7 @@ export default function OrderDetailView({
           isSelected,
           isDyed,
           rateKey,
-          defaultCalculatedRate: defaultRate,
+          defaultCalculatedRate: 0,
           ratePerMetre: effectiveRate,
           totalMetres,
           totalCost,
@@ -3827,164 +3918,7 @@ export default function OrderDetailView({
         </div>
       </div>
 
-      {/* =========================================================================
-       * 3. PRODUCTION PROGRESS CARD
-       * ========================================================================= */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
-        <div className="d-flex align-items-center gap-2.5 mb-4">
-          <div
-            className="rounded-2 d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-            style={{ width: '36px', height: '36px', backgroundColor: '#4f46e5', borderRadius: '8px' }}
-          >
-            <i className="ti ti-activity" style={{ fontSize: '18px', lineHeight: 1 }}></i>
-          </div>
-          <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '16px' }}>Production Progress</h6>
-        </div>
 
-        {/* Stepper Pipeline Timeline (11 Connected Steps) */}
-        <div className="d-flex align-items-center overflow-auto py-2 px-1">
-          {[
-            { icon: 'ti ti-shopping-bag', title: 'Sales Order', active: true },
-            { icon: 'ti ti-chart-line', title: 'Order Confirmation', active: confirmed },
-            { icon: 'ti ti-truck', title: 'Procurement' },
-            { icon: 'ti ti-palette', title: 'Processing' },
-            { icon: 'ti ti-cut', title: 'Cutting' },
-            { icon: 'ti ti-building-factory-2', title: 'After-Cut' },
-            { icon: 'ti ti-sparkles', title: 'Stitching' },
-            { icon: 'ti ti-sparkles', title: 'Finishing' },
-            { icon: 'ti ti-clipboard-check', title: 'QC' },
-            { icon: 'ti ti-box', title: 'Packing' },
-            { icon: 'ti ti-truck-delivery', title: 'Dispatch' }
-          ].map((step, sIdx, arr) => (
-            <React.Fragment key={sIdx}>
-              <div
-                className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0 transition"
-                title={step.title}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  backgroundColor: step.active ? '#eef2ff' : '#f8fafc',
-                  border: step.active ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
-                  color: step.active ? '#4f46e5' : '#94a3b8'
-                }}
-              >
-                <i className={step.icon} style={{ fontSize: '18px', lineHeight: 1 }}></i>
-              </div>
-              {sIdx < arr.length - 1 && (
-                <div
-                  className="flex-grow-1"
-                  style={{
-                    height: '2px',
-                    minWidth: '24px',
-                    backgroundColor: step.active && arr[sIdx + 1]?.active ? '#6366f1' : '#e2e8f0'
-                  }}
-                />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      {/* =========================================================================
-       * 4. NEXT STEPS CARD (1) - Clean, proportional & theme aligned
-       * ========================================================================= */}
-      <div
-        className="card border-0 shadow-sm rounded-4 bg-white"
-        style={{
-          border: '1px solid #e2e8f0',
-          padding: '24px',
-          marginBottom: '24px',
-          borderRadius: '14px',
-          backgroundColor: '#ffffff'
-        }}
-      >
-        <div className="d-flex align-items-center" style={{ gap: '14px', marginBottom: '18px' }}>
-          <div
-            className="rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-            style={{ width: '38px', height: '38px', minWidth: '38px', backgroundColor: '#8b5cf6', borderRadius: '10px' }}
-          >
-            <i className="ti ti-arrow-right" style={{ fontSize: '18px', lineHeight: 1 }}></i>
-          </div>
-          <h6 className="fw-bold text-dark mb-0 d-flex align-items-center" style={{ fontSize: '16px', gap: '8px' }}>
-            Next Steps
-            <span
-              className="badge rounded-pill fw-bold px-2 py-0.5"
-              style={{ backgroundColor: '#f3e8ff', color: '#7c3aed', fontSize: '11px' }}
-            >
-              {confirmed ? '0' : '1'}
-            </span>
-          </h6>
-        </div>
-
-        {confirmed ? (
-          <div
-            className="rounded-3 d-flex justify-content-between align-items-center"
-            style={{
-              padding: '16px 20px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '10px'
-            }}
-          >
-            <div className="d-flex align-items-center" style={{ gap: '14px' }}>
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-                style={{ width: '36px', height: '36px', minWidth: '36px', backgroundColor: '#10b981' }}
-              >
-                <i className="ti ti-check" style={{ fontSize: '18px', lineHeight: 1 }}></i>
-              </div>
-              <div>
-                <h6 className="fw-bold text-dark mb-0.5" style={{ fontSize: '14px' }}>
-                  Order Confirmed
-                </h6>
-                <p className="text-muted small mb-0" style={{ fontSize: '12px' }}>
-                  Order has been confirmed and queued for production pipeline.
-                </p>
-              </div>
-            </div>
-            <span className="badge rounded-pill fw-semibold px-2.5 py-1" style={{ backgroundColor: '#dcfce7', color: '#15803d', fontSize: '11.5px' }}>
-              Confirmed
-            </span>
-          </div>
-        ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={handleConfirmOrder}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleConfirmOrder();
-              }
-            }}
-            className="rounded-3 d-flex justify-content-between align-items-center transition cursor-pointer shadow-xs"
-            style={{
-              padding: '16px 20px',
-              backgroundColor: '#f8fafd',
-              border: '1.5px solid #e0e7ff',
-              borderRadius: '10px'
-            }}
-          >
-            <div className="d-flex align-items-center" style={{ gap: '14px' }}>
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center text-white shadow-xs flex-shrink-0"
-                style={{ width: '36px', height: '36px', minWidth: '36px', backgroundColor: '#2e37a4' }}
-              >
-                <i className="ti ti-circle-check" style={{ fontSize: '18px', lineHeight: 1 }}></i>
-              </div>
-              <div>
-                <h6 className="fw-bold text-dark mb-0.5" style={{ fontSize: '14px' }}>
-                  Confirm Order
-                </h6>
-                <p className="text-muted small mb-0" style={{ fontSize: '12px' }}>
-                  Review order details and confirm to start processing.
-                </p>
-              </div>
-            </div>
-            <i className="ti ti-arrow-right" style={{ color: '#2e37a4', fontSize: '16px' }}></i>
-          </div>
-        )}
-      </div>
 
       {/* =========================================================================
        * 5. ORDER INFORMATION CARD
@@ -4698,39 +4632,84 @@ export default function OrderDetailView({
             overflowX: 'auto',
             WebkitOverflowScrolling: 'touch',
             border: 'none',
-            paddingBottom: '0'
+            paddingBottom: '40px'
           }}
         >
+          <style>{`
+            .excel-bom-table {
+              border-collapse: collapse !important;
+              border: 1px solid #cbd5e1 !important;
+            }
+            .excel-bom-table th,
+            .excel-bom-table td {
+              border: 1px solid #cbd5e1 !important;
+              transition: none !important;
+            }
+            .excel-bom-table thead th {
+              background-color: #f1f5f9 !important;
+              color: #334155 !important;
+              font-weight: 600 !important;
+              border: 1px solid #cbd5e1 !important;
+              padding: 8px 10px !important;
+              user-select: none;
+            }
+            .excel-bom-table tbody tr {
+              background-color: #ffffff !important;
+              transition: none !important;
+            }
+            .excel-bom-table tbody tr:hover {
+              background-color: #ffffff !important;
+            }
+            .excel-bom-table tbody tr:hover td {
+              background-color: inherit !important;
+            }
+            .excel-bom-table * {
+              transition: none !important;
+              animation: none !important;
+            }
+            .excel-bom-table button:hover,
+            .excel-bom-table input:hover,
+            .excel-bom-table div:hover {
+              box-shadow: none !important;
+              transform: none !important;
+            }
+            .excel-bom-table input:focus {
+              outline: 2px solid #2563eb !important;
+              outline-offset: -1px !important;
+              border-color: #2563eb !important;
+              box-shadow: none !important;
+            }
+          `}</style>
           <table
-            className="table align-middle mb-0"
+            className="table align-middle mb-0 excel-bom-table"
             style={{
-              fontSize: '13px',
+              fontSize: '12.5px',
               borderCollapse: 'collapse',
               width: '100%',
-              minWidth: '920px'
+              minWidth: '940px',
+              border: '1px solid #cbd5e1'
             }}
           >
-            <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+            <thead>
               <tr>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Article</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Fabric</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Width<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(in)</span>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 10px', textAlign: 'left' }}>Article</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 10px', textAlign: 'left' }}>Fabric</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 10px', textAlign: 'left' }}>Colour</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>
+                  Width<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#64748b' }}>(in)</span>
                 </th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 14px' }}>Colour</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Dyed<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>
+                  Dyed<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#64748b' }}>(m/pc)</span>
                 </th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Shrink %</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>
-                  Greige<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#94a3b8' }}>(m/pc)</span>
-                </th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 10px', textAlign: 'center' }}>Pcs</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Dyed</th>
-                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '12px 12px', textAlign: 'center' }}>Total Greige</th>
-                {isConsumptionEditing && (
-                  <th style={{ width: '40px', padding: '12px 6px', textAlign: 'center' }}></th>
+                {showShrinkColumn && (
+                  <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>Shrink %</th>
                 )}
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>
+                  Greige<br /><span style={{ fontSize: '10px', fontWeight: 500, color: '#64748b' }}>(m/pc)</span>
+                </th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>Pcs</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>Total Dyed</th>
+                <th style={{ fontWeight: 600, fontSize: '11.5px', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 8px', textAlign: 'center' }}>Total Greige</th>
               </tr>
             </thead>
             <tbody>
@@ -4744,6 +4723,8 @@ export default function OrderDetailView({
                   const shrinkPct = isDyedSourced ? 0 : (group.shrinkPct || 0);
 
                   const widthOptions = getFabricMasterWidths(group.fabricQuality, group.width);
+                  const selectedWidths = getSelectedWidthsForGroup(group, widthOptions);
+                  const widthsToRender = selectedWidths.length > 0 ? selectedWidths : [''];
 
                   return group.rows.map((row, rIdx) => {
                     const isFirstRow = rIdx === 0;
@@ -4761,73 +4742,88 @@ export default function OrderDetailView({
                       <tr
                         key={row.key || `${section.articleName}_${gIdx}_${rIdx}`}
                         style={{
-                          borderBottom: '1px solid #f1f5f9',
                           verticalAlign: 'middle',
                           backgroundColor: '#ffffff'
                         }}
                       >
-                        {/* ARTICLE (Rowspan per entire article across all its fabrics) */}
+                        {/* 1. ARTICLE (Rowspan per entire article across all its fabrics) */}
                         {renderArticleCell && (
                           <td
                             rowSpan={section.totalRows}
                             style={{
                               verticalAlign: 'middle',
-                              padding: '12px 14px',
-                              borderRight: '1px solid #f1f5f9',
-                              borderBottom: '1px solid #e2e8f0'
+                              padding: '8px 10px',
+                              backgroundColor: '#ffffff'
                             }}
                           >
-                            <div className="d-flex align-items-center gap-2 mb-1.5">
+                            <div className="d-flex align-items-center gap-2 mb-1">
                               <span className="fs-5">{section.icon}</span>
                               <div>
-                                <div className="fw-bold text-dark fs-14" style={{ lineHeight: 1.2 }}>
+                                <div className="fw-bold text-dark" style={{ fontSize: '13px', lineHeight: 1.2 }}>
                                   {section.articleName}
                                 </div>
-                                <div className="text-muted text-uppercase" style={{ fontSize: '10px', letterSpacing: '0.04em' }}>
-                                  {section.articleCode}
-                                </div>
+                                {section.articleCode && section.articleCode.toLowerCase() !== section.articleName.toLowerCase() && (
+                                  <div className="text-muted text-uppercase" style={{ fontSize: '10px', letterSpacing: '0.03em' }}>
+                                    {section.articleCode}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
-                            {/* Toggle Buttons: [ Greige ] [ Dyed ] */}
+                            {/* Toggle Buttons: [ Greige ] [ Dyed ] (Excel Style Segmented Control) */}
                             {isConsumptionEditing ? (
-                              <div className="d-inline-flex p-0.5 rounded-2 border bg-light" style={{ gap: '2px', borderColor: '#e2e8f0' }}>
+                              <div
+                                className="d-inline-flex border"
+                                style={{
+                                  borderColor: '#cbd5e1',
+                                  borderRadius: '2px',
+                                  overflow: 'hidden',
+                                  backgroundColor: '#f8fafc'
+                                }}
+                              >
                                 <button
                                   type="button"
-                                  className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${section.sourcing !== 'Dyed' ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                    }`}
                                   style={{
                                     fontSize: '11px',
-                                    backgroundColor: section.sourcing !== 'Dyed' ? '#4361ee' : 'transparent',
-                                    border: 'none'
+                                    fontWeight: section.sourcing !== 'Dyed' ? 700 : 500,
+                                    padding: '2px 8px',
+                                    border: 'none',
+                                    backgroundColor: section.sourcing !== 'Dyed' ? '#2563eb' : '#ffffff',
+                                    color: section.sourcing !== 'Dyed' ? '#ffffff' : '#64748b',
+                                    cursor: 'pointer'
                                   }}
                                   onClick={() => handleToggleArticleSourcing(section.articleName, 'Greige')}
-                                  title="Greige Fabric (Dyed -> Greige conversion using shrinkage)"
+                                  title="Greige Fabric"
                                 >
                                   Greige
                                 </button>
                                 <button
                                   type="button"
-                                  className={`btn btn-xs py-0.5 px-2.5 rounded-1 fw-semibold transition-all ${section.sourcing === 'Dyed' ? 'text-white shadow-xs' : 'text-muted bg-transparent'
-                                    }`}
                                   style={{
                                     fontSize: '11px',
-                                    backgroundColor: section.sourcing === 'Dyed' ? '#0284c7' : 'transparent',
-                                    border: 'none'
+                                    fontWeight: section.sourcing === 'Dyed' ? 700 : 500,
+                                    padding: '2px 8px',
+                                    border: 'none',
+                                    borderLeft: '1px solid #cbd5e1',
+                                    backgroundColor: section.sourcing === 'Dyed' ? '#2563eb' : '#ffffff',
+                                    color: section.sourcing === 'Dyed' ? '#ffffff' : '#64748b',
+                                    cursor: 'pointer'
                                   }}
                                   onClick={() => handleToggleArticleSourcing(section.articleName, 'Dyed')}
-                                  title="Dyed Fabric (No shrinkage conversion, Shrink % blank)"
+                                  title="Dyed Fabric"
                                 >
                                   Dyed
                                 </button>
                               </div>
                             ) : (
                               <span
-                                className="badge px-2.5 py-1 rounded-2 fw-semibold"
                                 style={{
                                   fontSize: '11px',
+                                  fontWeight: 600,
+                                  padding: '2px 6px',
+                                  borderRadius: '2px',
                                   backgroundColor: section.sourcing === 'Dyed' ? '#e0f2fe' : '#eef2ff',
-                                  color: section.sourcing === 'Dyed' ? '#0284c7' : '#4361ee',
+                                  color: section.sourcing === 'Dyed' ? '#0369a1' : '#2563eb',
                                   border: section.sourcing === 'Dyed' ? '1px solid #bae6fd' : '1px solid #c7d2fe'
                                 }}
                               >
@@ -4837,467 +4833,651 @@ export default function OrderDetailView({
                           </td>
                         )}
 
-                      {/* FABRIC (Rowspan per article-fabric requirement) */}
-                      {isFirstRow && (
-                        <td
-                          rowSpan={group.rows.length}
-                          style={{
-                            verticalAlign: 'middle',
-                            padding: '12px 14px',
-                            borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <div className="fw-semibold text-dark fs-13">
-                            {group.fabricQuality || 'Grey Cotton Reyon'}
-                            {group.role && (
-                              <span className="badge bg-light text-secondary border ms-2" style={{ fontSize: '10.5px' }}>
-                                {autoCapitalizeWords(group.role)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* WIDTH (IN) (Rowspan per article fabric - all available widths rendered as stacked boxes) */}
-                      {isFirstRow && (
-                        <td
-                          rowSpan={group.rows.length}
-                          style={{
-                            verticalAlign: 'middle',
-                            textAlign: 'center',
-                            padding: '10px 8px',
-                            borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
-                            {widthOptions.map((w) => {
-                              const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
-                              return isConsumptionEditing ? (
-                                <button
-                                  key={w}
-                                  type="button"
-                                  className="btn btn-sm d-inline-flex align-items-center justify-content-center transition-all shadow-none"
-                                  style={{
-                                    minWidth: '66px',
-                                    height: '32px',
-                                    padding: '2px 8px',
-                                    fontSize: '12.5px',
-                                    fontFamily: 'monospace',
-                                    fontWeight: isSelected ? 700 : 600,
-                                    color: isSelected ? '#4361ee' : '#64748b',
-                                    backgroundColor: isSelected ? '#eef2ff' : '#ffffff',
-                                    border: isSelected ? '1.5px solid #4361ee' : '1.5px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: isSelected ? '0 0 0 2px rgba(67, 97, 238, 0.15)' : 'none'
-                                  }}
-                                  onClick={() => handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role)}
-                                  title={`Click to select ${w} width`}
-                                >
-                                  <span>{w}</span>
-                                  {isSelected && (
-                                    <i className="ti ti-check ms-1" style={{ fontSize: '11px', color: '#4361ee' }}></i>
-                                  )}
-                                </button>
-                              ) : (
-                                <div
-                                  key={w}
-                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                  style={{
-                                    minWidth: '64px',
-                                    height: '30px',
-                                    padding: '2px 8px',
-                                    fontSize: '12px',
-                                    fontWeight: isSelected ? 700 : 500,
-                                    color: isSelected ? '#4361ee' : '#94a3b8',
-                                    backgroundColor: isSelected ? '#eef2ff' : '#f8fafc',
-                                    border: isSelected ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
-                                    borderRadius: '6px'
-                                  }}
-                                >
-                                  <span>{w}</span>
-                                  {isSelected && (
-                                    <i className="ti ti-check ms-1" style={{ fontSize: '10px', color: '#4361ee' }}></i>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* COLOUR (Per row) */}
-                      <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
-                        <div className="d-flex align-items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
-                          <span
-                            className="d-inline-block rounded-circle flex-shrink-0"
+                        {/* 2. FABRIC (Rowspan per article-fabric requirement) */}
+                        {isFirstRow && (
+                          <td
+                            rowSpan={group.rows.length}
                             style={{
-                              width: '11px',
-                              height: '11px',
-                              backgroundColor: row.colorHex || '#333333',
-                              border: '1px solid rgba(0,0,0,0.1)'
+                              verticalAlign: 'middle',
+                              padding: '8px 10px',
+                              backgroundColor: '#ffffff'
                             }}
-                          />
-                          <span className="text-dark fw-medium" style={{ fontSize: '13px' }}>
-                            {row.colorName}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* DYED (M/PC) (Rowspan per article - stacked boxes corresponding to each width) */}
-                      {isFirstRow && (
-                        <td
-                          rowSpan={group.rows.length}
-                          style={{
-                            verticalAlign: 'middle',
-                            textAlign: 'center',
-                            padding: '10px 8px',
-                            borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
-                            {widthOptions.map((w) => {
-                              const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
-                              const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
-                              const storedRate = widthDyedRates[rateKey];
-                              // Strictly independent per width: NEVER auto-copy from another width or group.dyedRate
-                              const displayVal = (storedRate !== undefined && storedRate !== null)
-                                ? storedRate
-                                : ((group.width === w && group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== '') ? group.dyedRate : '');
-
-                              return isConsumptionEditing ? (
-                                <input
-                                  key={w}
-                                  type="number"
-                                  step="0.001"
-                                  min="0"
-                                  className="form-control form-control-sm text-center font-monospace"
+                          >
+                            <div className="fw-semibold text-dark" style={{ fontSize: '12.5px' }}>
+                              {group.fabricQuality || 'Grey Cotton Reyon'}
+                              {group.role && (
+                                <span
+                                  className="ms-2"
                                   style={{
-                                    width: '78px',
-                                    height: '32px',
-                                    border: isSelected ? '1.5px solid #4361ee' : '1.5px solid #cbd5e1',
-                                    backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
-                                    borderRadius: '6px',
-                                    fontSize: '13px',
-                                    fontWeight: isSelected ? 700 : 600,
-                                    color: isSelected ? '#1e293b' : '#64748b',
-                                    boxShadow: isSelected ? '0 0 0 2px rgba(67, 97, 238, 0.12)' : 'none',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  placeholder="0.000"
-                                  value={displayVal !== undefined && displayVal !== null ? displayVal : ''}
-                                  onFocus={() => {
-                                    if (!isSelected) {
-                                      handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
-                                    }
-                                  }}
-                                  onChange={(e) => handleUpdateWidthDyedRate(group.articleName, group.fabricQuality, group.role, w, e.target.value)}
-                                  title={`Dyed consumption for ${w} width`}
-                                />
-                              ) : (
-                                <div
-                                  key={w}
-                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                  style={{
-                                    minWidth: '70px',
-                                    height: '30px',
-                                    padding: '2px 8px',
-                                    fontSize: '12.5px',
-                                    fontWeight: isSelected ? 700 : 500,
-                                    color: isSelected ? '#1e293b' : '#94a3b8',
-                                    backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
-                                    border: isSelected ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
-                                    borderRadius: '6px'
+                                    fontSize: '10px',
+                                    fontWeight: 600,
+                                    padding: '1px 5px',
+                                    borderRadius: '2px',
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#475569',
+                                    border: '1px solid #cbd5e1'
                                   }}
                                 >
-                                  {displayVal !== undefined && displayVal !== null && displayVal !== '' && parseFloat(displayVal) > 0
-                                    ? parseFloat(displayVal).toFixed(3)
-                                    : '—'}
-                                </div>
-                              );
-                            })}
+                                  {autoCapitalizeWords(group.role)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+
+                        {/* 3. COLOUR (Per row - placed before Width) */}
+                        <td style={{ padding: '6px 10px', backgroundColor: '#ffffff' }}>
+                          <div className="d-flex align-items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
+                            <span
+                              className="d-inline-block rounded-circle flex-shrink-0"
+                              style={{
+                                width: '10px',
+                                height: '10px',
+                                backgroundColor: row.colorHex || '#333333',
+                                border: '1px solid rgba(0,0,0,0.2)'
+                              }}
+                            />
+                            <span className="text-dark fw-medium" style={{ fontSize: '12.5px' }}>
+                              {row.colorName}
+                            </span>
                           </div>
                         </td>
-                      )}
 
-                      {/* SHRINK % (Rowspan per article - blank if Dyed) */}
-                      {isFirstRow && (
-                        <td
-                          rowSpan={group.rows.length}
-                          style={{
-                            verticalAlign: 'middle',
-                            textAlign: 'center',
-                            padding: '10px 8px',
-                            borderRight: '1px solid #f1f5f9',
-                            borderBottom: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <div className="d-flex justify-content-center">
-                            <div
-                              className="d-inline-flex align-items-center justify-content-center font-monospace fw-semibold"
+                        {/* 4. WIDTH (IN) - Multi-Select & Selection */}
+                        {isFirstRow && (() => {
+                          const groupKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}`;
+                          return (
+                            <td
+                              rowSpan={group.rows.length}
                               style={{
-                                minWidth: '58px',
-                                height: '30px',
-                                padding: '0 8px',
-                                borderRadius: '6px',
-                                backgroundColor: '#f8fafc',
-                                color: '#475569',
-                                border: '1px solid #cbd5e1',
-                                fontSize: '12px'
+                                verticalAlign: 'middle',
+                                textAlign: 'center',
+                                padding: '4px 6px',
+                                backgroundColor: '#ffffff',
+                                position: 'relative'
                               }}
                             >
-                              {isDyedSourced ? '0%' : (group.shrinkPct ? `${group.shrinkPct}%` : '0%')}
-                            </div>
-                          </div>
-                        </td>
-                      )}
-
-                      {/* GREIGE (M/PC) */}
-                      <td
-                        style={{
-                          padding: '10px 8px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                      >
-                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
-                          {widthOptions.map((w) => {
-                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
-                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
-                            const storedRate = widthDyedRates[rateKey];
-                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
-                              ? parseFloat(storedRate)
-                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
-                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
-                            const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
-
-                            return (
-                              <div
-                                key={w}
-                                className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                style={{
-                                  minWidth: '68px',
-                                  height: '32px',
-                                  padding: '0 8px',
-                                  borderRadius: '6px',
-                                  backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
-                                  color: isSelected ? (wGreigePerPc > 0 ? '#1e293b' : '#94a3b8') : (wGreigePerPc > 0 ? '#64748b' : '#94a3b8'),
-                                  border: isSelected ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
-                                  fontSize: '12.5px',
-                                  fontWeight: isSelected ? 700 : 500,
-                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                onClick={() => {
-                                  if (isConsumptionEditing && !isSelected) {
-                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
-                                  }
-                                }}
-                                title={`Greige per piece for ${w} width`}
-                              >
-                                {wGreigePerPc > 0 ? wGreigePerPc.toFixed(3) : '0.000'}
+                              <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                                {isConsumptionEditing ? (
+                                  selectedWidths.length === 0 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace"
+                                      style={{
+                                        minWidth: '66px',
+                                        height: '26px',
+                                        padding: '2px 7px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        borderColor: '#cbd5e1',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#64748b',
+                                        borderRadius: '2px',
+                                        cursor: 'pointer',
+                                        boxShadow: 'none',
+                                        borderWidth: '1.5px',
+                                        borderStyle: 'dashed',
+                                        gap: '4px'
+                                      }}
+                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                      title="Click to select width"
+                                    >
+                                      <span>Select ▾</span>
+                                    </button>
+                                  ) : selectedWidths.length === 1 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
+                                      style={{
+                                        minWidth: '66px',
+                                        height: '26px',
+                                        padding: '2px 7px',
+                                        fontSize: '12px',
+                                        borderColor: '#2563eb',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        borderRadius: '2px',
+                                        cursor: 'pointer',
+                                        boxShadow: 'none',
+                                        borderWidth: '1.5px',
+                                        borderStyle: 'solid',
+                                        gap: '4px'
+                                      }}
+                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                      title="Click to select or add widths"
+                                    >
+                                      <span>{selectedWidths[0]}</span>
+                                      <i className="ti ti-chevron-down" style={{ fontSize: '11px', color: '#2563eb' }} />
+                                    </button>
+                                  ) : (
+                                    selectedWidths.map((w) => (
+                                      <div
+                                        key={w}
+                                        className="d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
+                                        style={{
+                                          minWidth: '66px',
+                                          height: '26px',
+                                          padding: '2px 5px',
+                                          fontSize: '12px',
+                                          color: '#1d4ed8',
+                                          backgroundColor: '#eff6ff',
+                                          border: '1.5px solid #2563eb',
+                                          borderRadius: '2px',
+                                          gap: '3px'
+                                        }}
+                                      >
+                                        <span
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                          title="Click to select or add widths"
+                                        >
+                                          {w}
+                                        </span>
+                                        <div className="d-flex align-items-center gap-1">
+                                          <button
+                                            type="button"
+                                            className="btn p-0 border-0 bg-transparent text-primary"
+                                            style={{ fontSize: '10px', lineHeight: 1 }}
+                                            onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                            title="Open width options"
+                                          >
+                                            <i className="ti ti-chevron-down" style={{ fontSize: '10px' }} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center"
+                                            style={{ width: '12px', height: '12px', lineHeight: 1 }}
+                                            title={`Remove ${w}`}
+                                            onClick={() => handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions)}
+                                          >
+                                            <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )
+                                ) : (
+                                  selectedWidths.length === 0 ? (
+                                    <div
+                                      className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                      style={{
+                                        minWidth: '58px',
+                                        height: '26px',
+                                        padding: '1px 6px',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        color: '#94a3b8'
+                                      }}
+                                    >
+                                      <span>—</span>
+                                    </div>
+                                  ) : (
+                                    selectedWidths.map((w) => (
+                                      <div
+                                        key={w}
+                                        className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                        style={{
+                                          minWidth: '58px',
+                                          height: '26px',
+                                          padding: '1px 6px',
+                                          fontSize: '12px',
+                                          fontWeight: 700,
+                                          color: '#1d4ed8',
+                                          backgroundColor: '#eff6ff',
+                                          border: '1.5px solid #2563eb',
+                                          borderRadius: '2px'
+                                        }}
+                                      >
+                                        <span>{w}</span>
+                                      </div>
+                                    ))
+                                  )
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </td>
 
-                      {/* PCS (Rendered from order sizes & quantities, read-only) */}
-                      <td
-                        style={{
-                          padding: '8px 6px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                      >
-                        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '32px' }}>
-                          <div
-                            className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                              {/* Floating Popover - opens right next to the width button */}
+                              {isConsumptionEditing && activeWidthDropdownKey === groupKey && (
+                                <>
+                                  {/* Full-screen invisible backdrop to dismiss on click outside */}
+                                  <div
+                                    style={{
+                                      position: 'fixed',
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      zIndex: 1040
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveWidthDropdownKey(null);
+                                    }}
+                                  />
+
+                                  {/* Popover Box */}
+                                  <div
+                                    className="card shadow"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '50%',
+                                      left: '100%',
+                                      transform: 'translateY(-50%)',
+                                      marginLeft: '6px',
+                                      minWidth: '160px',
+                                      zIndex: 1050,
+                                      borderRadius: '4px',
+                                      border: '1.5px solid #2563eb',
+                                      backgroundColor: '#ffffff',
+                                      padding: '0',
+                                      overflow: 'hidden',
+                                      textAlign: 'left',
+                                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div
+                                      className="d-flex align-items-center justify-content-between px-2 py-1.5 border-bottom"
+                                      style={{ backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe' }}
+                                    >
+                                      <div className="d-flex align-items-center gap-1">
+                                        <i className="ti ti-arrows-horizontal text-primary" style={{ fontSize: '12px' }} />
+                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', letterSpacing: '0.02em' }}>
+                                          Select Widths
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn-close"
+                                        style={{ fontSize: '8px', padding: 0 }}
+                                        onClick={() => setActiveWidthDropdownKey(null)}
+                                        aria-label="Close"
+                                      />
+                                    </div>
+
+                                    <div style={{ maxHeight: '180px', overflowY: 'auto', padding: '4px' }}>
+                                      {widthOptions.map(opt => {
+                                        const isChecked = selectedWidths.includes(opt);
+                                        return (
+                                          <div
+                                            key={opt}
+                                            className="d-flex align-items-center justify-content-between px-2 py-1.5 rounded"
+                                            style={{
+                                              cursor: 'pointer',
+                                              userSelect: 'none',
+                                              backgroundColor: isChecked ? '#eff6ff' : 'transparent',
+                                              margin: '2px 0'
+                                            }}
+                                            onClick={() => {
+                                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
+                                            }}
+                                          >
+                                            <div className="d-flex align-items-center gap-2">
+                                              <input
+                                                type="checkbox"
+                                                className="form-check-input m-0"
+                                                style={{
+                                                  cursor: 'pointer',
+                                                  width: '14px',
+                                                  height: '14px',
+                                                  accentColor: '#2563eb'
+                                                }}
+                                                checked={isChecked}
+                                                onChange={() => {}}
+                                              />
+                                              <span
+                                                className="font-monospace fw-bold"
+                                                style={{
+                                                  fontSize: '12px',
+                                                  color: isChecked ? '#1d4ed8' : '#334155'
+                                                }}
+                                              >
+                                                {opt}
+                                              </span>
+                                            </div>
+                                            {isChecked ? (
+                                              <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '9px', padding: '1px 4px' }}>
+                                                Active
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted" style={{ fontSize: '10px' }}>
+                                                + Add
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    <div className="border-top p-1 text-center" style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-primary w-100 py-1"
+                                        style={{ fontSize: '11px', fontWeight: 600, borderRadius: '3px' }}
+                                        onClick={() => setActiveWidthDropdownKey(null)}
+                                      >
+                                        Done
+                                      </button>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                          );
+                        })()}
+
+                        {/* 5. DYED (M/PC) */}
+                        {isFirstRow && (
+                          <td
+                            rowSpan={group.rows.length}
                             style={{
-                              minWidth: '68px',
-                              height: '32px',
-                              padding: '0 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#ffffff',
-                              color: pcs > 0 ? '#1e293b' : '#94a3b8',
-                              border: '1.5px solid #cbd5e1',
-                              fontSize: '13px',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                              userSelect: 'none'
+                              verticalAlign: 'middle',
+                              textAlign: 'center',
+                              padding: '4px 6px',
+                              backgroundColor: '#ffffff'
                             }}
-                            title="Ordered pieces from Customer Sizes & Quantities"
                           >
-                            {pcs > 0 ? pcs : '0'}
-                          </div>
-                        </div>
-                      </td>
+                            <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                              {widthsToRender.map((w, wIdx) => {
+                                const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                                const storedRate = widthDyedRates[rateKey];
+                                const displayVal = (storedRate !== undefined && storedRate !== null)
+                                  ? storedRate
+                                  : ((group.width === w && group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== '')
+                                      ? group.dyedRate
+                                      : (w === '' && group.dyedRate !== undefined && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== '' ? group.dyedRate : ''));
 
-                      {/* TOTAL DYED */}
-                      <td
-                        style={{
-                          padding: '10px 12px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                      >
-                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
-                          {widthOptions.map((w) => {
-                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
-                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
-                            const storedRate = widthDyedRates[rateKey];
-                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
-                              ? parseFloat(storedRate)
-                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
-                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
-                            const wTotalDyed = (wDyedVal > 0 && pcs > 0) ? (wDyedVal * pcs) : 0;
+                                return isConsumptionEditing ? (
+                                  <input
+                                    key={w || `dyed_${wIdx}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="form-control form-control-sm text-center font-monospace"
+                                    style={{
+                                      width: '74px',
+                                      height: '26px',
+                                      border: '1.5px solid #2563eb',
+                                      backgroundColor: '#ffffff',
+                                      borderRadius: '2px',
+                                      fontSize: '12.5px',
+                                      fontWeight: 700,
+                                      color: '#0f172a',
+                                      padding: '2px 4px'
+                                    }}
+                                    placeholder="0.00"
+                                    value={displayVal !== undefined && displayVal !== null ? displayVal : ''}
+                                    onChange={(e) => handleUpdateWidthDyedRate(group.articleName, group.fabricQuality, group.role, w, e.target.value)}
+                                    title={w ? `Dyed consumption for ${w} width` : 'Dyed consumption'}
+                                  />
+                                ) : (
+                                  <div
+                                    key={w || `dyed_${wIdx}`}
+                                    className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                    style={{
+                                      minWidth: '68px',
+                                      height: '26px',
+                                      padding: '1px 6px',
+                                      fontSize: '12px',
+                                      fontWeight: 700,
+                                      color: '#0f172a',
+                                      backgroundColor: '#ffffff',
+                                      border: '1.5px solid #bfdbfe',
+                                      borderRadius: '2px'
+                                    }}
+                                  >
+                                    {displayVal !== undefined && displayVal !== null && displayVal !== '' && parseFloat(displayVal) > 0
+                                      ? parseFloat(displayVal).toFixed(2)
+                                      : '—'}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        )}
 
-                            return (
-                              <div
-                                key={w}
-                                className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                style={{
-                                  minWidth: '78px',
-                                  height: '32px',
-                                  padding: '0 8px',
-                                  borderRadius: '6px',
-                                  backgroundColor: isSelected ? '#eef2ff' : '#f8fafc',
-                                  color: isSelected ? '#1d4ed8' : '#64748b',
-                                  border: isSelected ? '1.5px solid #818cf8' : '1px solid #e2e8f0',
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? 700 : 500,
-                                  boxShadow: isSelected ? '0 0 0 1px rgba(99, 102, 241, 0.15)' : 'none',
-                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                onClick={() => {
-                                  if (isConsumptionEditing && !isSelected) {
-                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
-                                  }
-                                }}
-                                title={`Total dyed for ${w} width`}
-                              >
-                                {wTotalDyed > 0 ? `${wTotalDyed.toFixed(2)}m` : '0.00m'}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </td>
+                        {/* 6. SHRINK % (Rendered per selected width) */}
+                        {showShrinkColumn && isFirstRow && (
+                          <td
+                            rowSpan={group.rows.length}
+                            style={{
+                              verticalAlign: 'middle',
+                              textAlign: 'center',
+                              padding: '4px 6px',
+                              backgroundColor: '#ffffff'
+                            }}
+                          >
+                            <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                              {widthsToRender.map((w, wIdx) => (
+                                <div key={w || `shrink_${wIdx}`} className="d-flex justify-content-center">
+                                  {isDyedSourced ? (
+                                    <div style={{ height: '26px', display: 'flex', alignItems: 'center' }}>
+                                      <span className="text-muted font-monospace" style={{ fontSize: '13px' }}>—</span>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="d-inline-flex align-items-center justify-content-center font-monospace fw-semibold"
+                                      style={{
+                                        minWidth: '54px',
+                                        height: '26px',
+                                        padding: '0 6px',
+                                        borderRadius: '2px',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#334155',
+                                        border: '1px solid #cbd5e1',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      {group.shrinkPct ? `${group.shrinkPct}%` : '0%'}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        )}
 
-                      {/* TOTAL GREIGE */}
-                      <td
-                        style={{
-                          padding: '10px 12px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                      >
-                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '6px' }}>
-                          {widthOptions.map((w) => {
-                            const isSelected = (group.width && group.width === w) || (!group.width && w === widthOptions[0]);
-                            const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
-                            const storedRate = widthDyedRates[rateKey];
-                            const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
-                              ? parseFloat(storedRate)
-                              : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : 0);
-                            const wDyedVal = isNaN(wVal) ? 0 : wVal;
-                            const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
-                            const wTotalGreige = (wGreigePerPc > 0 && pcs > 0) ? (wGreigePerPc * pcs) : 0;
-
-                            return (
-                              <div
-                                key={w}
-                                className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                style={{
-                                  minWidth: '78px',
-                                  height: '32px',
-                                  padding: '0 8px',
-                                  borderRadius: '6px',
-                                  backgroundColor: isSelected ? '#faf5ff' : '#f8fafc',
-                                  color: isSelected ? '#7e22ce' : '#64748b',
-                                  border: isSelected ? '1.5px solid #c084fc' : '1px solid #e2e8f0',
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? 700 : 500,
-                                  boxShadow: isSelected ? '0 0 0 1px rgba(192, 132, 252, 0.15)' : 'none',
-                                  cursor: isConsumptionEditing ? 'pointer' : 'default',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                onClick={() => {
-                                  if (isConsumptionEditing && !isSelected) {
-                                    handleSelectWidthForGroup(group.articleName, w, group.fabricQuality, group.role);
-                                  }
-                                }}
-                                title={`Total greige for ${w} width`}
-                              >
-                                {wTotalGreige > 0 ? `${wTotalGreige.toFixed(2)}m` : '0.00m'}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </td>
-
-                      {/* ACTION (Delete row) */}
-                      {isConsumptionEditing && (
+                        {/* 7. GREIGE (M/PC) */}
                         <td
                           style={{
-                            padding: '8px 6px',
+                            padding: '4px 6px',
                             textAlign: 'center',
-                            borderBottom: '1px solid #f1f5f9'
+                            backgroundColor: '#ffffff'
                           }}
                         >
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-icon p-1 text-danger border-0 bg-transparent rounded"
-                            style={{ width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            onClick={() => handleDeleteConsumptionRow(row.key, row.originalIndex)}
-                            title="Remove this fabric colour row"
-                          >
-                            <i className="ti ti-trash" style={{ fontSize: '15px' }}></i>
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                });
-              });
-            })}
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                            {widthsToRender.map((w, wIdx) => {
+                              const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                              const storedRate = widthDyedRates[rateKey];
+                              const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                                ? parseFloat(storedRate)
+                                : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : (w === '' && group.dyedRate ? parseFloat(group.dyedRate) : 0));
+                              const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                              const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
 
-              {/* GRAND TOTAL ROW */}
+                              return (
+                                <div
+                                  key={w || `greige_${wIdx}`}
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                  style={{
+                                    minWidth: '66px',
+                                    height: '26px',
+                                    padding: '0 6px',
+                                    borderRadius: '2px',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0f172a',
+                                    border: '1.5px solid #2563eb',
+                                    fontSize: '12px',
+                                    fontWeight: 700
+                                  }}
+                                  title={w ? `Greige per piece for ${w} width` : 'Greige per piece'}
+                                >
+                                  {wGreigePerPc > 0 ? wGreigePerPc.toFixed(2) : '0.00'}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+
+                        {/* 8. PCS (Rendered per selected width) */}
+                        <td
+                          style={{
+                            padding: '4px 6px',
+                            textAlign: 'center',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                            {widthsToRender.map((w, wIdx) => (
+                              <div key={w || `pcs_${wIdx}`} className="d-flex justify-content-center align-items-center">
+                                <div
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
+                                  style={{
+                                    minWidth: '58px',
+                                    height: '26px',
+                                    padding: '0 6px',
+                                    borderRadius: '2px',
+                                    backgroundColor: '#ffffff',
+                                    color: pcs > 0 ? '#0f172a' : '#94a3b8',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '12.5px',
+                                    userSelect: 'none'
+                                  }}
+                                  title="Ordered pieces"
+                                >
+                                  {pcs > 0 ? pcs : '0'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* 9. TOTAL DYED */}
+                        <td
+                          style={{
+                            padding: '4px 6px',
+                            textAlign: 'center',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                            {widthsToRender.map((w, wIdx) => {
+                              const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                              const storedRate = widthDyedRates[rateKey];
+                              const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                                ? parseFloat(storedRate)
+                                : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : (w === '' && group.dyedRate ? parseFloat(group.dyedRate) : 0));
+                              const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                              const wTotalDyed = (wDyedVal > 0 && pcs > 0) ? (wDyedVal * pcs) : 0;
+
+                              return (
+                                <div
+                                  key={w || `totdyed_${wIdx}`}
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                  style={{
+                                    minWidth: '72px',
+                                    height: '26px',
+                                    padding: '0 6px',
+                                    borderRadius: '2px',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0f172a',
+                                    border: '1.5px solid #2563eb',
+                                    fontSize: '12px',
+                                    fontWeight: 700
+                                  }}
+                                  title={w ? `Total dyed for ${w} width` : 'Total dyed'}
+                                >
+                                  {wTotalDyed > 0 ? `${wTotalDyed.toFixed(2)}m` : '0.00m'}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+
+                        {/* 10. TOTAL GREIGE */}
+                        <td
+                          style={{
+                            padding: '4px 6px',
+                            textAlign: 'center',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
+                            {widthsToRender.map((w, wIdx) => {
+                              const rateKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}___${w}`;
+                              const storedRate = widthDyedRates[rateKey];
+                              const wVal = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+                                ? parseFloat(storedRate)
+                                : ((group.width === w && group.dyedRate) ? parseFloat(group.dyedRate) : (w === '' && group.dyedRate ? parseFloat(group.dyedRate) : 0));
+                              const wDyedVal = isNaN(wVal) ? 0 : wVal;
+                              const wGreigePerPc = wDyedVal > 0 ? (isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100)) : 0;
+                              const wTotalGreige = (wGreigePerPc > 0 && pcs > 0) ? (wGreigePerPc * pcs) : 0;
+
+                              return (
+                                <div
+                                  key={w || `totgreige_${wIdx}`}
+                                  className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                  style={{
+                                    minWidth: '72px',
+                                    height: '26px',
+                                    padding: '0 6px',
+                                    borderRadius: '2px',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0f172a',
+                                    border: '1.5px solid #2563eb',
+                                    fontSize: '12px',
+                                    fontWeight: 700
+                                  }}
+                                  title={w ? `Total greige for ${w} width` : 'Total greige'}
+                                >
+                                  {wTotalGreige > 0 ? `${wTotalGreige.toFixed(2)}m` : '0.00m'}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                });
+              })}
+
+              {/* GRAND TOTAL ROW (Excel Style Summary) */}
               {consumptionRows.length > 0 && (
                 <tr
                   style={{
-                    borderTop: '2px solid #cbd5e1',
-                    backgroundColor: '#f1f5f9',
+                    borderTop: '2px solid #64748b',
+                    borderBottom: '2px solid #64748b',
+                    backgroundColor: '#f8fafc',
                     fontWeight: 700
                   }}
                 >
                   <td
                     colSpan={2}
-                    className="text-uppercase text-dark ps-3 py-2.5 fw-bold"
-                    style={{ fontSize: '12px', letterSpacing: '0.05em' }}
+                    className="text-uppercase text-dark ps-3 py-2 fw-bold"
+                    style={{ fontSize: '12px', letterSpacing: '0.04em' }}
                   >
                     <span>Total Garment Pieces</span>
                   </td>
-                  <td className="text-center text-muted small">—</td>
-                  <td className="text-center text-muted small">—</td>
-                  <td className="text-center text-muted small">—</td>
-                  <td className="text-center text-muted small">—</td>
-                  <td className="text-center text-muted small">—</td>
-                  <td className="text-center py-2.5">
+                  <td className="text-center text-muted small py-2">—</td>
+                  <td className="text-center text-muted small py-2">—</td>
+                  <td className="text-center text-muted small py-2">—</td>
+                  {showShrinkColumn && (
+                    <td className="text-center text-muted small py-2">—</td>
+                  )}
+                  <td className="text-center text-muted small py-2">—</td>
+                  <td className="text-center py-2">
                     <div className="d-flex justify-content-center">
                       <div
                         className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
                         style={{
-                          minWidth: '75px',
-                          height: '32px',
-                          padding: '0 8px',
-                          borderRadius: '6px',
+                          minWidth: '65px',
+                          height: '26px',
+                          padding: '0 6px',
+                          borderRadius: '2px',
                           backgroundColor: '#ffffff',
                           color: '#0f172a',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '13px'
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12.5px'
                         }}
                       >
                         {(() => {
@@ -5319,19 +5499,19 @@ export default function OrderDetailView({
                       </div>
                     </div>
                   </td>
-                  <td className="text-center py-2.5">
+                  <td className="text-center py-2">
                     <div className="d-flex justify-content-center">
                       <div
                         className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
                         style={{
-                          minWidth: '85px',
-                          height: '32px',
-                          padding: '0 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#dbeafe',
-                          color: '#1e40af',
-                          border: '1.5px solid #93c5fd',
-                          fontSize: '13px'
+                          minWidth: '75px',
+                          height: '26px',
+                          padding: '0 6px',
+                          borderRadius: '2px',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12px'
                         }}
                       >
                         {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalDyed || 0) : 0), 0) > 0
@@ -5340,19 +5520,19 @@ export default function OrderDetailView({
                       </div>
                     </div>
                   </td>
-                  <td className="text-center py-2.5">
+                  <td className="text-center py-2">
                     <div className="d-flex justify-content-center">
                       <div
                         className="d-inline-flex align-items-center justify-content-center font-monospace fw-bold"
                         style={{
-                          minWidth: '85px',
-                          height: '32px',
-                          padding: '0 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#f3e8ff',
-                          color: '#6b21a8',
-                          border: '1.5px solid #d8b4fe',
-                          fontSize: '13px'
+                          minWidth: '75px',
+                          height: '26px',
+                          padding: '0 6px',
+                          borderRadius: '2px',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12px'
                         }}
                       >
                         {fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? (fs.totalGreige || 0) : 0), 0) > 0
@@ -5361,9 +5541,6 @@ export default function OrderDetailView({
                       </div>
                     </div>
                   </td>
-                  {isConsumptionEditing && (
-                    <td style={{ backgroundColor: '#f1f5f9' }}></td>
-                  )}
                 </tr>
               )}
             </tbody>
@@ -5373,14 +5550,14 @@ export default function OrderDetailView({
         {/* Bottom Actions Bar */}
         <div
           className="d-flex align-items-center justify-content-end gap-2.5 p-3 px-4 bg-white"
-          style={{ borderTop: '1px solid #f1f5f9' }}
+          style={{ borderTop: '1px solid #cbd5e1' }}
         >
           {isConsumptionEditing ? (
             <>
               <button
                 type="button"
-                className="btn btn-outline-secondary px-3.5 py-2 rounded-3 fw-semibold bg-white shadow-xs transition-all"
-                style={{ borderColor: '#cbd5e1', color: '#475569', fontSize: '13px' }}
+                className="btn btn-outline-secondary px-3.5 py-1.5 fw-semibold bg-white"
+                style={{ borderColor: '#cbd5e1', color: '#475569', fontSize: '13px', borderRadius: '4px' }}
                 onClick={() => {
                   handleCancelConsumption();
                   setIsConsumptionEditing(false);
@@ -5391,10 +5568,13 @@ export default function OrderDetailView({
 
               <button
                 type="button"
-                className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
+                className="btn px-3.5 py-1.5 fw-semibold text-primary d-flex align-items-center gap-2"
                 style={{
-                  backgroundColor: '#eef2ff',
-                  borderColor: '#c7d2fe',
+                  backgroundColor: '#eff6ff',
+                  borderColor: '#bfdbfe',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderRadius: '4px',
                   fontSize: '13px'
                 }}
                 onClick={() => setShowRateCalculation(prev => !prev)}
@@ -5406,10 +5586,13 @@ export default function OrderDetailView({
 
               <button
                 type="button"
-                className="btn px-4 py-2 rounded-3 fw-semibold text-white shadow-sm d-flex align-items-center gap-2 transition-all"
+                className="btn px-4 py-1.5 fw-semibold text-white d-flex align-items-center gap-2"
                 style={{
-                  backgroundColor: '#2e37a4',
-                  borderColor: '#2e37a4',
+                  backgroundColor: '#2563eb',
+                  borderColor: '#2563eb',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderRadius: '4px',
                   fontSize: '13px'
                 }}
                 onClick={handleSaveConsumption}
@@ -5422,10 +5605,13 @@ export default function OrderDetailView({
             <>
               <button
                 type="button"
-                className="btn px-3.5 py-2 rounded-3 fw-semibold text-primary shadow-xs d-flex align-items-center gap-2 transition-all"
+                className="btn px-3.5 py-1.5 fw-semibold text-primary d-flex align-items-center gap-2"
                 style={{
-                  backgroundColor: '#eef2ff',
-                  borderColor: '#c7d2fe',
+                  backgroundColor: '#eff6ff',
+                  borderColor: '#bfdbfe',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderRadius: '4px',
                   fontSize: '13px'
                 }}
                 onClick={() => setShowRateCalculation(prev => !prev)}
@@ -5437,11 +5623,14 @@ export default function OrderDetailView({
 
               <button
                 type="button"
-                className="btn btn-sm rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs transition-all"
+                className="btn btn-sm px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5"
                 style={{
-                  color: '#7c3aed',
-                  borderColor: '#c4b5fd',
+                  color: '#2563eb',
+                  borderColor: '#bfdbfe',
                   backgroundColor: '#ffffff',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderRadius: '4px',
                   fontSize: '13px'
                 }}
                 onClick={() => setIsConsumptionEditing(true)}
@@ -5546,7 +5735,7 @@ export default function OrderDetailView({
                             min="0"
                             className="form-control form-control-sm text-end fw-bold font-monospace bg-white border-0 ps-1 pe-2 shadow-none"
                             style={{ fontSize: '13px', height: '32px', color: '#0f172a' }}
-                            placeholder={rc.defaultCalculatedRate.toFixed(2)}
+                            placeholder="0.00"
                             value={customMarketRates[rc.rateKey] ?? ''}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -5562,13 +5751,15 @@ export default function OrderDetailView({
                         {rc.totalMetres.toFixed(1)}m
                       </td>
                       <td className={`py-2.5 px-3 text-end font-monospace fw-bold ${rc.isSelected ? 'text-dark' : 'text-secondary'}`}>
-                        ₹{rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {rc.totalCost > 0
+                          ? `₹${rc.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '₹0.00'}
                       </td>
                       <td
                         className="py-2.5 px-3 text-end font-monospace fw-semibold"
                         style={{ color: rc.isSelected ? '#2e37a4' : '#64748b' }}
                       >
-                        ₹{rc.costPerGarment.toFixed(2)}
+                        {rc.costPerGarment > 0 ? `₹${rc.costPerGarment.toFixed(2)}` : '₹0.00'}
                       </td>
                     </tr>
                   ))}
@@ -5580,10 +5771,10 @@ export default function OrderDetailView({
                     </td>
                     <td className="py-2.5 px-3 text-end font-monospace">{rateTotals.totalMetres.toFixed(1)}m</td>
                     <td className="py-2.5 px-3 text-end font-monospace text-success fs-14">
-                      ₹{rateTotals.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{rateTotals.totalCost > 0 ? rateTotals.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
                     </td>
                     <td className="py-2.5 px-3 text-end font-monospace text-primary">
-                      Avg ₹{(rateTotals.totalCost / (rateTotals.totalPcs || 1)).toFixed(2)}/pc
+                      Avg ₹{rateTotals.totalCost > 0 && rateTotals.totalPcs > 0 ? (rateTotals.totalCost / rateTotals.totalPcs).toFixed(2) : '0.00'}/pc
                     </td>
                   </tr>
                 </tfoot>
@@ -5721,72 +5912,36 @@ export default function OrderDetailView({
                   <i className={cat.icon} style={{ fontSize: '14px' }}></i>
                 </div>
                 <span style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '100%' }}>
-                  {cat.name} ({cat.varieties?.length || 0})
+                  {cat.name}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* 2. Active Category Header Line (Matching Image 2) */}
-        <div className="d-flex align-items-center" style={{ gap: '10px', marginTop: '16px', marginBottom: '14px' }}>
-          <div
-            className="rounded-circle d-flex align-items-center justify-content-center"
-            style={{ width: '26px', height: '26px', minWidth: '26px', backgroundColor: '#eef2ff', color: '#2e37a4' }}
-          >
-            <i className={activeCategoryObj.icon} style={{ fontSize: '14px' }}></i>
+        {/* 2. Active Category Action Bar & Quick Varieties */}
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 mt-2">
+          <div className="d-flex align-items-center gap-2">
+            <div
+              className="rounded-circle d-flex align-items-center justify-content-center"
+              style={{ width: '26px', height: '26px', minWidth: '26px', backgroundColor: '#eef2ff', color: '#2563eb' }}
+            >
+              <i className={activeCategoryObj.icon} style={{ fontSize: '14px' }}></i>
+            </div>
+            <span className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+              {activeCategoryObj.name}
+            </span>
+            <span className="text-muted" style={{ fontSize: '12.5px' }}>
+              {(activeCategoryObj?.varieties?.length > 0) ? '— click a variety to add:' : ''}
+            </span>
           </div>
-          <span className="fw-semibold text-dark" style={{ fontSize: '14.5px' }}>
-            {activeCategoryObj.name} {(activeCategoryObj?.varieties?.length > 0) ? '— click one to add and configure it:' : ''}
-          </span>
         </div>
 
-        {/* 3. Article Buttons (e.g. [ Kurta ], [ Pajama ]) Matching Image 2 */}
-        <div className="d-flex flex-wrap align-items-center" style={{ gap: '12px', marginBottom: '18px' }}>
-          {orderArticles.map((art) => {
-            const isSelected = (selectedBomArticle || orderArticles[0]?.name) === art.name;
-            const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
-            return (
-              <button
-                key={art.name || art.id || 'Kurta'}
-                type="button"
-                className="btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs"
-                style={{
-                  width: '110px',
-                  height: '74px',
-                  backgroundColor: isSelected ? '#f0f2fd' : '#ffffff',
-                  border: isSelected ? '2px solid #2e37a4' : '1.5px solid #cbd5e1',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  setSelectedBomArticle(art.name);
-                }}
-                title={`Select ${art.name || 'Kurta'} to configure accessories`}
-              >
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center mb-1"
-                  style={{
-                    width: '30px',
-                    height: '30px',
-                    backgroundColor: isSelected ? '#2e37a4' : '#eef2ff',
-                    color: isSelected ? '#ffffff' : '#2e37a4'
-                  }}
-                >
-                  <span style={{ fontSize: '15px' }}>{isBottom ? '👖' : '👕'}</span>
-                </div>
-                <span className="fw-semibold text-dark small" style={{ fontSize: '13px' }}>
-                  {art.name || 'Kurta'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 4. Quick Variety Pills — click one to open popover */}
-        <div className="position-relative d-flex flex-wrap align-items-center" style={{ gap: '10px', marginBottom: '24px' }}>
+        {/* 3. Quick Variety Pills — click one to open popover */}
+        <div className="position-relative d-flex flex-wrap align-items-center mb-4" style={{ gap: '8px' }}>
           {(activeCategoryObj?.varieties || []).length === 0 ? (
             <div className="text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '13px' }}>
-              <i className="ti ti-info-circle" style={{ color: '#94a3b8', fontSize: '16px' }}></i>
+              <i className="ti ti-info-circle text-primary" style={{ fontSize: '16px' }}></i>
               <span>No accessories added in <strong>{activeCategoryObj?.name || activeCategory} Master</strong> yet. Add items in Accessories Master to select them here.</span>
             </div>
           ) : (
@@ -5794,16 +5949,16 @@ export default function OrderDetailView({
               <button
                 key={vIdx}
                 type="button"
-                className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill transition-all"
+                className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill shadow-xs transition-all"
                 style={{
                   fontSize: '12.5px',
-                  fontWeight: 500,
-                  padding: '7px 16px',
+                  fontWeight: 600,
+                  padding: '5px 14px',
                   backgroundColor: '#ffffff',
-                  borderColor: '#c7d2fe',
-                  color: '#2e37a4',
-                  boxShadow: 'none',
-                  borderRadius: '50px',
+                  borderColor: '#bfdbfe',
+                  borderWidth: '1.5px',
+                  borderStyle: 'solid',
+                  color: '#2563eb',
                   cursor: 'pointer'
                 }}
                 onClick={(e) => {
@@ -5818,7 +5973,7 @@ export default function OrderDetailView({
                 }}
                 title={`Add ${v.name}`}
               >
-                <span style={{ color: '#2e37a4', fontWeight: 700 }}>+</span>
+                <i className="ti ti-plus" style={{ fontSize: '12px', fontWeight: 'bold' }}></i>
                 <span>{v.name}</span>
               </button>
             ))
@@ -5920,28 +6075,31 @@ export default function OrderDetailView({
                     {/* Header with Title */}
                     <div className="d-flex align-items-center justify-content-between flex-wrap" style={{ gap: '12px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
                       <div className="d-flex align-items-center gap-2">
-                        <span className="fw-bold text-dark" style={{ fontSize: '16px' }}>
-                          {item.category || item.varietyName || 'Accessory'}
+                        <span className="fw-bold text-dark" style={{ fontSize: '15px' }}>
+                          {item.varietyName || item.category || 'Accessory'}
                         </span>
                         <span
                           className="badge rounded-pill px-2.5 py-0.5 fw-bold"
-                          style={{ fontSize: '11px', backgroundColor: '#f3e8ff', color: '#7c3aed', border: '1px solid #e9d5ff' }}
+                          style={{ fontSize: '11px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}
                         >
                           #{item.configIndex || item.instanceNum || 1}
                         </span>
-                        <span className="fw-bold" style={{ fontSize: '13.5px', color: '#7c3aed' }}>
-                          {item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? 'Meter' : 'Pcs')}
+                        <span className="badge rounded-2 px-2 py-0.5 fw-semibold" style={{ fontSize: '11.5px', backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}>
+                          {item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? 'Meter' : 'Piece')}
                         </span>
-                        {item.varietyName && item.varietyName.toLowerCase() !== (item.category || '').toLowerCase() && (
-                          <span className="text-muted fw-normal" style={{ fontSize: '12.5px' }}>
-                            · {item.varietyName}
+                        {item.category && item.varietyName && item.category.toLowerCase() !== item.varietyName.toLowerCase() && (
+                          <span className="text-muted" style={{ fontSize: '12px' }}>
+                            ({item.category})
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Article Selector Buttons / Tabs inside card (Matching Image 3 & Video) */}
-                    <div className="d-flex align-items-center gap-2 mb-3">
+                    {/* Article Selector Toggle Pills inside card */}
+                    <div className="d-flex align-items-center flex-wrap gap-2 mb-3">
+                      <span className="text-muted fw-semibold me-1" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Apply to:
+                      </span>
                       {orderArticles.map((art) => {
                         const isSelected = selectedArticles.some(a => a.toLowerCase() === (art.name || '').toLowerCase());
                         const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
@@ -5949,22 +6107,23 @@ export default function OrderDetailView({
                           <button
                             key={art.name}
                             type="button"
-                            className="btn d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-3 fw-semibold transition-all"
+                            className="btn btn-sm d-inline-flex align-items-center gap-1.5 px-3 py-1 rounded-pill fw-semibold transition-all"
                             style={{
-                              fontSize: '13px',
-                              backgroundColor: isSelected ? '#7c3aed' : '#ffffff',
-                              color: isSelected ? '#ffffff' : '#334155',
-                              border: isSelected ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
-                              boxShadow: isSelected ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
+                              fontSize: '12px',
+                              backgroundColor: isSelected ? '#2563eb' : '#ffffff',
+                              color: isSelected ? '#ffffff' : '#475569',
+                              border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                              boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.2)' : 'none',
                               cursor: 'pointer'
                             }}
                             onClick={() => {
                               handleToggleCardArticle(item.id, art.name);
                             }}
+                            title={isSelected ? `Click to remove ${art.name}` : `Click to include ${art.name}`}
                           >
-                            <span style={{ fontSize: '15px' }}>{isBottom ? '👖' : '🎽'}</span>
+                            <span>{art.icon || (isBottom ? '👖' : '👘')}</span>
                             <span>{art.name}</span>
-                            <span style={{ fontSize: '11px', opacity: 0.85 }}>{isSelected ? '∨' : '>'}</span>
+                            <i className={isSelected ? "ti ti-check" : "ti ti-plus"} style={{ fontSize: '11px', fontWeight: 'bold' }}></i>
                           </button>
                         );
                       })}
@@ -5975,13 +6134,13 @@ export default function OrderDetailView({
                       {renderCategoryCardTable(activeCategoryObj, item, selectedArticles, isEditing)}
                     </div>
 
-                    {/* Card Bottom Actions: Edit/Save & Delete (Moved to bottom of card per request) */}
+                    {/* Card Bottom Actions: Edit/Save & Delete */}
                     <div className="d-flex align-items-center justify-content-end gap-2 mt-3 pt-2.5" style={{ borderTop: '1px solid #f1f5f9' }}>
                       {isEditing ? (
                         <button
                           type="button"
                           className="btn btn-sm text-white rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs"
-                          style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontSize: '12.5px' }}
+                          style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', fontSize: '12.5px' }}
                           onClick={() => handleSaveItem(item)}
                         >
                           <i className="ti ti-device-floppy" style={{ fontSize: '15px' }}></i>
@@ -5991,7 +6150,7 @@ export default function OrderDetailView({
                         <button
                           type="button"
                           className="btn btn-sm rounded-2 px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs transition-all"
-                          style={{ color: '#7c3aed', borderColor: '#c4b5fd', backgroundColor: '#ffffff', fontSize: '12.5px' }}
+                          style={{ color: '#2563eb', borderColor: '#bfdbfe', backgroundColor: '#eff6ff', fontSize: '12.5px' }}
                           onClick={() => setEditingAccessoryIds(prev => ({ ...prev, [item.id]: true }))}
                           title="Edit Accessory"
                         >
@@ -6001,7 +6160,7 @@ export default function OrderDetailView({
                       )}
                       <button
                         type="button"
-                        className="btn btn-link text-muted p-1"
+                        className="btn btn-link text-danger p-1 text-decoration-none"
                         onClick={() => handleDeleteItem(item.id)}
                         title="Delete accessory"
                       >

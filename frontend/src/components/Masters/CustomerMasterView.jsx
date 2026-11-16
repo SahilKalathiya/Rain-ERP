@@ -32,10 +32,11 @@ const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
   return String(text)
-    .toUpperCase()
-    .replace(/(\d+)\s*L\b/g, '$1L')
-    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, (char) => char.toUpperCase())
+    .replace(/(\d+)\s*L\b/gi, '$1L')
+    .replace(/(\d+(?:\.\d+)?)\s*MM\b/gi, '$1 MM')
+    .replace(/(\d+(?:\.\d+)?)\s*CM\b/gi, '$1 CM');
 };
 
 export default function CustomerMasterView({ isInline = false, onSaveInline, onCloseInline }) {
@@ -132,7 +133,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
     setFormData({
       id: nextSeq,
       name: '',
-      type: 'Direct Customer',
+      type: '',
       customType: '',
       phone: '',
       email: '',
@@ -182,7 +183,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
     const isOtherType = formData.type === 'Other';
     const finalCustomerType = isOtherType
       ? (formData.customType?.trim() || 'Other')
-      : (formData.type || 'Direct Customer');
+      : (formData.type?.trim() || '');
 
     if (!finalCustomerType) {
       alert('Customer Type is mandatory.');
@@ -356,7 +357,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                     <label className="form-label fw-semibold small text-muted">Customer Name *</label>
                     <input
                       type="text"
-                      className="form-control text-uppercase"
+                      className="form-control"
                       placeholder="e.g. Manyavar Trends Retail"
                       required
                       value={formData.name}
@@ -575,7 +576,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                       <label className="form-label fw-semibold small text-muted">Customer Name *</label>
                       <input
                         type="text"
-                        className="form-control text-uppercase"
+                        className="form-control"
                         placeholder="e.g. Manyavar Trends Retail"
                         required
                         disabled={!isModalEditMode}
@@ -583,7 +584,7 @@ export default function CustomerMasterView({ isInline = false, onSaveInline, onC
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                       />
-                      <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
+                      <div className="form-text small text-muted">Title Case (e.g. Manyavar Trends Retail)</div>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold small text-muted">Customer Type *</label>
