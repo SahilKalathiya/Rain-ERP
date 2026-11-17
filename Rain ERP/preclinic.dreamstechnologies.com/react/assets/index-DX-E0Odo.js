@@ -19520,7 +19520,7 @@
       }
       const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
       rows.forEach((r) => {
-        if (r.articleName && r.width && (r._userSelectedWidth || order?.groupSelectedWidths)) {
+        if (r.articleName && r.width && r.width !== "\u2014") {
           const k = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}`;
           if (!initial[k]) {
             initial[k] = [r.width];
@@ -19532,14 +19532,13 @@
       return initial;
     });
     const [activeWidthDropdownKey, setActiveWidthDropdownKey] = (0, import_react5.useState)(null);
-    const [customWidthMap, setCustomWidthMap] = (0, import_react5.useState)({});
-    const getSelectedWidthsForGroup = (grp, options) => {
+    const getSelectedWidthsForGroup = (grp, options = []) => {
       const k = `${grp.articleName}___${grp.fabricQuality || ""}___${grp.role || ""}`;
       const stored = groupSelectedWidths[k];
       if (Array.isArray(stored)) {
         return stored;
       }
-      if (grp.width && options.includes(grp.width) && grp._userSelectedWidth) {
+      if (grp.width && grp.width !== "\u2014" && (options.length === 0 || options.includes(grp.width))) {
         return [grp.width];
       }
       return [];
@@ -19547,37 +19546,54 @@
     const handleToggleGroupWidth = (artName, fabricQuality, role, targetWidth, options) => {
       const cleanWidth = targetWidth === "\u2014" ? "" : targetWidth;
       const k = `${artName}___${fabricQuality || ""}___${role || ""}`;
-      setGroupSelectedWidths((prev) => {
-        const currentList = prev[k] && Array.isArray(prev[k]) ? [...prev[k]] : [];
-        let nextList;
-        if (currentList.includes(cleanWidth)) {
-          nextList = currentList.filter((x) => x !== cleanWidth);
-        } else {
-          nextList = [...currentList, cleanWidth];
+      let currentList = [];
+      if (groupSelectedWidths[k] && Array.isArray(groupSelectedWidths[k])) {
+        currentList = [...groupSelectedWidths[k]];
+      } else {
+        const matchRow = consumptionRows.find(
+          (r) => r.articleName === artName && (!fabricQuality || r.fabricQuality === fabricQuality) && (!role || !r.role || r.role.toLowerCase() === role.toLowerCase())
+        );
+        if (matchRow && matchRow.width && matchRow.width !== "\u2014") {
+          currentList = [matchRow.width];
         }
-        setConsumptionRows((prevRows) => prevRows.map((r) => {
-          const matchArt = r.articleName === artName;
-          const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
-          const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
-          if (matchArt && matchFab && matchRole) {
-            const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
-            return {
-              ...r,
-              width: primaryW,
-              dyedRate: nextDyed,
-              _userSelectedWidth: Boolean(primaryW)
-            };
-          }
-          return r;
-        }));
-        return { ...prev, [k]: nextList };
-      });
+      }
+      let nextList;
+      if (!cleanWidth) {
+        nextList = [];
+      } else if (currentList.includes(cleanWidth)) {
+        nextList = currentList.filter((x) => x !== cleanWidth);
+      } else {
+        nextList = [...currentList, cleanWidth];
+      }
+      const primaryW = nextList[0] || "";
+      const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${primaryW}`;
+      const storedRate = widthDyedRates[rateKey];
+      setGroupSelectedWidths((prev) => ({
+        ...prev,
+        [k]: nextList
+      }));
+      setConsumptionRows((prevRows) => prevRows.map((r) => {
+        const matchArt = r.articleName === artName;
+        const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+        const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+        if (matchArt && matchFab && matchRole) {
+          const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
+          return {
+            ...r,
+            width: primaryW,
+            selectedWidths: nextList,
+            dyedRate: nextDyed,
+            _userSelectedWidth: Boolean(primaryW)
+          };
+        }
+        return r;
+      }));
     };
     const handleSelectWidthForGroup = (artName, newWidth, fabricQuality, role) => {
       const cleanWidth = newWidth === "\u2014" ? "" : newWidth;
       const k = `${artName}___${fabricQuality || ""}___${role || ""}`;
       const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${cleanWidth}`;
-      const storedRate2 = widthDyedRates[rateKey];
+      const storedRate = widthDyedRates[rateKey];
       setGroupSelectedWidths((prev) => ({
         ...prev,
         [k]: cleanWidth ? [cleanWidth] : []
@@ -19587,7 +19603,7 @@
         const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
         const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
         if (matchArt && matchFab && matchRole) {
-          const nextDyed = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) || 0 : parseFloat(r.dyedRate) || 0;
+          const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
           return {
             ...r,
             width: cleanWidth,
@@ -19813,8 +19829,8 @@
         const masterShrink = getFabricMasterShrinkage(fabName);
         const shrink = isDyed ? 0 : masterShrink;
         const rateKey = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}___${width}`;
-        const storedRate2 = widthDyedRates[rateKey];
-        const dyed = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) || 0 : parseFloat(r.dyedRate) || 0;
+        const storedRate = widthDyedRates[rateKey];
+        const dyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
         const greigePerPc = dyed > 0 ? isDyed ? dyed : dyed * (1 + shrink / 100) : 0;
         const totalDyed = dyed > 0 ? dyed * pcs : 0;
         const totalGreige = greigePerPc > 0 ? greigePerPc * pcs : 0;
@@ -19890,8 +19906,8 @@
         grp.rows.forEach((r) => {
           const rPcs = parseInt(r.pcs, 10) || 0;
           const rateKey = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}___${currentSelectedWidth}`;
-          const storedRate2 = widthDyedRates[rateKey];
-          const dyed = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) || 0 : parseFloat(r.dyedRate) || 0;
+          const storedRate = widthDyedRates[rateKey];
+          const dyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
           const shrink = grp.isDyed ? 0 : getFabricMasterShrinkage(grp.fabricName);
           const greigePerPc = grp.isDyed ? dyed : dyed > 0 ? dyed * (1 + shrink / 100) : 0;
           currentBaseMetres += (grp.isDyed ? dyed : greigePerPc) * rPcs;
@@ -19914,8 +19930,8 @@
           if (isUserConfiguredWidth) {
             grp.rows.forEach((r) => {
               const rateKey2 = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}___${w}`;
-              const storedRate2 = widthDyedRates[rateKey2];
-              const wVal = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) : r.width === w && r.dyedRate ? parseFloat(r.dyedRate) : 0;
+              const storedRate = widthDyedRates[rateKey2];
+              const wVal = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) : r.width === w && r.dyedRate ? parseFloat(r.dyedRate) : 0;
               if (!isNaN(wVal) && wVal > 0) {
                 hasCustomWidthRate = true;
                 const rPcs = parseInt(r.pcs, 10) || 0;
@@ -20314,8 +20330,7 @@
       articlesList.map((art, aIdx) => {
         const isExpanded = !!expandedArticles[aIdx];
         const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || "");
-        const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
-        const artIcon = art.icon || (isBottom ? "\u{1F456}" : isDupatta ? "\u{1F9E3}" : "\u{1F455}");
+        const artIcon = art.icon || (isBottom ? "\u{1F456}" : "\u{1F455}");
         const hasFabric = Boolean(art.fabricQuality && art.fabricQuality.trim() !== "");
         const hasLength = Boolean(art.avgGarmentLength && String(art.avgGarmentLength).trim() !== "" && !isNaN(parseFloat(art.avgGarmentLength)));
         return /* @__PURE__ */ import_react5.default.createElement("div", { key: aIdx, className: "border rounded-4 overflow-hidden mb-3", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
@@ -20357,14 +20372,13 @@
             className: "p-2.5 px-3 rounded-3 d-flex justify-content-between align-items-center border",
             style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" }
           },
-          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary small fw-medium" }, "# Avg. Length ", isDupatta ? "(mts)" : "(in)", ":"), editingLengthIdx === aIdx ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
+          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary small fw-medium" }, "# Avg. Length:"), editingLengthIdx === aIdx ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
             "input",
             {
               type: "number",
               step: "0.01",
               className: "form-control form-control-sm",
               style: { width: "90px" },
-              placeholder: isDupatta ? "e.g. 2.25" : "e.g. 45",
               value: tempLengthVal,
               onChange: (e) => setTempLengthVal(e.target.value),
               autoFocus: true
@@ -20381,7 +20395,10 @@
               }
             },
             "Save"
-          )) : /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small" }, parseFloat(art.avgGarmentLength).toFixed(2), " ", isDupatta ? "mts" : "inches")),
+          )) : /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small" }, (() => {
+            const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || art.articleName || "").trim());
+            return `${parseFloat(art.avgGarmentLength).toFixed(2)} ${isDupatta ? "mts" : "inches"}`;
+          })())),
           editingLengthIdx !== aIdx && /* @__PURE__ */ import_react5.default.createElement(
             "button",
             {
@@ -20837,7 +20854,7 @@
                           position: "relative"
                         }
                       },
-                      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, isConsumptionEditing ? /* @__PURE__ */ import_react5.default.createElement(
+                      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, isConsumptionEditing ? selectedWidths.length === 0 ? /* @__PURE__ */ import_react5.default.createElement(
                         "button",
                         {
                           type: "button",
@@ -20846,33 +20863,104 @@
                             minWidth: "68px",
                             height: "28px",
                             padding: "2px 8px",
-                            fontSize: selectedWidths.length > 0 ? "12px" : "11px",
-                            fontWeight: selectedWidths.length > 0 ? 700 : 600,
-                            borderColor: activeWidthDropdownKey === groupKey ? "#1d4ed8" : selectedWidths.length > 0 ? "#2563eb" : "#cbd5e1",
-                            backgroundColor: selectedWidths.length > 0 ? "#eff6ff" : "#f8fafc",
-                            color: selectedWidths.length > 0 ? "#1d4ed8" : "#64748b",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            borderColor: activeWidthDropdownKey === groupKey ? "#1d4ed8" : "#cbd5e1",
+                            backgroundColor: "#f8fafc",
+                            color: "#64748b",
                             borderRadius: "4px",
                             cursor: "pointer",
                             boxShadow: activeWidthDropdownKey === groupKey ? "0 0 0 2px rgba(37, 99, 235, 0.2)" : "none",
                             borderWidth: "1.5px",
-                            borderStyle: selectedWidths.length > 0 ? "solid" : "dashed",
+                            borderStyle: "dashed",
                             gap: "6px"
                           },
                           onClick: () => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey),
-                          title: "Click to select or change fabric width"
+                          title: "Click to select widths"
                         },
-                        /* @__PURE__ */ import_react5.default.createElement("span", null, selectedWidths.length > 0 ? selectedWidths[0] : "Select"),
+                        /* @__PURE__ */ import_react5.default.createElement("span", null, "Select \u25BE")
+                      ) : selectedWidths.length === 1 ? /* @__PURE__ */ import_react5.default.createElement(
+                        "button",
+                        {
+                          type: "button",
+                          className: "btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace fw-bold",
+                          style: {
+                            minWidth: "68px",
+                            height: "28px",
+                            padding: "2px 8px",
+                            fontSize: "12px",
+                            borderColor: activeWidthDropdownKey === groupKey ? "#1d4ed8" : "#2563eb",
+                            backgroundColor: "#eff6ff",
+                            color: "#1d4ed8",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            boxShadow: activeWidthDropdownKey === groupKey ? "0 0 0 2px rgba(37, 99, 235, 0.2)" : "none",
+                            borderWidth: "1.5px",
+                            borderStyle: "solid",
+                            gap: "6px"
+                          },
+                          onClick: () => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey),
+                          title: "Click to select or add widths"
+                        },
+                        /* @__PURE__ */ import_react5.default.createElement("span", null, selectedWidths[0]),
                         /* @__PURE__ */ import_react5.default.createElement(
                           "i",
                           {
                             className: `ti ti-chevron-${activeWidthDropdownKey === groupKey ? "up" : "down"}`,
-                            style: {
-                              fontSize: "11px",
-                              color: selectedWidths.length > 0 ? "#2563eb" : "#94a3b8"
-                            }
+                            style: { fontSize: "11px", color: "#2563eb" }
                           }
                         )
-                      ) : /* @__PURE__ */ import_react5.default.createElement(
+                      ) : selectedWidths.map((w) => /* @__PURE__ */ import_react5.default.createElement(
+                        "div",
+                        {
+                          key: w,
+                          className: "d-inline-flex align-items-center justify-content-between font-monospace fw-bold",
+                          style: {
+                            minWidth: "68px",
+                            height: "28px",
+                            padding: "2px 6px",
+                            fontSize: "12px",
+                            color: "#1d4ed8",
+                            backgroundColor: "#eff6ff",
+                            border: "1.5px solid #2563eb",
+                            borderRadius: "4px",
+                            gap: "4px"
+                          }
+                        },
+                        /* @__PURE__ */ import_react5.default.createElement(
+                          "span",
+                          {
+                            style: { cursor: "pointer" },
+                            onClick: () => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey),
+                            title: "Click to select or add widths"
+                          },
+                          w
+                        ),
+                        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react5.default.createElement(
+                          "button",
+                          {
+                            type: "button",
+                            className: "btn p-0 border-0 bg-transparent text-primary",
+                            style: { fontSize: "10px", lineHeight: 1 },
+                            onClick: () => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey),
+                            title: "Open width options"
+                          },
+                          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-chevron-down", style: { fontSize: "10px" } })
+                        ), /* @__PURE__ */ import_react5.default.createElement(
+                          "button",
+                          {
+                            type: "button",
+                            className: "btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center",
+                            style: { width: "12px", height: "12px", lineHeight: 1 },
+                            title: `Remove ${w}`,
+                            onClick: (e) => {
+                              e.stopPropagation();
+                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions);
+                            }
+                          },
+                          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "10px", fontWeight: "bold" } })
+                        ))
+                      )) : selectedWidths.length === 0 ? /* @__PURE__ */ import_react5.default.createElement(
                         "div",
                         {
                           className: "d-inline-flex align-items-center justify-content-center font-monospace",
@@ -20881,15 +20969,30 @@
                             height: "26px",
                             padding: "1px 6px",
                             fontSize: "12px",
-                            fontWeight: selectedWidths.length > 0 ? 700 : 600,
-                            color: selectedWidths.length > 0 ? "#1d4ed8" : "#94a3b8",
-                            backgroundColor: selectedWidths.length > 0 ? "#eff6ff" : "transparent",
-                            border: selectedWidths.length > 0 ? "1.5px solid #2563eb" : "none",
+                            fontWeight: 600,
+                            color: "#94a3b8"
+                          }
+                        },
+                        /* @__PURE__ */ import_react5.default.createElement("span", null, "\u2014")
+                      ) : selectedWidths.map((w) => /* @__PURE__ */ import_react5.default.createElement(
+                        "div",
+                        {
+                          key: w,
+                          className: "d-inline-flex align-items-center justify-content-center font-monospace",
+                          style: {
+                            minWidth: "58px",
+                            height: "26px",
+                            padding: "1px 6px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#1d4ed8",
+                            backgroundColor: "#eff6ff",
+                            border: "1.5px solid #2563eb",
                             borderRadius: "2px"
                           }
                         },
-                        /* @__PURE__ */ import_react5.default.createElement("span", null, selectedWidths.length > 0 ? selectedWidths[0] : "\u2014")
-                      )),
+                        /* @__PURE__ */ import_react5.default.createElement("span", null, w)
+                      ))),
                       isConsumptionEditing && activeWidthDropdownKey === groupKey && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement(
                         "div",
                         {
@@ -20915,8 +21018,8 @@
                             top: "calc(100% + 4px)",
                             left: "50%",
                             transform: "translateX(-50%)",
-                            minWidth: "150px",
-                            maxWidth: "185px",
+                            minWidth: "155px",
+                            maxWidth: "190px",
                             zIndex: 1060,
                             borderRadius: "6px",
                             border: "1.5px solid #2563eb",
@@ -20934,7 +21037,7 @@
                             className: "d-flex align-items-center justify-content-between px-2.5 py-1.5 border-bottom",
                             style: { backgroundColor: "#eff6ff", borderBottom: "1px solid #bfdbfe" }
                           },
-                          /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "11px", fontWeight: 700, color: "#1e40af", letterSpacing: "0.02em" } }, "Select Width"),
+                          /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "11px", fontWeight: 700, color: "#1e40af", letterSpacing: "0.02em" } }, "Select Widths"),
                           /* @__PURE__ */ import_react5.default.createElement(
                             "button",
                             {
@@ -20947,7 +21050,7 @@
                           )
                         ),
                         /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxHeight: "180px", overflowY: "auto", padding: "4px" } }, widthOptions.map((opt) => {
-                          const isSelected = selectedWidths.includes(opt) || !selectedWidths.length && opt === group.width;
+                          const isSelected = selectedWidths.includes(opt);
                           return /* @__PURE__ */ import_react5.default.createElement(
                             "div",
                             {
@@ -20960,11 +21063,11 @@
                                 margin: "2px 0",
                                 color: isSelected ? "#1d4ed8" : "#334155",
                                 fontWeight: isSelected ? 700 : 500,
-                                fontSize: "12px"
+                                fontSize: "12.5px"
                               },
-                              onClick: () => {
-                                handleSelectWidthForGroup(group.articleName, opt, group.fabricQuality, group.role);
-                                setActiveWidthDropdownKey(null);
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
                               },
                               onMouseEnter: (e) => {
                                 if (!isSelected) e.currentTarget.style.backgroundColor = "#f1f5f9";
@@ -20974,7 +21077,21 @@
                               }
                             },
                             /* @__PURE__ */ import_react5.default.createElement("span", { className: "font-monospace fw-bold" }, opt),
-                            isSelected ? /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge bg-primary-subtle text-primary", style: { fontSize: "9px", padding: "1px 4px" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check me-0.5" }), " Active") : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "10px" } }, "Select")
+                            isSelected ? /* @__PURE__ */ import_react5.default.createElement(
+                              "span",
+                              {
+                                className: "badge rounded-pill fw-bold",
+                                style: {
+                                  backgroundColor: "#e0e7ff",
+                                  color: "#1d4ed8",
+                                  border: "1px solid #bfdbfe",
+                                  fontSize: "10px",
+                                  padding: "2px 7px"
+                                }
+                              },
+                              /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check me-0.5" }),
+                              " Active"
+                            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px" } }, "Select")
                           );
                         }), selectedWidths.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
                           "div",
@@ -20986,9 +21103,9 @@
                               fontSize: "11px",
                               fontWeight: 500
                             },
-                            onClick: () => {
+                            onClick: (e) => {
+                              e.stopPropagation();
                               handleSelectWidthForGroup(group.articleName, "", group.fabricQuality, group.role);
-                              setActiveWidthDropdownKey(null);
                             },
                             onMouseEnter: (e) => {
                               e.currentTarget.style.backgroundColor = "#fef2f2";
@@ -21002,44 +21119,18 @@
                           /* @__PURE__ */ import_react5.default.createElement("span", null, "Clear width (\u2014)"),
                           /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "10px" } })
                         )),
-                        /* @__PURE__ */ import_react5.default.createElement("div", { className: "border-top p-1.5", style: { backgroundColor: "#f8fafc", borderTop: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
-                          "form",
+                        /* @__PURE__ */ import_react5.default.createElement("div", { className: "border-top p-1 text-center", style: { backgroundColor: "#f8fafc", borderTop: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
+                          "button",
                           {
-                            onSubmit: (e) => {
-                              e.preventDefault();
-                              const val = (customWidthMap[groupKey] || "").trim();
-                              if (val) {
-                                const clean = val.replace(/"/g, "") + '"';
-                                handleSelectWidthForGroup(group.articleName, clean, group.fabricQuality, group.role);
-                                setCustomWidthMap((prev) => ({ ...prev, [groupKey]: "" }));
-                                setActiveWidthDropdownKey(null);
-                              }
-                            },
-                            className: "d-flex gap-1"
-                          },
-                          /* @__PURE__ */ import_react5.default.createElement(
-                            "input",
-                            {
-                              type: "text",
-                              className: "form-control form-control-sm font-monospace py-0 px-2",
-                              placeholder: "Custom (e.g. 48)",
-                              style: { fontSize: "11px", height: "24px" },
-                              value: customWidthMap[groupKey] || "",
-                              onChange: (e) => {
-                                const v = e.target.value;
-                                setCustomWidthMap((prev) => ({ ...prev, [groupKey]: v }));
-                              }
+                            type: "button",
+                            className: "btn btn-sm btn-primary w-100 py-1",
+                            style: { fontSize: "11px", fontWeight: 600, borderRadius: "3px" },
+                            onClick: (e) => {
+                              e.stopPropagation();
+                              setActiveWidthDropdownKey(null);
                             }
-                          ),
-                          /* @__PURE__ */ import_react5.default.createElement(
-                            "button",
-                            {
-                              type: "submit",
-                              className: "btn btn-sm btn-primary py-0 px-2",
-                              style: { fontSize: "10px", height: "24px", fontWeight: 600, whiteSpace: "nowrap" }
-                            },
-                            "+ Add"
-                          )
+                          },
+                          "Done"
                         ))
                       ))
                     );
@@ -21057,8 +21148,8 @@
                     },
                     /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, widthsToRender.map((w, wIdx) => {
                       const rateKey = `${group.articleName}___${group.fabricQuality || ""}___${group.role || ""}___${w}`;
-                      const storedRate2 = widthDyedRates[rateKey];
-                      const displayVal = storedRate2 !== void 0 && storedRate2 !== null ? storedRate2 : group.width === w && group.dyedRate !== void 0 && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== "" ? group.dyedRate : w === "" && group.dyedRate !== void 0 && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== "" ? group.dyedRate : "";
+                      const storedRate = widthDyedRates[rateKey];
+                      const displayVal = storedRate !== void 0 && storedRate !== null ? storedRate : group.width === w && group.dyedRate !== void 0 && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== "" ? group.dyedRate : w === "" && group.dyedRate !== void 0 && group.dyedRate !== null && group.dyedRate !== 0 && group.dyedRate !== "" ? group.dyedRate : "";
                       return isConsumptionEditing ? /* @__PURE__ */ import_react5.default.createElement(
                         "input",
                         {
@@ -21144,8 +21235,8 @@
                     },
                     /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, widthsToRender.map((w, wIdx) => {
                       const rateKey = `${group.articleName}___${group.fabricQuality || ""}___${group.role || ""}___${w}`;
-                      const storedRate2 = widthDyedRates[rateKey];
-                      const wVal = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
+                      const storedRate = widthDyedRates[rateKey];
+                      const wVal = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
                       const wDyedVal = isNaN(wVal) ? 0 : wVal;
                       const wGreigePerPc = wDyedVal > 0 ? isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100) : 0;
                       return /* @__PURE__ */ import_react5.default.createElement(
@@ -21210,8 +21301,8 @@
                     },
                     /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, widthsToRender.map((w, wIdx) => {
                       const rateKey = `${group.articleName}___${group.fabricQuality || ""}___${group.role || ""}___${w}`;
-                      const storedRate2 = widthDyedRates[rateKey];
-                      const wVal = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
+                      const storedRate = widthDyedRates[rateKey];
+                      const wVal = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
                       const wDyedVal = isNaN(wVal) ? 0 : wVal;
                       const wTotalDyed = wDyedVal > 0 && pcs > 0 ? wDyedVal * pcs : 0;
                       return /* @__PURE__ */ import_react5.default.createElement(
@@ -21247,8 +21338,8 @@
                     },
                     /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, widthsToRender.map((w, wIdx) => {
                       const rateKey = `${group.articleName}___${group.fabricQuality || ""}___${group.role || ""}___${w}`;
-                      const storedRate2 = widthDyedRates[rateKey];
-                      const wVal = storedRate2 !== void 0 && storedRate2 !== null && storedRate2 !== "" ? parseFloat(storedRate2) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
+                      const storedRate = widthDyedRates[rateKey];
+                      const wVal = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) : group.width === w && group.dyedRate ? parseFloat(group.dyedRate) : w === "" && group.dyedRate ? parseFloat(group.dyedRate) : 0;
                       const wDyedVal = isNaN(wVal) ? 0 : wVal;
                       const wGreigePerPc = wDyedVal > 0 ? isDyedSourced ? wDyedVal : wDyedVal * (1 + shrinkPct / 100) : 0;
                       const wTotalGreige = wGreigePerPc > 0 && pcs > 0 ? wGreigePerPc * pcs : 0;
@@ -21593,10 +21684,14 @@
       orderArticles.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
         "div",
         {
-          className: "d-flex align-items-center justify-content-between flex-wrap gap-2 p-2.5 rounded-3 mb-3",
-          style: { backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }
+          className: "p-3.5 rounded-3 mb-3 border shadow-xs",
+          style: {
+            backgroundColor: "#f8fafc",
+            borderColor: "#cbd5e1"
+          }
         },
-        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary fw-bold px-1", style: { fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Select Article:"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-1.5" }, orderArticles.map((art) => {
+        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 pb-2 border-bottom", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge rounded-pill px-2.5 py-1 text-white fw-bold", style: { fontSize: "11px", backgroundColor: "#2e37a4" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-hanger me-1" }), "Article Selection"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "14px" } }, "Select Article to Configure Accessories")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, selectedBomArticle ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-white border", style: { borderColor: "#c7d2fe" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted small", style: { fontSize: "11.5px" } }, "Configuring for:"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge rounded-pill px-2.5 py-1 fw-bold text-white", style: { backgroundColor: "#2e37a4", fontSize: "12px" } }, selectedBomArticle)) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted small fst-italic", style: { fontSize: "12px" } }, "\u{1F449} Click an article below to select it"))),
+        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-2.5" }, orderArticles.map((art) => {
           const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || "");
           const isDupatta = /dupatta|stole|scarf/i.test(art.name || "");
           const defaultIcon = isBottom ? "\u{1F456}" : isDupatta ? "\u{1F9E3}" : "\u{1F458}";
@@ -21609,18 +21704,19 @@
             {
               key: art.name,
               type: "button",
-              className: `btn btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 px-3.5 py-1.5 transition-all fw-semibold ${isSelected ? "shadow-xs" : ""}`,
+              className: `btn rounded-3 d-inline-flex align-items-center gap-2 px-3.5 py-2 transition-all fw-bold ${isSelected ? "shadow-sm" : "shadow-xs"}`,
               style: {
-                fontSize: "13px",
+                fontSize: "13.5px",
                 backgroundColor: isSelected ? "#2e37a4" : "#ffffff",
-                color: isSelected ? "#ffffff" : "#475569",
-                border: isSelected ? "1.5px solid #2e37a4" : "1px solid #cbd5e1",
-                cursor: "pointer"
+                color: isSelected ? "#ffffff" : "#334155",
+                border: isSelected ? "2px solid #2e37a4" : "1.5px solid #cbd5e1",
+                cursor: "pointer",
+                minHeight: "44px"
               },
               onClick: () => setSelectedBomArticle((prev) => prev === art.name ? "" : art.name)
             },
-            /* @__PURE__ */ import_react5.default.createElement("span", null, art.icon || defaultIcon),
-            /* @__PURE__ */ import_react5.default.createElement("span", null, art.name),
+            /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "17px", lineHeight: 1 } }, art.icon || defaultIcon),
+            /* @__PURE__ */ import_react5.default.createElement("span", { style: { letterSpacing: "0.01em" } }, art.name),
             /* @__PURE__ */ import_react5.default.createElement(
               "span",
               {
@@ -21629,34 +21725,15 @@
                   backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0",
                   color: isSelected ? "#ffffff" : "#475569",
                   fontSize: "11px",
-                  padding: "2px 7px"
+                  padding: "3px 8px"
                 }
               },
               countForArt
-            )
+            ),
+            isSelected && /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check ms-0.5", style: { fontSize: "14px" } })
           );
-        }))),
-        /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small pe-1 d-flex align-items-center gap-1.5", style: { fontSize: "12px" } }, selectedBomArticle ? /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("span", null, "Configuring for:"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge rounded-2 px-2.5 py-1 fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", border: "1px solid #c7d2fe", fontSize: "12px" } }, selectedBomArticle)) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted fst-italic" }, "Click an article to configure (e.g. Kurta, Pant, Dupatta)"))
+        }))
       ),
-      /* @__PURE__ */ import_react5.default.createElement("div", { style: { marginBottom: "20px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "input-group rounded-3 overflow-hidden shadow-xs border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "input-group-text bg-white border-0 text-muted ps-3" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-search", style: { fontSize: "16px" } })), /* @__PURE__ */ import_react5.default.createElement(
-        "input",
-        {
-          type: "text",
-          className: "form-control border-0 shadow-none ps-2",
-          placeholder: "Search accessories across all categories...",
-          value: accessorySearchQuery,
-          onChange: (e) => setAccessorySearchQuery(e.target.value),
-          style: { fontSize: "13px", height: "42px" }
-        }
-      ), accessorySearchQuery && /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-link text-muted pe-3 text-decoration-none",
-          onClick: () => setAccessorySearchQuery("")
-        },
-        "\xD7"
-      ))),
       /* @__PURE__ */ import_react5.default.createElement(
         "div",
         {
@@ -26076,7 +26153,15 @@
             )
           );
         }
-        return { ...c, assignedArticleIds: updated, jointCards: newJointCards, jointArticles: {}, sizeConfigs: newSizeConfigs };
+        let nextConfigMode = { ...c.configMode || {} };
+        if (nextConfigMode.connectionType === "all") {
+          nextConfigMode.connectedArticleIds = [...updated];
+        } else if (nextConfigMode.connectionType === "custom") {
+          const curConnected = nextConfigMode.connectedArticleIds || [];
+          const validConnected = curConnected.filter((id) => updated.includes(id));
+          nextConfigMode.connectedArticleIds = validConnected;
+        }
+        return { ...c, assignedArticleIds: updated, jointCards: newJointCards, jointArticles: {}, configMode: nextConfigMode, sizeConfigs: newSizeConfigs };
       }));
     };
     const toggleCustomerColor = (cIdx, colorName) => {
@@ -26149,9 +26234,77 @@
       const assigned = cust.assignedArticleIds || [];
       const connectedIds = mode.connectionType === "custom" && Array.isArray(mode.connectedArticleIds) ? mode.connectedArticleIds : assigned;
       if (connectedIds.includes(artId)) {
-        return connectedIds.map((aId) => getSizeConfigKey(aId, colorName));
+        if (mode.sameColor !== false) {
+          return connectedIds.map((aId) => getSizeConfigKey(aId, colorName));
+        }
+        const thisArtColors = cust.articleColors && cust.articleColors[artId] || cust.selectedColors || [];
+        const colIdx = thisArtColors.indexOf(colorName);
+        return connectedIds.map((aId) => {
+          if (aId === artId) return cardKey;
+          const otherArtColors = cust.articleColors && cust.articleColors[aId] || cust.selectedColors || [];
+          const targetColor = colIdx >= 0 && otherArtColors[colIdx] ? otherArtColors[colIdx] : otherArtColors[0] || colorName;
+          return getSizeConfigKey(aId, targetColor);
+        });
       }
       return [cardKey];
+    };
+    const computeArticleGroups = (cust) => {
+      const assigned = (cust?.assignedArticleIds || []).filter((id) => addedArticles.some((a) => a.id === id));
+      if (assigned.length === 0) return [];
+      const mode = cust?.configMode || {};
+      const isMatchingSet = Boolean(
+        mode.connectionType !== "independent" && mode.sameSize !== false && mode.sameValue !== false && (mode.sameColor === true || mode.sameValue === true || mode.connectionType === "all" || mode.connectionType === "custom")
+      );
+      if (!isMatchingSet || assigned.length <= 1) {
+        return assigned.map((aId) => {
+          const art = addedArticles.find((a) => a.id === aId);
+          return {
+            groupKey: aId,
+            groupArtIds: [aId],
+            leadArtId: aId,
+            isSet: false,
+            label: art?.name || "Article",
+            badgeLabel: null
+          };
+        });
+      }
+      if (mode.connectionType !== "custom") {
+        const names = assigned.map((aId) => addedArticles.find((a) => a.id === aId)?.name).filter(Boolean);
+        return [{
+          groupKey: assigned.join("___"),
+          groupArtIds: [...assigned],
+          leadArtId: assigned[0],
+          isSet: true,
+          label: names.join(" + "),
+          badgeLabel: `\u26A1 1:1 Matching Set (${assigned.length} Articles)`
+        }];
+      }
+      const connected = Array.isArray(mode.connectedArticleIds) && mode.connectedArticleIds.length >= 2 ? mode.connectedArticleIds.filter((id) => assigned.includes(id)) : assigned.slice(0, 2);
+      const remaining = assigned.filter((aId) => !connected.includes(aId));
+      const groups = [];
+      if (connected.length > 0) {
+        const comboNames = connected.map((aId) => addedArticles.find((a) => a.id === aId)?.name).filter(Boolean);
+        groups.push({
+          groupKey: connected.join("___"),
+          groupArtIds: [...connected],
+          leadArtId: connected[0],
+          isSet: true,
+          label: comboNames.join(" + "),
+          badgeLabel: `\u2702\uFE0F 1:1 Combo Set (${connected.length} Articles)`
+        });
+      }
+      remaining.forEach((aId) => {
+        const art = addedArticles.find((a) => a.id === aId);
+        groups.push({
+          groupKey: aId,
+          groupArtIds: [aId],
+          leadArtId: aId,
+          isSet: false,
+          label: art?.name || "Article",
+          badgeLabel: "\u{1F4E6} Separate Article"
+        });
+      });
+      return groups;
     };
     const setCustomerConfigMode = (cIdx, newMode) => {
       setOrderCustomers((prev) => prev.map((c, idx) => {
@@ -26173,20 +26326,38 @@
         if (newMode.sameValue && newMode.sameSize) {
           const assigned = c.assignedArticleIds || [];
           const connectedIds = newMode.connectionType === "custom" && Array.isArray(newMode.connectedArticleIds) ? newMode.connectedArticleIds : newMode.connectionType === "independent" ? [] : assigned;
-          const colors = c.selectedColors || [];
-          if (connectedIds.length > 1 && colors.length > 0) {
+          if (connectedIds.length > 1) {
             const leadArtId = connectedIds[0];
             const nextConfigs = { ...c.sizeConfigs || {} };
-            colors.forEach((col) => {
-              const leadKey = getSizeConfigKey(leadArtId, col);
-              const leadCfg = nextConfigs[leadKey];
-              if (leadCfg) {
-                connectedIds.slice(1).forEach((otherArtId) => {
-                  const otherKey = getSizeConfigKey(otherArtId, col);
-                  nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
-                });
-              }
-            });
+            if (newMode.sameColor !== false) {
+              const colors = c.selectedColors || [];
+              colors.forEach((col) => {
+                const leadKey = getSizeConfigKey(leadArtId, col);
+                const leadCfg = nextConfigs[leadKey];
+                if (leadCfg) {
+                  connectedIds.slice(1).forEach((otherArtId) => {
+                    const otherKey = getSizeConfigKey(otherArtId, col);
+                    nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
+                  });
+                }
+              });
+            } else {
+              const leadColors = c.articleColors && c.articleColors[leadArtId] || c.selectedColors || [];
+              leadColors.forEach((leadCol, cIdx2) => {
+                const leadKey = getSizeConfigKey(leadArtId, leadCol);
+                const leadCfg = nextConfigs[leadKey];
+                if (leadCfg) {
+                  connectedIds.slice(1).forEach((otherArtId) => {
+                    const otherColors = c.articleColors && c.articleColors[otherArtId] || c.selectedColors || [];
+                    const otherCol = otherColors[cIdx2] || otherColors[0];
+                    if (otherCol) {
+                      const otherKey = getSizeConfigKey(otherArtId, otherCol);
+                      nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
+                    }
+                  });
+                }
+              });
+            }
             updatedCust.sizeConfigs = nextConfigs;
           }
         }
@@ -26291,7 +26462,8 @@
     };
     const getSizeConfigKey = (artId, colorName) => `${artId}_${colorName}`;
     const getPairSeriesConfigs = (cust, artId, colorName) => {
-      const key = getSizeConfigKey(artId, colorName);
+      const actualColor = Array.isArray(colorName) ? colorName[0] : colorName;
+      const key = getSizeConfigKey(artId, actualColor);
       const curCfg = cust?.sizeConfigs?.[key];
       if (curCfg && Array.isArray(curCfg.seriesConfigs)) {
         return curCfg.seriesConfigs;
@@ -26676,10 +26848,12 @@
       }));
     };
     const addSeriesToGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const cleanName = getCleanSeriesName(seriesObj);
         const cleanLower = cleanName.toLowerCase();
         const seriesNameLower = (seriesObj?.name || "").toLowerCase();
@@ -26708,22 +26882,26 @@
         const updatedList = [...curList, newSeriesEntry];
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const removeSeriesFromGroup = (cIdx, groupArtIds, colorName, seriesId) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const cleanTarget = (seriesId || "").toLowerCase();
         const updatedList = curList.filter((sc) => {
           const scClean = (sc.seriesName || "").toLowerCase();
@@ -26732,21 +26910,25 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const toggleSeriesInGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const cust = orderCustomers[cIdx];
       const leadArtId = groupArtIds[0];
-      const curList = getPairSeriesConfigs(cust, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(cust, leadArtId, leadCol);
       const cleanName = getCleanSeriesName(seriesObj);
       const cleanLower = cleanName.toLowerCase();
       const seriesNameLower = (seriesObj?.name || "").toLowerCase();
@@ -26762,10 +26944,12 @@
       }
     };
     const toggleSizeInGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           const curSizes = sc.selectedSizes || [];
@@ -26790,22 +26974,26 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const setRatioModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioUsed) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           const selectedSizes = sc.selectedSizes || [];
@@ -26835,22 +27023,26 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const updateRatioCalculationForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioStr, baseQty, userEdited = false) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           const cleanRatio = ratioStr !== void 0 ? ratioStr : sc.ratioString || "";
@@ -26880,44 +27072,52 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const setUniformModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, isUniform) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           return { ...sc, uniform: isUniform };
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const updateUniformQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, qty) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           const newQtys = {};
@@ -26928,22 +27128,26 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
     };
     const updateIndividualSizeQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz, qty) => {
+      const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+      const leadCol = colorsToUpdate[0];
       const leadArtId = groupArtIds[0];
       setOrderCustomers((prev) => prev.map((c, idx) => {
         if (idx !== cIdx) return c;
-        const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+        const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
         const updatedList = curList.map((sc) => {
           if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
           return {
@@ -26956,13 +27160,15 @@
         });
         const combinedQtys = computeCombinedSizeQtys(updatedList);
         const nextConfigs = { ...c.sizeConfigs || {} };
-        groupArtIds.forEach((aId) => {
-          const key = getSizeConfigKey(aId, colorName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+        colorsToUpdate.forEach((cName) => {
+          groupArtIds.forEach((aId) => {
+            const key = getSizeConfigKey(aId, cName);
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          });
         });
         return { ...c, sizeConfigs: nextConfigs };
       }));
@@ -27120,13 +27326,9 @@
           const bufferPct = rawBuf !== void 0 && rawBuf !== null && rawBuf !== "" ? parseFloat(String(rawBuf).replace("%", "")) || 0 : 2;
           let dyedPerPiece = "";
           const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
-          const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
+          const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || "").trim());
           if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
-            if (isDupatta) {
-              dyedPerPiece = Number(rawAvgLen.toFixed(3));
-            } else {
-              dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
-            }
+            dyedPerPiece = isDupatta ? Number(rawAvgLen.toFixed(3)) : Number((rawAvgLen * 0.0254).toFixed(3));
           } else if (fr.consumption !== void 0 && fr.consumption !== null && fr.consumption !== "") {
             dyedPerPiece = parseFloat(fr.consumption) || "";
           } else if (art.consumption !== void 0 && art.consumption !== null && art.consumption !== "") {
@@ -27569,31 +27771,31 @@
       },
       /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-trash me-1" }),
       " Remove article"
-    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "row g-3 mb-3 align-items-end" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-6" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold" }, "Article name"), /* @__PURE__ */ import_react10.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white",
-        placeholder: "e.g. Kurta",
-        style: { textTransform: "capitalize" },
-        value: art.name,
-        onChange: (e) => updateArticleName(art.id, autoCapitalizeWords6(e.target.value)),
-        onBlur: (e) => updateArticleName(art.id, autoCapitalizeWords6((e.target.value || "").trim()))
-      }
-    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, (() => {
-      const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
-      return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react10.default.createElement("span", null, isDupatta ? "Avg length (mts)" : "Avg length (in)"), isDupatta && /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-primary-subtle text-primary border", style: { fontSize: "10px" } }, "in meters")), /* @__PURE__ */ import_react10.default.createElement(
+    )), (() => {
+      const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || "").trim());
+      return /* @__PURE__ */ import_react10.default.createElement("div", { className: "row g-3 mb-3 align-items-end" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-6" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold" }, "Article name"), /* @__PURE__ */ import_react10.default.createElement(
+        "input",
+        {
+          type: "text",
+          className: "form-control form-control-sm bg-white",
+          placeholder: "e.g. Kurta",
+          style: { textTransform: "capitalize" },
+          value: art.name,
+          onChange: (e) => updateArticleName(art.id, autoCapitalizeWords6(e.target.value)),
+          onBlur: (e) => updateArticleName(art.id, autoCapitalizeWords6((e.target.value || "").trim()))
+        }
+      )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold" }, isDupatta ? "Avg length (mts)" : "Avg length (in)"), /* @__PURE__ */ import_react10.default.createElement(
         "input",
         {
           type: "number",
-          step: isDupatta ? "0.01" : "0.5",
+          step: "any",
           className: "form-control form-control-sm bg-white",
           placeholder: isDupatta ? "e.g. 2.25" : "e.g. 45",
           value: art.avgLength ?? "",
           onChange: (e) => updateArticleAvgLength(art.id, e.target.value)
         }
-      ), isDupatta && /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted d-block mt-0.5", style: { fontSize: "10.5px" } }, "Order sheet: Dupatta length measured in mts"));
-    })())), /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-muted mb-2 fw-medium" }, "Fabric requirement \u2014 add a row per fabric this article needs (e.g. Outer + Lining for a kurta):"), (art.fabrics || []).map((fr, fi) => /* @__PURE__ */ import_react10.default.createElement("div", { key: fi, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Role"), /* @__PURE__ */ import_react10.default.createElement(
+      )));
+    })(), /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-muted mb-2 fw-medium" }, "Fabric requirement \u2014 add a row per fabric this article needs (e.g. Outer + Lining for a kurta):"), (art.fabrics || []).map((fr, fi) => /* @__PURE__ */ import_react10.default.createElement("div", { key: fi, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Role"), /* @__PURE__ */ import_react10.default.createElement(
       "input",
       {
         type: "text",
@@ -27714,7 +27916,9 @@
         ), /* @__PURE__ */ import_react10.default.createElement("i", { className: `ti ti-chevron-${isExpanded ? "up" : "down"} fs-5 text-muted` }))
       ), isExpanded && (() => {
         const configMode = cust.configMode || {};
-        const currentArtTabId = activeColorArtTab[ci] || cust.assignedArticleIds?.[0] || "";
+        const assignedArticleIds = (cust.assignedArticleIds || []).filter((id) => addedArticles.some((a) => a.id === id));
+        const isMultiArticle = assignedArticleIds.length > 1;
+        const currentArtTabId = activeColorArtTab[ci] || assignedArticleIds[0] || "";
         const currentArtObj = addedArticles.find((a) => a.id === currentArtTabId);
         const currentArtColors = configMode.sameColor === false && currentArtTabId ? cust.articleColors?.[currentArtTabId] || [] : cust.selectedColors || [];
         return /* @__PURE__ */ import_react10.default.createElement("div", { className: "p-4 bg-white" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-1" }, "Select Customer"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex gap-2 align-items-center" }, /* @__PURE__ */ import_react10.default.createElement(
@@ -27752,292 +27956,7 @@
             /* @__PURE__ */ import_react10.default.createElement("span", null, art.name),
             isAssigned && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check small" })
           );
-        }))), (cust.assignedArticleIds || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement(
-          "div",
-          {
-            className: "p-3.5 rounded-4 mb-4 border shadow-xs",
-            style: {
-              backgroundColor: "#ffffff",
-              borderColor: "#c7d2fe"
-            }
-          },
-          /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2.5 border-bottom", style: { borderColor: "#e0e7ff" } }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge rounded-pill px-2.5 py-1 text-white fw-bold", style: { fontSize: "11px", backgroundColor: "#2e37a4" } }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-adjustments-horizontal me-1" }), "Set Matching Setup"), /* @__PURE__ */ import_react10.default.createElement("h6", { className: "fw-bold text-dark mb-0", style: { fontSize: "14px" } }, "Article Combination Setup (", cust.assignedArticleIds.length, " Articles)")), /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-secondary small mb-0 mt-1", style: { fontSize: "12px" } }, (cust.assignedArticleIds || []).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + "), " \u2014 Answer the guided questions below to configure how articles match:")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-1.5" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-muted small fw-semibold me-1", style: { fontSize: "11px" } }, "Quick Presets:"), /* @__PURE__ */ import_react10.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-              style: { fontSize: "11px", backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
-              onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: "all", connectedArticleIds: [...cust.assignedArticleIds || []] }),
-              title: "Same Color, Same Size, Auto-sync Quantities across All Articles"
-            },
-            "\u26A1 Full Matching Set"
-          ), /* @__PURE__ */ import_react10.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false && configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-              style: { fontSize: "11px", backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false && configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
-              onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: false, connectionType: "all", connectedArticleIds: [...cust.assignedArticleIds || []] }),
-              title: "Same Color, Same Size, Independent Quantities"
-            },
-            "\u2696\uFE0F Shared Sizes, Separate Qty"
-          ), /* @__PURE__ */ import_react10.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === false && configMode.sameValue === false ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-              style: { fontSize: "11px", backgroundColor: configMode.sameColor === true && configMode.sameSize === false && configMode.sameValue === false ? "#2e37a4" : "#fff" },
-              onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: false, sameValue: false, connectionType: "independent", connectedArticleIds: [] }),
-              title: "Same Color, Different Sizes & Quantities"
-            },
-            "\u{1F4CF} Shared Colors, Separate Sizes"
-          ), /* @__PURE__ */ import_react10.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-              style: { fontSize: "11px", backgroundColor: configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? "#2e37a4" : "#fff" },
-              onClick: () => setCustomerConfigMode(ci, { sameColor: false, sameSize: false, sameValue: false, connectionType: "independent", connectedArticleIds: [] }),
-              title: "Independent Colors, Sizes, and Quantities per Article"
-            },
-            "\u{1F3A8} Custom Mix & Match"
-          ))),
-          /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-column gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-            "div",
-            {
-              className: "p-3 rounded-3 border transition",
-              style: {
-                backgroundColor: configMode.sameColor === true ? "#f8faff" : configMode.sameColor === false ? "#fffbeb" : "#ffffff",
-                borderColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? "#c7d2fe" : "#e2e8f0"
-              }
-            },
-            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-              "span",
-              {
-                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
-                style: { width: "24px", height: "24px", fontSize: "11px", fontWeight: "bold", backgroundColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? "#2e37a4" : "#94a3b8" }
-              },
-              "1"
-            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "Do all ", cust.assignedArticleIds.length, " articles have the same colors?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameColor === true ? "Colors selected once will apply across all articles" : configMode.sameColor === false ? "Select independent colors for each individual article" : "Choose whether articles share colors or have separate color palettes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameColor === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameColor === true ? "#2e37a4" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameColor: true })
-              },
-              configMode.sameColor === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " Yes (Same Colors)"
-            ), /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameColor === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameColor === false ? "#1e293b" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameColor: false })
-              },
-              configMode.sameColor === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " No (Different Colors)"
-            )))
-          ), /* @__PURE__ */ import_react10.default.createElement(
-            "div",
-            {
-              className: "p-3 rounded-3 border transition",
-              style: {
-                backgroundColor: configMode.sameSize === true ? "#f8faff" : configMode.sameSize === false ? "#fffbeb" : "#ffffff",
-                borderColor: configMode.sameSize !== void 0 && configMode.sameSize !== null ? "#c7d2fe" : "#e2e8f0"
-              }
-            },
-            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-              "span",
-              {
-                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
-                style: { width: "24px", height: "24px", fontSize: "11px", fontWeight: "bold", backgroundColor: configMode.sameSize !== void 0 && configMode.sameSize !== null ? "#2e37a4" : "#94a3b8" }
-              },
-              "2"
-            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "Are sizes identical across all articles?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameSize === true ? "Size series (e.g. S, M, L, XL) will be shared across all articles" : configMode.sameSize === false ? "Configure different size series for each article independently" : "Choose whether articles share the same size series or have different sizes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameSize === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameSize === true ? "#2e37a4" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameSize: true })
-              },
-              configMode.sameSize === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " Yes (Same Sizes)"
-            ), /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameSize === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameSize === false ? "#1e293b" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameSize: false, sameValue: false })
-              },
-              configMode.sameSize === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " No (Different Sizes)"
-            )))
-          ), (cust.assignedArticleIds || []).length > 2 && /* @__PURE__ */ import_react10.default.createElement(
-            "div",
-            {
-              className: "p-3 rounded-3 border transition",
-              style: {
-                backgroundColor: configMode.connectionType ? "#f8faff" : "#ffffff",
-                borderColor: configMode.connectionType ? "#c7d2fe" : "#e2e8f0"
-              }
-            },
-            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-              "span",
-              {
-                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
-                style: { width: "24px", height: "24px", fontSize: "11px", fontWeight: "bold", backgroundColor: configMode.connectionType ? "#2e37a4" : "#94a3b8" }
-              },
-              "3"
-            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "How should these ", cust.assignedArticleIds.length, " articles be connected?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, "Connect all ", cust.assignedArticleIds.length, " articles into one set, or pair specific articles together"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, {
-                  ...configMode,
-                  connectionType: "all",
-                  connectedArticleIds: [...cust.assignedArticleIds || []]
-                })
-              },
-              configMode.connectionType === "all" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " ",
-              /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-link me-1" }),
-              " Connect All Together"
-            ), /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "custom" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.connectionType === "custom" ? "#2e37a4" : "#fff" },
-                onClick: () => {
-                  const assigned = cust.assignedArticleIds || [];
-                  const initialPair = configMode.connectedArticleIds && configMode.connectedArticleIds.length > 0 ? configMode.connectedArticleIds : assigned.slice(0, 2);
-                  setCustomerConfigMode(ci, {
-                    ...configMode,
-                    connectionType: "custom",
-                    connectedArticleIds: initialPair
-                  });
-                }
-              },
-              configMode.connectionType === "custom" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " ",
-              /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-components me-1" }),
-              " Custom Pairing"
-            ), /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "independent" ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.connectionType === "independent" ? "#1e293b" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, {
-                  ...configMode,
-                  connectionType: "independent",
-                  connectedArticleIds: []
-                })
-              },
-              configMode.connectionType === "independent" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " Keep Separate"
-            ))),
-            configMode.connectionType === "custom" && /* @__PURE__ */ import_react10.default.createElement("div", { className: "mt-2.5 ms-4 ps-1 p-2.5 rounded-3 bg-white border", style: { borderColor: "#c7d2fe" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "small fw-bold text-dark" }, "Click articles to connect into a combo set:"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-primary text-white", style: { fontSize: "10px" } }, (configMode.connectedArticleIds || []).length, " of ", cust.assignedArticleIds.length, " Connected")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, (cust.assignedArticleIds || []).map((aId) => {
-              const art = addedArticles.find((a) => a.id === aId);
-              if (!art) return null;
-              const isConnected = (configMode.connectedArticleIds || []).includes(aId);
-              return /* @__PURE__ */ import_react10.default.createElement(
-                "button",
-                {
-                  key: aId,
-                  type: "button",
-                  className: `btn btn-sm rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1.5 ${isConnected ? "btn-primary text-white" : "btn-outline-secondary bg-white"}`,
-                  style: { fontSize: "11px", backgroundColor: isConnected ? "#2e37a4" : void 0 },
-                  onClick: () => {
-                    const current = configMode.connectedArticleIds || [];
-                    const next = isConnected ? current.filter((id) => id !== aId) : [...current, aId];
-                    setCustomerConfigMode(ci, {
-                      ...configMode,
-                      connectedArticleIds: next
-                    });
-                  }
-                },
-                /* @__PURE__ */ import_react10.default.createElement("span", null, art.name),
-                /* @__PURE__ */ import_react10.default.createElement("i", { className: `ti ti-${isConnected ? "link" : "plus"} small` })
-              );
-            })), /* @__PURE__ */ import_react10.default.createElement("div", { className: "mt-2 text-muted small", style: { fontSize: "11px" } }, (configMode.connectedArticleIds || []).length > 0 ? /* @__PURE__ */ import_react10.default.createElement("span", null, "\u{1F517} ", /* @__PURE__ */ import_react10.default.createElement("strong", null, "Connected Set:"), " ", (configMode.connectedArticleIds || []).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + "), (cust.assignedArticleIds || []).filter((id) => !(configMode.connectedArticleIds || []).includes(id)).length > 0 && /* @__PURE__ */ import_react10.default.createElement("span", { className: "ms-2" }, "\u2022 ", /* @__PURE__ */ import_react10.default.createElement("strong", null, "Independent:"), " ", (cust.assignedArticleIds || []).filter((id) => !(configMode.connectedArticleIds || []).includes(id)).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(", "))) : /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-warning" }, "\u26A0\uFE0F Please select at least 2 articles to connect together.")))
-          ), configMode.sameSize === true && configMode.connectionType !== "independent" && /* @__PURE__ */ import_react10.default.createElement(
-            "div",
-            {
-              className: "p-3 rounded-3 border transition",
-              style: {
-                backgroundColor: configMode.sameValue === true ? "#f0fdf4" : configMode.sameValue === false ? "#f8faff" : "#ffffff",
-                borderColor: configMode.sameValue !== void 0 && configMode.sameValue !== null ? "#bbf7d0" : "#e2e8f0"
-              }
-            },
-            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-              "span",
-              {
-                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
-                style: { width: "24px", height: "24px", fontSize: "11px", fontWeight: "bold", backgroundColor: configMode.sameValue === true ? "#16a34a" : "#2e37a4" }
-              },
-              (cust.assignedArticleIds || []).length > 2 ? "4" : "3"
-            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark fs-14" }, "Auto-sync piece quantities across connected articles?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameValue === true ? "Entering quantities or ratio on one article will automatically sync to matching connected articles" : configMode.sameValue === false ? "Piece quantities will be entered separately for each article" : "Choose whether entering pieces on one article automatically fills connected articles"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameValue === true ? "btn-success text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameValue === true ? "#16a34a" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: true })
-              },
-              configMode.sameValue === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " ",
-              /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-wand me-1" }),
-              " Yes (Auto-Sync Qty)"
-            ), /* @__PURE__ */ import_react10.default.createElement(
-              "button",
-              {
-                type: "button",
-                className: `btn px-3 py-1.5 fw-semibold ${configMode.sameValue === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                style: { fontSize: "12px", backgroundColor: configMode.sameValue === false ? "#1e293b" : "#fff" },
-                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: false })
-              },
-              configMode.sameValue === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-              " No (Independent Qty)"
-            )))
-          )),
-          (() => {
-            const isComplete = configMode.sameColor !== void 0 && configMode.sameColor !== null && (configMode.sameSize !== void 0 && configMode.sameSize !== null);
-            if (!isComplete) {
-              return /* @__PURE__ */ import_react10.default.createElement(
-                "div",
-                {
-                  className: "mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center justify-content-between gap-2 border",
-                  style: {
-                    backgroundColor: "#f8fafc",
-                    borderColor: "#e2e8f0",
-                    fontSize: "12px",
-                    color: "#64748b"
-                  }
-                },
-                /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-hand-click text-primary fs-5" }), /* @__PURE__ */ import_react10.default.createElement("span", null, /* @__PURE__ */ import_react10.default.createElement("strong", null, "No Default Selection:"), " Please answer the questions above or click a Quick Preset to configure matching articles."))
-              );
-            }
-            return /* @__PURE__ */ import_react10.default.createElement(
-              "div",
-              {
-                className: "mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center justify-content-between gap-2 border",
-                style: {
-                  backgroundColor: configMode.sameValue && configMode.sameSize ? "#f0fdf4" : "#eff6ff",
-                  borderColor: configMode.sameValue && configMode.sameSize ? "#bbf7d0" : "#bfdbfe",
-                  fontSize: "12px"
-                }
-              },
-              /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("i", { className: `ti ti-${configMode.sameValue && configMode.sameSize ? "circle-check text-success" : "info-circle text-primary"} fs-5` }), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("strong", { className: configMode.sameValue && configMode.sameSize ? "text-success" : "text-primary" }, "Active Setup:"), " ", /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-dark fw-medium" }, configMode.connectionType === "custom" ? /* @__PURE__ */ import_react10.default.createElement("span", null, "Custom Pairing (", (configMode.connectedArticleIds || []).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + ") || "None", ")") : configMode.connectionType === "independent" || !configMode.sameSize && !configMode.sameColor ? /* @__PURE__ */ import_react10.default.createElement("span", null, "All Independent Articles") : /* @__PURE__ */ import_react10.default.createElement("span", null, "All ", cust.assignedArticleIds.length, " Articles Connected (Full Set)"), " ", "\u2022", " ", configMode.sameColor ? "Shared Colors" : "Different Colors", " ", "\u2022", " ", configMode.sameSize ? "Shared Sizes" : "Different Sizes", configMode.sameSize && (configMode.connectionType || "all") !== "independent" && /* @__PURE__ */ import_react10.default.createElement("span", null, " \u2022 ", configMode.sameValue ? "\u2728 Auto-Sync Quantities Active" : "Independent Quantities"))))
-            );
-          })()
-        ), /* @__PURE__ */ import_react10.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-0" }, !configMode.sameColor ? `Colors for ${currentArtObj?.name || "Article"}:` : "Colors for this Customer:"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-secondary small ms-2" }, "(", currentArtColors.length, " selected \u2022 ", masterColors.length, " in palette)")), /* @__PURE__ */ import_react10.default.createElement(
+        }))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label fw-semibold small text-muted mb-0" }, configMode.sameColor === false ? `Colors for ${currentArtObj?.name || "Article"}:` : "Colors for this Customer:"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-secondary small ms-2" }, "(", currentArtColors.length, " selected \u2022 ", masterColors.length, " in palette)")), /* @__PURE__ */ import_react10.default.createElement(
           "button",
           {
             type: "button",
@@ -28050,7 +27969,7 @@
           },
           /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-plus fs-6" }),
           /* @__PURE__ */ import_react10.default.createElement("span", null, "Add Colour")
-        )), !configMode.sameColor && (cust.assignedArticleIds || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "p-2.5 rounded-3 mb-2.5 bg-white border d-flex flex-wrap align-items-center gap-2", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "small fw-bold text-dark d-flex align-items-center gap-1 me-1" }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-shirt text-primary" }), "Select Article to assign colors:"), (cust.assignedArticleIds || []).map((aId) => {
+        )), configMode.sameColor === false && (cust.assignedArticleIds || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "p-2.5 rounded-3 mb-2.5 bg-white border d-flex flex-wrap align-items-center gap-2", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "small fw-bold text-dark d-flex align-items-center gap-1 me-1" }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-shirt text-primary" }), "Select Article to assign colors:"), (cust.assignedArticleIds || []).map((aId) => {
           const art = addedArticles.find((a) => a.id === aId);
           if (!art) return null;
           const artCols = cust.articleColors?.[aId] || [];
@@ -28228,34 +28147,405 @@
               isSelected && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check small text-white ms-0.5" })
             );
           }));
-        })()), (() => {
-          const hasConfiguredColors = configMode.sameColor ? (cust.selectedColors || []).length > 0 : (cust.assignedArticleIds || []).some((aId) => (cust.articleColors?.[aId] || []).length > 0);
+        })()), (cust.assignedArticleIds || []).length > 1 && ((cust.selectedColors || []).length > 0 || (cust.assignedArticleIds || []).some((aId) => (cust.articleColors?.[aId] || []).length > 0)) && /* @__PURE__ */ import_react10.default.createElement(
+          "div",
+          {
+            className: "p-3.5 rounded-4 mb-4 border shadow-xs",
+            style: {
+              backgroundColor: "#ffffff",
+              borderColor: "#c7d2fe"
+            }
+          },
+          /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2.5 border-bottom", style: { borderColor: "#e0e7ff" } }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge rounded-pill px-2.5 py-1 text-white fw-bold", style: { fontSize: "11px", backgroundColor: "#2e37a4" } }, /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-adjustments-horizontal me-1" }), "Set Matching Setup"), /* @__PURE__ */ import_react10.default.createElement("h6", { className: "fw-bold text-dark mb-0", style: { fontSize: "14px" } }, "Article Combination Setup (", assignedArticleIds.length, " Articles)")), /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-secondary small mb-0 mt-1", style: { fontSize: "12px" } }, assignedArticleIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + "), " \u2014 Answer the guided questions below to configure how articles match:")), (() => {
+            const assignedNames = assignedArticleIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean);
+            const firstTwoNames = assignedNames.slice(0, 2).join(" + ") || "Kurta + Pant";
+            const restNames = assignedNames.slice(2).join(", ") || "Dupatta";
+            const isThreePlus = assignedArticleIds.length > 2;
+            return /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-1.5" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-muted small fw-semibold me-1", style: { fontSize: "11px" } }, "Quick Presets:"), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "11px", backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: "all", connectedArticleIds: [...assignedArticleIds] }),
+                title: "Same Colors, Same Sizes, 1:1 Matching Quantities"
+              },
+              "\u26A1 Full Matching Set"
+            ), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === false && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "11px", backgroundColor: configMode.sameColor === false && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { sameColor: false, sameSize: true, sameValue: true, connectionType: "all", connectedArticleIds: [...assignedArticleIds] }),
+                title: "Different / Contrast Colors, Same Sizes, 1:1 Matching Quantities"
+              },
+              "\u{1F3A8} Contrast Set (Jodi)"
+            ), isThreePlus && /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.connectionType === "custom" && configMode.sameValue === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "11px", backgroundColor: configMode.connectionType === "custom" && configMode.sameValue === true ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: "custom", connectedArticleIds: assignedArticleIds.slice(0, 2) }),
+                title: `${firstTwoNames} combo set (1:1 sync), ${restNames} separate`
+              },
+              "\u2702\uFE0F ",
+              firstTwoNames,
+              " Combo"
+            ), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "11px", backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: false, connectionType: "independent", connectedArticleIds: [] }),
+                title: "Same Colors, Same Sizes, Separate Quantities per Article"
+              },
+              "\u2696\uFE0F Shared Sizes, Separate Qty"
+            ), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "11px", backgroundColor: configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { sameColor: false, sameSize: false, sameValue: false, connectionType: "independent", connectedArticleIds: [] }),
+                title: "Independent Colors, Sizes, and Quantities per Article"
+              },
+              "\u{1F9E9} Custom Mix & Match"
+            ));
+          })()),
+          /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-column gap-3" }, (() => {
+            const assignedNames = assignedArticleIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean);
+            const isThreePlus = assignedArticleIds.length > 2;
+            const firstTwoNames = assignedNames.slice(0, 2).join(" + ") || "Kurta + Pant";
+            const connectedIds = configMode.connectedArticleIds && configMode.connectedArticleIds.length > 0 ? configMode.connectedArticleIds : assignedArticleIds.slice(0, 2);
+            const comboArticleNames = connectedIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean);
+            const separateArticleNames = assignedArticleIds.filter((id) => !connectedIds.includes(id)).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean);
+            const isAnswered = configMode.connectionType !== void 0 && configMode.connectionType !== null;
+            return /* @__PURE__ */ import_react10.default.createElement(
+              "div",
+              {
+                className: "p-3.5 rounded-3 border transition",
+                style: {
+                  backgroundColor: isAnswered ? "#f8faff" : "#ffffff",
+                  borderColor: isAnswered ? "#c7d2fe" : "#e2e8f0"
+                }
+              },
+              /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
+                "span",
+                {
+                  className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
+                  style: { width: "26px", height: "26px", fontSize: "12px", fontWeight: "bold", backgroundColor: isAnswered ? "#2e37a4" : "#94a3b8" }
+                },
+                "1"
+              ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, isThreePlus ? `How should these ${assignedArticleIds.length} articles be grouped?` : `Are ${assignedNames.join(" & ")} a Matching Set (Jodi) or Separate Articles?`), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.connectionType === "all" ? isThreePlus ? `\u26A1 Complete ${assignedArticleIds.length}-Piece Set \u2014 all articles match together in equal quantities` : `\u26A1 Matching Set (1:1 Jodi) \u2014 articles are paired together as a set` : configMode.connectionType === "custom" ? `\u2702\uFE0F Combo Set: ${comboArticleNames.join(" + ") || firstTwoNames} (1:1 match)${separateArticleNames.length > 0 ? ` \u2022 ${separateArticleNames.join(", ")} is separate` : ""}` : configMode.connectionType === "independent" ? "\u{1F4E6} All Separate Articles \u2014 each article is handled independently" : isThreePlus ? "Choose whether articles form a complete set, combo set, or are all separate" : "Choose whether articles are sold as a matching pair or independent items"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, isThreePlus ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, {
+                    ...configMode,
+                    connectionType: "all",
+                    connectedArticleIds: [...assignedArticleIds]
+                  })
+                },
+                configMode.connectionType === "all" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "\u26A1 Complete ",
+                assignedArticleIds.length,
+                "-Piece Set"
+              ), /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "custom" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.connectionType === "custom" ? "#2e37a4" : "#fff" },
+                  onClick: () => {
+                    setCustomerConfigMode(ci, {
+                      ...configMode,
+                      connectionType: "custom",
+                      connectedArticleIds: assignedArticleIds.slice(0, 2)
+                    });
+                  }
+                },
+                configMode.connectionType === "custom" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "\u2702\uFE0F Combo Set + Separate"
+              ), /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3 py-1.5 fw-semibold ${configMode.connectionType === "independent" ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.connectionType === "independent" ? "#1e293b" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, {
+                    ...configMode,
+                    connectionType: "independent",
+                    connectedArticleIds: []
+                  })
+                },
+                configMode.connectionType === "independent" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "\u{1F4E6} All Separate"
+              )) : /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === "all" ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.connectionType === "all" ? "#2e37a4" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, {
+                    ...configMode,
+                    connectionType: "all",
+                    connectedArticleIds: [...assignedArticleIds]
+                  })
+                },
+                configMode.connectionType === "all" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "\u26A1 Matching Set (1:1 Jodi)"
+              ), /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === "independent" ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.connectionType === "independent" ? "#1e293b" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, {
+                    ...configMode,
+                    connectionType: "independent",
+                    connectedArticleIds: []
+                  })
+                },
+                configMode.connectionType === "independent" && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "\u{1F4E6} Separate Articles"
+              )))),
+              configMode.connectionType === "custom" && /* @__PURE__ */ import_react10.default.createElement("div", { className: "mt-2.5 p-2.5 rounded-3 bg-white border", style: { borderColor: "#c7d2fe" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "small fw-bold text-dark", style: { fontSize: "12px" } }, "Select articles that form the Matching Combo Set:"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-primary text-white", style: { fontSize: "10px" } }, connectedIds.length, " of ", assignedArticleIds.length, " in Combo (", separateArticleNames.length, " Separate)")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, assignedArticleIds.map((aId) => {
+                const art = addedArticles.find((a) => a.id === aId);
+                if (!art) return null;
+                const isConnected = connectedIds.includes(aId);
+                return /* @__PURE__ */ import_react10.default.createElement(
+                  "button",
+                  {
+                    key: aId,
+                    type: "button",
+                    className: `btn btn-sm rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1.5 ${isConnected ? "btn-primary text-white" : "btn-outline-secondary bg-white"}`,
+                    style: { fontSize: "11.5px", backgroundColor: isConnected ? "#2e37a4" : void 0 },
+                    onClick: () => {
+                      let next;
+                      if (isConnected) {
+                        if (connectedIds.length <= 2) {
+                          return;
+                        }
+                        next = connectedIds.filter((id) => id !== aId);
+                      } else {
+                        next = [...connectedIds, aId];
+                      }
+                      setCustomerConfigMode(ci, {
+                        ...configMode,
+                        connectedArticleIds: next
+                      });
+                    }
+                  },
+                  /* @__PURE__ */ import_react10.default.createElement("span", null, art.name),
+                  /* @__PURE__ */ import_react10.default.createElement("i", { className: `ti ti-${isConnected ? "check" : "plus"} small` })
+                );
+              })))
+            );
+          })(), /* @__PURE__ */ import_react10.default.createElement(
+            "div",
+            {
+              className: "p-3.5 rounded-3 border transition",
+              style: {
+                backgroundColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? configMode.sameColor ? "#f8faff" : "#fffbeb" : "#ffffff",
+                borderColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? "#c7d2fe" : "#e2e8f0"
+              }
+            },
+            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
+              "span",
+              {
+                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
+                style: { width: "26px", height: "26px", fontSize: "12px", fontWeight: "bold", backgroundColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? "#2e37a4" : "#94a3b8" }
+              },
+              "2"
+            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Do articles have the same colors or contrast?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameColor === true ? "\u{1F3A8} Same Colors \u2014 color palette selected below applies across all articles" : configMode.sameColor === false ? "\u{1F3AD} Contrast / Different Colors \u2014 select independent or contrast colors for each article (e.g. Yellow Kurta + Maroon Pant)" : "Choose whether articles share colors or have separate / contrast palettes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameColor === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "12px", backgroundColor: configMode.sameColor === true ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameColor: true })
+              },
+              configMode.sameColor === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+              "Yes"
+            ), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameColor === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "12px", backgroundColor: configMode.sameColor === false ? "#1e293b" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameColor: false })
+              },
+              configMode.sameColor === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+              "No"
+            )))
+          ), /* @__PURE__ */ import_react10.default.createElement(
+            "div",
+            {
+              className: "p-3.5 rounded-3 border transition",
+              style: {
+                backgroundColor: configMode.sameSize !== void 0 && configMode.sameSize !== null ? configMode.sameSize ? "#f8faff" : "#fffbeb" : "#ffffff",
+                borderColor: configMode.sameSize !== void 0 && configMode.sameSize !== null ? "#c7d2fe" : "#e2e8f0"
+              }
+            },
+            /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
+              "span",
+              {
+                className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
+                style: { width: "26px", height: "26px", fontSize: "12px", fontWeight: "bold", backgroundColor: configMode.sameSize !== void 0 && configMode.sameSize !== null ? "#2e37a4" : "#94a3b8" }
+              },
+              "3"
+            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Are sizes identical across all articles?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameSize === true ? "\u{1F4CF} Same Sizes \u2014 size series (e.g. S, M, L, XL) will be shared across all articles" : configMode.sameSize === false ? "\u{1F4D0} Different Sizes \u2014 configure different size scales for each article (e.g. Kurta S/M/L, Pant 28/30/32, Dupatta Free Size)" : "Choose whether articles share the same size series or have different sizes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameSize === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "12px", backgroundColor: configMode.sameSize === true ? "#2e37a4" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameSize: true })
+              },
+              configMode.sameSize === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+              "Yes"
+            ), /* @__PURE__ */ import_react10.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameSize === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                style: { fontSize: "12px", backgroundColor: configMode.sameSize === false ? "#1e293b" : "#fff" },
+                onClick: () => setCustomerConfigMode(ci, { ...configMode, sameSize: false })
+              },
+              configMode.sameSize === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+              "No"
+            )))
+          ), (() => {
+            const isAnswered = configMode.sameValue !== void 0 && configMode.sameValue !== null;
+            return /* @__PURE__ */ import_react10.default.createElement(
+              "div",
+              {
+                className: "p-3.5 rounded-3 border transition",
+                style: {
+                  backgroundColor: isAnswered ? configMode.sameValue ? "#f8faff" : "#fffbeb" : "#ffffff",
+                  borderColor: isAnswered ? "#c7d2fe" : "#e2e8f0"
+                }
+              },
+              /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
+                "span",
+                {
+                  className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
+                  style: {
+                    width: "26px",
+                    height: "26px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    backgroundColor: isAnswered ? "#2e37a4" : "#94a3b8"
+                  }
+                },
+                "4"
+              ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Do articles have the same value / piece quantities (1:1 Ratio)?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameValue === true ? "\u26A1 Same Value (1:1 Auto-Sync) \u2014 quantities entered on one article automatically sync to connected articles" : configMode.sameValue === false ? "\u2696\uFE0F Different / Separate Values \u2014 enter independent quantities for each article (e.g. 100 Kurta, 50 Pant)" : "Choose whether articles share equal 1:1 piece quantities or have independent quantities"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.sameValue === true ? "#2e37a4" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: true })
+                },
+                configMode.sameValue === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "Yes"
+              ), /* @__PURE__ */ import_react10.default.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
+                  style: { fontSize: "12px", backgroundColor: configMode.sameValue === false ? "#1e293b" : "#fff" },
+                  onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: false })
+                },
+                configMode.sameValue === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
+                "No"
+              )))
+            );
+          })()),
+          (() => {
+            const hasAnySelection = configMode.connectionType !== void 0 || configMode.sameColor !== void 0 || configMode.sameSize !== void 0 || configMode.sameValue !== void 0;
+            if (!hasAnySelection) {
+              return /* @__PURE__ */ import_react10.default.createElement(
+                "div",
+                {
+                  className: "mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center gap-2 border shadow-xs",
+                  style: {
+                    backgroundColor: "#f8fafc",
+                    borderColor: "#e2e8f0",
+                    fontSize: "12px",
+                    color: "#64748b"
+                  }
+                },
+                /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-hand-click text-primary fs-6" }),
+                /* @__PURE__ */ import_react10.default.createElement("span", null, /* @__PURE__ */ import_react10.default.createElement("strong", { className: "text-dark" }, "No Default Selection:"), " Please answer the questions above or click a Quick Preset to configure matching articles.")
+              );
+            }
+            const isCompleteSet = configMode.connectionType === "all" && configMode.sameValue;
+            const isComboSet = configMode.connectionType === "custom";
+            const isIndependent = configMode.connectionType === "independent" || configMode.sameValue === false;
+            let presetLabel = "\u2699\uFE0F Custom Setup";
+            if (isCompleteSet && configMode.sameColor === true && configMode.sameSize === true) {
+              presetLabel = "\u26A1 Full Matching Set";
+            } else if (isCompleteSet && configMode.sameColor === false && configMode.sameSize === true) {
+              presetLabel = "\u{1F3A8} Contrast Set (Jodi)";
+            } else if (isComboSet) {
+              const comboNames = (configMode.connectedArticleIds || []).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + ");
+              presetLabel = `\u2702\uFE0F Combo: ${comboNames || "Combo Set"}`;
+            } else if (isIndependent && configMode.sameColor === true && configMode.sameSize === true) {
+              presetLabel = "\u2696\uFE0F Shared Sizes, Separate Qty";
+            } else if (isIndependent && configMode.sameColor === true && configMode.sameSize === false) {
+              presetLabel = "\u{1F4CF} Shared Colors, Different Sizes";
+            } else if (isIndependent && configMode.sameColor === false && configMode.sameSize === false) {
+              presetLabel = "\u{1F9E9} Custom Mix & Match";
+            }
+            const isAutoSync = Boolean(configMode.sameValue && configMode.sameSize && configMode.connectionType !== "independent");
+            return /* @__PURE__ */ import_react10.default.createElement(
+              "div",
+              {
+                className: "mt-3 p-2.5 px-3 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border shadow-xs",
+                style: {
+                  backgroundColor: isAutoSync ? "#f0fdf4" : "#eff6ff",
+                  borderColor: isAutoSync ? "#bbf7d0" : "#bfdbfe",
+                  fontSize: "12px"
+                }
+              },
+              /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: `badge ${isAutoSync ? "bg-success" : "bg-primary"} text-white fw-bold`, style: { fontSize: "11px" } }, presetLabel), /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-dark fw-medium" }, isCompleteSet ? /* @__PURE__ */ import_react10.default.createElement("span", null, "Complete ", /* @__PURE__ */ import_react10.default.createElement("strong", null, assignedArticleIds.length, "-Piece Matching Set")) : isComboSet ? /* @__PURE__ */ import_react10.default.createElement("span", null, "Matching Combo: ", /* @__PURE__ */ import_react10.default.createElement("strong", null, (configMode.connectedArticleIds || []).map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(" + ") || "Combo")) : configMode.connectionType === "independent" ? /* @__PURE__ */ import_react10.default.createElement("span", null, "Independent Articles") : /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-muted" }, "Grouping pending"), configMode.sameColor !== void 0 && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, " ", "\u2022", " ", /* @__PURE__ */ import_react10.default.createElement("span", { className: configMode.sameColor ? "text-primary" : "text-purple" }, configMode.sameColor === true ? "\u{1F3A8} Shared Colors" : "\u{1F3AD} Contrast Colors")), configMode.sameSize !== void 0 && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, " ", "\u2022", " ", /* @__PURE__ */ import_react10.default.createElement("span", { className: configMode.sameSize ? "text-primary" : "text-secondary" }, configMode.sameSize === true ? "\u{1F4CF} Shared Sizes" : "\u{1F4D0} Different Sizes")), isAutoSync ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, " ", "\u2022", " ", /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-success fw-bold" }, "\u26A1 1:1 Matching Quantities")) : configMode.sameValue === false ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, " ", "\u2022", " ", /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-secondary" }, "\u{1F4E6} Separate Quantities")) : null))
+            );
+          })()
+        ), (() => {
+          const hasConfiguredColors = configMode.sameColor !== false ? (cust.selectedColors || []).length > 0 : (cust.assignedArticleIds || []).some((aId) => (cust.articleColors?.[aId] || []).length > 0);
           if ((cust.assignedArticleIds || []).length === 0 || !hasConfiguredColors) return null;
-          return /* @__PURE__ */ import_react10.default.createElement("div", { className: "pt-3 border-top" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-secondary fw-semibold" }, "Sizes & quantities:"), configMode.sameValue && configMode.sameSize && (cust.assignedArticleIds || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1", style: { fontSize: "11px" } }, "\u2728 Full Set Auto-Sync Active: Quantities entered on one article automatically sync across all matching articles")), (cust.assignedArticleIds || []).map((artId) => {
-            const artObj = addedArticles.find((a) => a.id === artId);
-            if (!artObj) return null;
-            const artColors = !configMode.sameColor ? cust.articleColors?.[artId] || [] : cust.selectedColors || [];
-            if (artColors.length === 0) return null;
-            return artColors.map((colName) => {
-              const key = getSizeConfigKey(artId, colName);
-              const cfg = cust.sizeConfigs?.[key];
-              const colorObj = masterColors.find((c) => c.name === colName) || { hex: "#333333" };
+          const groups = computeArticleGroups(cust);
+          const isAllSameColor = configMode.sameColor !== false;
+          return /* @__PURE__ */ import_react10.default.createElement("div", { className: "pt-3 border-top" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-secondary fw-semibold" }, "Sizes & quantities:"), configMode.sameValue && configMode.sameSize && (cust.assignedArticleIds || []).length > 1 && /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1", style: { fontSize: "11px" } }, "\u2728 1:1 Matching Set: Quantities entered below automatically create full matching sets")), groups.map((group) => {
+            const groupColors = isAllSameColor ? cust.selectedColors || [] : cust.articleColors?.[group.leadArtId] || [];
+            if (groupColors.length === 0) return null;
+            const isAllSameValue = configMode.sameValue !== false;
+            const combineAllColors = Boolean(isAllSameColor && isAllSameValue && group.isSet);
+            const cardsToRender = combineAllColors ? [{ colorsInCard: groupColors, isMultiColorCombined: groupColors.length > 1 }] : groupColors.map((cName) => ({ colorsInCard: [cName], isMultiColorCombined: false }));
+            return cardsToRender.map(({ colorsInCard, isMultiColorCombined }) => {
+              const leadColName = colorsInCard[0];
+              const colName = isMultiColorCombined ? colorsInCard : leadColName;
+              const leadKey = getSizeConfigKey(group.leadArtId, leadColName);
+              const cfg = cust.sizeConfigs?.[leadKey];
+              const colorObj = masterColors.find((c) => c.name === leadColName) || { hex: "#333333" };
               let pairTotalPieces = 0;
               if (cfg?.sizeQtys) {
                 Object.values(cfg.sizeQtys).forEach((q) => {
                   pairTotalPieces += parseInt(q, 10) || 0;
                 });
               }
-              const activeSeriesList = getPairSeriesConfigs(cust, artId, colName);
-              const otherArticlesInColor = (cust.assignedArticleIds || []).filter((aId) => aId !== artId).map((aId) => addedArticles.find((a) => a.id === aId)).filter(Boolean);
-              const jointedOtherArticles = otherArticlesInColor.filter(
-                (oArt) => areCardsJointed(cust, key, getSizeConfigKey(oArt.id, colName))
-              );
-              const isJointed = jointedOtherArticles.length > 0 || configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0;
+              const activeSeriesList = getPairSeriesConfigs(cust, group.leadArtId, colName);
+              const isJointed = group.isSet;
               return /* @__PURE__ */ import_react10.default.createElement(
                 "div",
                 {
-                  key,
+                  key: isMultiColorCombined ? `${group.groupKey}___all_colors` : `${group.groupKey}_${leadColName}`,
                   className: "p-4 rounded-4 mb-4 bg-white shadow-xs",
                   style: {
                     border: isJointed ? "1.5px solid #818cf8" : "1.5px solid #c7d2fe",
@@ -28264,69 +28554,45 @@
                     boxShadow: "0 2px 10px rgba(46, 55, 164, 0.04)"
                   }
                 },
-                /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react10.default.createElement(
+                /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, isMultiColorCombined ? /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, colorsInCard.map((cName) => {
+                  const cObj = masterColors.find((c) => c.name === cName) || { hex: "#333333" };
+                  return /* @__PURE__ */ import_react10.default.createElement(
+                    "span",
+                    {
+                      key: cName,
+                      className: "badge rounded-pill d-inline-flex align-items-center gap-1.5 px-2.5 py-1 border shadow-xs",
+                      style: { backgroundColor: "#f8fafc", color: "#1e293b", borderColor: "#cbd5e1", fontSize: "12px" }
+                    },
+                    /* @__PURE__ */ import_react10.default.createElement("span", { className: "rounded-circle border", style: { width: "10px", height: "10px", backgroundColor: cObj.hex } }),
+                    /* @__PURE__ */ import_react10.default.createElement("span", null, cName)
+                  );
+                }), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fw-bold text-dark ms-1", style: { fontSize: "15px" } }, group.label, " \u2014 All ", colorsInCard.length, " Colors")) : /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(
                   "span",
                   {
                     className: "rounded-circle border",
                     style: { width: "13px", height: "13px", backgroundColor: colorObj.hex }
                   }
-                ), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "15px" } }, artObj.name, " \u2014 ", colName), configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0 ? /* @__PURE__ */ import_react10.default.createElement(
+                ), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "15px" } }, group.label, " \u2014 ", leadColName)), group.isSet ? /* @__PURE__ */ import_react10.default.createElement(
                   "span",
                   {
                     className: "badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1",
                     style: { fontSize: "11px" },
-                    title: "Quantities entered here automatically reflect on matching articles"
+                    title: "Quantities entered here automatically reflect on all matching articles"
                   },
                   /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-link" }),
-                  /* @__PURE__ */ import_react10.default.createElement("span", null, "Auto-Synced with ", otherArticlesInColor.map((a) => a.name).join(", "))
-                ) : configMode.sameSize && otherArticlesInColor.length > 0 ? /* @__PURE__ */ import_react10.default.createElement(
-                  "span",
+                  /* @__PURE__ */ import_react10.default.createElement("span", null, group.badgeLabel || "1:1 Matching Set")
+                ) : null), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isMultiColorCombined && groupColors.length > 1 && /* @__PURE__ */ import_react10.default.createElement(
+                  "button",
                   {
-                    className: "badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1",
-                    style: { fontSize: "11px" },
-                    title: "Sizes are synced across articles, but quantities are independent"
+                    type: "button",
+                    className: "btn btn-xs btn-outline-primary rounded-pill px-2.5 py-1 fw-semibold d-inline-flex align-items-center gap-1 shadow-xs",
+                    style: { fontSize: "11px", borderColor: "#c7d2fe" },
+                    onClick: () => openCopySizesForGroup(ci, group.groupArtIds, leadColName),
+                    title: `Copy these sizes & quantities from ${leadColName} to other colors`
                   },
-                  /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-ruler-2" }),
-                  /* @__PURE__ */ import_react10.default.createElement("span", null, "Shared Sizes \u2022 Independent Quantities")
-                ) : null, otherArticlesInColor.length > 0 && !(configMode.sameValue && configMode.sameSize) && /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-inline-flex align-items-center gap-1.5 ms-2 flex-wrap" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-secondary fw-semibold", style: { fontSize: "12px" } }, "Joint with:"), otherArticlesInColor.map((otherArt) => {
-                  const otherKey = getSizeConfigKey(otherArt.id, colName);
-                  const isChecked = areCardsJointed(cust, key, otherKey);
-                  return /* @__PURE__ */ import_react10.default.createElement(
-                    "label",
-                    {
-                      key: otherArt.id,
-                      className: "d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill border transition-all user-select-none",
-                      style: {
-                        backgroundColor: isChecked ? "#eef2ff" : "#f8fafc",
-                        borderColor: isChecked ? "#6366f1" : "#cbd5e1",
-                        cursor: "pointer",
-                        boxShadow: isChecked ? "0 1px 3px rgba(99,102,241,0.2)" : "none"
-                      },
-                      title: isChecked ? `Click to unjoint ${otherArt.name}` : `Click to joint with ${otherArt.name} (shares sizes & quantities)`
-                    },
-                    /* @__PURE__ */ import_react10.default.createElement(
-                      "input",
-                      {
-                        type: "checkbox",
-                        className: "form-check-input m-0 cursor-pointer",
-                        checked: isChecked,
-                        onChange: () => toggleArticleJointInColor(ci, colName, artId, otherArt.id),
-                        style: { width: "15px", height: "15px", cursor: "pointer" }
-                      }
-                    ),
-                    /* @__PURE__ */ import_react10.default.createElement(
-                      "span",
-                      {
-                        className: "fw-semibold",
-                        style: {
-                          fontSize: "12px",
-                          color: isChecked ? "#2e37a4" : "#475569"
-                        }
-                      },
-                      otherArt.name
-                    )
-                  );
-                }))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement(
+                  /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-copy" }),
+                  /* @__PURE__ */ import_react10.default.createElement("span", null, "Copy to other colors")
+                ), /* @__PURE__ */ import_react10.default.createElement(
                   "span",
                   {
                     className: "badge rounded-pill px-3 py-1.5 font-monospace fw-bold",
@@ -28338,26 +28604,17 @@
                       borderColor: pairTotalPieces > 0 ? "#c7d2fe" : "#e2e8f0"
                     }
                   },
-                  pairTotalPieces,
-                  " pcs"
+                  isMultiColorCombined ? `${pairTotalPieces} sets / color \xD7 ${colorsInCard.length} colors = ${pairTotalPieces * colorsInCard.length} sets (${pairTotalPieces * colorsInCard.length * group.groupArtIds.length} pcs)` : group.isSet ? `${pairTotalPieces} sets (${pairTotalPieces * group.groupArtIds.length} pcs)` : `${pairTotalPieces} pcs`
                 ))),
-                /* @__PURE__ */ import_react10.default.createElement("div", null, configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0 ? /* @__PURE__ */ import_react10.default.createElement(
+                /* @__PURE__ */ import_react10.default.createElement("div", null, group.isSet && /* @__PURE__ */ import_react10.default.createElement(
                   "div",
                   {
                     className: "d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border",
                     style: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0", color: "#166534", fontSize: "12px", fontWeight: 500 }
                   },
                   /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-wand" }),
-                  /* @__PURE__ */ import_react10.default.createElement("span", null, /* @__PURE__ */ import_react10.default.createElement("strong", null, "Full Set Auto-Sync Active:"), " Entering sizes or quantities here will automatically update ", /* @__PURE__ */ import_react10.default.createElement("strong", null, otherArticlesInColor.map((a) => a.name).join(", ")), ".")
-                ) : jointedOtherArticles.length > 0 ? /* @__PURE__ */ import_react10.default.createElement(
-                  "div",
-                  {
-                    className: "d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border",
-                    style: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0", color: "#166534", fontSize: "12px", fontWeight: 500 }
-                  },
-                  /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-link" }),
-                  /* @__PURE__ */ import_react10.default.createElement("span", null, "Jointed with ", /* @__PURE__ */ import_react10.default.createElement("strong", null, jointedOtherArticles.map((a) => a.name).join(", ")), " \u2014 linked as matching combo set.")
-                ) : null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "text-muted small mb-2 fw-medium" }, "Pick a size series:"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, (normalizedMasterSizeSeries || []).map((series) => {
+                  /* @__PURE__ */ import_react10.default.createElement("span", null, isMultiColorCombined ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("strong", null, "\u26A1 1:1 Matching Across All ", colorsInCard.length, " Colors & ", group.groupArtIds.length, " Articles:"), " ", colorsInCard.length, " colors (", colorsInCard.join(", "), ") & ", group.groupArtIds.length, " articles (", group.groupArtIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(", "), ") are combined into this single box. Quantities entered below automatically apply across all of them.") : /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("strong", null, "1:1 Set Active:"), " Sizes and quantities entered here automatically apply across all ", group.groupArtIds.length, " articles (", group.groupArtIds.map((id) => addedArticles.find((a) => a.id === id)?.name).filter(Boolean).join(", "), ")."))
+                ), /* @__PURE__ */ import_react10.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "text-muted small mb-2 fw-medium" }, "Pick a size series:"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, (normalizedMasterSizeSeries || []).map((series) => {
                   const isOpen = activeSeriesList.some((sc) => {
                     const scClean = (sc.seriesName || "").toLowerCase();
                     const scId = (sc.seriesId || "").toLowerCase();
@@ -28385,7 +28642,7 @@
                         justifyContent: "center",
                         boxShadow: isOpen ? "0 2px 6px rgba(46, 55, 164, 0.2)" : "none"
                       },
-                      onClick: () => toggleSeriesInPair(ci, artId, colName, series)
+                      onClick: () => toggleSeriesInGroup(ci, group.groupArtIds, colName, series)
                     },
                     /* @__PURE__ */ import_react10.default.createElement("span", null, series.displayName || series.name),
                     isOpen && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check ms-1.5 small" })
@@ -28429,7 +28686,7 @@
                       {
                         type: "button",
                         className: "btn btn-link text-danger p-0 small text-decoration-none fw-medium",
-                        onClick: () => removeSeriesFromPair(ci, artId, colName, sc.seriesId)
+                        onClick: () => removeSeriesFromGroup(ci, group.groupArtIds, colName, sc.seriesId)
                       },
                       "Remove series"
                     )),
@@ -28454,7 +28711,7 @@
                             color: isSzSelected ? "#ffffff" : "#334155",
                             fontSize: "13px"
                           },
-                          onClick: () => toggleSizeInPairSeries(ci, artId, colName, sc.seriesId, sz)
+                          onClick: () => toggleSizeInGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz)
                         },
                         sz,
                         " ",
@@ -28475,8 +28732,8 @@
                           boxShadow: !sc.ratioUsed && sc.uniform !== true ? "0 2px 4px rgba(46,55,164,0.2)" : "none"
                         },
                         onClick: () => {
-                          setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                          setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false);
+                          setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
+                          setUniformModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
                         }
                       },
                       /* @__PURE__ */ import_react10.default.createElement("span", null, "\u270D\uFE0F"),
@@ -28495,7 +28752,7 @@
                           boxShadow: sc.ratioUsed ? "0 2px 4px rgba(46,55,164,0.2)" : "none"
                         },
                         onClick: () => {
-                          setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                          setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, true);
                         }
                       },
                       /* @__PURE__ */ import_react10.default.createElement("span", null, "\u26A1"),
@@ -28514,8 +28771,8 @@
                           boxShadow: sc.uniform === true ? "0 2px 4px rgba(46,55,164,0.2)" : "none"
                         },
                         onClick: () => {
-                          setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                          setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                          setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
+                          setUniformModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, true);
                         }
                       },
                       /* @__PURE__ */ import_react10.default.createElement("span", null, "\u{1F522}"),
@@ -28530,7 +28787,7 @@
                         value: sc.ratioString || "",
                         onChange: (e) => {
                           const formatted = formatRatioInput(e.target.value, sc.ratioString, (sc.selectedSizes || []).length);
-                          updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, formatted, sc.baseSetQty, true);
+                          updateRatioCalculationForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, formatted, sc.baseSetQty, true);
                         }
                       }
                     )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-auto" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Base Set Qty:"), /* @__PURE__ */ import_react10.default.createElement(
@@ -28543,7 +28800,7 @@
                         placeholder: "100",
                         value: sc.baseSetQty || "",
                         onChange: (e) => {
-                          updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true);
+                          updateRatioCalculationForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sc.ratioString, e.target.value, true);
                         }
                       }
                     )))) : sc.uniform === true ? /* @__PURE__ */ import_react10.default.createElement("div", { className: "p-3 mb-3 rounded-3 border bg-light", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "small text-muted fw-semibold" }, "Uniform quantity for all ", (sc.selectedSizes || []).length, " sizes:"), /* @__PURE__ */ import_react10.default.createElement(
@@ -28555,7 +28812,7 @@
                         style: { width: "90px" },
                         placeholder: "0",
                         value: sc.uniformQty || "",
-                        onChange: (e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)
+                        onChange: (e) => updateUniformQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, e.target.value)
                       }
                     ), /* @__PURE__ */ import_react10.default.createElement("span", { className: "small text-muted" }, "pcs / size"))) : null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap gap-2.5" }, (sc.selectedSizes || []).map((sz) => /* @__PURE__ */ import_react10.default.createElement("div", { key: sz, className: "d-flex flex-column align-items-center" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-light text-dark border mb-1 px-2 py-0.5", style: { fontSize: "11px" } }, sz), /* @__PURE__ */ import_react10.default.createElement(
                       "input",
@@ -28566,7 +28823,7 @@
                         style: { width: "70px", height: "32px", fontSize: "13px" },
                         placeholder: "0",
                         value: sc.sizeQtys?.[sz] !== void 0 ? sc.sizeQtys[sz] : "",
-                        onChange: (e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)
+                        onChange: (e) => updateIndividualSizeQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz, e.target.value)
                       }
                     ))))) : null
                   );
@@ -28574,7 +28831,7 @@
               );
             });
           }));
-        })());
+        })(), "                      ");
       })());
     })), /* @__PURE__ */ import_react10.default.createElement(
       "div",

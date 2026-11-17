@@ -2470,7 +2470,7 @@ export default function OrderDetailView({
     }
     const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
     rows.forEach(r => {
-      if (r.articleName && r.width && (r._userSelectedWidth || order?.groupSelectedWidths)) {
+      if (r.articleName && r.width && r.width !== '—') {
         const k = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}`;
         if (!initial[k]) {
           initial[k] = [r.width];
@@ -2482,57 +2482,77 @@ export default function OrderDetailView({
     return initial;
   });
 
-  // State to manage which fabric group has its width multi-select popover open
+  // State to manage which fabric group has its width popover open
   const [activeWidthDropdownKey, setActiveWidthDropdownKey] = useState(null);
-  const [customWidthMap, setCustomWidthMap] = useState({});
 
-  const getSelectedWidthsForGroup = (grp, options) => {
+  const getSelectedWidthsForGroup = (grp, options = []) => {
     const k = `${grp.articleName}___${grp.fabricQuality || ''}___${grp.role || ''}`;
     const stored = groupSelectedWidths[k];
     if (Array.isArray(stored)) {
       return stored;
     }
-    if (grp.width && options.includes(grp.width) && grp._userSelectedWidth) {
+    if (grp.width && grp.width !== '—' && (options.length === 0 || options.includes(grp.width))) {
       return [grp.width];
     }
-    return []; // No default pre-fill!
+    return [];
   };
 
   const handleToggleGroupWidth = (artName, fabricQuality, role, targetWidth, options) => {
     const cleanWidth = targetWidth === '—' ? '' : targetWidth;
     const k = `${artName}___${fabricQuality || ''}___${role || ''}`;
-    setGroupSelectedWidths(prev => {
-      const currentList = (prev[k] && Array.isArray(prev[k]))
-        ? [...prev[k]]
-        : [];
 
-      let nextList;
-      if (currentList.includes(cleanWidth)) {
-        nextList = currentList.filter(x => x !== cleanWidth);
-      } else {
-        nextList = [...currentList, cleanWidth];
+    let currentList = [];
+    if (groupSelectedWidths[k] && Array.isArray(groupSelectedWidths[k])) {
+      currentList = [...groupSelectedWidths[k]];
+    } else {
+      const matchRow = consumptionRows.find(r =>
+        r.articleName === artName &&
+        (!fabricQuality || r.fabricQuality === fabricQuality) &&
+        (!role || !r.role || r.role.toLowerCase() === role.toLowerCase())
+      );
+      if (matchRow && matchRow.width && matchRow.width !== '—') {
+        currentList = [matchRow.width];
       }
+    }
 
-      setConsumptionRows(prevRows => prevRows.map(r => {
-        const matchArt = r.articleName === artName;
-        const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
-        const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
-        if (matchArt && matchFab && matchRole) {
-          const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
-            ? (parseFloat(storedRate) || 0)
-            : (parseFloat(r.dyedRate) || 0);
-          return {
-            ...r,
-            width: primaryW,
-            dyedRate: nextDyed,
-            _userSelectedWidth: Boolean(primaryW)
-          };
-        }
-        return r;
-      }));
+    let nextList;
+    if (!cleanWidth) {
+      nextList = [];
+    } else if (currentList.includes(cleanWidth)) {
+      nextList = currentList.filter(x => x !== cleanWidth);
+    } else {
+      nextList = [...currentList, cleanWidth];
+    }
 
-      return { ...prev, [k]: nextList };
-    });
+    const primaryW = nextList[0] || '';
+    const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${primaryW}`;
+    const storedRate = widthDyedRates[rateKey];
+
+    // 1. Update groupSelectedWidths
+    setGroupSelectedWidths(prev => ({
+      ...prev,
+      [k]: nextList
+    }));
+
+    // 2. Update consumptionRows outside setGroupSelectedWidths
+    setConsumptionRows(prevRows => prevRows.map(r => {
+      const matchArt = r.articleName === artName;
+      const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+      const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+      if (matchArt && matchFab && matchRole) {
+        const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
+          ? (parseFloat(storedRate) || 0)
+          : (parseFloat(r.dyedRate) || 0);
+        return {
+          ...r,
+          width: primaryW,
+          selectedWidths: nextList,
+          dyedRate: nextDyed,
+          _userSelectedWidth: Boolean(primaryW)
+        };
+      }
+      return r;
+    }));
   };
 
   const handleSelectWidthForGroup = (artName, newWidth, fabricQuality, role) => {
@@ -3536,8 +3556,7 @@ export default function OrderDetailView({
         {articlesList.map((art, aIdx) => {
           const isExpanded = !!expandedArticles[aIdx];
           const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
-          const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
-          const artIcon = art.icon || (isBottom ? '👖' : isDupatta ? '🧣' : '👕');
+          const artIcon = art.icon || (isBottom ? '👖' : '👕');
           const hasFabric = Boolean(art.fabricQuality && art.fabricQuality.trim() !== '');
           const hasLength = Boolean(art.avgGarmentLength && String(art.avgGarmentLength).trim() !== '' && !isNaN(parseFloat(art.avgGarmentLength)));
 
@@ -3617,7 +3636,7 @@ export default function OrderDetailView({
                     >
                       <div className="d-flex align-items-center gap-2">
                         <span className="text-secondary small fw-medium">
-                          # Avg. Length {isDupatta ? '(mts)' : '(in)'}:
+                          # Avg. Length:
                         </span>
                         {editingLengthIdx === aIdx ? (
                           <div className="d-flex align-items-center gap-2">
@@ -3626,7 +3645,6 @@ export default function OrderDetailView({
                               step="0.01"
                               className="form-control form-control-sm"
                               style={{ width: '90px' }}
-                              placeholder={isDupatta ? "e.g. 2.25" : "e.g. 45"}
                               value={tempLengthVal}
                               onChange={(e) => setTempLengthVal(e.target.value)}
                               autoFocus
@@ -3645,7 +3663,10 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <strong className="text-dark small">
-                            {parseFloat(art.avgGarmentLength).toFixed(2)} {isDupatta ? 'mts' : 'inches'}
+                            {(() => {
+                              const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || art.articleName || '').trim());
+                              return `${parseFloat(art.avgGarmentLength).toFixed(2)} ${isDupatta ? 'mts' : 'inches'}`;
+                            })()}
                           </strong>
                         )}
                       </div>
@@ -4227,54 +4248,145 @@ export default function OrderDetailView({
                             >
                               <div className="d-flex flex-column align-items-center justify-content-center" style={{ gap: '4px' }}>
                                 {isConsumptionEditing ? (
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace"
-                                    style={{
-                                      minWidth: '68px',
-                                      height: '28px',
-                                      padding: '2px 8px',
-                                      fontSize: selectedWidths.length > 0 ? '12px' : '11px',
-                                      fontWeight: selectedWidths.length > 0 ? 700 : 600,
-                                      borderColor: activeWidthDropdownKey === groupKey ? '#1d4ed8' : (selectedWidths.length > 0 ? '#2563eb' : '#cbd5e1'),
-                                      backgroundColor: selectedWidths.length > 0 ? '#eff6ff' : '#f8fafc',
-                                      color: selectedWidths.length > 0 ? '#1d4ed8' : '#64748b',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer',
-                                      boxShadow: activeWidthDropdownKey === groupKey ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : 'none',
-                                      borderWidth: '1.5px',
-                                      borderStyle: selectedWidths.length > 0 ? 'solid' : 'dashed',
-                                      gap: '6px'
-                                    }}
-                                    onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
-                                    title="Click to select or change fabric width"
-                                  >
-                                    <span>{selectedWidths.length > 0 ? selectedWidths[0] : 'Select'}</span>
-                                    <i
-                                      className={`ti ti-chevron-${activeWidthDropdownKey === groupKey ? 'up' : 'down'}`}
+                                  selectedWidths.length === 0 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace"
                                       style={{
+                                        minWidth: '68px',
+                                        height: '28px',
+                                        padding: '2px 8px',
                                         fontSize: '11px',
-                                        color: selectedWidths.length > 0 ? '#2563eb' : '#94a3b8'
+                                        fontWeight: 600,
+                                        borderColor: activeWidthDropdownKey === groupKey ? '#1d4ed8' : '#cbd5e1',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#64748b',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        boxShadow: activeWidthDropdownKey === groupKey ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : 'none',
+                                        borderWidth: '1.5px',
+                                        borderStyle: 'dashed',
+                                        gap: '6px'
                                       }}
-                                    />
-                                  </button>
+                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                      title="Click to select widths"
+                                    >
+                                      <span>Select ▾</span>
+                                    </button>
+                                  ) : selectedWidths.length === 1 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
+                                      style={{
+                                        minWidth: '68px',
+                                        height: '28px',
+                                        padding: '2px 8px',
+                                        fontSize: '12px',
+                                        borderColor: activeWidthDropdownKey === groupKey ? '#1d4ed8' : '#2563eb',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        boxShadow: activeWidthDropdownKey === groupKey ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : 'none',
+                                        borderWidth: '1.5px',
+                                        borderStyle: 'solid',
+                                        gap: '6px'
+                                      }}
+                                      onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                      title="Click to select or add widths"
+                                    >
+                                      <span>{selectedWidths[0]}</span>
+                                      <i
+                                        className={`ti ti-chevron-${activeWidthDropdownKey === groupKey ? 'up' : 'down'}`}
+                                        style={{ fontSize: '11px', color: '#2563eb' }}
+                                      />
+                                    </button>
+                                  ) : (
+                                    selectedWidths.map((w) => (
+                                      <div
+                                        key={w}
+                                        className="d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
+                                        style={{
+                                          minWidth: '68px',
+                                          height: '28px',
+                                          padding: '2px 6px',
+                                          fontSize: '12px',
+                                          color: '#1d4ed8',
+                                          backgroundColor: '#eff6ff',
+                                          border: '1.5px solid #2563eb',
+                                          borderRadius: '4px',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        <span
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                          title="Click to select or add widths"
+                                        >
+                                          {w}
+                                        </span>
+                                        <div className="d-flex align-items-center gap-1">
+                                          <button
+                                            type="button"
+                                            className="btn p-0 border-0 bg-transparent text-primary"
+                                            style={{ fontSize: '10px', lineHeight: 1 }}
+                                            onClick={() => setActiveWidthDropdownKey(activeWidthDropdownKey === groupKey ? null : groupKey)}
+                                            title="Open width options"
+                                          >
+                                            <i className="ti ti-chevron-down" style={{ fontSize: '10px' }} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center"
+                                            style={{ width: '12px', height: '12px', lineHeight: 1 }}
+                                            title={`Remove ${w}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions);
+                                            }}
+                                          >
+                                            <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )
                                 ) : (
-                                  <div
-                                    className="d-inline-flex align-items-center justify-content-center font-monospace"
-                                    style={{
-                                      minWidth: '58px',
-                                      height: '26px',
-                                      padding: '1px 6px',
-                                      fontSize: '12px',
-                                      fontWeight: selectedWidths.length > 0 ? 700 : 600,
-                                      color: selectedWidths.length > 0 ? '#1d4ed8' : '#94a3b8',
-                                      backgroundColor: selectedWidths.length > 0 ? '#eff6ff' : 'transparent',
-                                      border: selectedWidths.length > 0 ? '1.5px solid #2563eb' : 'none',
-                                      borderRadius: '2px'
-                                    }}
-                                  >
-                                    <span>{selectedWidths.length > 0 ? selectedWidths[0] : '—'}</span>
-                                  </div>
+                                  selectedWidths.length === 0 ? (
+                                    <div
+                                      className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                      style={{
+                                        minWidth: '58px',
+                                        height: '26px',
+                                        padding: '1px 6px',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        color: '#94a3b8'
+                                      }}
+                                    >
+                                      <span>—</span>
+                                    </div>
+                                  ) : (
+                                    selectedWidths.map((w) => (
+                                      <div
+                                        key={w}
+                                        className="d-inline-flex align-items-center justify-content-center font-monospace"
+                                        style={{
+                                          minWidth: '58px',
+                                          height: '26px',
+                                          padding: '1px 6px',
+                                          fontSize: '12px',
+                                          fontWeight: 700,
+                                          color: '#1d4ed8',
+                                          backgroundColor: '#eff6ff',
+                                          border: '1.5px solid #2563eb',
+                                          borderRadius: '2px'
+                                        }}
+                                      >
+                                        <span>{w}</span>
+                                      </div>
+                                    ))
+                                  )
                                 )}
                               </div>
 
@@ -4305,8 +4417,8 @@ export default function OrderDetailView({
                                       top: 'calc(100% + 4px)',
                                       left: '50%',
                                       transform: 'translateX(-50%)',
-                                      minWidth: '150px',
-                                      maxWidth: '185px',
+                                      minWidth: '155px',
+                                      maxWidth: '190px',
                                       zIndex: 1060,
                                       borderRadius: '6px',
                                       border: '1.5px solid #2563eb',
@@ -4324,7 +4436,7 @@ export default function OrderDetailView({
                                       style={{ backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe' }}
                                     >
                                       <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', letterSpacing: '0.02em' }}>
-                                        Select Width
+                                        Select Widths
                                       </span>
                                       <button
                                         type="button"
@@ -4335,10 +4447,10 @@ export default function OrderDetailView({
                                       />
                                     </div>
 
-                                    {/* Width Options List */}
+                                    {/* Width Options List (Multi-Select) */}
                                     <div style={{ maxHeight: '180px', overflowY: 'auto', padding: '4px' }}>
                                       {widthOptions.map(opt => {
-                                        const isSelected = selectedWidths.includes(opt) || (!selectedWidths.length && opt === group.width);
+                                        const isSelected = selectedWidths.includes(opt);
                                         return (
                                           <div
                                             key={opt}
@@ -4350,11 +4462,11 @@ export default function OrderDetailView({
                                               margin: '2px 0',
                                               color: isSelected ? '#1d4ed8' : '#334155',
                                               fontWeight: isSelected ? 700 : 500,
-                                              fontSize: '12px'
+                                              fontSize: '12.5px'
                                             }}
-                                            onClick={() => {
-                                              handleSelectWidthForGroup(group.articleName, opt, group.fabricQuality, group.role);
-                                              setActiveWidthDropdownKey(null);
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
                                             }}
                                             onMouseEnter={(e) => {
                                               if (!isSelected) e.currentTarget.style.backgroundColor = '#f1f5f9';
@@ -4365,11 +4477,20 @@ export default function OrderDetailView({
                                           >
                                             <span className="font-monospace fw-bold">{opt}</span>
                                             {isSelected ? (
-                                              <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '9px', padding: '1px 4px' }}>
+                                              <span
+                                                className="badge rounded-pill fw-bold"
+                                                style={{
+                                                  backgroundColor: '#e0e7ff',
+                                                  color: '#1d4ed8',
+                                                  border: '1px solid #bfdbfe',
+                                                  fontSize: '10px',
+                                                  padding: '2px 7px'
+                                                }}
+                                              >
                                                 <i className="ti ti-check me-0.5"></i> Active
                                               </span>
                                             ) : (
-                                              <span className="text-muted" style={{ fontSize: '10px' }}>
+                                              <span className="text-muted" style={{ fontSize: '11px' }}>
                                                 Select
                                               </span>
                                             )}
@@ -4387,9 +4508,9 @@ export default function OrderDetailView({
                                             fontSize: '11px',
                                             fontWeight: 500
                                           }}
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             handleSelectWidthForGroup(group.articleName, '', group.fabricQuality, group.role);
-                                            setActiveWidthDropdownKey(null);
                                           }}
                                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.color = '#dc2626'; }}
                                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#64748b'; }}
@@ -4400,40 +4521,19 @@ export default function OrderDetailView({
                                       )}
                                     </div>
 
-                                    {/* Custom Width Input */}
-                                    <div className="border-top p-1.5" style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                                      <form
-                                        onSubmit={(e) => {
-                                          e.preventDefault();
-                                          const val = (customWidthMap[groupKey] || '').trim();
-                                          if (val) {
-                                            const clean = val.replace(/"/g, '') + '"';
-                                            handleSelectWidthForGroup(group.articleName, clean, group.fabricQuality, group.role);
-                                            setCustomWidthMap(prev => ({ ...prev, [groupKey]: '' }));
-                                            setActiveWidthDropdownKey(null);
-                                          }
+                                    {/* Done button */}
+                                    <div className="border-top p-1 text-center" style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-primary w-100 py-1"
+                                        style={{ fontSize: '11px', fontWeight: 600, borderRadius: '3px' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveWidthDropdownKey(null);
                                         }}
-                                        className="d-flex gap-1"
                                       >
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm font-monospace py-0 px-2"
-                                          placeholder="Custom (e.g. 48)"
-                                          style={{ fontSize: '11px', height: '24px' }}
-                                          value={customWidthMap[groupKey] || ''}
-                                          onChange={(e) => {
-                                            const v = e.target.value;
-                                            setCustomWidthMap(prev => ({ ...prev, [groupKey]: v }));
-                                          }}
-                                        />
-                                        <button
-                                          type="submit"
-                                          className="btn btn-sm btn-primary py-0 px-2"
-                                          style={{ fontSize: '10px', height: '24px', fontWeight: 600, whiteSpace: 'nowrap' }}
-                                        >
-                                          + Add
-                                        </button>
-                                      </form>
+                                        Done
+                                      </button>
                                     </div>
                                   </div>
                                 </>
@@ -5137,104 +5237,91 @@ export default function OrderDetailView({
         </div>
 
         {/* ========================================================================= */}
-        {/* TOP ARTICLE TABS (Kurta, Pant, Dupatta) - Section 11                      */}
+        {/* TOP ARTICLE TABS (Kurta, Pant, Dupatta) - Section 11 (Big Card Box)       */}
         {/* ========================================================================= */}
         {orderArticles.length > 0 && (
           <div
-            className="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2.5 rounded-3 mb-3"
-            style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}
+            className="p-3.5 rounded-3 mb-3 border shadow-xs"
+            style={{
+              backgroundColor: '#f8fafc',
+              borderColor: '#cbd5e1'
+            }}
           >
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              <span className="text-secondary fw-bold px-1" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Select Article:
-              </span>
-              <div className="d-flex align-items-center flex-wrap gap-1.5">
-                {orderArticles.map(art => {
-                  const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
-                  const isDupatta = /dupatta|stole|scarf/i.test(art.name || '');
-                  const defaultIcon = isBottom ? '👖' : (isDupatta ? '🧣' : '👘');
-                  const isSelected = Boolean(selectedBomArticle && selectedBomArticle.toLowerCase() === (art.name || '').toLowerCase());
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 pb-2 border-bottom" style={{ borderColor: '#e2e8f0' }}>
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge rounded-pill px-2.5 py-1 text-white fw-bold" style={{ fontSize: '11px', backgroundColor: '#2e37a4' }}>
+                  <i className="ti ti-hanger me-1"></i>
+                  Article Selection
+                </span>
+                <span className="fw-bold text-dark" style={{ fontSize: '14px' }}>
+                  Select Article to Configure Accessories
+                </span>
+              </div>
 
-                  // Count configured accessories for this article
-                  const countForArt = addedAccessories.filter(item =>
-                    getCardSelectedArticles(item).some(a => a.toLowerCase() === (art.name || '').toLowerCase())
-                  ).length;
-
-                  return (
-                    <button
-                      key={art.name}
-                      type="button"
-                      className={`btn btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 px-3.5 py-1.5 transition-all fw-semibold ${isSelected ? 'shadow-xs' : ''}`}
-                      style={{
-                        fontSize: '13px',
-                        backgroundColor: isSelected ? '#2e37a4' : '#ffffff',
-                        color: isSelected ? '#ffffff' : '#475569',
-                        border: isSelected ? '1.5px solid #2e37a4' : '1px solid #cbd5e1',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setSelectedBomArticle(prev => prev === art.name ? '' : art.name)}
-                    >
-                      <span>{art.icon || defaultIcon}</span>
-                      <span>{art.name}</span>
-                      <span
-                        className="badge rounded-pill ms-1"
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
-                          color: isSelected ? '#ffffff' : '#475569',
-                          fontSize: '11px',
-                          padding: '2px 7px'
-                        }}
-                      >
-                        {countForArt}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="d-flex align-items-center gap-2">
+                {selectedBomArticle ? (
+                  <div className="d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-white border" style={{ borderColor: '#c7d2fe' }}>
+                    <span className="text-muted small" style={{ fontSize: '11.5px' }}>Configuring for:</span>
+                    <span className="badge rounded-pill px-2.5 py-1 fw-bold text-white" style={{ backgroundColor: '#2e37a4', fontSize: '12px' }}>
+                      {selectedBomArticle}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-muted small fst-italic" style={{ fontSize: '12px' }}>
+                    👉 Click an article below to select it
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="text-muted small pe-1 d-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
-              {selectedBomArticle ? (
-                <>
-                  <span>Configuring for:</span>
-                  <span className="badge rounded-2 px-2.5 py-1 fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}>
-                    {selectedBomArticle}
-                  </span>
-                </>
-              ) : (
-                <span className="text-muted fst-italic">
-                  Click an article to configure (e.g. Kurta, Pant, Dupatta)
-                </span>
-              )}
+            {/* Large Article Cards / Buttons */}
+            <div className="d-flex align-items-center flex-wrap gap-2.5">
+              {orderArticles.map(art => {
+                const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
+                const isDupatta = /dupatta|stole|scarf/i.test(art.name || '');
+                const defaultIcon = isBottom ? '👖' : (isDupatta ? '🧣' : '👘');
+                const isSelected = Boolean(selectedBomArticle && selectedBomArticle.toLowerCase() === (art.name || '').toLowerCase());
+
+                // Count configured accessories for this article
+                const countForArt = addedAccessories.filter(item =>
+                  getCardSelectedArticles(item).some(a => a.toLowerCase() === (art.name || '').toLowerCase())
+                ).length;
+
+                return (
+                  <button
+                    key={art.name}
+                    type="button"
+                    className={`btn rounded-3 d-inline-flex align-items-center gap-2 px-3.5 py-2 transition-all fw-bold ${isSelected ? 'shadow-sm' : 'shadow-xs'}`}
+                    style={{
+                      fontSize: '13.5px',
+                      backgroundColor: isSelected ? '#2e37a4' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#334155',
+                      border: isSelected ? '2px solid #2e37a4' : '1.5px solid #cbd5e1',
+                      cursor: 'pointer',
+                      minHeight: '44px'
+                    }}
+                    onClick={() => setSelectedBomArticle(prev => prev === art.name ? '' : art.name)}
+                  >
+                    <span style={{ fontSize: '17px', lineHeight: 1 }}>{art.icon || defaultIcon}</span>
+                    <span style={{ letterSpacing: '0.01em' }}>{art.name}</span>
+                    <span
+                      className="badge rounded-pill ms-1"
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                        color: isSelected ? '#ffffff' : '#475569',
+                        fontSize: '11px',
+                        padding: '3px 8px'
+                      }}
+                    >
+                      {countForArt}
+                    </span>
+                    {isSelected && <i className="ti ti-check ms-0.5" style={{ fontSize: '14px' }}></i>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
-
-        {/* Search Bar */}
-        <div style={{ marginBottom: '20px' }}>
-          <div className="input-group rounded-3 overflow-hidden shadow-xs border" style={{ borderColor: '#e2e8f0' }}>
-            <span className="input-group-text bg-white border-0 text-muted ps-3">
-              <i className="ti ti-search" style={{ fontSize: '16px' }}></i>
-            </span>
-            <input
-              type="text"
-              className="form-control border-0 shadow-none ps-2"
-              placeholder="Search accessories across all categories..."
-              value={accessorySearchQuery}
-              onChange={(e) => setAccessorySearchQuery(e.target.value)}
-              style={{ fontSize: '13px', height: '42px' }}
-            />
-            {accessorySearchQuery && (
-              <button
-                type="button"
-                className="btn btn-link text-muted pe-3 text-decoration-none"
-                onClick={() => setAccessorySearchQuery('')}
-              >
-                &times;
-              </button>
-            )}
-          </div>
-        </div>
 
         {/* 1. Category Buttons Grid */}
         <div

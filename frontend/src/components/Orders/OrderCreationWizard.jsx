@@ -22,7 +22,7 @@ export const deduplicateColors = (list) => {
   if (!Array.isArray(list)) return [];
   const seen = new Set();
   const result = [];
-  
+
   list.forEach((col, idx) => {
     if (!col || !col.name) return;
     const rawName = col.name.trim();
@@ -288,19 +288,19 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         avgLength: art.avgLength || art.avgGarmentLength || '',
         fabrics: (Array.isArray(art.fabrics) && art.fabrics.length > 0)
           ? art.fabrics.map(f => ({
-              role: f.role || '',
-              fabricId: f.fabricId || '',
-              fabricQuality: f.fabricQuality || '',
-              avgLength: f.avgLength || art.avgLength || ''
-            }))
+            role: f.role || '',
+            fabricId: f.fabricId || '',
+            fabricQuality: f.fabricQuality || '',
+            avgLength: f.avgLength || art.avgLength || ''
+          }))
           : [
-              {
-                role: '',
-                fabricId: art.fabricId || '',
-                fabricQuality: art.fabricQuality || '',
-                avgLength: art.avgLength || ''
-              }
-            ]
+            {
+              role: '',
+              fabricId: art.fabricId || '',
+              fabricQuality: art.fabricQuality || '',
+              avgLength: art.avgLength || ''
+            }
+          ]
       }));
     }
     return [];
@@ -347,19 +347,19 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           avgLength: art.avgLength || art.avgGarmentLength || '',
           fabrics: (Array.isArray(art.fabrics) && art.fabrics.length > 0)
             ? art.fabrics.map(f => ({
-                role: f.role || '',
-                fabricId: f.fabricId || '',
-                fabricQuality: f.fabricQuality || '',
-                avgLength: f.avgLength || art.avgLength || ''
-              }))
+              role: f.role || '',
+              fabricId: f.fabricId || '',
+              fabricQuality: f.fabricQuality || '',
+              avgLength: f.avgLength || art.avgLength || ''
+            }))
             : [
-                {
-                  role: '',
-                  fabricId: art.fabricId || '',
-                  fabricQuality: art.fabricQuality || '',
-                  avgLength: art.avgLength || ''
-                }
-              ]
+              {
+                role: '',
+                fabricId: art.fabricId || '',
+                fabricQuality: art.fabricQuality || '',
+                avgLength: art.avgLength || ''
+              }
+            ]
         })));
       }
       const rawCusts = editingOrder.customerOrders || editingOrder.customers;
@@ -407,11 +407,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             const finalCombined = [...mapped, ...userAdded];
             try {
               localStorage.setItem('raindrop_fabrics_v1', JSON.stringify(finalCombined));
-            } catch (e) {}
+            } catch (e) { }
             return finalCombined;
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const colRes = await api.getColors();
@@ -436,14 +436,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             return deduplicated;
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const storedSeries = getStoredData('erp_size_series_v1', null);
         if (Array.isArray(storedSeries)) {
           setMasterSizeSeries(storedSeries);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     loadMasters();
   }, []);
@@ -620,8 +620,17 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           )
         );
       }
-      // Strictly NO auto pre-fill! Every article starts independent unless explicitly checked by user.
-      return { ...c, assignedArticleIds: updated, jointCards: newJointCards, jointArticles: {}, sizeConfigs: newSizeConfigs };
+
+      let nextConfigMode = { ...(c.configMode || {}) };
+      if (nextConfigMode.connectionType === 'all') {
+        nextConfigMode.connectedArticleIds = [...updated];
+      } else if (nextConfigMode.connectionType === 'custom') {
+        const curConnected = nextConfigMode.connectedArticleIds || [];
+        const validConnected = curConnected.filter(id => updated.includes(id));
+        nextConfigMode.connectedArticleIds = validConnected;
+      }
+
+      return { ...c, assignedArticleIds: updated, jointCards: newJointCards, jointArticles: {}, configMode: nextConfigMode, sizeConfigs: newSizeConfigs };
     }));
   };
 
@@ -713,10 +722,92 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       : assigned;
 
     if (connectedIds.includes(artId)) {
-      return connectedIds.map(aId => getSizeConfigKey(aId, colorName));
+      if (mode.sameColor !== false) {
+        return connectedIds.map(aId => getSizeConfigKey(aId, colorName));
+      }
+      // If sameColor is false (e.g. Contrast Combo): sync across corresponding colors
+      const thisArtColors = (cust.articleColors && cust.articleColors[artId]) || cust.selectedColors || [];
+      const colIdx = thisArtColors.indexOf(colorName);
+      return connectedIds.map(aId => {
+        if (aId === artId) return cardKey;
+        const otherArtColors = (cust.articleColors && cust.articleColors[aId]) || cust.selectedColors || [];
+        const targetColor = (colIdx >= 0 && otherArtColors[colIdx]) ? otherArtColors[colIdx] : (otherArtColors[0] || colorName);
+        return getSizeConfigKey(aId, targetColor);
+      });
     }
 
     return [cardKey];
+  };
+
+  // Helper to compute grouped cards for an order customer based on Set / Combo / Separate setup
+  const computeArticleGroups = (cust) => {
+    const assigned = (cust?.assignedArticleIds || []).filter(id => addedArticles.some(a => a.id === id));
+    if (assigned.length === 0) return [];
+
+    const mode = cust?.configMode || {};
+    const isMatchingSet = Boolean(
+      mode.connectionType !== 'independent' &&
+      mode.sameSize !== false &&
+      mode.sameValue !== false &&
+      (mode.sameColor === true || mode.sameValue === true || mode.connectionType === 'all' || mode.connectionType === 'custom')
+    );
+
+    if (!isMatchingSet || assigned.length <= 1) {
+      return assigned.map(aId => {
+        const art = addedArticles.find(a => a.id === aId);
+        return {
+          groupKey: aId,
+          groupArtIds: [aId],
+          leadArtId: aId,
+          isSet: false,
+          label: art?.name || 'Article',
+          badgeLabel: null
+        };
+      });
+    }
+
+    if (mode.connectionType !== 'custom') {
+      const names = assigned.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
+      return [{
+        groupKey: assigned.join('___'),
+        groupArtIds: [...assigned],
+        leadArtId: assigned[0],
+        isSet: true,
+        label: names.join(' + '),
+        badgeLabel: `⚡ 1:1 Matching Set (${assigned.length} Articles)`
+      }];
+    }
+
+    const connected = (Array.isArray(mode.connectedArticleIds) && mode.connectedArticleIds.length >= 2)
+      ? mode.connectedArticleIds.filter(id => assigned.includes(id))
+      : assigned.slice(0, 2);
+    const remaining = assigned.filter(aId => !connected.includes(aId));
+
+    const groups = [];
+    if (connected.length > 0) {
+      const comboNames = connected.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
+      groups.push({
+        groupKey: connected.join('___'),
+        groupArtIds: [...connected],
+        leadArtId: connected[0],
+        isSet: true,
+        label: comboNames.join(' + '),
+        badgeLabel: `✂️ 1:1 Combo Set (${connected.length} Articles)`
+      });
+    }
+    remaining.forEach(aId => {
+      const art = addedArticles.find(a => a.id === aId);
+      groups.push({
+        groupKey: aId,
+        groupArtIds: [aId],
+        leadArtId: aId,
+        isSet: false,
+        label: art?.name || 'Article',
+        badgeLabel: '📦 Separate Article'
+      });
+    });
+
+    return groups;
   };
 
   const setCustomerConfigMode = (cIdx, newMode) => {
@@ -744,20 +835,39 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           ? newMode.connectedArticleIds
           : (newMode.connectionType === 'independent' ? [] : assigned);
 
-        const colors = c.selectedColors || [];
-        if (connectedIds.length > 1 && colors.length > 0) {
+        if (connectedIds.length > 1) {
           const leadArtId = connectedIds[0];
           const nextConfigs = { ...(c.sizeConfigs || {}) };
-          colors.forEach(col => {
-            const leadKey = getSizeConfigKey(leadArtId, col);
-            const leadCfg = nextConfigs[leadKey];
-            if (leadCfg) {
-              connectedIds.slice(1).forEach(otherArtId => {
-                const otherKey = getSizeConfigKey(otherArtId, col);
-                nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
-              });
-            }
-          });
+
+          if (newMode.sameColor !== false) {
+            const colors = c.selectedColors || [];
+            colors.forEach(col => {
+              const leadKey = getSizeConfigKey(leadArtId, col);
+              const leadCfg = nextConfigs[leadKey];
+              if (leadCfg) {
+                connectedIds.slice(1).forEach(otherArtId => {
+                  const otherKey = getSizeConfigKey(otherArtId, col);
+                  nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
+                });
+              }
+            });
+          } else {
+            const leadColors = (c.articleColors && c.articleColors[leadArtId]) || c.selectedColors || [];
+            leadColors.forEach((leadCol, cIdx) => {
+              const leadKey = getSizeConfigKey(leadArtId, leadCol);
+              const leadCfg = nextConfigs[leadKey];
+              if (leadCfg) {
+                connectedIds.slice(1).forEach(otherArtId => {
+                  const otherColors = (c.articleColors && c.articleColors[otherArtId]) || c.selectedColors || [];
+                  const otherCol = otherColors[cIdx] || otherColors[0];
+                  if (otherCol) {
+                    const otherKey = getSizeConfigKey(otherArtId, otherCol);
+                    nextConfigs[otherKey] = JSON.parse(JSON.stringify(leadCfg));
+                  }
+                });
+              }
+            });
+          }
           updatedCust.sizeConfigs = nextConfigs;
         }
       }
@@ -890,7 +1000,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
 
   // Helper to get active series list for a customer (artId, colName) pair
   const getPairSeriesConfigs = (cust, artId, colorName) => {
-    const key = getSizeConfigKey(artId, colorName);
+    const actualColor = Array.isArray(colorName) ? colorName[0] : colorName;
+    const key = getSizeConfigKey(artId, actualColor);
     const curCfg = cust?.sizeConfigs?.[key];
     if (curCfg && Array.isArray(curCfg.seriesConfigs)) {
       return curCfg.seriesConfigs;
@@ -937,12 +1048,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       })) {
         return c;
       }
-      const fullDef = masterSizeSeries.find(s => 
+      const fullDef = masterSizeSeries.find(s =>
         (s.id && seriesObj.id && s.id === seriesObj.id) ||
         (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
         getCleanSeriesName(s).toLowerCase() === cleanLower ||
         (s.id || '').toLowerCase() === (seriesObj.id || '').toLowerCase()
-      ) || initialSizeSeries.find(s => 
+      ) || initialSizeSeries.find(s =>
         (s.id && seriesObj.id && s.id === seriesObj.id) ||
         (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
         getCleanSeriesName(s).toLowerCase() === cleanLower
@@ -1041,10 +1152,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       const scClean = (sc.seriesName || '').toLowerCase();
       const scId = (sc.seriesId || '').toLowerCase();
       return scClean === cleanLower ||
-             scClean === seriesNameLower ||
-             scId === cleanLower ||
-             scId === seriesNameLower ||
-             scId === (seriesObj.id || '').toLowerCase();
+        scClean === seriesNameLower ||
+        scId === cleanLower ||
+        scId === seriesNameLower ||
+        scId === (seriesObj.id || '').toLowerCase();
     });
     if (existing) {
       removeSeriesFromPair(cIdx, artId, colorName, existing.seriesId);
@@ -1321,12 +1432,14 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     }));
   };
 
-  // Group-aware series and size manipulators (works for 1 article or N linked articles)
+  // Group-aware series and size manipulators (works for 1 article or N linked articles, and 1 or N colors)
   const addSeriesToGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const cleanName = getCleanSeriesName(seriesObj);
       const cleanLower = cleanName.toLowerCase();
       const seriesNameLower = (seriesObj?.name || '').toLowerCase();
@@ -1337,12 +1450,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       })) {
         return c;
       }
-      const fullDef = masterSizeSeries.find(s => 
+      const fullDef = masterSizeSeries.find(s =>
         (s.id && seriesObj.id && s.id === seriesObj.id) ||
         (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
         getCleanSeriesName(s).toLowerCase() === cleanLower ||
         (s.id || '').toLowerCase() === (seriesObj.id || '').toLowerCase()
-      ) || initialSizeSeries.find(s => 
+      ) || initialSizeSeries.find(s =>
         (s.id && seriesObj.id && s.id === seriesObj.id) ||
         (s.name && (s.name.toLowerCase() === seriesNameLower || s.name.toLowerCase() === cleanLower)) ||
         getCleanSeriesName(s).toLowerCase() === cleanLower
@@ -1366,23 +1479,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       const updatedList = [...curList, newSeriesEntry];
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const removeSeriesFromGroup = (cIdx, groupArtIds, colorName, seriesId) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const cleanTarget = (seriesId || '').toLowerCase();
       const updatedList = curList.filter(sc => {
         const scClean = (sc.seriesName || '').toLowerCase();
@@ -1391,22 +1508,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const toggleSeriesInGroup = (cIdx, groupArtIds, colorName, seriesObj) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const cust = orderCustomers[cIdx];
     const leadArtId = groupArtIds[0];
-    const curList = getPairSeriesConfigs(cust, leadArtId, colorName);
+    const curList = getPairSeriesConfigs(cust, leadArtId, leadCol);
     const cleanName = getCleanSeriesName(seriesObj);
     const cleanLower = cleanName.toLowerCase();
     const seriesNameLower = (seriesObj?.name || '').toLowerCase();
@@ -1414,10 +1535,10 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       const scClean = (sc.seriesName || '').toLowerCase();
       const scId = (sc.seriesId || '').toLowerCase();
       return scClean === cleanLower ||
-             scClean === seriesNameLower ||
-             scId === cleanLower ||
-             scId === seriesNameLower ||
-             scId === (seriesObj.id || '').toLowerCase();
+        scClean === seriesNameLower ||
+        scId === cleanLower ||
+        scId === seriesNameLower ||
+        scId === (seriesObj.id || '').toLowerCase();
     });
     if (existing) {
       removeSeriesFromGroup(cIdx, groupArtIds, colorName, existing.seriesId);
@@ -1427,10 +1548,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
   };
 
   const toggleSizeInGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const curSizes = sc.selectedSizes || [];
@@ -1455,23 +1578,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const setRatioModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioUsed) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const selectedSizes = sc.selectedSizes || [];
@@ -1501,23 +1628,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const updateRatioCalculationForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, ratioStr, baseQty, userEdited = false) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const cleanRatio = ratioStr !== undefined ? ratioStr : (sc.ratioString || '');
@@ -1547,46 +1678,54 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const setUniformModeForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, isUniform) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         return { ...sc, uniform: isUniform };
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const updateUniformQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, qty) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         const newQtys = {};
@@ -1597,23 +1736,27 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
   const updateIndividualSizeQtyForGroupSeries = (cIdx, groupArtIds, colorName, seriesId, sz, qty) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colorsToUpdate[0];
     const leadArtId = groupArtIds[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, leadArtId, colorName);
+      const curList = getPairSeriesConfigs(c, leadArtId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         return {
@@ -1626,19 +1769,21 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      groupArtIds.forEach(aId => {
-        const key = getSizeConfigKey(aId, colorName);
-        nextConfigs[key] = {
-          ...nextConfigs[key],
-          seriesConfigs: updatedList,
-          sizeQtys: combinedQtys
-        };
+      colorsToUpdate.forEach(cName => {
+        groupArtIds.forEach(aId => {
+          const key = getSizeConfigKey(aId, cName);
+          nextConfigs[key] = {
+            ...nextConfigs[key],
+            seriesConfigs: updatedList,
+            sizeQtys: combinedQtys
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
   };
 
-  const openCopySizesForGroup = (cIdx, groupArtIds, sourceColor) => {
+    const openCopySizesForGroup = (cIdx, groupArtIds, sourceColor) => {
     const cust = orderCustomers[cIdx];
     const leadArtId = groupArtIds[0];
     const sourceCfg = cust?.sizeConfigs?.[getSizeConfigKey(leadArtId, sourceColor)];
@@ -1809,31 +1954,26 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       (art.fabrics || []).forEach((fr, frIdx) => {
         const fab = fabrics.find(f => f.id === fr.fabricId) || fabrics[0];
         const isGreige = fr.source === 'Greige Fabric' || !fr.source || String(fr.source).includes('Greige');
-        const rawShrink = fab?.defaultShrinkage !== undefined && fab?.defaultShrinkage !== null && fab?.defaultShrinkage !== '' 
-          ? fab.defaultShrinkage 
+        const rawShrink = fab?.defaultShrinkage !== undefined && fab?.defaultShrinkage !== null && fab?.defaultShrinkage !== ''
+          ? fab.defaultShrinkage
           : fab?.shrinkage;
-        const shrinkPct = isGreige 
-          ? (rawShrink !== undefined && rawShrink !== null && rawShrink !== '' ? (parseFloat(String(rawShrink).replace('%', '')) || 0) : 3.5) 
+        const shrinkPct = isGreige
+          ? (rawShrink !== undefined && rawShrink !== null && rawShrink !== '' ? (parseFloat(String(rawShrink).replace('%', '')) || 0) : 3.5)
           : 0;
-        const rawBuf = fab?.maxBuffer !== undefined && fab?.maxBuffer !== null && fab?.maxBuffer !== '' 
-          ? fab.maxBuffer 
+        const rawBuf = fab?.maxBuffer !== undefined && fab?.maxBuffer !== null && fab?.maxBuffer !== ''
+          ? fab.maxBuffer
           : 2.0;
-        const bufferPct = (rawBuf !== undefined && rawBuf !== null && rawBuf !== '') 
-          ? (parseFloat(String(rawBuf).replace('%', '')) || 0) 
+        const bufferPct = (rawBuf !== undefined && rawBuf !== null && rawBuf !== '')
+          ? (parseFloat(String(rawBuf).replace('%', '')) || 0)
           : 2.0;
 
         // Default or parsed dyed length in meters
         let dyedPerPiece = '';
         const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
-        const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
+        const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || '').trim());
         if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
-          if (isDupatta) {
-            // Order sheet rule: Dupatta length measured in mts
-            dyedPerPiece = Number(rawAvgLen.toFixed(3));
-          } else {
-            // If entered in inches, convert to meters (1 in = 0.0254 m)
-            dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
-          }
+          // If Dupatta, entered directly in meters (mts); else in inches, convert to meters (1 in = 0.0254 m)
+          dyedPerPiece = isDupatta ? Number(rawAvgLen.toFixed(3)) : Number((rawAvgLen * 0.0254).toFixed(3));
         } else if (fr.consumption !== undefined && fr.consumption !== null && fr.consumption !== '') {
           dyedPerPiece = parseFloat(fr.consumption) || '';
         } else if (art.consumption !== undefined && art.consumption !== null && art.consumption !== '') {
@@ -1945,8 +2085,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       widths: Array.isArray(newFabric.widths)
         ? newFabric.widths
         : (typeof newFabric.widths === 'string'
-            ? newFabric.widths.split(',').map(w => w.trim()).filter(Boolean)
-            : ['44"', '58"']),
+          ? newFabric.widths.split(',').map(w => w.trim()).filter(Boolean)
+          : ['44"', '58"']),
       shrinkage: parseFloat(newFabric.defaultShrinkage || newFabric.shrinkage) || 0,
       active: newFabric.active !== false
     };
@@ -1955,12 +2095,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       const updated = [cleanItem, ...prev.filter(p => p.id !== cleanItem.id)];
       try {
         localStorage.setItem('raindrop_fabrics_v1', JSON.stringify(updated));
-      } catch (err) {}
+      } catch (err) { }
       return updated;
     });
 
     if (api && api.saveFabric) {
-      try { api.saveFabric(cleanItem); } catch (err) {}
+      try { api.saveFabric(cleanItem); } catch (err) { }
     }
 
     // Auto-select in active fabric row
@@ -1996,7 +2136,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     setMasterColors(updated);
     setStoredColorsMaster(updated);
     if (api && api.saveColor) {
-      try { await api.saveColor(created); } catch (err) {}
+      try { await api.saveColor(created); } catch (err) { }
     }
 
     // Section 14.3: A colour added via "+ Add Colour" mid-order must immediately appear in that order's colour list
@@ -2027,8 +2167,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
   const handleFinalSave = (status) => {
     // If user didn't enter a styleName, default it to article name or Kurta
     const primaryArticleName = autoCapitalizeWords(addedArticles[0]?.name || 'Kurta');
-    const finalStyleName = (orderInfo.styleName && orderInfo.styleName.trim()) 
-      ? autoCapitalizeWords(orderInfo.styleName.trim()) 
+    const finalStyleName = (orderInfo.styleName && orderInfo.styleName.trim())
+      ? autoCapitalizeWords(orderInfo.styleName.trim())
       : `${primaryArticleName} Style (${orderInfo.orderId})`;
 
     // If no articles added explicitly, default to Kurta
@@ -2080,30 +2220,30 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           return hasAnyPieces ? artPieces > 0 : true;
         })
         .map(art => {
-        const firstFabId = art.fabrics?.[0]?.fabricId;
-        const matchingFab = fabrics.find(f => f.id === firstFabId);
-        const fabQuality = matchingFab?.qualityName || matchingFab?.quality || matchingFab?.name || art.fabrics?.[0]?.fabricQuality || '';
-        const avgLen = art.avgLength || art.fabrics?.[0]?.avgLength || art.avgGarmentLength || '';
-        const artPieces = getPiecesForArticle(art.id, art.name);
-        return {
-          ...art,
-          name: autoCapitalizeWords(art.name || primaryArticleName),
-          totalPieces: artPieces || 0,
-          fabricQuality: fabQuality,
-          fabrics: (art.fabrics || []).map(f => {
-            const fMatch = fabrics.find(fx => fx.id === f.fabricId);
-            return {
-              ...f,
-              fabricQuality: fMatch?.qualityName || fMatch?.quality || fMatch?.name || f.fabricQuality || '',
-              role: autoCapitalizeWords(f.role || ''),
-              color: f.color || '',
-              colorName: f.color || ''
-            };
-          }),
-          avgGarmentLength: avgLen,
-          avgLength: avgLen
-        };
-      }),
+          const firstFabId = art.fabrics?.[0]?.fabricId;
+          const matchingFab = fabrics.find(f => f.id === firstFabId);
+          const fabQuality = matchingFab?.qualityName || matchingFab?.quality || matchingFab?.name || art.fabrics?.[0]?.fabricQuality || '';
+          const avgLen = art.avgLength || art.fabrics?.[0]?.avgLength || art.avgGarmentLength || '';
+          const artPieces = getPiecesForArticle(art.id, art.name);
+          return {
+            ...art,
+            name: autoCapitalizeWords(art.name || primaryArticleName),
+            totalPieces: artPieces || 0,
+            fabricQuality: fabQuality,
+            fabrics: (art.fabrics || []).map(f => {
+              const fMatch = fabrics.find(fx => fx.id === f.fabricId);
+              return {
+                ...f,
+                fabricQuality: fMatch?.qualityName || fMatch?.quality || fMatch?.name || f.fabricQuality || '',
+                role: autoCapitalizeWords(f.role || ''),
+                color: f.color || '',
+                colorName: f.color || ''
+              };
+            }),
+            avgGarmentLength: avgLen,
+            avgLength: avgLen
+          };
+        }),
       customerOrders: mappedCustomerOrders,
       fabricConsumptions: fabricConsumptionRows,
       fabricQualityGroups: fabricGroups,
@@ -2269,9 +2409,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                   id={`article-tile-${tIdx}`}
                   role="button"
                   tabIndex={0}
-                  className={`p-3 rounded-3 text-center border transition position-relative cursor-pointer ${
-                    isSelected ? 'shadow-xs' : 'bg-white'
-                  }`}
+                  className={`p-3 rounded-3 text-center border transition position-relative cursor-pointer ${isSelected ? 'shadow-xs' : 'bg-white'
+                    }`}
                   style={{
                     backgroundColor: isSelected ? '#eef2ff' : '#ffffff',
                     borderColor: isSelected ? '#2e37a4' : '#e2e8f0',
@@ -2422,50 +2561,38 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                   </button>
                 </div>
 
-                <div className="row g-3 mb-3 align-items-end">
-                  <div className="col-12 col-md-6">
-                    <label className="form-label small text-muted mb-1 fw-semibold">Article name</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm bg-white"
-                      placeholder="e.g. Kurta"
-                      style={{ textTransform: 'capitalize' }}
-                      value={art.name}
-                      onChange={(e) => updateArticleName(art.id, autoCapitalizeWords(e.target.value))}
-                      onBlur={(e) => updateArticleName(art.id, autoCapitalizeWords((e.target.value || '').trim()))}
-                    />
-                  </div>
-                  <div className="col-12 col-md-3">
-                    {(() => {
-                      const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
-                      return (
-                        <>
-                          <label className="form-label small text-muted mb-1 fw-semibold d-flex align-items-center justify-content-between">
-                            <span>{isDupatta ? 'Avg length (mts)' : 'Avg length (in)'}</span>
-                            {isDupatta && (
-                              <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '10px' }}>
-                                in meters
-                              </span>
-                            )}
-                          </label>
-                          <input
-                            type="number"
-                            step={isDupatta ? '0.01' : '0.5'}
-                            className="form-control form-control-sm bg-white"
-                            placeholder={isDupatta ? 'e.g. 2.25' : 'e.g. 45'}
-                            value={art.avgLength ?? ''}
-                            onChange={(e) => updateArticleAvgLength(art.id, e.target.value)}
-                          />
-                          {isDupatta && (
-                            <small className="text-muted d-block mt-0.5" style={{ fontSize: '10.5px' }}>
-                              Order sheet: Dupatta length measured in mts
-                            </small>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
+                {(() => {
+                  const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || '').trim());
+                  return (
+                    <div className="row g-3 mb-3 align-items-end">
+                      <div className="col-12 col-md-6">
+                        <label className="form-label small text-muted mb-1 fw-semibold">Article name</label>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm bg-white"
+                          placeholder="e.g. Kurta"
+                          style={{ textTransform: 'capitalize' }}
+                          value={art.name}
+                          onChange={(e) => updateArticleName(art.id, autoCapitalizeWords(e.target.value))}
+                          onBlur={(e) => updateArticleName(art.id, autoCapitalizeWords((e.target.value || '').trim()))}
+                        />
+                      </div>
+                      <div className="col-12 col-md-3">
+                        <label className="form-label small text-muted mb-1 fw-semibold">
+                          {isDupatta ? 'Avg length (mts)' : 'Avg length (in)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          className="form-control form-control-sm bg-white"
+                          placeholder={isDupatta ? 'e.g. 2.25' : 'e.g. 45'}
+                          value={art.avgLength ?? ''}
+                          onChange={(e) => updateArticleAvgLength(art.id, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="small text-muted mb-2 fw-medium">
                   Fabric requirement — add a row per fabric this article needs (e.g. Outer + Lining for a kurta):
@@ -2570,9 +2697,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                 <button
                   key={num}
                   type="button"
-                  className={`btn rounded-3 fw-bold transition ${
-                    isSelected ? 'text-white shadow-sm' : 'btn-light border text-secondary'
-                  }`}
+                  className={`btn rounded-3 fw-bold transition ${isSelected ? 'text-white shadow-sm' : 'btn-light border text-secondary'
+                    }`}
                   style={{
                     width: '45px',
                     height: '42px',
@@ -2655,7 +2781,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                   {/* Customer Accordion Body */}
                   {isExpanded && (() => {
                     const configMode = cust.configMode || {};
-                    const currentArtTabId = activeColorArtTab[ci] || (cust.assignedArticleIds?.[0]) || '';
+                    const assignedArticleIds = (cust.assignedArticleIds || []).filter(id => addedArticles.some(a => a.id === id));
+                    const isMultiArticle = assignedArticleIds.length > 1;
+                    const currentArtTabId = activeColorArtTab[ci] || (assignedArticleIds[0]) || '';
                     const currentArtObj = addedArticles.find(a => a.id === currentArtTabId);
                     const currentArtColors = (configMode.sameColor === false && currentArtTabId)
                       ? (cust.articleColors?.[currentArtTabId] || [])
@@ -2708,9 +2836,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                   <button
                                     key={art.id}
                                     type="button"
-                                    className={`btn btn-sm rounded-pill px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 transition ${
-                                      isAssigned ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
-                                    }`}
+                                    className={`btn btn-sm rounded-pill px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 transition ${isAssigned ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                      }`}
                                     style={{ backgroundColor: isAssigned ? '#2e37a4' : '#f8fafc', borderColor: isAssigned ? '#2e37a4' : '#e2e8f0' }}
                                     onClick={() => toggleCustomerArticle(ci, art.id)}
                                   >
@@ -2723,444 +2850,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           </div>
                         </div>
 
-                        {/* Section: Interactive Article Combination & Guided Questionnaire */}
-                        {(cust.assignedArticleIds || []).length > 1 && (
-                          <div
-                            className="p-3.5 rounded-4 mb-4 border shadow-xs"
-                            style={{
-                              backgroundColor: '#ffffff',
-                              borderColor: '#c7d2fe'
-                            }}
-                          >
-                            {/* Header */}
-                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2.5 border-bottom" style={{ borderColor: '#e0e7ff' }}>
-                              <div>
-                                <div className="d-flex align-items-center gap-2">
-                                  <span className="badge rounded-pill px-2.5 py-1 text-white fw-bold" style={{ fontSize: '11px', backgroundColor: '#2e37a4' }}>
-                                    <i className="ti ti-adjustments-horizontal me-1"></i>
-                                    Set Matching Setup
-                                  </span>
-                                  <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '14px' }}>
-                                    Article Combination Setup ({cust.assignedArticleIds.length} Articles)
-                                  </h6>
-                                </div>
-                                <p className="text-secondary small mb-0 mt-1" style={{ fontSize: '12px' }}>
-                                  {(cust.assignedArticleIds || []).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')} &mdash; Answer the guided questions below to configure how articles match:
-                                </p>
-                              </div>
-
-                              {/* Quick Presets */}
-                              <div className="d-flex flex-wrap align-items-center gap-1.5">
-                                <span className="text-muted small fw-semibold me-1" style={{ fontSize: '11px' }}>Quick Presets:</span>
-                                <button
-                                  type="button"
-                                  className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${
-                                    configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all'
-                                      ? 'btn-primary text-white shadow-xs'
-                                      : 'btn-outline-secondary bg-white text-dark'
-                                  }`}
-                                  style={{ fontSize: '11px', backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
-                                  onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: 'all', connectedArticleIds: [...(cust.assignedArticleIds || [])] })}
-                                  title="Same Color, Same Size, Auto-sync Quantities across All Articles"
-                                >
-                                  ⚡ Full Matching Set
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${
-                                    configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false && configMode.connectionType === 'all'
-                                      ? 'btn-primary text-white shadow-xs'
-                                      : 'btn-outline-secondary bg-white text-dark'
-                                  }`}
-                                  style={{ fontSize: '11px', backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false && configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
-                                  onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: false, connectionType: 'all', connectedArticleIds: [...(cust.assignedArticleIds || [])] })}
-                                  title="Same Color, Same Size, Independent Quantities"
-                                >
-                                  ⚖️ Shared Sizes, Separate Qty
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${
-                                    configMode.sameColor === true && configMode.sameSize === false && configMode.sameValue === false
-                                      ? 'btn-primary text-white shadow-xs'
-                                      : 'btn-outline-secondary bg-white text-dark'
-                                  }`}
-                                  style={{ fontSize: '11px', backgroundColor: configMode.sameColor === true && configMode.sameSize === false && configMode.sameValue === false ? '#2e37a4' : '#fff' }}
-                                  onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: false, sameValue: false, connectionType: 'independent', connectedArticleIds: [] })}
-                                  title="Same Color, Different Sizes & Quantities"
-                                >
-                                  📏 Shared Colors, Separate Sizes
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${
-                                    configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false
-                                      ? 'btn-primary text-white shadow-xs'
-                                      : 'btn-outline-secondary bg-white text-dark'
-                                  }`}
-                                  style={{ fontSize: '11px', backgroundColor: configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? '#2e37a4' : '#fff' }}
-                                  onClick={() => setCustomerConfigMode(ci, { sameColor: false, sameSize: false, sameValue: false, connectionType: 'independent', connectedArticleIds: [] })}
-                                  title="Independent Colors, Sizes, and Quantities per Article"
-                                >
-                                  🎨 Custom Mix &amp; Match
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Guided Interactive Questions */}
-                            <div className="d-flex flex-column gap-2.5">
-                              {/* Question 1: Colors */}
-                              <div
-                                className="p-3 rounded-3 border transition"
-                                style={{
-                                  backgroundColor: configMode.sameColor === true ? '#f8faff' : (configMode.sameColor === false ? '#fffbeb' : '#ffffff'),
-                                  borderColor: (configMode.sameColor !== undefined && configMode.sameColor !== null) ? '#c7d2fe' : '#e2e8f0'
-                                }}
-                              >
-                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                  <div className="d-flex align-items-center gap-2.5">
-                                    <span
-                                      className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                      style={{ width: '24px', height: '24px', fontSize: '11px', fontWeight: 'bold', backgroundColor: (configMode.sameColor !== undefined && configMode.sameColor !== null) ? '#2e37a4' : '#94a3b8' }}
-                                    >
-                                      1
-                                    </span>
-                                    <div>
-                                      <div className="fw-bold text-dark fs-14">
-                                        Do all {cust.assignedArticleIds.length} articles have the same colors?
-                                      </div>
-                                      <small className="text-muted">
-                                        {configMode.sameColor === true
-                                          ? 'Colors selected once will apply across all articles'
-                                          : configMode.sameColor === false
-                                          ? 'Select independent colors for each individual article'
-                                          : 'Choose whether articles share colors or have separate color palettes'}
-                                      </small>
-                                    </div>
-                                  </div>
-                                  <div className="btn-group btn-group-sm ms-auto" role="group">
-                                    <button
-                                      type="button"
-                                      className={`btn px-3 py-1.5 fw-semibold ${configMode.sameColor === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                      style={{ fontSize: '12px', backgroundColor: configMode.sameColor === true ? '#2e37a4' : '#fff' }}
-                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameColor: true })}
-                                    >
-                                      {configMode.sameColor === true && <i className="ti ti-check me-1"></i>} Yes (Same Colors)
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={`btn px-3 py-1.5 fw-semibold ${configMode.sameColor === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                      style={{ fontSize: '12px', backgroundColor: configMode.sameColor === false ? '#1e293b' : '#fff' }}
-                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameColor: false })}
-                                    >
-                                      {configMode.sameColor === false && <i className="ti ti-check me-1"></i>} No (Different Colors)
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Question 2: Sizes */}
-                              <div
-                                className="p-3 rounded-3 border transition"
-                                style={{
-                                  backgroundColor: configMode.sameSize === true ? '#f8faff' : (configMode.sameSize === false ? '#fffbeb' : '#ffffff'),
-                                  borderColor: (configMode.sameSize !== undefined && configMode.sameSize !== null) ? '#c7d2fe' : '#e2e8f0'
-                                }}
-                              >
-                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                  <div className="d-flex align-items-center gap-2.5">
-                                    <span
-                                      className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                      style={{ width: '24px', height: '24px', fontSize: '11px', fontWeight: 'bold', backgroundColor: (configMode.sameSize !== undefined && configMode.sameSize !== null) ? '#2e37a4' : '#94a3b8' }}
-                                    >
-                                      2
-                                    </span>
-                                    <div>
-                                      <div className="fw-bold text-dark fs-14">
-                                        Are sizes identical across all articles?
-                                      </div>
-                                      <small className="text-muted">
-                                        {configMode.sameSize === true
-                                          ? 'Size series (e.g. S, M, L, XL) will be shared across all articles'
-                                          : configMode.sameSize === false
-                                          ? 'Configure different size series for each article independently'
-                                          : 'Choose whether articles share the same size series or have different sizes'}
-                                      </small>
-                                    </div>
-                                  </div>
-                                  <div className="btn-group btn-group-sm ms-auto" role="group">
-                                    <button
-                                      type="button"
-                                      className={`btn px-3 py-1.5 fw-semibold ${configMode.sameSize === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                      style={{ fontSize: '12px', backgroundColor: configMode.sameSize === true ? '#2e37a4' : '#fff' }}
-                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameSize: true })}
-                                    >
-                                      {configMode.sameSize === true && <i className="ti ti-check me-1"></i>} Yes (Same Sizes)
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={`btn px-3 py-1.5 fw-semibold ${configMode.sameSize === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                      style={{ fontSize: '12px', backgroundColor: configMode.sameSize === false ? '#1e293b' : '#fff' }}
-                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameSize: false, sameValue: false })}
-                                    >
-                                      {configMode.sameSize === false && <i className="ti ti-check me-1"></i>} No (Different Sizes)
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Question 3: Connection & Pairing (Shown when there are > 2 articles) */}
-                              {(cust.assignedArticleIds || []).length > 2 && (
-                                <div
-                                  className="p-3 rounded-3 border transition"
-                                  style={{
-                                    backgroundColor: configMode.connectionType ? '#f8faff' : '#ffffff',
-                                    borderColor: configMode.connectionType ? '#c7d2fe' : '#e2e8f0'
-                                  }}
-                                >
-                                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                                    <div className="d-flex align-items-center gap-2.5">
-                                      <span
-                                        className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                        style={{ width: '24px', height: '24px', fontSize: '11px', fontWeight: 'bold', backgroundColor: configMode.connectionType ? '#2e37a4' : '#94a3b8' }}
-                                      >
-                                        3
-                                      </span>
-                                      <div>
-                                        <div className="fw-bold text-dark fs-14">
-                                          How should these {cust.assignedArticleIds.length} articles be connected?
-                                        </div>
-                                        <small className="text-muted">
-                                          Connect all {cust.assignedArticleIds.length} articles into one set, or pair specific articles together
-                                        </small>
-                                      </div>
-                                    </div>
-                                    <div className="btn-group btn-group-sm ms-auto" role="group">
-                                      <button
-                                        type="button"
-                                        className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                        style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
-                                        onClick={() => setCustomerConfigMode(ci, {
-                                          ...configMode,
-                                          connectionType: 'all',
-                                          connectedArticleIds: [...(cust.assignedArticleIds || [])]
-                                        })}
-                                      >
-                                        {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>} <i className="ti ti-link me-1"></i> Connect All Together
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'custom' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                        style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'custom' ? '#2e37a4' : '#fff' }}
-                                        onClick={() => {
-                                          const assigned = cust.assignedArticleIds || [];
-                                          const initialPair = (configMode.connectedArticleIds && configMode.connectedArticleIds.length > 0)
-                                            ? configMode.connectedArticleIds
-                                            : assigned.slice(0, 2);
-                                          setCustomerConfigMode(ci, {
-                                            ...configMode,
-                                            connectionType: 'custom',
-                                            connectedArticleIds: initialPair
-                                          });
-                                        }}
-                                      >
-                                        {configMode.connectionType === 'custom' && <i className="ti ti-check me-1"></i>} <i className="ti ti-components me-1"></i> Custom Pairing
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'independent' ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                        style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'independent' ? '#1e293b' : '#fff' }}
-                                        onClick={() => setCustomerConfigMode(ci, {
-                                          ...configMode,
-                                          connectionType: 'independent',
-                                          connectedArticleIds: []
-                                        })}
-                                      >
-                                        {configMode.connectionType === 'independent' && <i className="ti ti-check me-1"></i>} Keep Separate
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Custom Pairing Selector */}
-                                  {configMode.connectionType === 'custom' && (
-                                    <div className="mt-2.5 ms-4 ps-1 p-2.5 rounded-3 bg-white border" style={{ borderColor: '#c7d2fe' }}>
-                                      <div className="d-flex align-items-center justify-content-between mb-2">
-                                        <span className="small fw-bold text-dark">
-                                          Click articles to connect into a combo set:
-                                        </span>
-                                        <span className="badge bg-primary text-white" style={{ fontSize: '10px' }}>
-                                          {(configMode.connectedArticleIds || []).length} of {cust.assignedArticleIds.length} Connected
-                                        </span>
-                                      </div>
-                                      <div className="d-flex flex-wrap gap-2">
-                                        {(cust.assignedArticleIds || []).map(aId => {
-                                          const art = addedArticles.find(a => a.id === aId);
-                                          if (!art) return null;
-                                          const isConnected = (configMode.connectedArticleIds || []).includes(aId);
-                                          return (
-                                            <button
-                                              key={aId}
-                                              type="button"
-                                              className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1.5 ${
-                                                isConnected ? 'btn-primary text-white' : 'btn-outline-secondary bg-white'
-                                              }`}
-                                              style={{ fontSize: '11px', backgroundColor: isConnected ? '#2e37a4' : undefined }}
-                                              onClick={() => {
-                                                const current = configMode.connectedArticleIds || [];
-                                                const next = isConnected
-                                                  ? current.filter(id => id !== aId)
-                                                  : [...current, aId];
-                                                setCustomerConfigMode(ci, {
-                                                  ...configMode,
-                                                  connectedArticleIds: next
-                                                });
-                                              }}
-                                            >
-                                              <span>{art.name}</span>
-                                              <i className={`ti ti-${isConnected ? 'link' : 'plus'} small`}></i>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                      <div className="mt-2 text-muted small" style={{ fontSize: '11px' }}>
-                                        {(configMode.connectedArticleIds || []).length > 0 ? (
-                                          <span>
-                                            🔗 <strong>Connected Set:</strong> {(configMode.connectedArticleIds || []).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')}
-                                            {(cust.assignedArticleIds || []).filter(id => !(configMode.connectedArticleIds || []).includes(id)).length > 0 && (
-                                              <span className="ms-2">&bull; <strong>Independent:</strong> {(cust.assignedArticleIds || []).filter(id => !(configMode.connectedArticleIds || []).includes(id)).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(', ')}</span>
-                                            )}
-                                          </span>
-                                        ) : (
-                                          <span className="text-warning">⚠️ Please select at least 2 articles to connect together.</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Question 4: Quantity Synchronization (Shown when sizes are identical and articles connected) */}
-                              {configMode.sameSize === true && configMode.connectionType !== 'independent' && (
-                                <div
-                                  className="p-3 rounded-3 border transition"
-                                  style={{
-                                    backgroundColor: configMode.sameValue === true ? '#f0fdf4' : (configMode.sameValue === false ? '#f8faff' : '#ffffff'),
-                                    borderColor: (configMode.sameValue !== undefined && configMode.sameValue !== null) ? '#bbf7d0' : '#e2e8f0'
-                                  }}
-                                >
-                                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                    <div className="d-flex align-items-center gap-2.5">
-                                      <span
-                                        className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                        style={{ width: '24px', height: '24px', fontSize: '11px', fontWeight: 'bold', backgroundColor: configMode.sameValue === true ? '#16a34a' : '#2e37a4' }}
-                                      >
-                                        {(cust.assignedArticleIds || []).length > 2 ? '4' : '3'}
-                                      </span>
-                                      <div>
-                                        <div className="fw-bold text-dark fs-14">
-                                          Auto-sync piece quantities across connected articles?
-                                        </div>
-                                        <small className="text-muted">
-                                          {configMode.sameValue === true
-                                            ? 'Entering quantities or ratio on one article will automatically sync to matching connected articles'
-                                            : configMode.sameValue === false
-                                            ? 'Piece quantities will be entered separately for each article'
-                                            : 'Choose whether entering pieces on one article automatically fills connected articles'}
-                                        </small>
-                                      </div>
-                                    </div>
-                                    <div className="btn-group btn-group-sm ms-auto" role="group">
-                                      <button
-                                        type="button"
-                                        className={`btn px-3 py-1.5 fw-semibold ${configMode.sameValue === true ? 'btn-success text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                        style={{ fontSize: '12px', backgroundColor: configMode.sameValue === true ? '#16a34a' : '#fff' }}
-                                        onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: true })}
-                                      >
-                                        {configMode.sameValue === true && <i className="ti ti-check me-1"></i>} <i className="ti ti-wand me-1"></i> Yes (Auto-Sync Qty)
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`btn px-3 py-1.5 fw-semibold ${configMode.sameValue === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                        style={{ fontSize: '12px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
-                                        onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: false })}
-                                      >
-                                        {configMode.sameValue === false && <i className="ti ti-check me-1"></i>} No (Independent Qty)
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Active Setup Summary Bar */}
-                            {(() => {
-                              const isComplete = (configMode.sameColor !== undefined && configMode.sameColor !== null) && (configMode.sameSize !== undefined && configMode.sameSize !== null);
-                              if (!isComplete) {
-                                return (
-                                  <div
-                                    className="mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center justify-content-between gap-2 border"
-                                    style={{
-                                      backgroundColor: '#f8fafc',
-                                      borderColor: '#e2e8f0',
-                                      fontSize: '12px',
-                                      color: '#64748b'
-                                    }}
-                                  >
-                                    <div className="d-flex align-items-center gap-2">
-                                      <i className="ti ti-hand-click text-primary fs-5"></i>
-                                      <span>
-                                        <strong>No Default Selection:</strong> Please answer the questions above or click a Quick Preset to configure matching articles.
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <div
-                                  className="mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center justify-content-between gap-2 border"
-                                  style={{
-                                    backgroundColor: (configMode.sameValue && configMode.sameSize) ? '#f0fdf4' : '#eff6ff',
-                                    borderColor: (configMode.sameValue && configMode.sameSize) ? '#bbf7d0' : '#bfdbfe',
-                                    fontSize: '12px'
-                                  }}
-                                >
-                                  <div className="d-flex align-items-center gap-2">
-                                    <i className={`ti ti-${(configMode.sameValue && configMode.sameSize) ? 'circle-check text-success' : 'info-circle text-primary'} fs-5`}></i>
-                                    <div>
-                                      <strong className={(configMode.sameValue && configMode.sameSize) ? 'text-success' : 'text-primary'}>
-                                        Active Setup:
-                                      </strong>{' '}
-                                      <span className="text-dark fw-medium">
-                                        {configMode.connectionType === 'custom' ? (
-                                          <span>Custom Pairing ({((configMode.connectedArticleIds || []).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')) || 'None'})</span>
-                                        ) : (configMode.connectionType === 'independent' || (!configMode.sameSize && !configMode.sameColor)) ? (
-                                          <span>All Independent Articles</span>
-                                        ) : (
-                                          <span>All {cust.assignedArticleIds.length} Articles Connected (Full Set)</span>
-                                        )}
-                                        {' '}&bull;{' '}
-                                        {configMode.sameColor ? 'Shared Colors' : 'Different Colors'}
-                                        {' '}&bull;{' '}
-                                        {configMode.sameSize ? 'Shared Sizes' : 'Different Sizes'}
-                                        {configMode.sameSize && (configMode.connectionType || 'all') !== 'independent' && (
-                                          <span> &bull; {configMode.sameValue ? '✨ Auto-Sync Quantities Active' : 'Independent Quantities'}</span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
-
-                        {/* Colors for this Customer with Seasonal / Collection Tabs */}
+                                                {/* Colors for this Customer with Seasonal / Collection Tabs */}
                         <div className="mb-4">
                           <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <div>
                               <label className="form-label fw-semibold small text-muted mb-0">
-                                {!configMode.sameColor ? `Colors for ${currentArtObj?.name || 'Article'}:` : 'Colors for this Customer:'}
+                                {configMode.sameColor === false ? `Colors for ${currentArtObj?.name || 'Article'}:` : 'Colors for this Customer:'}
                               </label>
                               <span className="text-secondary small ms-2">
                                 ({currentArtColors.length} selected &bull; {masterColors.length} in palette)
@@ -3181,7 +2876,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           </div>
 
                           {/* Article Tabs for Color Assignment when sameColor is false */}
-                          {!configMode.sameColor && (cust.assignedArticleIds || []).length > 1 && (
+                          {configMode.sameColor === false && (cust.assignedArticleIds || []).length > 1 && (
                             <div className="p-2.5 rounded-3 mb-2.5 bg-white border d-flex flex-wrap align-items-center gap-2" style={{ borderColor: '#cbd5e1' }}>
                               <span className="small fw-bold text-dark d-flex align-items-center gap-1 me-1">
                                 <i className="ti ti-shirt text-primary"></i>
@@ -3196,9 +2891,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                   <button
                                     key={aId}
                                     type="button"
-                                    className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold transition d-inline-flex align-items-center gap-1.5 ${
-                                      isTabActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
-                                    }`}
+                                    className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold transition d-inline-flex align-items-center gap-1.5 ${isTabActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                      }`}
                                     style={{
                                       backgroundColor: isTabActive ? '#2e37a4' : '#ffffff',
                                       borderColor: isTabActive ? '#2e37a4' : '#cbd5e1',
@@ -3245,9 +2939,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                       <button
                                         key={tab.key}
                                         type="button"
-                                        className={`btn btn-sm py-1 px-2.5 rounded-pill fw-semibold transition d-inline-flex align-items-center gap-1.5 ${
-                                          isActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
-                                        }`}
+                                        className={`btn btn-sm py-1 px-2.5 rounded-pill fw-semibold transition d-inline-flex align-items-center gap-1.5 ${isActive ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                          }`}
                                         style={{
                                           fontSize: '12px',
                                           backgroundColor: isActive ? '#2e37a4' : '#ffffff',
@@ -3258,9 +2951,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                         <span>{tab.icon}</span>
                                         <span>{tab.label}</span>
                                         <span
-                                          className={`badge rounded-pill px-1.5 py-0.5 ${
-                                            isActive ? 'bg-white text-primary' : 'bg-light text-muted border'
-                                          }`}
+                                          className={`badge rounded-pill px-1.5 py-0.5 ${isActive ? 'bg-white text-primary' : 'bg-light text-muted border'
+                                            }`}
                                           style={{ fontSize: '10px' }}
                                         >
                                           {count}
@@ -3358,7 +3050,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                               // Section 14.3: A colour with no Quarter/Season tag must still be selectable via search
                               if (searchQuery) {
                                 return (col.name || '').toLowerCase().includes(searchQuery) ||
-                                       (col.pantone || '').toLowerCase().includes(searchQuery);
+                                  (col.pantone || '').toLowerCase().includes(searchQuery);
                               }
 
                               const qTag = getColorQuarterTag(col);
@@ -3389,9 +3081,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                     <button
                                       key={col.id || col.name}
                                       type="button"
-                                      className={`btn btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 transition ${
-                                        isSelected ? 'btn-dark text-white shadow-xs' : 'btn-light border text-secondary'
-                                      }`}
+                                      className={`btn btn-sm rounded-pill px-3 py-1.5 d-flex align-items-center gap-2 transition ${isSelected ? 'btn-dark text-white shadow-xs' : 'btn-light border text-secondary'
+                                        }`}
                                       style={{
                                         backgroundColor: isSelected ? '#1e293b' : '#ffffff',
                                         borderColor: isSelected ? '#0f172a' : '#cbd5e1'
@@ -3419,13 +3110,569 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           })()}
                         </div>
 
-                        {/* Sizes & Quantities Breakdown per (Article, Color) */}
+                        {/* Section: Interactive Article Combination & Guided Questionnaire (Placed right below article selection) */}
+                        {(cust.assignedArticleIds || []).length > 1 && (((cust.selectedColors || []).length > 0) || ((cust.assignedArticleIds || []).some(aId => (cust.articleColors?.[aId] || []).length > 0))) && (
+                          <div
+                            className="p-3.5 rounded-4 mb-4 border shadow-xs"
+                            style={{
+                              backgroundColor: '#ffffff',
+                              borderColor: '#c7d2fe'
+                            }}
+                          >
+                            {/* Header */}
+                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2.5 border-bottom" style={{ borderColor: '#e0e7ff' }}>
+                              <div>
+                                <div className="d-flex align-items-center gap-2">
+                                  <span className="badge rounded-pill px-2.5 py-1 text-white fw-bold" style={{ fontSize: '11px', backgroundColor: '#2e37a4' }}>
+                                    <i className="ti ti-adjustments-horizontal me-1"></i>
+                                    Set Matching Setup
+                                  </span>
+                                  <h6 className="fw-bold text-dark mb-0" style={{ fontSize: '14px' }}>
+                                    Article Combination Setup ({assignedArticleIds.length} Articles)
+                                  </h6>
+                                </div>
+                                <p className="text-secondary small mb-0 mt-1" style={{ fontSize: '12px' }}>
+                                  {assignedArticleIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')} &mdash; Answer the guided questions below to configure how articles match:
+                                </p>
+                              </div>
+
+                              {/* Quick Presets */}
+                              {(() => {
+                                const assignedNames = assignedArticleIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean);
+                                const firstTwoNames = assignedNames.slice(0, 2).join(' + ') || 'Kurta + Pant';
+                                const restNames = assignedNames.slice(2).join(', ') || 'Dupatta';
+                                const isThreePlus = assignedArticleIds.length > 2;
+
+                                return (
+                                  <div className="d-flex flex-wrap align-items-center gap-1.5">
+                                    <span className="text-muted small fw-semibold me-1" style={{ fontSize: '11px' }}>Quick Presets:</span>
+                                    <button
+                                      type="button"
+                                      className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all'
+                                        ? 'btn-primary text-white shadow-xs'
+                                        : 'btn-outline-secondary bg-white text-dark'
+                                        }`}
+                                      style={{ fontSize: '11px', backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: 'all', connectedArticleIds: [...assignedArticleIds] })}
+                                      title="Same Colors, Same Sizes, 1:1 Matching Quantities"
+                                    >
+                                      ⚡ Full Matching Set
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === false && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all'
+                                        ? 'btn-primary text-white shadow-xs'
+                                        : 'btn-outline-secondary bg-white text-dark'
+                                        }`}
+                                      style={{ fontSize: '11px', backgroundColor: configMode.sameColor === false && configMode.sameSize === true && configMode.sameValue === true && configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { sameColor: false, sameSize: true, sameValue: true, connectionType: 'all', connectedArticleIds: [...assignedArticleIds] })}
+                                      title="Different / Contrast Colors, Same Sizes, 1:1 Matching Quantities"
+                                    >
+                                      🎨 Contrast Set (Jodi)
+                                    </button>
+                                    {isThreePlus && (
+                                      <button
+                                        type="button"
+                                        className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.connectionType === 'custom' && configMode.sameValue === true
+                                          ? 'btn-primary text-white shadow-xs'
+                                          : 'btn-outline-secondary bg-white text-dark'
+                                          }`}
+                                        style={{ fontSize: '11px', backgroundColor: configMode.connectionType === 'custom' && configMode.sameValue === true ? '#2e37a4' : '#fff' }}
+                                        onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: true, connectionType: 'custom', connectedArticleIds: assignedArticleIds.slice(0, 2) })}
+                                        title={`${firstTwoNames} combo set (1:1 sync), ${restNames} separate`}
+                                      >
+                                        ✂️ {firstTwoNames} Combo
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false
+                                        ? 'btn-primary text-white shadow-xs'
+                                        : 'btn-outline-secondary bg-white text-dark'
+                                        }`}
+                                      style={{ fontSize: '11px', backgroundColor: configMode.sameColor === true && configMode.sameSize === true && configMode.sameValue === false ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { sameColor: true, sameSize: true, sameValue: false, connectionType: 'independent', connectedArticleIds: [] })}
+                                      title="Same Colors, Same Sizes, Separate Quantities per Article"
+                                    >
+                                      ⚖️ Shared Sizes, Separate Qty
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`btn btn-xs rounded-pill px-2.5 py-1 fw-semibold transition ${configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false
+                                        ? 'btn-primary text-white shadow-xs'
+                                        : 'btn-outline-secondary bg-white text-dark'
+                                        }`}
+                                      style={{ fontSize: '11px', backgroundColor: configMode.sameColor === false && configMode.sameSize === false && configMode.sameValue === false ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { sameColor: false, sameSize: false, sameValue: false, connectionType: 'independent', connectedArticleIds: [] })}
+                                      title="Independent Colors, Sizes, and Quantities per Article"
+                                    >
+                                      🧩 Custom Mix &amp; Match
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Guided Interactive Questions - Clean 3-Step Flow */}
+                            <div className="d-flex flex-column gap-3">
+                              {/* Question 1: Matching Set (Jodi) vs Separate Articles */}
+                              {(() => {
+                                const assignedNames = assignedArticleIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean);
+                                const isThreePlus = assignedArticleIds.length > 2;
+                                const firstTwoNames = assignedNames.slice(0, 2).join(' + ') || 'Kurta + Pant';
+                                const connectedIds = (configMode.connectedArticleIds && configMode.connectedArticleIds.length > 0)
+                                  ? configMode.connectedArticleIds
+                                  : assignedArticleIds.slice(0, 2);
+                                const comboArticleNames = connectedIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean);
+                                const separateArticleNames = assignedArticleIds.filter(id => !connectedIds.includes(id)).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean);
+                                const isAnswered = configMode.connectionType !== undefined && configMode.connectionType !== null;
+
+                                return (
+                                  <div
+                                    className="p-3.5 rounded-3 border transition"
+                                    style={{
+                                      backgroundColor: isAnswered ? '#f8faff' : '#ffffff',
+                                      borderColor: isAnswered ? '#c7d2fe' : '#e2e8f0'
+                                    }}
+                                  >
+                                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                                      <div className="d-flex align-items-center gap-2.5">
+                                        <span
+                                          className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                          style={{ width: '26px', height: '26px', fontSize: '12px', fontWeight: 'bold', backgroundColor: isAnswered ? '#2e37a4' : '#94a3b8' }}
+                                        >
+                                          1
+                                        </span>
+                                        <div>
+                                          <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+                                            {isThreePlus
+                                              ? `How should these ${assignedArticleIds.length} articles be grouped?`
+                                              : `Are ${assignedNames.join(' & ')} a Matching Set (Jodi) or Separate Articles?`}
+                                          </div>
+                                          <small className="text-muted">
+                                            {configMode.connectionType === 'all'
+                                              ? (isThreePlus
+                                                ? `⚡ Complete ${assignedArticleIds.length}-Piece Set — all articles match together in equal quantities`
+                                                : `⚡ Matching Set (1:1 Jodi) — articles are paired together as a set`)
+                                              : configMode.connectionType === 'custom'
+                                                ? `✂️ Combo Set: ${comboArticleNames.join(' + ') || firstTwoNames} (1:1 match)${separateArticleNames.length > 0 ? ` • ${separateArticleNames.join(', ')} is separate` : ''}`
+                                                : configMode.connectionType === 'independent'
+                                                  ? '📦 All Separate Articles — each article is handled independently'
+                                                  : (isThreePlus
+                                                    ? 'Choose whether articles form a complete set, combo set, or are all separate'
+                                                    : 'Choose whether articles are sold as a matching pair or independent items')}
+                                          </small>
+                                        </div>
+                                      </div>
+                                      <div className="btn-group btn-group-sm ms-auto" role="group">
+                                        {isThreePlus ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                              style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
+                                              onClick={() => setCustomerConfigMode(ci, {
+                                                ...configMode,
+                                                connectionType: 'all',
+                                                connectedArticleIds: [...assignedArticleIds]
+                                              })}
+                                            >
+                                              {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
+                                              ⚡ Complete {assignedArticleIds.length}-Piece Set
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'custom' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                              style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'custom' ? '#2e37a4' : '#fff' }}
+                                              onClick={() => {
+                                                setCustomerConfigMode(ci, {
+                                                  ...configMode,
+                                                  connectionType: 'custom',
+                                                  connectedArticleIds: assignedArticleIds.slice(0, 2)
+                                                });
+                                              }}
+                                            >
+                                              {configMode.connectionType === 'custom' && <i className="ti ti-check me-1"></i>}
+                                              ✂️ Combo Set + Separate
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'independent' ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                              style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'independent' ? '#1e293b' : '#fff' }}
+                                              onClick={() => setCustomerConfigMode(ci, {
+                                                ...configMode,
+                                                connectionType: 'independent',
+                                                connectedArticleIds: []
+                                              })}
+                                            >
+                                              {configMode.connectionType === 'independent' && <i className="ti ti-check me-1"></i>}
+                                              📦 All Separate
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button
+                                              type="button"
+                                              className={`btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                              style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
+                                              onClick={() => setCustomerConfigMode(ci, {
+                                                ...configMode,
+                                                connectionType: 'all',
+                                                connectedArticleIds: [...assignedArticleIds]
+                                              })}
+                                            >
+                                              {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
+                                              ⚡ Matching Set (1:1 Jodi)
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={`btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === 'independent' ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                              style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'independent' ? '#1e293b' : '#fff' }}
+                                              onClick={() => setCustomerConfigMode(ci, {
+                                                ...configMode,
+                                                connectionType: 'independent',
+                                                connectedArticleIds: []
+                                              })}
+                                            >
+                                              {configMode.connectionType === 'independent' && <i className="ti ti-check me-1"></i>}
+                                              📦 Separate Articles
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Custom Combo Selector (shown when Combo Set is chosen) */}
+                                    {configMode.connectionType === 'custom' && (
+                                      <div className="mt-2.5 p-2.5 rounded-3 bg-white border" style={{ borderColor: '#c7d2fe' }}>
+                                        <div className="d-flex align-items-center justify-content-between mb-2">
+                                          <span className="small fw-bold text-dark" style={{ fontSize: '12px' }}>
+                                            Select articles that form the Matching Combo Set:
+                                          </span>
+                                          <span className="badge bg-primary text-white" style={{ fontSize: '10px' }}>
+                                            {connectedIds.length} of {assignedArticleIds.length} in Combo ({separateArticleNames.length} Separate)
+                                          </span>
+                                        </div>
+                                        <div className="d-flex flex-wrap gap-2">
+                                          {assignedArticleIds.map(aId => {
+                                            const art = addedArticles.find(a => a.id === aId);
+                                            if (!art) return null;
+                                            const isConnected = connectedIds.includes(aId);
+                                            return (
+                                              <button
+                                                key={aId}
+                                                type="button"
+                                                className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1.5 ${isConnected ? 'btn-primary text-white' : 'btn-outline-secondary bg-white'
+                                                  }`}
+                                                style={{ fontSize: '11.5px', backgroundColor: isConnected ? '#2e37a4' : undefined }}
+                                                onClick={() => {
+                                                  let next;
+                                                  if (isConnected) {
+                                                    if (connectedIds.length <= 2) {
+                                                      return; // Maintain at least 2 articles in combo
+                                                    }
+                                                    next = connectedIds.filter(id => id !== aId);
+                                                  } else {
+                                                    next = [...connectedIds, aId];
+                                                  }
+                                                  setCustomerConfigMode(ci, {
+                                                    ...configMode,
+                                                    connectedArticleIds: next
+                                                  });
+                                                }}
+                                              >
+                                                <span>{art.name}</span>
+                                                <i className={`ti ti-${isConnected ? 'check' : 'plus'} small`}></i>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Question 2: Colors Setup */}
+                              <div
+                                className="p-3.5 rounded-3 border transition"
+                                style={{
+                                  backgroundColor: configMode.sameColor !== undefined && configMode.sameColor !== null ? (configMode.sameColor ? '#f8faff' : '#fffbeb') : '#ffffff',
+                                  borderColor: (configMode.sameColor !== undefined && configMode.sameColor !== null) ? '#c7d2fe' : '#e2e8f0'
+                                }}
+                              >
+                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                  <div className="d-flex align-items-center gap-2.5">
+                                    <span
+                                      className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                      style={{ width: '26px', height: '26px', fontSize: '12px', fontWeight: 'bold', backgroundColor: (configMode.sameColor !== undefined && configMode.sameColor !== null) ? '#2e37a4' : '#94a3b8' }}
+                                    >
+                                      2
+                                    </span>
+                                    <div>
+                                      <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+                                        Do articles have the same colors or contrast?
+                                      </div>
+                                      <small className="text-muted">
+                                        {configMode.sameColor === true
+                                          ? '🎨 Same Colors — color palette selected below applies across all articles'
+                                          : configMode.sameColor === false
+                                            ? '🎭 Contrast / Different Colors — select independent or contrast colors for each article (e.g. Yellow Kurta + Maroon Pant)'
+                                            : 'Choose whether articles share colors or have separate / contrast palettes'}
+                                      </small>
+                                    </div>
+                                  </div>
+                                  <div className="btn-group btn-group-sm ms-auto" role="group">
+                                    <button
+                                      type="button"
+                                      className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameColor === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                      style={{ fontSize: '12px', backgroundColor: configMode.sameColor === true ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameColor: true })}
+                                    >
+                                      {configMode.sameColor === true && <i className="ti ti-check me-1"></i>}
+                                      Yes
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameColor === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                      style={{ fontSize: '12px', backgroundColor: configMode.sameColor === false ? '#1e293b' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameColor: false })}
+                                    >
+                                      {configMode.sameColor === false && <i className="ti ti-check me-1"></i>}
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Question 3: Sizes Setup */}
+                              <div
+                                className="p-3.5 rounded-3 border transition"
+                                style={{
+                                  backgroundColor: configMode.sameSize !== undefined && configMode.sameSize !== null ? (configMode.sameSize ? '#f8faff' : '#fffbeb') : '#ffffff',
+                                  borderColor: (configMode.sameSize !== undefined && configMode.sameSize !== null) ? '#c7d2fe' : '#e2e8f0'
+                                }}
+                              >
+                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                  <div className="d-flex align-items-center gap-2.5">
+                                    <span
+                                      className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                      style={{ width: '26px', height: '26px', fontSize: '12px', fontWeight: 'bold', backgroundColor: (configMode.sameSize !== undefined && configMode.sameSize !== null) ? '#2e37a4' : '#94a3b8' }}
+                                    >
+                                      3
+                                    </span>
+                                    <div>
+                                      <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+                                        Are sizes identical across all articles?
+                                      </div>
+                                      <small className="text-muted">
+                                        {configMode.sameSize === true
+                                          ? '📏 Same Sizes — size series (e.g. S, M, L, XL) will be shared across all articles'
+                                          : configMode.sameSize === false
+                                            ? '📐 Different Sizes — configure different size scales for each article (e.g. Kurta S/M/L, Pant 28/30/32, Dupatta Free Size)'
+                                            : 'Choose whether articles share the same size series or have different sizes'}
+                                      </small>
+                                    </div>
+                                  </div>
+                                  <div className="btn-group btn-group-sm ms-auto" role="group">
+                                    <button
+                                      type="button"
+                                      className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameSize === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                      style={{ fontSize: '12px', backgroundColor: configMode.sameSize === true ? '#2e37a4' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameSize: true })}
+                                    >
+                                      {configMode.sameSize === true && <i className="ti ti-check me-1"></i>}
+                                      Yes
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameSize === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                      style={{ fontSize: '12px', backgroundColor: configMode.sameSize === false ? '#1e293b' : '#fff' }}
+                                      onClick={() => setCustomerConfigMode(ci, { ...configMode, sameSize: false })}
+                                    >
+                                      {configMode.sameSize === false && <i className="ti ti-check me-1"></i>}
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Question 4: Same Value / Quantity Setup */}
+                              {(() => {
+                                const isAnswered = configMode.sameValue !== undefined && configMode.sameValue !== null;
+                                return (
+                                  <div
+                                    className="p-3.5 rounded-3 border transition"
+                                    style={{
+                                      backgroundColor: isAnswered ? (configMode.sameValue ? '#f8faff' : '#fffbeb') : '#ffffff',
+                                      borderColor: isAnswered ? '#c7d2fe' : '#e2e8f0'
+                                    }}
+                                  >
+                                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                      <div className="d-flex align-items-center gap-2.5">
+                                        <span
+                                          className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                          style={{
+                                            width: '26px',
+                                            height: '26px',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            backgroundColor: isAnswered ? '#2e37a4' : '#94a3b8'
+                                          }}
+                                        >
+                                          4
+                                        </span>
+                                        <div>
+                                          <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+                                            Do articles have the same value / piece quantities (1:1 Ratio)?
+                                          </div>
+                                          <small className="text-muted">
+                                            {configMode.sameValue === true
+                                              ? '⚡ Same Value (1:1 Auto-Sync) — quantities entered on one article automatically sync to connected articles'
+                                              : configMode.sameValue === false
+                                                ? '⚖️ Different / Separate Values — enter independent quantities for each article (e.g. 100 Kurta, 50 Pant)'
+                                                : 'Choose whether articles share equal 1:1 piece quantities or have independent quantities'}
+                                          </small>
+                                        </div>
+                                      </div>
+                                      <div className="btn-group btn-group-sm ms-auto" role="group">
+                                        <button
+                                          type="button"
+                                          className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                          style={{ fontSize: '12px', backgroundColor: configMode.sameValue === true ? '#2e37a4' : '#fff' }}
+                                          onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: true })}
+                                        >
+                                          {configMode.sameValue === true && <i className="ti ti-check me-1"></i>}
+                                          Yes
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                          style={{ fontSize: '12px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
+                                          onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: false })}
+                                        >
+                                          {configMode.sameValue === false && <i className="ti ti-check me-1"></i>}
+                                          No
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Active Setup Summary Bar */}
+                            {(() => {
+                              const hasAnySelection = configMode.connectionType !== undefined || configMode.sameColor !== undefined || configMode.sameSize !== undefined || configMode.sameValue !== undefined;
+                              if (!hasAnySelection) {
+                                return (
+                                  <div
+                                    className="mt-3 p-2.5 px-3 rounded-3 d-flex align-items-center gap-2 border shadow-xs"
+                                    style={{
+                                      backgroundColor: '#f8fafc',
+                                      borderColor: '#e2e8f0',
+                                      fontSize: '12px',
+                                      color: '#64748b'
+                                    }}
+                                  >
+                                    <i className="ti ti-hand-click text-primary fs-6"></i>
+                                    <span>
+                                      <strong className="text-dark">No Default Selection:</strong> Please answer the questions above or click a Quick Preset to configure matching articles.
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              const isCompleteSet = configMode.connectionType === 'all' && configMode.sameValue;
+                              const isComboSet = configMode.connectionType === 'custom';
+                              const isIndependent = configMode.connectionType === 'independent' || configMode.sameValue === false;
+
+                              let presetLabel = '⚙️ Custom Setup';
+                              if (isCompleteSet && configMode.sameColor === true && configMode.sameSize === true) {
+                                presetLabel = '⚡ Full Matching Set';
+                              } else if (isCompleteSet && configMode.sameColor === false && configMode.sameSize === true) {
+                                presetLabel = '🎨 Contrast Set (Jodi)';
+                              } else if (isComboSet) {
+                                const comboNames = (configMode.connectedArticleIds || []).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ');
+                                presetLabel = `✂️ Combo: ${comboNames || 'Combo Set'}`;
+                              } else if (isIndependent && configMode.sameColor === true && configMode.sameSize === true) {
+                                presetLabel = '⚖️ Shared Sizes, Separate Qty';
+                              } else if (isIndependent && configMode.sameColor === true && configMode.sameSize === false) {
+                                presetLabel = '📏 Shared Colors, Different Sizes';
+                              } else if (isIndependent && configMode.sameColor === false && configMode.sameSize === false) {
+                                presetLabel = '🧩 Custom Mix & Match';
+                              }
+
+                              const isAutoSync = Boolean(configMode.sameValue && configMode.sameSize && configMode.connectionType !== 'independent');
+
+                              return (
+                                <div
+                                  className="mt-3 p-2.5 px-3 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border shadow-xs"
+                                  style={{
+                                    backgroundColor: isAutoSync ? '#f0fdf4' : '#eff6ff',
+                                    borderColor: isAutoSync ? '#bbf7d0' : '#bfdbfe',
+                                    fontSize: '12px'
+                                  }}
+                                >
+                                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                                    <span className={`badge ${isAutoSync ? 'bg-success' : 'bg-primary'} text-white fw-bold`} style={{ fontSize: '11px' }}>
+                                      {presetLabel}
+                                    </span>
+                                    <span className="text-dark fw-medium">
+                                      {isCompleteSet ? (
+                                        <span>Complete <strong>{assignedArticleIds.length}-Piece Matching Set</strong></span>
+                                      ) : isComboSet ? (
+                                        <span>Matching Combo: <strong>{((configMode.connectedArticleIds || []).map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')) || 'Combo'}</strong></span>
+                                      ) : configMode.connectionType === 'independent' ? (
+                                        <span>Independent Articles</span>
+                                      ) : (
+                                        <span className="text-muted">Grouping pending</span>
+                                      )}
+                                      {configMode.sameColor !== undefined && (
+                                        <>
+                                          {' '}&bull;{' '}
+                                          <span className={configMode.sameColor ? 'text-primary' : 'text-purple'}>
+                                            {configMode.sameColor === true ? '🎨 Shared Colors' : '🎭 Contrast Colors'}
+                                          </span>
+                                        </>
+                                      )}
+                                      {configMode.sameSize !== undefined && (
+                                        <>
+                                          {' '}&bull;{' '}
+                                          <span className={configMode.sameSize ? 'text-primary' : 'text-secondary'}>
+                                            {configMode.sameSize === true ? '📏 Shared Sizes' : '📐 Different Sizes'}
+                                          </span>
+                                        </>
+                                      )}
+                                      {isAutoSync ? (
+                                        <>
+                                          {' '}&bull;{' '}
+                                          <span className="text-success fw-bold">⚡ 1:1 Matching Quantities</span>
+                                        </>
+                                      ) : configMode.sameValue === false ? (
+                                        <>
+                                          {' '}&bull;{' '}
+                                          <span className="text-secondary">📦 Separate Quantities</span>
+                                        </>
+                                      ) : null}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Sizes & Quantities Breakdown per (Group, Color) */}
                         {(() => {
-                          const hasConfiguredColors = configMode.sameColor
+                          const hasConfiguredColors = configMode.sameColor !== false
                             ? (cust.selectedColors || []).length > 0
                             : (cust.assignedArticleIds || []).some(aId => (cust.articleColors?.[aId] || []).length > 0);
 
                           if ((cust.assignedArticleIds || []).length === 0 || !hasConfiguredColors) return null;
+
+                          const groups = computeArticleGroups(cust);
+                          const isAllSameColor = configMode.sameColor !== false;
 
                           return (
                             <div className="pt-3 border-top">
@@ -3433,25 +3680,30 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                 <div className="small text-secondary fw-semibold">Sizes &amp; quantities:</div>
                                 {configMode.sameValue && configMode.sameSize && (cust.assignedArticleIds || []).length > 1 && (
                                   <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1" style={{ fontSize: '11px' }}>
-                                    ✨ Full Set Auto-Sync Active: Quantities entered on one article automatically sync across all matching articles
+                                    ✨ 1:1 Matching Set: Quantities entered below automatically create full matching sets
                                   </span>
                                 )}
                               </div>
 
-                              {(cust.assignedArticleIds || []).map((artId) => {
-                                const artObj = addedArticles.find(a => a.id === artId);
-                                if (!artObj) return null;
+                              {groups.map((group) => {
+                                const groupColors = isAllSameColor
+                                  ? (cust.selectedColors || [])
+                                  : (cust.articleColors?.[group.leadArtId] || []);
 
-                                const artColors = (!configMode.sameColor)
-                                  ? (cust.articleColors?.[artId] || [])
-                                  : (cust.selectedColors || []);
+                                if (groupColors.length === 0) return null;
 
-                                if (artColors.length === 0) return null;
+                                const isAllSameValue = configMode.sameValue !== false;
+                                const combineAllColors = Boolean(isAllSameColor && isAllSameValue && group.isSet);
+                                const cardsToRender = combineAllColors
+                                  ? [{ colorsInCard: groupColors, isMultiColorCombined: groupColors.length > 1 }]
+                                  : groupColors.map(cName => ({ colorsInCard: [cName], isMultiColorCombined: false }));
 
-                                return artColors.map((colName) => {
-                                  const key = getSizeConfigKey(artId, colName);
-                                  const cfg = cust.sizeConfigs?.[key];
-                                  const colorObj = masterColors.find(c => c.name === colName) || { hex: '#333333' };
+                                return cardsToRender.map(({ colorsInCard, isMultiColorCombined }) => {
+                                  const leadColName = colorsInCard[0];
+                                  const colName = isMultiColorCombined ? colorsInCard : leadColName;
+                                  const leadKey = getSizeConfigKey(group.leadArtId, leadColName);
+                                  const cfg = cust.sizeConfigs?.[leadKey];
+                                  const colorObj = masterColors.find(c => c.name === leadColName) || { hex: '#333333' };
 
                                   let pairTotalPieces = 0;
                                   if (cfg?.sizeQtys) {
@@ -3460,23 +3712,12 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                     });
                                   }
 
-                                  const activeSeriesList = getPairSeriesConfigs(cust, artId, colName);
-
-                                  // Other articles in the same color for this customer
-                                  const otherArticlesInColor = (cust.assignedArticleIds || [])
-                                    .filter(aId => aId !== artId)
-                                    .map(aId => addedArticles.find(a => a.id === aId))
-                                    .filter(Boolean);
-
-                                  // Which other articles in this color are currently jointed with this card
-                                  const jointedOtherArticles = otherArticlesInColor.filter(oArt => 
-                                    areCardsJointed(cust, key, getSizeConfigKey(oArt.id, colName))
-                                  );
-                                  const isJointed = jointedOtherArticles.length > 0 || (configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0);
+                                  const activeSeriesList = getPairSeriesConfigs(cust, group.leadArtId, colName);
+                                  const isJointed = group.isSet;
 
                                   return (
                                     <div
-                                      key={key}
+                                      key={isMultiColorCombined ? `${group.groupKey}___all_colors` : `${group.groupKey}_${leadColName}`}
                                       className="p-4 rounded-4 mb-4 bg-white shadow-xs"
                                       style={{
                                         border: isJointed ? '1.5px solid #818cf8' : '1.5px solid #c7d2fe',
@@ -3488,79 +3729,62 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                       {/* Card Header */}
                                       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                         <div className="d-flex align-items-center gap-2 flex-wrap">
-                                          <span
-                                            className="rounded-circle border"
-                                            style={{ width: '13px', height: '13px', backgroundColor: colorObj.hex }}
-                                          ></span>
-                                          <span className="fw-bold text-dark" style={{ fontSize: '15px' }}>
-                                            {artObj.name} &mdash; {colName}
-                                          </span>
+                                          {isMultiColorCombined ? (
+                                            <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                              {colorsInCard.map(cName => {
+                                                const cObj = masterColors.find(c => c.name === cName) || { hex: '#333333' };
+                                                return (
+                                                  <span
+                                                    key={cName}
+                                                    className="badge rounded-pill d-inline-flex align-items-center gap-1.5 px-2.5 py-1 border shadow-xs"
+                                                    style={{ backgroundColor: '#f8fafc', color: '#1e293b', borderColor: '#cbd5e1', fontSize: '12px' }}
+                                                  >
+                                                    <span className="rounded-circle border" style={{ width: '10px', height: '10px', backgroundColor: cObj.hex }}></span>
+                                                    <span>{cName}</span>
+                                                  </span>
+                                                );
+                                              })}
+                                              <span className="fw-bold text-dark ms-1" style={{ fontSize: '15px' }}>
+                                                {group.label} &mdash; All {colorsInCard.length} Colors
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <span
+                                                className="rounded-circle border"
+                                                style={{ width: '13px', height: '13px', backgroundColor: colorObj.hex }}
+                                              ></span>
+                                              <span className="fw-bold text-dark" style={{ fontSize: '15px' }}>
+                                                {group.label} &mdash; {leadColName}
+                                              </span>
+                                            </>
+                                          )}
 
-                                          {configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0 ? (
+                                          {group.isSet ? (
                                             <span
                                               className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1"
                                               style={{ fontSize: '11px' }}
-                                              title="Quantities entered here automatically reflect on matching articles"
+                                              title="Quantities entered here automatically reflect on all matching articles"
                                             >
                                               <i className="ti ti-link"></i>
-                                              <span>Auto-Synced with {otherArticlesInColor.map(a => a.name).join(', ')}</span>
-                                            </span>
-                                          ) : configMode.sameSize && otherArticlesInColor.length > 0 ? (
-                                            <span
-                                              className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1"
-                                              style={{ fontSize: '11px' }}
-                                              title="Sizes are synced across articles, but quantities are independent"
-                                            >
-                                              <i className="ti ti-ruler-2"></i>
-                                              <span>Shared Sizes &bull; Independent Quantities</span>
+                                              <span>{group.badgeLabel || '1:1 Matching Set'}</span>
                                             </span>
                                           ) : null}
-
-                                          {/* Checkboxes for Joint / Pair with other articles in this color (when not in full auto-sync) */}
-                                          {otherArticlesInColor.length > 0 && !(configMode.sameValue && configMode.sameSize) && (
-                                            <div className="d-inline-flex align-items-center gap-1.5 ms-2 flex-wrap">
-                                              <span className="text-secondary fw-semibold" style={{ fontSize: '12px' }}>
-                                                Joint with:
-                                              </span>
-                                              {otherArticlesInColor.map(otherArt => {
-                                                const otherKey = getSizeConfigKey(otherArt.id, colName);
-                                                const isChecked = areCardsJointed(cust, key, otherKey);
-                                                return (
-                                                  <label
-                                                    key={otherArt.id}
-                                                    className="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill border transition-all user-select-none"
-                                                    style={{
-                                                      backgroundColor: isChecked ? '#eef2ff' : '#f8fafc',
-                                                      borderColor: isChecked ? '#6366f1' : '#cbd5e1',
-                                                      cursor: 'pointer',
-                                                      boxShadow: isChecked ? '0 1px 3px rgba(99,102,241,0.2)' : 'none'
-                                                    }}
-                                                    title={isChecked ? `Click to unjoint ${otherArt.name}` : `Click to joint with ${otherArt.name} (shares sizes & quantities)`}
-                                                  >
-                                                    <input
-                                                      type="checkbox"
-                                                      className="form-check-input m-0 cursor-pointer"
-                                                      checked={isChecked}
-                                                      onChange={() => toggleArticleJointInColor(ci, colName, artId, otherArt.id)}
-                                                      style={{ width: '15px', height: '15px', cursor: 'pointer' }}
-                                                    />
-                                                    <span
-                                                      className="fw-semibold"
-                                                      style={{
-                                                        fontSize: '12px',
-                                                        color: isChecked ? '#2e37a4' : '#475569'
-                                                      }}
-                                                    >
-                                                      {otherArt.name}
-                                                    </span>
-                                                  </label>
-                                                );
-                                              })}
-                                            </div>
-                                          )}
                                         </div>
 
                                         <div className="d-flex align-items-center gap-2">
+                                          {!isMultiColorCombined && groupColors.length > 1 && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-1 fw-semibold d-inline-flex align-items-center gap-1 shadow-xs"
+                                              style={{ fontSize: '11px', borderColor: '#c7d2fe' }}
+                                              onClick={() => openCopySizesForGroup(ci, group.groupArtIds, leadColName)}
+                                              title={`Copy these sizes & quantities from ${leadColName} to other colors`}
+                                            >
+                                              <i className="ti ti-copy"></i>
+                                              <span>Copy to other colors</span>
+                                            </button>
+                                          )}
                                           <span
                                             className="badge rounded-pill px-3 py-1.5 font-monospace fw-bold"
                                             style={{
@@ -3571,332 +3795,332 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               borderColor: pairTotalPieces > 0 ? '#c7d2fe' : '#e2e8f0'
                                             }}
                                           >
-                                            {pairTotalPieces} pcs
+                                            {isMultiColorCombined
+                                              ? `${pairTotalPieces} sets / color × ${colorsInCard.length} colors = ${pairTotalPieces * colorsInCard.length} sets (${pairTotalPieces * colorsInCard.length * group.groupArtIds.length} pcs)`
+                                              : group.isSet
+                                                ? `${pairTotalPieces} sets (${pairTotalPieces * group.groupArtIds.length} pcs)`
+                                                : `${pairTotalPieces} pcs`}
                                           </span>
                                         </div>
                                       </div>
 
-                                      {/* Card Body - ALWAYS direct and fully editable */}
+                                      {/* Card Body */}
                                       <div>
-                                        {/* Notice banner if auto-synced or jointed */}
-                                        {configMode.sameValue && configMode.sameSize && otherArticlesInColor.length > 0 ? (
+                                        {/* Notice banner if group is set */}
+                                        {group.isSet && (
                                           <div
                                             className="d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border"
                                             style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', fontSize: '12px', fontWeight: 500 }}
                                           >
                                             <i className="ti ti-wand"></i>
                                             <span>
-                                              <strong>Full Set Auto-Sync Active:</strong> Entering sizes or quantities here will automatically update <strong>{otherArticlesInColor.map(a => a.name).join(', ')}</strong>.
+                                              {isMultiColorCombined ? (
+                                                <>
+                                                  <strong>⚡ 1:1 Matching Across All {colorsInCard.length} Colors &amp; {group.groupArtIds.length} Articles:</strong>
+                                                  {' '}{colorsInCard.length} colors ({colorsInCard.join(', ')}) &amp; {group.groupArtIds.length} articles ({group.groupArtIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(', ')}) are combined into this single box. Quantities entered below automatically apply across all of them.
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <strong>1:1 Set Active:</strong> Sizes and quantities entered here automatically apply across all {group.groupArtIds.length} articles ({group.groupArtIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(', ')}).
+                                                </>
+                                              )}
                                             </span>
                                           </div>
-                                        ) : jointedOtherArticles.length > 0 ? (
+                                        )}
+                                        {/* Pick a size series */}
+                                        <div className="mb-3">
+                                          <div className="text-muted small mb-2 fw-medium">Pick a size series:</div>
+                                          <div className="d-flex flex-wrap gap-2">
+                                            {(normalizedMasterSizeSeries || []).map((series) => {
+                                              const isOpen = activeSeriesList.some(sc => {
+                                                const scClean = (sc.seriesName || '').toLowerCase();
+                                                const scId = (sc.seriesId || '').toLowerCase();
+                                                const sName = (series.name || '').toLowerCase();
+                                                const sClean = getCleanSeriesName(series).toLowerCase();
+                                                const sId = (series.id || '').toLowerCase();
+                                                return scClean === sName || scClean === sClean || scId === sId || scId === sName;
+                                              });
+                                              return (
+                                                <button
+                                                  key={series.id || series.name}
+                                                  type="button"
+                                                  className={`btn btn-sm rounded-pill transition-all ${isOpen ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
+                                                    }`}
+                                                  style={{
+                                                    minWidth: '90px',
+                                                    height: '36px',
+                                                    padding: '6px 14px',
+                                                    fontSize: '13px',
+                                                    fontWeight: isOpen ? 600 : 500,
+                                                    backgroundColor: isOpen ? '#2e37a4' : '#ffffff',
+                                                    borderColor: isOpen ? '#2e37a4' : '#e2e8f0',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: isOpen ? '0 2px 6px rgba(46, 55, 164, 0.2)' : 'none'
+                                                  }}
+                                                  onClick={() => toggleSeriesInGroup(ci, group.groupArtIds, colName, series)}
+                                                >
+                                                  <span>{series.displayName || series.name}</span>
+                                                  {isOpen && <i className="ti ti-check ms-1.5 small"></i>}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+
+                                        {/* Series Content */}
+                                        {activeSeriesList.length === 0 ? (
                                           <div
-                                            className="d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border"
-                                            style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', fontSize: '12px', fontWeight: 500 }}
+                                            className="p-3 rounded-3 text-center border border-dashed bg-light text-muted"
+                                            style={{ fontSize: '13px' }}
                                           >
-                                            <i className="ti ti-link"></i>
-                                            <span>
-                                              Jointed with <strong>{jointedOtherArticles.map(a => a.name).join(', ')}</strong> &mdash; linked as matching combo set.
-                                            </span>
+                                            Click a size series above to open it and enter quantities.
                                           </div>
-                                        ) : null}
-                                      {/* Pick a size series */}
-                                      <div className="mb-3">
-                                        <div className="text-muted small mb-2 fw-medium">Pick a size series:</div>
-                                        <div className="d-flex flex-wrap gap-2">
-                                          {(normalizedMasterSizeSeries || []).map((series) => {
-                                            const isOpen = activeSeriesList.some(sc => {
-                                              const scClean = (sc.seriesName || '').toLowerCase();
-                                              const scId = (sc.seriesId || '').toLowerCase();
-                                              const sName = (series.name || '').toLowerCase();
-                                              const sClean = getCleanSeriesName(series).toLowerCase();
-                                              const sId = (series.id || '').toLowerCase();
-                                              return scClean === sName || scClean === sClean || scId === sId || scId === sName;
-                                            });
-                                            return (
-                                              <button
-                                                key={series.id || series.name}
-                                                type="button"
-                                                className={`btn btn-sm rounded-pill transition-all ${
-                                                  isOpen ? 'btn-primary text-white shadow-xs' : 'btn-light border text-secondary'
-                                                }`}
-                                                style={{
-                                                  minWidth: '90px',
-                                                  height: '36px',
-                                                  padding: '6px 14px',
-                                                  fontSize: '13px',
-                                                  fontWeight: isOpen ? 600 : 500,
-                                                  backgroundColor: isOpen ? '#2e37a4' : '#ffffff',
-                                                  borderColor: isOpen ? '#2e37a4' : '#e2e8f0',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  boxShadow: isOpen ? '0 2px 6px rgba(46, 55, 164, 0.2)' : 'none'
-                                                }}
-                                                onClick={() => toggleSeriesInPair(ci, artId, colName, series)}
-                                              >
-                                                <span>{series.displayName || series.name}</span>
-                                                {isOpen && <i className="ti ti-check ms-1.5 small"></i>}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
+                                        ) : (
+                                          <div className="d-flex flex-column gap-3">
+                                            {activeSeriesList.map((sc, scIdx) => {
+                                              const cleanScName = getCleanSeriesName({ name: sc.seriesName || sc.seriesId });
+                                              const scNameLower = (sc.seriesName || '').toLowerCase();
+                                              const defSeries = masterSizeSeries.find(s =>
+                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
+                                                getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase() ||
+                                                s.id === sc.seriesId || s.name === sc.seriesId
+                                              ) || initialSizeSeries.find(s =>
+                                                (s.id && sc.seriesId && s.id === sc.seriesId) ||
+                                                (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
+                                                getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()
+                                              ) || {
+                                                name: sc.seriesName || cleanScName,
+                                                sizes: sc.sizes || []
+                                              };
+                                              const seriesName = sc.seriesName || defSeries.name || cleanScName || sc.seriesId;
+                                              const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0)
+                                                ? defSeries.sizes
+                                                : (defSeries.sizeRecords && defSeries.sizeRecords.length > 0)
+                                                  ? defSeries.sizeRecords.map(r => r.sizeName).filter(Boolean)
+                                                  : (sc.sizes || []);
 
-                                      {/* Series Content */}
-                                      {activeSeriesList.length === 0 ? (
-                                        <div
-                                          className="p-3 rounded-3 text-center border border-dashed bg-light text-muted"
-                                          style={{ fontSize: '13px' }}
-                                        >
-                                          Click a size series above to open it and enter quantities.
-                                        </div>
-                                      ) : (
-                                        <div className="d-flex flex-column gap-3">
-                                          {activeSeriesList.map((sc, scIdx) => {
-                                            const cleanScName = getCleanSeriesName({ name: sc.seriesName || sc.seriesId });
-                                            const scNameLower = (sc.seriesName || '').toLowerCase();
-                                            const defSeries = masterSizeSeries.find(s => 
-                                              (s.id && sc.seriesId && s.id === sc.seriesId) ||
-                                              (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
-                                              getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase() ||
-                                              s.id === sc.seriesId || s.name === sc.seriesId
-                                            ) || initialSizeSeries.find(s => 
-                                              (s.id && sc.seriesId && s.id === sc.seriesId) ||
-                                              (s.name && (s.name.toLowerCase() === scNameLower || s.name.toLowerCase() === cleanScName.toLowerCase())) ||
-                                              getCleanSeriesName(s).toLowerCase() === cleanScName.toLowerCase()
-                                            ) || {
-                                              name: sc.seriesName || cleanScName,
-                                              sizes: sc.sizes || []
-                                            };
-                                            const seriesName = sc.seriesName || defSeries.name || cleanScName || sc.seriesId;
-                                            const seriesSizes = (defSeries.sizes && defSeries.sizes.length > 0)
-                                              ? defSeries.sizes
-                                              : (defSeries.sizeRecords && defSeries.sizeRecords.length > 0)
-                                                ? defSeries.sizeRecords.map(r => r.sizeName).filter(Boolean)
-                                                : (sc.sizes || []);
+                                              return (
+                                                <div
+                                                  key={`${sc.seriesId}_${scIdx}`}
+                                                  className="bg-white rounded-3 shadow-xs"
+                                                  style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', backgroundColor: '#fcfdff', padding: '16px 20px' }}
+                                                >
+                                                  <div className="d-flex justify-content-between align-items-center mb-3">
+                                                    <span
+                                                      className="badge rounded-pill px-3 py-1.5 fw-semibold"
+                                                      style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}
+                                                    >
+                                                      {seriesName}
+                                                    </span>
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-link text-danger p-0 small text-decoration-none fw-medium"
+                                                      onClick={() => removeSeriesFromGroup(ci, group.groupArtIds, colName, sc.seriesId)}
+                                                    >
+                                                      Remove series
+                                                    </button>
+                                                  </div>
 
-                                            return (
-                                              <div
-                                                key={`${sc.seriesId}_${scIdx}`}
-                                                className="bg-white rounded-3 shadow-xs"
-                                                style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', backgroundColor: '#fcfdff', padding: '16px 20px' }}
-                                              >
-                                                <div className="d-flex justify-content-between align-items-center mb-3">
-                                                  <span
-                                                    className="badge rounded-pill px-3 py-1.5 fw-semibold"
-                                                    style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}
-                                                  >
-                                                    {seriesName}
-                                                  </span>
-                                                  <button
-                                                    type="button"
-                                                    className="btn btn-link text-danger p-0 small text-decoration-none fw-medium"
-                                                    onClick={() => removeSeriesFromPair(ci, artId, colName, sc.seriesId)}
-                                                  >
-                                                    Remove series
-                                                  </button>
-                                                </div>
+                                                  <div className="small text-muted mb-2.5 fw-medium" style={{ fontSize: '13px' }}>Tap the sizes needed:</div>
+                                                  <div className="d-flex flex-wrap gap-2 mb-2.5">
+                                                    {seriesSizes.map((sz) => {
+                                                      const isSzSelected = (sc.selectedSizes || []).includes(sz);
+                                                      return (
+                                                        <button
+                                                          key={sz}
+                                                          type="button"
+                                                          className={`btn btn-sm rounded-pill transition ${isSzSelected ? 'fw-bold shadow-xs' : 'text-dark border bg-white shadow-xs'
+                                                            }`}
+                                                          style={{
+                                                            minWidth: '46px',
+                                                            height: '34px',
+                                                            padding: '4px 12px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: isSzSelected ? '#2e37a4' : '#ffffff',
+                                                            borderColor: isSzSelected ? '#2e37a4' : '#e2e8f0',
+                                                            color: isSzSelected ? '#ffffff' : '#334155',
+                                                            fontSize: '13px'
+                                                          }}
+                                                          onClick={() => toggleSizeInGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz)}
+                                                        >
+                                                          {sz} {isSzSelected && <i className="ti ti-check small text-white ms-1"></i>}
+                                                        </button>
+                                                      );
+                                                    })}
+                                                  </div>
 
-                                                <div className="small text-muted mb-2.5 fw-medium" style={{ fontSize: '13px' }}>Tap the sizes needed:</div>
-                                                <div className="d-flex flex-wrap gap-2 mb-2.5">
-                                                  {seriesSizes.map((sz) => {
-                                                    const isSzSelected = (sc.selectedSizes || []).includes(sz);
-                                                    return (
-                                                      <button
-                                                        key={sz}
-                                                        type="button"
-                                                        className={`btn btn-sm rounded-pill transition ${
-                                                          isSzSelected ? 'fw-bold shadow-xs' : 'text-dark border bg-white shadow-xs'
-                                                        }`}
-                                                        style={{
-                                                          minWidth: '46px',
-                                                          height: '34px',
-                                                          padding: '4px 12px',
-                                                          display: 'inline-flex',
-                                                          alignItems: 'center',
-                                                          justifyContent: 'center',
-                                                          backgroundColor: isSzSelected ? '#2e37a4' : '#ffffff',
-                                                          borderColor: isSzSelected ? '#2e37a4' : '#e2e8f0',
-                                                          color: isSzSelected ? '#ffffff' : '#334155',
-                                                          fontSize: '13px'
-                                                        }}
-                                                        onClick={() => toggleSizeInPairSeries(ci, artId, colName, sc.seriesId, sz)}
-                                                      >
-                                                        {sz} {isSzSelected && <i className="ti ti-check small text-white ms-1"></i>}
-                                                      </button>
-                                                    );
-                                                  })}
-                                                </div>
-
-                                                {/* Quantity Method Switcher */}
-                                                {(sc.selectedSizes || []).length >= 1 ? (
-                                                  <div>
-                                                    <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 p-2 rounded-3 bg-white border" style={{ borderColor: '#e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                                      <div className="d-flex align-items-center gap-2 flex-wrap">
-                                                        <span className="small fw-semibold text-muted" style={{ fontSize: '12px' }}>
-                                                          Quantity Method:
-                                                        </span>
-                                                        <div className="btn-group btn-group-sm" role="group">
-                                                          <button
-                                                            type="button"
-                                                            className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
-                                                            style={{
-                                                              fontSize: '12px',
-                                                              fontWeight: 600,
-                                                              backgroundColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#ffffff',
-                                                              color: (!sc.ratioUsed && sc.uniform !== true) ? '#ffffff' : '#475569',
-                                                              borderColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#cbd5e1',
-                                                              boxShadow: (!sc.ratioUsed && sc.uniform !== true) ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
-                                                            }}
-                                                            onClick={() => {
-                                                              setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                                                              setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                                                            }}
-                                                          >
-                                                            <span>✍️</span>
-                                                            <span>Manual Entry</span>
-                                                          </button>
-
-                                                          <button
-                                                            type="button"
-                                                            className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
-                                                            style={{
-                                                              fontSize: '12px',
-                                                              fontWeight: 600,
-                                                              backgroundColor: sc.ratioUsed ? '#2e37a4' : '#ffffff',
-                                                              color: sc.ratioUsed ? '#ffffff' : '#475569',
-                                                              borderColor: sc.ratioUsed ? '#2e37a4' : '#cbd5e1',
-                                                              boxShadow: sc.ratioUsed ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
-                                                            }}
-                                                            onClick={() => {
-                                                              setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, true);
-                                                            }}
-                                                          >
-                                                            <span>⚡</span>
-                                                            <span>Set Ratio (e.g. 1:2:2:1)</span>
-                                                          </button>
-
-                                                          {(sc.selectedSizes || []).length >= 2 && (
+                                                  {/* Quantity Method Switcher */}
+                                                  {(sc.selectedSizes || []).length >= 1 ? (
+                                                    <div>
+                                                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 p-2 rounded-3 bg-white border" style={{ borderColor: '#e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                          <span className="small fw-semibold text-muted" style={{ fontSize: '12px' }}>
+                                                            Quantity Method:
+                                                          </span>
+                                                          <div className="btn-group btn-group-sm" role="group">
                                                             <button
                                                               type="button"
                                                               className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
                                                               style={{
                                                                 fontSize: '12px',
                                                                 fontWeight: 600,
-                                                                backgroundColor: sc.uniform === true ? '#2e37a4' : '#ffffff',
-                                                                color: sc.uniform === true ? '#ffffff' : '#475569',
-                                                                borderColor: sc.uniform === true ? '#2e37a4' : '#cbd5e1',
-                                                                boxShadow: sc.uniform === true ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                                backgroundColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#ffffff',
+                                                                color: (!sc.ratioUsed && sc.uniform !== true) ? '#ffffff' : '#475569',
+                                                                borderColor: (!sc.ratioUsed && sc.uniform !== true) ? '#2e37a4' : '#cbd5e1',
+                                                                boxShadow: (!sc.ratioUsed && sc.uniform !== true) ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
                                                               }}
                                                               onClick={() => {
-                                                                setRatioModeForPairSeries(ci, artId, colName, sc.seriesId, false);
-                                                                setUniformModeForPairSeries(ci, artId, colName, sc.seriesId, true);
+                                                                setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
+                                                                setUniformModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
                                                               }}
                                                             >
-                                                              <span>🔢</span>
-                                                              <span>Uniform Qty (All sizes same)</span>
+                                                              <span>✍️</span>
+                                                              <span>Manual Entry</span>
                                                             </button>
-                                                          )}
+
+                                                            <button
+                                                              type="button"
+                                                              className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
+                                                              style={{
+                                                                fontSize: '12px',
+                                                                fontWeight: 600,
+                                                                backgroundColor: sc.ratioUsed ? '#2e37a4' : '#ffffff',
+                                                                color: sc.ratioUsed ? '#ffffff' : '#475569',
+                                                                borderColor: sc.ratioUsed ? '#2e37a4' : '#cbd5e1',
+                                                                boxShadow: sc.ratioUsed ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                              }}
+                                                              onClick={() => {
+                                                                setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, true);
+                                                              }}
+                                                            >
+                                                              <span>⚡</span>
+                                                              <span>Set Ratio (e.g. 1:2:2:1)</span>
+                                                            </button>
+
+                                                            {(sc.selectedSizes || []).length >= 2 && (
+                                                              <button
+                                                                type="button"
+                                                                className="btn btn-sm d-inline-flex align-items-center gap-1.5 transition-all"
+                                                                style={{
+                                                                  fontSize: '12px',
+                                                                  fontWeight: 600,
+                                                                  backgroundColor: sc.uniform === true ? '#2e37a4' : '#ffffff',
+                                                                  color: sc.uniform === true ? '#ffffff' : '#475569',
+                                                                  borderColor: sc.uniform === true ? '#2e37a4' : '#cbd5e1',
+                                                                  boxShadow: sc.uniform === true ? '0 2px 4px rgba(46,55,164,0.2)' : 'none'
+                                                                }}
+                                                                onClick={() => {
+                                                                  setRatioModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, false);
+                                                                  setUniformModeForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, true);
+                                                                }}
+                                                              >
+                                                                <span>🔢</span>
+                                                                <span>Uniform Qty (All sizes same)</span>
+                                                              </button>
+                                                            )}
+                                                          </div>
                                                         </div>
                                                       </div>
-                                                    </div>
 
-                                                    {/* Ratio inputs */}
-                                                    {sc.ratioUsed ? (
-                                                      <div className="p-3 mb-3 rounded-3 border" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                                                        <div className="d-flex align-items-center gap-2 mb-2">
-                                                          <i className="ti ti-percentage text-success fs-5"></i>
-                                                          <span className="fw-bold text-success-emphasis" style={{ fontSize: '13px' }}>
-                                                            Set Ratio Multiplication Mode
-                                                          </span>
-                                                        </div>
-                                                        <div className="row g-2 align-items-center">
-                                                          <div className="col-auto">
-                                                            <label className="form-label small text-muted mb-1">Ratio ({(sc.selectedSizes || []).join(':')}):</label>
-                                                            <input
-                                                              type="text"
-                                                              className="form-control form-control-sm font-monospace text-center fw-bold"
-                                                              style={{ width: '130px', fontSize: '13px' }}
-                                                              placeholder={(sc.selectedSizes || []).map(() => '1').join(':')}
-                                                              value={sc.ratioString || ''}
-                                                              onChange={(e) => {
-                                                                const formatted = formatRatioInput(e.target.value, sc.ratioString, (sc.selectedSizes || []).length);
-                                                                updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, formatted, sc.baseSetQty, true);
-                                                              }}
-                                                            />
+                                                      {/* Ratio inputs */}
+                                                      {sc.ratioUsed ? (
+                                                        <div className="p-3 mb-3 rounded-3 border" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                                                          <div className="d-flex align-items-center gap-2 mb-2">
+                                                            <i className="ti ti-percentage text-success fs-5"></i>
+                                                            <span className="fw-bold text-success-emphasis" style={{ fontSize: '13px' }}>
+                                                              Set Ratio Multiplication Mode
+                                                            </span>
                                                           </div>
-                                                          <div className="col-auto">
-                                                            <label className="form-label small text-muted mb-1">Base Set Qty:</label>
+                                                          <div className="row g-2 align-items-center">
+                                                            <div className="col-auto">
+                                                              <label className="form-label small text-muted mb-1">Ratio ({(sc.selectedSizes || []).join(':')}):</label>
+                                                              <input
+                                                                type="text"
+                                                                className="form-control form-control-sm font-monospace text-center fw-bold"
+                                                                style={{ width: '130px', fontSize: '13px' }}
+                                                                placeholder={(sc.selectedSizes || []).map(() => '1').join(':')}
+                                                                value={sc.ratioString || ''}
+                                                                onChange={(e) => {
+                                                                  const formatted = formatRatioInput(e.target.value, sc.ratioString, (sc.selectedSizes || []).length);
+                                                                  updateRatioCalculationForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, formatted, sc.baseSetQty, true);
+                                                                }}
+                                                              />
+                                                            </div>
+                                                            <div className="col-auto">
+                                                              <label className="form-label small text-muted mb-1">Base Set Qty:</label>
+                                                              <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="form-control form-control-sm font-monospace text-center fw-bold"
+                                                                style={{ width: '100px', fontSize: '13px' }}
+                                                                placeholder="100"
+                                                                value={sc.baseSetQty || ''}
+                                                                onChange={(e) => {
+                                                                  updateRatioCalculationForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sc.ratioString, e.target.value, true);
+                                                                }}
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                      ) : sc.uniform === true ? (
+                                                        <div className="p-3 mb-3 rounded-3 border bg-light" style={{ borderColor: '#e2e8f0' }}>
+                                                          <div className="d-flex align-items-center gap-2">
+                                                            <span className="small text-muted fw-semibold">Uniform quantity for all {(sc.selectedSizes || []).length} sizes:</span>
                                                             <input
                                                               type="number"
-                                                              min="1"
-                                                              className="form-control form-control-sm font-monospace text-center fw-bold"
-                                                              style={{ width: '100px', fontSize: '13px' }}
-                                                              placeholder="100"
-                                                              value={sc.baseSetQty || ''}
-                                                              onChange={(e) => {
-                                                                updateRatioCalculationForPairSeries(ci, artId, colName, sc.seriesId, sc.ratioString, e.target.value, true);
-                                                              }}
+                                                              min="0"
+                                                              className="form-control form-control-sm text-center font-monospace fw-bold"
+                                                              style={{ width: '90px' }}
+                                                              placeholder="0"
+                                                              value={sc.uniformQty || ''}
+                                                              onChange={(e) => updateUniformQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, e.target.value)}
                                                             />
+                                                            <span className="small text-muted">pcs / size</span>
                                                           </div>
                                                         </div>
-                                                      </div>
-                                                    ) : sc.uniform === true ? (
-                                                      <div className="p-3 mb-3 rounded-3 border bg-light" style={{ borderColor: '#e2e8f0' }}>
-                                                        <div className="d-flex align-items-center gap-2">
-                                                          <span className="small text-muted fw-semibold">Uniform quantity for all {(sc.selectedSizes || []).length} sizes:</span>
-                                                          <input
-                                                            type="number"
-                                                            min="0"
-                                                            className="form-control form-control-sm text-center font-monospace fw-bold"
-                                                            style={{ width: '90px' }}
-                                                            placeholder="0"
-                                                            value={sc.uniformQty || ''}
-                                                            onChange={(e) => updateUniformQtyForPairSeries(ci, artId, colName, sc.seriesId, e.target.value)}
-                                                          />
-                                                          <span className="small text-muted">pcs / size</span>
-                                                        </div>
-                                                      </div>
-                                                    ) : null}
+                                                      ) : null}
 
-                                                    {/* Individual Size Inputs */}
-                                                    <div className="d-flex flex-wrap gap-2.5">
-                                                      {(sc.selectedSizes || []).map((sz) => (
-                                                        <div key={sz} className="d-flex flex-column align-items-center">
-                                                          <span className="badge bg-light text-dark border mb-1 px-2 py-0.5" style={{ fontSize: '11px' }}>
-                                                            {sz}
-                                                          </span>
-                                                          <input
-                                                            type="number"
-                                                            min="0"
-                                                            className="form-control form-control-sm text-center font-monospace fw-semibold"
-                                                            style={{ width: '70px', height: '32px', fontSize: '13px' }}
-                                                            placeholder="0"
-                                                            value={sc.sizeQtys?.[sz] !== undefined ? sc.sizeQtys[sz] : ''}
-                                                            onChange={(e) => updateIndividualSizeQtyForPairSeries(ci, artId, colName, sc.seriesId, sz, e.target.value)}
-                                                          />
-                                                        </div>
-                                                      ))}
+                                                      {/* Individual Size Inputs */}
+                                                      <div className="d-flex flex-wrap gap-2.5">
+                                                        {(sc.selectedSizes || []).map((sz) => (
+                                                          <div key={sz} className="d-flex flex-column align-items-center">
+                                                            <span className="badge bg-light text-dark border mb-1 px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                                              {sz}
+                                                            </span>
+                                                            <input
+                                                              type="number"
+                                                              min="0"
+                                                              className="form-control form-control-sm text-center font-monospace fw-semibold"
+                                                              style={{ width: '70px', height: '32px', fontSize: '13px' }}
+                                                              placeholder="0"
+                                                              value={sc.sizeQtys?.[sz] !== undefined ? sc.sizeQtys[sz] : ''}
+                                                              onChange={(e) => updateIndividualSizeQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz, e.target.value)}
+                                                            />
+                                                          </div>
+                                                        ))}
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                ) : null}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
+                                                  ) : null}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                            });
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
+                                  );
+                                });
+                              })}
+                            </div>
+                          );
+                        })()}                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
