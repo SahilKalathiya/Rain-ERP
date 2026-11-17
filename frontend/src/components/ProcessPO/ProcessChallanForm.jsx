@@ -88,8 +88,8 @@ export default function ProcessChallanForm({
   const [remarks, setRemarks] = useState(initialChallan?.remarks || '');
 
   // Signatures (Section 9 & Page 15)
-  const [companyRep, setCompanyRep] = useState(initialChallan?.company_representative || 'Anurag');
-  const [receiverSignature, setReceiverSignature] = useState(initialChallan?.receiver_signature || 'Raju Dyeing Rep');
+  const [companyRep, setCompanyRep] = useState(initialChallan?.company_representative || '');
+  const [receiverSignature, setReceiverSignature] = useState(initialChallan?.receiver_signature || '');
 
   // Stock Bales / Rolls
   const [items, setItems] = useState(initialChallan?.items || []);

@@ -2485,12 +2485,14 @@ export default function OrderDetailView({
   // State to manage which fabric group has its width popover open
   const [activeWidthDropdownKey, setActiveWidthDropdownKey] = useState(null);
   const [widthDropdownPos, setWidthDropdownPos] = useState(null);
+  const [activeWidthGroupData, setActiveWidthGroupData] = useState(null);
 
-  const handleOpenWidthDropdown = (e, gKey) => {
+  const handleOpenWidthDropdown = (e, gKey, groupData) => {
     e.stopPropagation();
     if (activeWidthDropdownKey === gKey) {
       setActiveWidthDropdownKey(null);
       setWidthDropdownPos(null);
+      setActiveWidthGroupData(null);
     } else {
       const rect = e.currentTarget.getBoundingClientRect();
       const estHeight = 290;
@@ -2499,6 +2501,7 @@ export default function OrderDetailView({
       const leftPos = Math.min(Math.max(130, rect.left + rect.width / 2), window.innerWidth - 140);
       setWidthDropdownPos({ top: topPos, left: leftPos });
       setActiveWidthDropdownKey(gKey);
+      setActiveWidthGroupData(groupData);
     }
   };
 
@@ -4252,6 +4255,12 @@ export default function OrderDetailView({
                         {/* 4. WIDTH (IN) - Multi-Select & Selection */}
                         {isFirstRow && (() => {
                           const groupKey = `${group.articleName}___${group.fabricQuality || ''}___${group.role || ''}`;
+                          const groupData = {
+                            articleName: group.articleName,
+                            fabricQuality: group.fabricQuality,
+                            role: group.role,
+                            widthOptions: widthOptions
+                          };
                           return (
                             <td
                               rowSpan={group.rows.length}
@@ -4285,7 +4294,7 @@ export default function OrderDetailView({
                                         borderStyle: 'dashed',
                                         gap: '6px'
                                       }}
-                                      onClick={(e) => handleOpenWidthDropdown(e, groupKey)}
+                                      onClick={(e) => handleOpenWidthDropdown(e, groupKey, groupData)}
                                       title="Click to select widths"
                                     >
                                       <span>Select ▾</span>
@@ -4309,7 +4318,7 @@ export default function OrderDetailView({
                                         borderStyle: 'solid',
                                         gap: '6px'
                                       }}
-                                      onClick={(e) => handleOpenWidthDropdown(e, groupKey)}
+                                      onClick={(e) => handleOpenWidthDropdown(e, groupKey, groupData)}
                                       title="Click to select or add widths"
                                     >
                                       <span>{selectedWidths[0]}</span>
@@ -4337,7 +4346,7 @@ export default function OrderDetailView({
                                       >
                                         <span
                                           style={{ cursor: 'pointer' }}
-                                          onClick={(e) => handleOpenWidthDropdown(e, groupKey)}
+                                          onClick={(e) => handleOpenWidthDropdown(e, groupKey, groupData)}
                                           title="Click to select or add widths"
                                         >
                                           {w}
@@ -4347,7 +4356,7 @@ export default function OrderDetailView({
                                             type="button"
                                             className="btn p-0 border-0 bg-transparent text-primary"
                                             style={{ fontSize: '10px', lineHeight: 1 }}
-                                            onClick={(e) => handleOpenWidthDropdown(e, groupKey)}
+                                            onClick={(e) => handleOpenWidthDropdown(e, groupKey, groupData)}
                                             title="Open width options"
                                           >
                                             <i className="ti ti-chevron-down" style={{ fontSize: '10px' }} />
@@ -4407,209 +4416,6 @@ export default function OrderDetailView({
                                 )}
                               </div>
 
-                              {/* Clean Fixed-Position Dropdown Menu - Rock solid, does not jump */}
-                              {isConsumptionEditing && activeWidthDropdownKey === groupKey && (
-                                <>
-                                  {/* Full-screen invisible backdrop to dismiss on click outside */}
-                                  <div
-                                    style={{
-                                      position: 'fixed',
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      bottom: 0,
-                                      zIndex: 1050
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveWidthDropdownKey(null);
-                                      setWidthDropdownPos(null);
-                                    }}
-                                  />
-
-                                  {/* Dropdown Menu Container (Fixed position prevents jumping when width is selected) */}
-                                  <div
-                                    className="card shadow-lg"
-                                    style={{
-                                      position: 'fixed',
-                                      top: widthDropdownPos ? `${widthDropdownPos.top}px` : '50%',
-                                      left: widthDropdownPos ? `${widthDropdownPos.left}px` : '50%',
-                                      transform: widthDropdownPos ? 'translateX(-50%)' : 'translate(-50%, -50%)',
-                                      minWidth: '220px',
-                                      maxWidth: '260px',
-                                      zIndex: 1060,
-                                      borderRadius: '12px',
-                                      border: '1px solid #cbd5e1',
-                                      backgroundColor: '#ffffff',
-                                      padding: '0',
-                                      overflow: 'hidden',
-                                      textAlign: 'left',
-                                      boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 6px 16px -4px rgba(15, 23, 42, 0.12)'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {/* Dropdown Header */}
-                                    <div
-                                      className="d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom"
-                                      style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
-                                    >
-                                      <div className="d-flex align-items-center gap-2">
-                                        <span
-                                          className="rounded-circle d-inline-flex align-items-center justify-content-center text-white"
-                                          style={{ width: '22px', height: '22px', backgroundColor: '#2e37a4', fontSize: '11px' }}
-                                        >
-                                          <i className="ti ti-ruler-2"></i>
-                                        </span>
-                                        <div>
-                                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
-                                            Select Widths
-                                          </div>
-                                          <div style={{ fontSize: '10.5px', color: '#64748b' }}>
-                                            {selectedWidths.length > 0 ? `${selectedWidths.length} selected` : 'Choose fabric widths'}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
-                                        style={{ width: '24px', height: '24px', color: '#64748b' }}
-                                        onClick={() => {
-                                          setActiveWidthDropdownKey(null);
-                                          setWidthDropdownPos(null);
-                                        }}
-                                        aria-label="Close"
-                                      >
-                                        <i className="ti ti-x" style={{ fontSize: '11px' }}></i>
-                                      </button>
-                                    </div>
-
-                                    {/* Width Options List (Multi-Select) */}
-                                    <div style={{ maxHeight: '210px', overflowY: 'auto', padding: '8px' }}>
-                                      <div className="d-flex flex-column gap-1.5">
-                                        {widthOptions.map(opt => {
-                                          const isSelected = selectedWidths.includes(opt);
-                                          return (
-                                            <div
-                                              key={opt}
-                                              className="d-flex align-items-center justify-content-between px-3 py-2 rounded-3 transition-all"
-                                              style={{
-                                                cursor: 'pointer',
-                                                userSelect: 'none',
-                                                backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
-                                                border: isSelected ? '1.5px solid #2e37a4' : '1px solid #e2e8f0',
-                                                color: isSelected ? '#1e293b' : '#334155'
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
-                                              }}
-                                              onMouseEnter={(e) => {
-                                                if (!isSelected) {
-                                                  e.currentTarget.style.backgroundColor = '#f1f5f9';
-                                                  e.currentTarget.style.borderColor = '#cbd5e1';
-                                                }
-                                              }}
-                                              onMouseLeave={(e) => {
-                                                if (!isSelected) {
-                                                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                                                  e.currentTarget.style.borderColor = '#e2e8f0';
-                                                }
-                                              }}
-                                            >
-                                              <div className="d-flex align-items-center gap-2.5">
-                                                <span
-                                                  className="rounded-circle d-inline-flex align-items-center justify-content-center transition-all"
-                                                  style={{
-                                                    width: '20px',
-                                                    height: '20px',
-                                                    fontSize: '11px',
-                                                    backgroundColor: isSelected ? '#2e37a4' : '#ffffff',
-                                                    color: isSelected ? '#ffffff' : '#94a3b8',
-                                                    border: isSelected ? '1.5px solid #2e37a4' : '1.5px solid #cbd5e1'
-                                                  }}
-                                                >
-                                                  {isSelected ? <i className="ti ti-check" style={{ strokeWidth: 3 }}></i> : null}
-                                                </span>
-                                                <span className="font-monospace fw-bold" style={{ fontSize: '13.5px' }}>
-                                                  {opt}
-                                                </span>
-                                              </div>
-                                              {isSelected ? (
-                                                <span
-                                                  className="badge rounded-pill fw-bold text-white shadow-xs"
-                                                  style={{
-                                                    backgroundColor: '#2e37a4',
-                                                    fontSize: '10px',
-                                                    padding: '3px 8px'
-                                                  }}
-                                                >
-                                                  Active
-                                                </span>
-                                              ) : (
-                                                <span className="text-muted" style={{ fontSize: '11px', fontWeight: 500 }}>
-                                                  Select
-                                                </span>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-
-                                      {/* Clear / Reset Option */}
-                                      {selectedWidths.length > 0 && (
-                                        <div
-                                          className="d-flex align-items-center justify-content-center gap-1.5 px-2.5 py-1.5 rounded-2 mt-2 text-danger transition"
-                                          style={{
-                                            cursor: 'pointer',
-                                            userSelect: 'none',
-                                            fontSize: '11.5px',
-                                            fontWeight: 600,
-                                            backgroundColor: '#fff5f5',
-                                            border: '1px dashed #fecaca'
-                                          }}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSelectWidthForGroup(group.articleName, '', group.fabricQuality, group.role);
-                                          }}
-                                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
-                                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff5f5'; }}
-                                        >
-                                          <i className="ti ti-trash" style={{ fontSize: '12px' }} />
-                                          <span>Clear selection ({selectedWidths.length})</span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Footer with Done / Cancel */}
-                                    <div className="border-top p-2 px-2.5 bg-light d-flex align-items-center justify-content-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline-secondary px-3 py-1.5"
-                                        style={{ fontSize: '12px', fontWeight: 600, borderRadius: '8px' }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setActiveWidthDropdownKey(null);
-                                          setWidthDropdownPos(null);
-                                        }}
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm text-white px-4 py-1.5 fw-semibold shadow-xs flex-grow-1"
-                                        style={{ backgroundColor: '#2e37a4', borderRadius: '8px', fontSize: '12.5px' }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setActiveWidthDropdownKey(null);
-                                          setWidthDropdownPos(null);
-                                        }}
-                                      >
-                                        Done {selectedWidths.length > 0 ? `(${selectedWidths.length})` : ''}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
                             </td>
                           );
                         })()}
@@ -5824,6 +5630,243 @@ export default function OrderDetailView({
           ))}
         </div>
       </div>
+
+      {/* Global Rock-Solid Fixed Dropdown Menu for Fabric Widths */}
+      {isConsumptionEditing && activeWidthDropdownKey && activeWidthGroupData && (() => {
+        const selectedWidths = getSelectedWidthsForGroup(
+          {
+            articleName: activeWidthGroupData.articleName,
+            fabricQuality: activeWidthGroupData.fabricQuality,
+            role: activeWidthGroupData.role
+          },
+          activeWidthGroupData.widthOptions
+        );
+
+        return (
+          <>
+            {/* Full-screen invisible backdrop to dismiss on click outside */}
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 9998,
+                backgroundColor: 'transparent'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveWidthDropdownKey(null);
+                setWidthDropdownPos(null);
+                setActiveWidthGroupData(null);
+              }}
+            />
+
+            {/* Dropdown Menu Container (Root-level z-index 9999, completely independent of table rows) */}
+            <div
+              className="card shadow-lg"
+              style={{
+                position: 'fixed',
+                top: widthDropdownPos ? `${widthDropdownPos.top}px` : '50%',
+                left: widthDropdownPos ? `${widthDropdownPos.left}px` : '50%',
+                transform: widthDropdownPos ? 'translateX(-50%)' : 'translate(-50%, -50%)',
+                minWidth: '220px',
+                maxWidth: '260px',
+                zIndex: 9999,
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#ffffff',
+                padding: '0',
+                overflow: 'hidden',
+                textAlign: 'left',
+                boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 6px 16px -4px rgba(15, 23, 42, 0.12)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Dropdown Header */}
+              <div
+                className="d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom"
+                style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <span
+                    className="rounded-circle d-inline-flex align-items-center justify-content-center text-white"
+                    style={{ width: '22px', height: '22px', backgroundColor: '#2e37a4', fontSize: '11px' }}
+                  >
+                    <i className="ti ti-ruler-2"></i>
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                      Select Widths
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                      {selectedWidths.length > 0 ? `${selectedWidths.length} selected` : 'Choose fabric widths'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
+                  style={{ width: '24px', height: '24px', color: '#64748b' }}
+                  onClick={() => {
+                    setActiveWidthDropdownKey(null);
+                    setWidthDropdownPos(null);
+                    setActiveWidthGroupData(null);
+                  }}
+                  aria-label="Close"
+                >
+                  <i className="ti ti-x" style={{ fontSize: '11px' }}></i>
+                </button>
+              </div>
+
+              {/* Width Options List (Multi-Select) */}
+              <div style={{ maxHeight: '210px', overflowY: 'auto', padding: '8px' }}>
+                <div className="d-flex flex-column gap-1.5">
+                  {(activeWidthGroupData.widthOptions || []).map(opt => {
+                    const isSelected = selectedWidths.includes(opt);
+                    return (
+                      <div
+                        key={opt}
+                        role="button"
+                        tabIndex={0}
+                        className="d-flex align-items-center justify-content-between px-3 py-2 rounded-3 transition-all"
+                        style={{
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
+                          border: isSelected ? '1.5px solid #2e37a4' : '1px solid #e2e8f0',
+                          color: isSelected ? '#1e293b' : '#334155'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleGroupWidth(
+                            activeWidthGroupData.articleName,
+                            activeWidthGroupData.fabricQuality,
+                            activeWidthGroupData.role,
+                            opt,
+                            activeWidthGroupData.widthOptions
+                          );
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#f1f5f9';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-2.5" style={{ pointerEvents: 'none' }}>
+                          <span
+                            className="rounded-circle d-inline-flex align-items-center justify-content-center transition-all"
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              fontSize: '11px',
+                              backgroundColor: isSelected ? '#2e37a4' : '#ffffff',
+                              color: isSelected ? '#ffffff' : '#94a3b8',
+                              border: isSelected ? '1.5px solid #2e37a4' : '1.5px solid #cbd5e1'
+                            }}
+                          >
+                            {isSelected ? <i className="ti ti-check" style={{ strokeWidth: 3 }}></i> : null}
+                          </span>
+                          <span className="font-monospace fw-bold" style={{ fontSize: '13.5px' }}>
+                            {opt}
+                          </span>
+                        </div>
+                        <div style={{ pointerEvents: 'none' }}>
+                          {isSelected ? (
+                            <span
+                              className="badge rounded-pill fw-bold text-white shadow-xs"
+                              style={{
+                                backgroundColor: '#2e37a4',
+                                fontSize: '10px',
+                                padding: '3px 8px'
+                              }}
+                            >
+                              Active
+                            </span>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '11px', fontWeight: 500 }}>
+                              Select
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Clear / Reset Option */}
+                {selectedWidths.length > 0 && (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="d-flex align-items-center justify-content-center gap-1.5 px-2.5 py-1.5 rounded-2 mt-2 text-danger transition"
+                    style={{
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      backgroundColor: '#fff5f5',
+                      border: '1px dashed #fecaca'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectWidthForGroup(
+                        activeWidthGroupData.articleName,
+                        '',
+                        activeWidthGroupData.fabricQuality,
+                        activeWidthGroupData.role
+                      );
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff5f5'; }}
+                  >
+                    <i className="ti ti-trash" style={{ fontSize: '12px' }} />
+                    <span>Clear selection ({selectedWidths.length})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer with Done / Cancel */}
+              <div className="border-top p-2 px-2.5 bg-light d-flex align-items-center justify-content-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary px-3 py-1.5"
+                  style={{ fontSize: '12px', fontWeight: 600, borderRadius: '8px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveWidthDropdownKey(null);
+                    setWidthDropdownPos(null);
+                    setActiveWidthGroupData(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm text-white px-4 py-1.5 fw-semibold shadow-xs flex-grow-1"
+                  style={{ backgroundColor: '#2e37a4', borderRadius: '8px', fontSize: '12.5px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveWidthDropdownKey(null);
+                    setWidthDropdownPos(null);
+                    setActiveWidthGroupData(null);
+                  }}
+                >
+                  Done {selectedWidths.length > 0 ? `(${selectedWidths.length})` : ''}
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* 7 Accessory Purchase Order Generation Modals */}
       {activePOModalCategory === 'TASSEL' ? (

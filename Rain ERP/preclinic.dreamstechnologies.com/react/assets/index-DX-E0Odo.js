@@ -19533,11 +19533,13 @@
     });
     const [activeWidthDropdownKey, setActiveWidthDropdownKey] = (0, import_react5.useState)(null);
     const [widthDropdownPos, setWidthDropdownPos] = (0, import_react5.useState)(null);
-    const handleOpenWidthDropdown = (e, gKey) => {
+    const [activeWidthGroupData, setActiveWidthGroupData] = (0, import_react5.useState)(null);
+    const handleOpenWidthDropdown = (e, gKey, groupData) => {
       e.stopPropagation();
       if (activeWidthDropdownKey === gKey) {
         setActiveWidthDropdownKey(null);
         setWidthDropdownPos(null);
+        setActiveWidthGroupData(null);
       } else {
         const rect = e.currentTarget.getBoundingClientRect();
         const estHeight = 290;
@@ -19546,6 +19548,7 @@
         const leftPos = Math.min(Math.max(130, rect.left + rect.width / 2), window.innerWidth - 140);
         setWidthDropdownPos({ top: topPos, left: leftPos });
         setActiveWidthDropdownKey(gKey);
+        setActiveWidthGroupData(groupData);
       }
     };
     const getSelectedWidthsForGroup = (grp, options = []) => {
@@ -20858,6 +20861,12 @@
                   ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-dark fw-medium", style: { fontSize: "12.5px" } }, row.colorName))),
                   isFirstRow && (() => {
                     const groupKey = `${group.articleName}___${group.fabricQuality || ""}___${group.role || ""}`;
+                    const groupData = {
+                      articleName: group.articleName,
+                      fabricQuality: group.fabricQuality,
+                      role: group.role,
+                      widthOptions
+                    };
                     return /* @__PURE__ */ import_react5.default.createElement(
                       "td",
                       {
@@ -20891,7 +20900,7 @@
                             borderStyle: "dashed",
                             gap: "6px"
                           },
-                          onClick: (e) => handleOpenWidthDropdown(e, groupKey),
+                          onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
                           title: "Click to select widths"
                         },
                         /* @__PURE__ */ import_react5.default.createElement("span", null, "Select \u25BE")
@@ -20915,7 +20924,7 @@
                             borderStyle: "solid",
                             gap: "6px"
                           },
-                          onClick: (e) => handleOpenWidthDropdown(e, groupKey),
+                          onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
                           title: "Click to select or add widths"
                         },
                         /* @__PURE__ */ import_react5.default.createElement("span", null, selectedWidths[0]),
@@ -20947,7 +20956,7 @@
                           "span",
                           {
                             style: { cursor: "pointer" },
-                            onClick: (e) => handleOpenWidthDropdown(e, groupKey),
+                            onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
                             title: "Click to select or add widths"
                           },
                           w
@@ -20958,7 +20967,7 @@
                             type: "button",
                             className: "btn p-0 border-0 bg-transparent text-primary",
                             style: { fontSize: "10px", lineHeight: 1 },
-                            onClick: (e) => handleOpenWidthDropdown(e, groupKey),
+                            onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
                             title: "Open width options"
                           },
                           /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-chevron-down", style: { fontSize: "10px" } })
@@ -21008,189 +21017,7 @@
                           }
                         },
                         /* @__PURE__ */ import_react5.default.createElement("span", null, w)
-                      ))),
-                      isConsumptionEditing && activeWidthDropdownKey === groupKey && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement(
-                        "div",
-                        {
-                          style: {
-                            position: "fixed",
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 1050
-                          },
-                          onClick: (e) => {
-                            e.stopPropagation();
-                            setActiveWidthDropdownKey(null);
-                            setWidthDropdownPos(null);
-                          }
-                        }
-                      ), /* @__PURE__ */ import_react5.default.createElement(
-                        "div",
-                        {
-                          className: "card shadow-lg",
-                          style: {
-                            position: "fixed",
-                            top: widthDropdownPos ? `${widthDropdownPos.top}px` : "50%",
-                            left: widthDropdownPos ? `${widthDropdownPos.left}px` : "50%",
-                            transform: widthDropdownPos ? "translateX(-50%)" : "translate(-50%, -50%)",
-                            minWidth: "220px",
-                            maxWidth: "260px",
-                            zIndex: 1060,
-                            borderRadius: "12px",
-                            border: "1px solid #cbd5e1",
-                            backgroundColor: "#ffffff",
-                            padding: "0",
-                            overflow: "hidden",
-                            textAlign: "left",
-                            boxShadow: "0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 6px 16px -4px rgba(15, 23, 42, 0.12)"
-                          },
-                          onClick: (e) => e.stopPropagation()
-                        },
-                        /* @__PURE__ */ import_react5.default.createElement(
-                          "div",
-                          {
-                            className: "d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom",
-                            style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" }
-                          },
-                          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
-                            "span",
-                            {
-                              className: "rounded-circle d-inline-flex align-items-center justify-content-center text-white",
-                              style: { width: "22px", height: "22px", backgroundColor: "#2e37a4", fontSize: "11px" }
-                            },
-                            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-ruler-2" })
-                          ), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "13px", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 } }, "Select Widths"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "10.5px", color: "#64748b" } }, selectedWidths.length > 0 ? `${selectedWidths.length} selected` : "Choose fabric widths"))),
-                          /* @__PURE__ */ import_react5.default.createElement(
-                            "button",
-                            {
-                              type: "button",
-                              className: "btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center",
-                              style: { width: "24px", height: "24px", color: "#64748b" },
-                              onClick: () => {
-                                setActiveWidthDropdownKey(null);
-                                setWidthDropdownPos(null);
-                              },
-                              "aria-label": "Close"
-                            },
-                            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "11px" } })
-                          )
-                        ),
-                        /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxHeight: "210px", overflowY: "auto", padding: "8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-1.5" }, widthOptions.map((opt) => {
-                          const isSelected = selectedWidths.includes(opt);
-                          return /* @__PURE__ */ import_react5.default.createElement(
-                            "div",
-                            {
-                              key: opt,
-                              className: "d-flex align-items-center justify-content-between px-3 py-2 rounded-3 transition-all",
-                              style: {
-                                cursor: "pointer",
-                                userSelect: "none",
-                                backgroundColor: isSelected ? "#eff6ff" : "#f8fafc",
-                                border: isSelected ? "1.5px solid #2e37a4" : "1px solid #e2e8f0",
-                                color: isSelected ? "#1e293b" : "#334155"
-                              },
-                              onClick: (e) => {
-                                e.stopPropagation();
-                                handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, opt, widthOptions);
-                              },
-                              onMouseEnter: (e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.backgroundColor = "#f1f5f9";
-                                  e.currentTarget.style.borderColor = "#cbd5e1";
-                                }
-                              },
-                              onMouseLeave: (e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.backgroundColor = "#f8fafc";
-                                  e.currentTarget.style.borderColor = "#e2e8f0";
-                                }
-                              }
-                            },
-                            /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react5.default.createElement(
-                              "span",
-                              {
-                                className: "rounded-circle d-inline-flex align-items-center justify-content-center transition-all",
-                                style: {
-                                  width: "20px",
-                                  height: "20px",
-                                  fontSize: "11px",
-                                  backgroundColor: isSelected ? "#2e37a4" : "#ffffff",
-                                  color: isSelected ? "#ffffff" : "#94a3b8",
-                                  border: isSelected ? "1.5px solid #2e37a4" : "1.5px solid #cbd5e1"
-                                }
-                              },
-                              isSelected ? /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check", style: { strokeWidth: 3 } }) : null
-                            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "font-monospace fw-bold", style: { fontSize: "13.5px" } }, opt)),
-                            isSelected ? /* @__PURE__ */ import_react5.default.createElement(
-                              "span",
-                              {
-                                className: "badge rounded-pill fw-bold text-white shadow-xs",
-                                style: {
-                                  backgroundColor: "#2e37a4",
-                                  fontSize: "10px",
-                                  padding: "3px 8px"
-                                }
-                              },
-                              "Active"
-                            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px", fontWeight: 500 } }, "Select")
-                          );
-                        })), selectedWidths.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
-                          "div",
-                          {
-                            className: "d-flex align-items-center justify-content-center gap-1.5 px-2.5 py-1.5 rounded-2 mt-2 text-danger transition",
-                            style: {
-                              cursor: "pointer",
-                              userSelect: "none",
-                              fontSize: "11.5px",
-                              fontWeight: 600,
-                              backgroundColor: "#fff5f5",
-                              border: "1px dashed #fecaca"
-                            },
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              handleSelectWidthForGroup(group.articleName, "", group.fabricQuality, group.role);
-                            },
-                            onMouseEnter: (e) => {
-                              e.currentTarget.style.backgroundColor = "#fee2e2";
-                            },
-                            onMouseLeave: (e) => {
-                              e.currentTarget.style.backgroundColor = "#fff5f5";
-                            }
-                          },
-                          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-trash", style: { fontSize: "12px" } }),
-                          /* @__PURE__ */ import_react5.default.createElement("span", null, "Clear selection (", selectedWidths.length, ")")
-                        )),
-                        /* @__PURE__ */ import_react5.default.createElement("div", { className: "border-top p-2 px-2.5 bg-light d-flex align-items-center justify-content-between gap-2", style: { borderTop: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
-                          "button",
-                          {
-                            type: "button",
-                            className: "btn btn-sm btn-outline-secondary px-3 py-1.5",
-                            style: { fontSize: "12px", fontWeight: 600, borderRadius: "8px" },
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              setActiveWidthDropdownKey(null);
-                              setWidthDropdownPos(null);
-                            }
-                          },
-                          "Cancel"
-                        ), /* @__PURE__ */ import_react5.default.createElement(
-                          "button",
-                          {
-                            type: "button",
-                            className: "btn btn-sm text-white px-4 py-1.5 fw-semibold shadow-xs flex-grow-1",
-                            style: { backgroundColor: "#2e37a4", borderRadius: "8px", fontSize: "12.5px" },
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              setActiveWidthDropdownKey(null);
-                              setWidthDropdownPos(null);
-                            }
-                          },
-                          "Done ",
-                          selectedWidths.length > 0 ? `(${selectedWidths.length})` : ""
-                        ))
-                      ))
+                      )))
                     );
                   })(),
                   isFirstRow && /* @__PURE__ */ import_react5.default.createElement(
@@ -22115,7 +21942,218 @@
       /* @__PURE__ */ import_react5.default.createElement("h5", { className: "fw-bold text-dark mb-2", style: { fontSize: "16px" } }, "History"),
       /* @__PURE__ */ import_react5.default.createElement("hr", { className: "my-2", style: { borderColor: "#e2e8f0" } }),
       /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-2 mt-2" }, orderHistory.map((h, hIdx) => /* @__PURE__ */ import_react5.default.createElement("div", { key: hIdx, className: "d-flex align-items-start gap-2 text-secondary", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("span", { style: { color: "#d97706", fontSize: "16px", lineHeight: "18px" } }, "\u2022"), /* @__PURE__ */ import_react5.default.createElement("span", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, h.dateFormatted || formatDateWithTime(h.date)), " \u2014 ", h.text))))
-    ), activePOModalCategory === "TASSEL" ? /* @__PURE__ */ import_react5.default.createElement(
+    ), isConsumptionEditing && activeWidthDropdownKey && activeWidthGroupData && (() => {
+      const selectedWidths = getSelectedWidthsForGroup(
+        {
+          articleName: activeWidthGroupData.articleName,
+          fabricQuality: activeWidthGroupData.fabricQuality,
+          role: activeWidthGroupData.role
+        },
+        activeWidthGroupData.widthOptions
+      );
+      return /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement(
+        "div",
+        {
+          style: {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9998,
+            backgroundColor: "transparent"
+          },
+          onClick: (e) => {
+            e.stopPropagation();
+            setActiveWidthDropdownKey(null);
+            setWidthDropdownPos(null);
+            setActiveWidthGroupData(null);
+          }
+        }
+      ), /* @__PURE__ */ import_react5.default.createElement(
+        "div",
+        {
+          className: "card shadow-lg",
+          style: {
+            position: "fixed",
+            top: widthDropdownPos ? `${widthDropdownPos.top}px` : "50%",
+            left: widthDropdownPos ? `${widthDropdownPos.left}px` : "50%",
+            transform: widthDropdownPos ? "translateX(-50%)" : "translate(-50%, -50%)",
+            minWidth: "220px",
+            maxWidth: "260px",
+            zIndex: 9999,
+            borderRadius: "12px",
+            border: "1px solid #cbd5e1",
+            backgroundColor: "#ffffff",
+            padding: "0",
+            overflow: "hidden",
+            textAlign: "left",
+            boxShadow: "0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 6px 16px -4px rgba(15, 23, 42, 0.12)"
+          },
+          onClick: (e) => e.stopPropagation()
+        },
+        /* @__PURE__ */ import_react5.default.createElement(
+          "div",
+          {
+            className: "d-flex align-items-center justify-content-between px-3 py-2.5 border-bottom",
+            style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" }
+          },
+          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
+            "span",
+            {
+              className: "rounded-circle d-inline-flex align-items-center justify-content-center text-white",
+              style: { width: "22px", height: "22px", backgroundColor: "#2e37a4", fontSize: "11px" }
+            },
+            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-ruler-2" })
+          ), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "13px", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 } }, "Select Widths"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "10.5px", color: "#64748b" } }, selectedWidths.length > 0 ? `${selectedWidths.length} selected` : "Choose fabric widths"))),
+          /* @__PURE__ */ import_react5.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center",
+              style: { width: "24px", height: "24px", color: "#64748b" },
+              onClick: () => {
+                setActiveWidthDropdownKey(null);
+                setWidthDropdownPos(null);
+                setActiveWidthGroupData(null);
+              },
+              "aria-label": "Close"
+            },
+            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "11px" } })
+          )
+        ),
+        /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxHeight: "210px", overflowY: "auto", padding: "8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-1.5" }, (activeWidthGroupData.widthOptions || []).map((opt) => {
+          const isSelected = selectedWidths.includes(opt);
+          return /* @__PURE__ */ import_react5.default.createElement(
+            "div",
+            {
+              key: opt,
+              role: "button",
+              tabIndex: 0,
+              className: "d-flex align-items-center justify-content-between px-3 py-2 rounded-3 transition-all",
+              style: {
+                cursor: "pointer",
+                userSelect: "none",
+                backgroundColor: isSelected ? "#eff6ff" : "#f8fafc",
+                border: isSelected ? "1.5px solid #2e37a4" : "1px solid #e2e8f0",
+                color: isSelected ? "#1e293b" : "#334155"
+              },
+              onClick: (e) => {
+                e.stopPropagation();
+                handleToggleGroupWidth(
+                  activeWidthGroupData.articleName,
+                  activeWidthGroupData.fabricQuality,
+                  activeWidthGroupData.role,
+                  opt,
+                  activeWidthGroupData.widthOptions
+                );
+              },
+              onMouseEnter: (e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.backgroundColor = "#f1f5f9";
+                  e.currentTarget.style.borderColor = "#cbd5e1";
+                }
+              },
+              onMouseLeave: (e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.backgroundColor = "#f8fafc";
+                  e.currentTarget.style.borderColor = "#e2e8f0";
+                }
+              }
+            },
+            /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2.5", style: { pointerEvents: "none" } }, /* @__PURE__ */ import_react5.default.createElement(
+              "span",
+              {
+                className: "rounded-circle d-inline-flex align-items-center justify-content-center transition-all",
+                style: {
+                  width: "20px",
+                  height: "20px",
+                  fontSize: "11px",
+                  backgroundColor: isSelected ? "#2e37a4" : "#ffffff",
+                  color: isSelected ? "#ffffff" : "#94a3b8",
+                  border: isSelected ? "1.5px solid #2e37a4" : "1.5px solid #cbd5e1"
+                }
+              },
+              isSelected ? /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check", style: { strokeWidth: 3 } }) : null
+            ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "font-monospace fw-bold", style: { fontSize: "13.5px" } }, opt)),
+            /* @__PURE__ */ import_react5.default.createElement("div", { style: { pointerEvents: "none" } }, isSelected ? /* @__PURE__ */ import_react5.default.createElement(
+              "span",
+              {
+                className: "badge rounded-pill fw-bold text-white shadow-xs",
+                style: {
+                  backgroundColor: "#2e37a4",
+                  fontSize: "10px",
+                  padding: "3px 8px"
+                }
+              },
+              "Active"
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px", fontWeight: 500 } }, "Select"))
+          );
+        })), selectedWidths.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
+          "div",
+          {
+            role: "button",
+            tabIndex: 0,
+            className: "d-flex align-items-center justify-content-center gap-1.5 px-2.5 py-1.5 rounded-2 mt-2 text-danger transition",
+            style: {
+              cursor: "pointer",
+              userSelect: "none",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              backgroundColor: "#fff5f5",
+              border: "1px dashed #fecaca"
+            },
+            onClick: (e) => {
+              e.stopPropagation();
+              handleSelectWidthForGroup(
+                activeWidthGroupData.articleName,
+                "",
+                activeWidthGroupData.fabricQuality,
+                activeWidthGroupData.role
+              );
+            },
+            onMouseEnter: (e) => {
+              e.currentTarget.style.backgroundColor = "#fee2e2";
+            },
+            onMouseLeave: (e) => {
+              e.currentTarget.style.backgroundColor = "#fff5f5";
+            }
+          },
+          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-trash", style: { fontSize: "12px" } }),
+          /* @__PURE__ */ import_react5.default.createElement("span", null, "Clear selection (", selectedWidths.length, ")")
+        )),
+        /* @__PURE__ */ import_react5.default.createElement("div", { className: "border-top p-2 px-2.5 bg-light d-flex align-items-center justify-content-between gap-2", style: { borderTop: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-outline-secondary px-3 py-1.5",
+            style: { fontSize: "12px", fontWeight: 600, borderRadius: "8px" },
+            onClick: (e) => {
+              e.stopPropagation();
+              setActiveWidthDropdownKey(null);
+              setWidthDropdownPos(null);
+              setActiveWidthGroupData(null);
+            }
+          },
+          "Cancel"
+        ), /* @__PURE__ */ import_react5.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm text-white px-4 py-1.5 fw-semibold shadow-xs flex-grow-1",
+            style: { backgroundColor: "#2e37a4", borderRadius: "8px", fontSize: "12.5px" },
+            onClick: (e) => {
+              e.stopPropagation();
+              setActiveWidthDropdownKey(null);
+              setWidthDropdownPos(null);
+              setActiveWidthGroupData(null);
+            }
+          },
+          "Done ",
+          selectedWidths.length > 0 ? `(${selectedWidths.length})` : ""
+        ))
+      ));
+    })(), activePOModalCategory === "TASSEL" ? /* @__PURE__ */ import_react5.default.createElement(
       TasselPOModal,
       {
         isOpen: true,
@@ -50238,8 +50276,8 @@
     const [customerBrand, setCustomerBrand] = (0, import_react38.useState)(initialChallan?.customer_brand || "");
     const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "L100");
     const [remarks, setRemarks] = (0, import_react38.useState)(initialChallan?.remarks || "");
-    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "Anurag");
-    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "Raju Dyeing Rep");
+    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "");
+    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "");
     const [items, setItems] = (0, import_react38.useState)(initialChallan?.items || []);
     const [showLinkPOModal, setShowLinkPOModal] = (0, import_react38.useState)(false);
     const [showStockPickerModal, setShowStockPickerModal] = (0, import_react38.useState)(false);
@@ -51060,38 +51098,26 @@ Confirm dispatch with mixed batches?`
     );
     const [isReadOnly, setIsReadOnly] = (0, import_react40.useState)(isLocked ? true : Boolean(readOnlyDefault));
     const [editingSection, setEditingSection] = (0, import_react40.useState)(isLocked ? null : "all");
-    const [linkedPoId, setLinkedPoId] = (0, import_react40.useState)(initialReturn?.linked_po_id || (availablePOs[0]?.id || ""));
-    const [linkedChallanId, setLinkedChallanId] = (0, import_react40.useState)(initialReturn?.linked_challan_id || (availableChallans[0]?.id || ""));
-    const [vendorId, setVendorId] = (0, import_react40.useState)(() => {
-      if (initialReturn?.vendor_id) return initialReturn.vendor_id;
-      if (availablePOs && availablePOs.length > 0) return availablePOs[0].vendor_id || initialVendors[0]?.id || "";
-      return initialVendors[0]?.id || "";
-    });
-    const [vendorName, setVendorName] = (0, import_react40.useState)(() => {
-      if (initialReturn?.vendor_name) return initialReturn.vendor_name;
-      if (availablePOs && availablePOs.length > 0) return availablePOs[0].vendor_name || initialVendors[0]?.name || "";
-      return initialVendors[0]?.name || "";
-    });
+    const [linkedPoId, setLinkedPoId] = (0, import_react40.useState)(initialReturn?.linked_po_id || "");
+    const [linkedChallanId, setLinkedChallanId] = (0, import_react40.useState)(initialReturn?.linked_challan_id || "");
+    const [vendorId, setVendorId] = (0, import_react40.useState)(initialReturn?.vendor_id || "");
+    const [vendorName, setVendorName] = (0, import_react40.useState)(initialReturn?.vendor_name || "");
     const [externalChallanNo, setExternalChallanNo] = (0, import_react40.useState)(initialReturn?.vendor_external_challan_no || "");
     const [externalChallanDate, setExternalChallanDate] = (0, import_react40.useState)(initialReturn?.vendor_challan_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
     const [vendorInvoiceNo, setVendorInvoiceNo] = (0, import_react40.useState)(initialReturn?.vendor_invoice_no || "");
     const [vendorInvoiceValue, setVendorInvoiceValue] = (0, import_react40.useState)(initialReturn?.vendor_invoice_value || "");
     const [receivedDate, setReceivedDate] = (0, import_react40.useState)(initialReturn?.received_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
-    const [fabricQuality, setFabricQuality] = (0, import_react40.useState)(() => {
-      if (initialReturn?.fabric_quality) return initialReturn.fabric_quality;
-      if (availablePOs && availablePOs.length > 0) {
-        return availablePOs[0].fabric_quality || availablePOs[0].items?.[0]?.fabric_name || "100x100 Voile Solid Dye";
-      }
-      return "100x100 Voile Solid Dye";
-    });
-    const [width, setWidth] = (0, import_react40.useState)(initialReturn?.width || "48");
-    const [weight, setWeight] = (0, import_react40.useState)(initialReturn?.weight || "122.5");
+    const [fabricQuality, setFabricQuality] = (0, import_react40.useState)(initialReturn?.fabric_quality || "");
+    const [width, setWidth] = (0, import_react40.useState)(initialReturn?.width || "");
+    const [weight, setWeight] = (0, import_react40.useState)(initialReturn?.weight || "");
     const [foldingStandard, setFoldingStandard] = (0, import_react40.useState)(initialReturn?.folding_standard || "Fold 100");
     const [vendorDeclaredMeters, setVendorDeclaredMeters] = (0, import_react40.useState)(initialReturn?.vendor_declared_meters || "");
     const [vendorDeclaredPieces, setVendorDeclaredPieces] = (0, import_react40.useState)(initialReturn?.vendor_declared_pieces || "");
-    const [greyFabricReturned, setGreyFabricReturned] = (0, import_react40.useState)(initialReturn?.grey_fabric_returned_meters || 0);
+    const [greyFabricReturned, setGreyFabricReturned] = (0, import_react40.useState)(
+      initialReturn?.grey_fabric_returned_meters !== void 0 && initialReturn?.grey_fabric_returned_meters !== null ? initialReturn.grey_fabric_returned_meters : ""
+    );
     const [targetInvoiceForGrey, setTargetInvoiceForGrey] = (0, import_react40.useState)(
-      initialReturn?.target_invoice_for_grey || "INV-MS-0091 (M.S. Textiles - Auto Assigned Largest Balance)"
+      initialReturn?.target_invoice_for_grey || ""
     );
     const [isManualInvoiceOverride, setIsManualInvoiceOverride] = (0, import_react40.useState)(false);
     const availablePurchaseInvoices = [
@@ -51124,12 +51150,7 @@ Confirm dispatch with mixed batches?`
       if (initialReturn?.pieces && initialReturn.pieces.length > 0) {
         return initialReturn.pieces;
       }
-      return [
-        { id: 1, piece_no: 1, meters: 63.1, color_name: "Beige", folding: "Fold 100" },
-        { id: 2, piece_no: 2, meters: 104.1, color_name: "Beige", folding: "Fold 100" },
-        { id: 3, piece_no: 3, meters: 184.6, color_name: "Beige", folding: "Fold 100" },
-        { id: 4, piece_no: 4, meters: 119.6, color_name: "Beige", folding: "Fold 100" }
-      ];
+      return [];
     });
     const calculatedTotalMeters = pieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
     const statedMeters = parseFloat(vendorDeclaredMeters) || 0;
@@ -51141,21 +51162,19 @@ Confirm dispatch with mixed batches?`
       setPieces(updated);
     };
     const addPieceRow = () => {
-      setPieces([
-        ...pieces,
+      setPieces((prev) => [
+        ...prev,
         {
-          id: Date.now(),
-          piece_no: pieces.length + 1,
+          id: Date.now() + Math.random(),
+          piece_no: prev.length + 1,
           meters: "",
-          color_name: pieces[pieces.length - 1]?.color_name || "Beige",
-          folding: foldingStandard
+          color_name: prev[prev.length - 1]?.color_name || (colorMasterList[0]?.name || ""),
+          folding: foldingStandard || "Fold 100"
         }
       ]);
     };
     const removePieceRow = (idx) => {
-      if (pieces.length <= 1) return;
-      const filtered = pieces.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 }));
-      setPieces(filtered);
+      setPieces((prev) => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 })));
     };
     const handleSubmit = (e, andRunQC = false) => {
       if (e && e.preventDefault) e.preventDefault();
@@ -51332,7 +51351,20 @@ Do you want to override and save?`
         style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
         value: linkedPoId,
         disabled: !isSectionEditable("header"),
-        onChange: (e) => setLinkedPoId(e.target.value)
+        onChange: (e) => {
+          const val = e.target.value;
+          setLinkedPoId(val);
+          if (val) {
+            const poObj = availablePOs.find((p) => String(p.po_number) === String(val) || String(p.id) === String(val));
+            if (poObj) {
+              if (poObj.vendor_id) setVendorId(poObj.vendor_id);
+              if (poObj.vendor_name) setVendorName(poObj.vendor_name);
+              if (poObj.fabric_quality || poObj.items?.[0]?.fabric_name) {
+                setFabricQuality(poObj.fabric_quality || poObj.items?.[0]?.fabric_name);
+              }
+            }
+          }
+        }
       },
       /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "-- Select Linked PO --"),
       availablePOs.map((po) => /* @__PURE__ */ import_react40.default.createElement("option", { key: po.id || po.po_number, value: po.po_number || po.id }, "PO #", po.po_number || po.id, " (", po.vendor_name, ")"))
@@ -51343,7 +51375,23 @@ Do you want to override and save?`
         style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
         value: linkedChallanId,
         disabled: !isSectionEditable("header"),
-        onChange: (e) => setLinkedChallanId(e.target.value)
+        onChange: (e) => {
+          const val = e.target.value;
+          setLinkedChallanId(val);
+          if (val) {
+            const chObj = availableChallans.find((c) => String(c.challan_number) === String(val) || String(c.id) === String(val));
+            if (chObj) {
+              if (chObj.vendor_id) setVendorId(chObj.vendor_id);
+              if (chObj.vendor_name) setVendorName(chObj.vendor_name);
+              if (chObj.items?.[0]?.fabric_name) {
+                setFabricQuality(chObj.items[0].fabric_name);
+              }
+              if (chObj.folding_notation) {
+                setFoldingStandard(chObj.folding_notation);
+              }
+            }
+          }
+        }
       },
       /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "-- Select Challan --"),
       availableChallans.map((ch) => /* @__PURE__ */ import_react40.default.createElement("option", { key: ch.id || ch.challan_number, value: ch.challan_number || ch.id }, "CH #", ch.challan_number || ch.id, " (", ch.vendor_name, ")"))
@@ -51420,7 +51468,7 @@ Do you want to override and save?`
         onChange: (e) => setVendorDeclaredMeters(e.target.value),
         placeholder: "e.g. 1477.60"
       }
-    ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, statedMeters > 0 && (isMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Mismatch Flagged:"), " Stated ", statedMeters.toFixed(2), "m vs Grid ", calculatedTotalMeters.toFixed(2), "m (Diff: ", meterDifference > 0 ? `+${meterDifference}` : meterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Match:"), " Stated Summary matches Piece-wise Grid exactly!"))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "table-responsive bg-white border rounded" }, /* @__PURE__ */ import_react40.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react40.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "text-secondary fs-11 text-uppercase" }, /* @__PURE__ */ import_react40.default.createElement("th", { className: "text-center", style: { width: "40px" } }, "Than #"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { minWidth: "150px" } }, "Color Shade"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "140px" } }, "Folding"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "160px" }, className: "text-end text-primary" }, "Length (Metres) *"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "QC Status"), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "45px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react40.default.createElement("tbody", null, pieces.map((p, idx) => /* @__PURE__ */ import_react40.default.createElement("tr", { key: p.id || idx }, /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center fw-bold text-muted font-monospace" }, idx + 1), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
+    ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, statedMeters > 0 && (isMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Mismatch Flagged:"), " Stated ", statedMeters.toFixed(2), "m vs Grid ", calculatedTotalMeters.toFixed(2), "m (Diff: ", meterDifference > 0 ? `+${meterDifference}` : meterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Match:"), " Stated Summary matches Piece-wise Grid exactly!"))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "table-responsive bg-white border rounded" }, /* @__PURE__ */ import_react40.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react40.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "text-secondary fs-11 text-uppercase" }, /* @__PURE__ */ import_react40.default.createElement("th", { className: "text-center", style: { width: "40px" } }, "Than #"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { minWidth: "150px" } }, "Color Shade"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "140px" } }, "Folding"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "160px" }, className: "text-end text-primary" }, "Length (Metres) *"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "QC Status"), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "45px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react40.default.createElement("tbody", null, pieces.length === 0 ? /* @__PURE__ */ import_react40.default.createElement("tr", null, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 6 : 5, className: "text-center py-4 text-muted" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-receipt-off fs-24 d-block mb-1 text-secondary opacity-50" }), "No piece / than entries recorded yet. Click ", /* @__PURE__ */ import_react40.default.createElement("strong", null, '"+ Add Piece / Than"'), " above to enter received rolls.")) : pieces.map((p, idx) => /* @__PURE__ */ import_react40.default.createElement("tr", { key: p.id || idx }, /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center fw-bold text-muted font-monospace" }, idx + 1), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
       "select",
       {
         className: "form-select form-select-sm bg-white fs-12",
@@ -51433,6 +51481,7 @@ Do you want to override and save?`
           setPieces(updated);
         }
       },
+      /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "Select Color..."),
       colorMasterList.map((c) => /* @__PURE__ */ import_react40.default.createElement("option", { key: c.id || c.name, value: c.name }, c.name))
     )), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
       "input",
@@ -51467,7 +51516,6 @@ Do you want to override and save?`
         type: "button",
         className: "btn btn-link text-danger p-0",
         onClick: () => removePieceRow(idx),
-        disabled: pieces.length <= 1,
         title: "Delete than"
       },
       /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-trash fs-15" })
@@ -51519,7 +51567,7 @@ Do you want to override and save?`
         onChange: (e) => setTargetInvoiceForGrey(e.target.value)
       },
       availablePurchaseInvoices.map((inv) => /* @__PURE__ */ import_react40.default.createElement("option", { key: inv.invoiceNo, value: `${inv.invoiceNo} (${inv.supplier})` }, inv.invoiceNo, " \u2014 ", inv.supplier, " (Remaining Stock: ", inv.remainingStock.toFixed(1), "m)"))
-    ) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "form-control form-control-sm bg-light text-dark fs-13 d-flex align-items-center gap-2", style: { height: "38px", borderRadius: "6px" } }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-sparkles text-warning" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Auto-Assigned:"), " INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)")))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-2 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement(
+    ) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "form-control form-control-sm bg-light text-dark fs-13 d-flex align-items-center gap-2", style: { height: "38px", borderRadius: "6px" } }, parseFloat(greyFabricReturned) > 0 ? /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-sparkles text-warning" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Auto-Assigned:"), " ", targetInvoiceForGrey || "INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)")) : /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted" }, "Not applicable (0 Metres returned)")))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-2 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement(
       "div",
       {
         className: "p-3 px-4 border-bottom d-flex align-items-center justify-content-between",
@@ -51592,46 +51640,42 @@ Do you want to override and save?`
     const [searchTerm, setSearchTerm] = (0, import_react41.useState)("");
     const [outcomeFilter, setOutcomeFilter] = (0, import_react41.useState)("ALL");
     const [selectedPiece, setSelectedPiece] = (0, import_react41.useState)({
-      id: "PQC-0001",
-      piece_no: 10,
-      original_length: 63.1,
-      color_name: "Beige",
-      vendor_challan_ref: "Challan #2196 (Raju Dyeing)"
+      id: "",
+      piece_no: 1,
+      original_length: "",
+      color_name: "",
+      vendor_challan_ref: ""
     });
     const [qcOutcome, setQcOutcome] = (0, import_react41.useState)("Accepted");
     const [rejectionAction, setRejectionAction] = (0, import_react41.useState)("Reprocess");
-    const [divisionType, setDivisionType] = (0, import_react41.useState)("Piece Division");
-    const [pieceSplits, setPieceSplits] = (0, import_react41.useState)([
-      { piece_suffix: "A", meters: 30, notes: "Continuous machine join cut 1" },
-      { piece_suffix: "B", meters: 33.1, notes: "Continuous machine join cut 2" }
-    ]);
+    const [divisionType, setDivisionType] = (0, import_react41.useState)("None");
+    const [pieceSplits, setPieceSplits] = (0, import_react41.useState)([]);
     const [lotBatchId, setLotBatchId] = (0, import_react41.useState)("Batch 1 - Standard Shade");
-    const [paperDefectPhoto, setPaperDefectPhoto] = (0, import_react41.useState)(
-      "https://images.unsplash.com/photo-1586769852044-692d6e3703f0?w=400&h=300&fit=crop"
-    );
-    const [adjustedYield, setAdjustedYield] = (0, import_react41.useState)(24);
-    const [notes, setNotes] = (0, import_react41.useState)("Middle machine stitch join discovered at 30.00m. Split into two clean cuts.");
-    const [colorFastness, setColorFastness] = (0, import_react41.useState)("Pass");
+    const [paperDefectPhoto, setPaperDefectPhoto] = (0, import_react41.useState)(null);
+    const [adjustedYield, setAdjustedYield] = (0, import_react41.useState)("");
+    const [notes, setNotes] = (0, import_react41.useState)("");
+    const [colorFastness, setColorFastness] = (0, import_react41.useState)("");
     const [colorFastnessProof, setColorFastnessProof] = (0, import_react41.useState)(null);
     const handleOpenPieceQC = (record) => {
       setSelectedPiece({
         id: record.id || `PQC-${Date.now().toString().slice(-4)}`,
+        return_id: record.return_id || "",
         piece_no: record.piece_no || 1,
-        original_length: parseFloat(record.original_length) || 100,
-        color_name: record.color_name || "Beige",
-        vendor_challan_ref: record.vendor_challan_ref || `Return ${record.return_id || "#PRN-2196"}`
+        original_length: record.original_length ? parseFloat(record.original_length) : "",
+        color_name: record.color_name || "",
+        vendor_challan_ref: record.vendor_challan_ref || (record.return_id ? `Return ${record.return_id}` : "")
       });
       setQcOutcome(record.qc_outcome || "Accepted");
       setRejectionAction(record.rejection_action || "Reprocess");
-      setDivisionType(record.division_type || (record.qc_outcome === "Accepted" ? "None" : "None"));
+      setDivisionType(record.division_type || "None");
       setPieceSplits(record.piece_splits && record.piece_splits.length > 0 ? record.piece_splits : [
-        { piece_suffix: "A", meters: Number((record.original_length / 2).toFixed(2)) || 50, notes: "Split cut 1" },
-        { piece_suffix: "B", meters: Number((record.original_length / 2).toFixed(2)) || 50, notes: "Split cut 2" }
+        { piece_suffix: "A", meters: "", notes: "" },
+        { piece_suffix: "B", meters: "", notes: "" }
       ]);
       setLotBatchId(record.lot_batch_id || "Batch 1 - Standard Shade");
       setPaperDefectPhoto(record.paper_qc_report_photo || null);
-      setAdjustedYield(record.adjusted_yield || Math.floor((record.original_length || 100) / 2.6));
-      setColorFastness(record.color_fastness || "Pass");
+      setAdjustedYield(record.adjusted_yield !== void 0 && record.adjusted_yield !== null && record.adjusted_yield !== "" ? String(record.adjusted_yield) : "");
+      setColorFastness(record.color_fastness || "");
       setColorFastnessProof(record.color_fastness_proof_photo || null);
       setNotes(record.notes || "");
       setViewMode("inspect");
@@ -51753,11 +51797,13 @@ Do you want to override and save?`
             handleOpenPieceQC({
               id: `PQC-${Date.now().toString().slice(-4)}`,
               piece_no: qcRecords.length + 1,
-              original_length: 100,
-              color_name: "Beige",
-              vendor_challan_ref: "Challan #2196 (Raju Dyeing)",
+              original_length: "",
+              color_name: "",
+              vendor_challan_ref: "",
               qc_outcome: "Accepted",
-              division_type: "None"
+              division_type: "None",
+              adjusted_yield: "",
+              color_fastness: ""
             });
           }
         },
@@ -52098,13 +52144,14 @@ Do you want to override and save?`
           className: "form-control form-control-sm fw-bold text-primary fs-13",
           style: { borderColor: "#cbd5e1", height: "36px", borderRadius: "6px" },
           value: adjustedYield,
+          placeholder: "Enter yield pcs",
           onChange: (e) => setAdjustedYield(e.target.value)
         }
       ), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-10 mt-1 d-block" }, "Estimated pcs after defect bypass")), /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-5" }, /* @__PURE__ */ import_react41.default.createElement("label", { className: "form-label fs-12 fw-bold text-secondary mb-1" }, "Color Fastness Rub/Wash Test *"), /* @__PURE__ */ import_react41.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react41.default.createElement(
         "select",
         {
-          className: `form-select form-select-sm fw-bold fs-13 ${colorFastness === "Pass" ? "text-success border-success" : "text-danger border-danger"}`,
-          style: { height: "36px", borderRadius: "6px" },
+          className: `form-select form-select-sm fw-bold fs-13 ${colorFastness === "Pass" ? "text-success border-success" : colorFastness === "Fail" ? "text-danger border-danger" : "text-secondary"}`,
+          style: { height: "36px", borderRadius: "6px", borderColor: "#cbd5e1" },
           value: colorFastness,
           onChange: (e) => {
             const val = e.target.value;
@@ -52115,6 +52162,7 @@ Do you want to override and save?`
             }
           }
         },
+        /* @__PURE__ */ import_react41.default.createElement("option", { value: "" }, "-- Select Test Outcome --"),
         /* @__PURE__ */ import_react41.default.createElement("option", { value: "Pass" }, "PASS (Clean Swatch)"),
         /* @__PURE__ */ import_react41.default.createElement("option", { value: "Fail" }, "FAIL (Staining / Crocking)")
       ), /* @__PURE__ */ import_react41.default.createElement("label", { className: "btn btn-outline-secondary btn-sm mb-0 text-nowrap fs-12 d-flex align-items-center" }, /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-camera me-1" }), " Proof", /* @__PURE__ */ import_react41.default.createElement(

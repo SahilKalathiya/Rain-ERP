@@ -43,21 +43,12 @@ export default function ProcessReturnForm({
   const [isReadOnly, setIsReadOnly] = useState(isLocked ? true : Boolean(readOnlyDefault));
   const [editingSection, setEditingSection] = useState(isLocked ? null : 'all');
 
-  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || (availablePOs[0]?.id || ''));
-  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || (availableChallans[0]?.id || ''));
+  const [linkedPoId, setLinkedPoId] = useState(initialReturn?.linked_po_id || '');
+  const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || '');
 
   // Vendor Identification
-  const [vendorId, setVendorId] = useState(() => {
-    if (initialReturn?.vendor_id) return initialReturn.vendor_id;
-    if (availablePOs && availablePOs.length > 0) return availablePOs[0].vendor_id || initialVendors[0]?.id || '';
-    return initialVendors[0]?.id || '';
-  });
-
-  const [vendorName, setVendorName] = useState(() => {
-    if (initialReturn?.vendor_name) return initialReturn.vendor_name;
-    if (availablePOs && availablePOs.length > 0) return availablePOs[0].vendor_name || initialVendors[0]?.name || '';
-    return initialVendors[0]?.name || '';
-  });
+  const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || '');
+  const [vendorName, setVendorName] = useState(initialReturn?.vendor_name || '');
 
   const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '');
   const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || new Date().toISOString().split('T')[0]);
@@ -65,16 +56,10 @@ export default function ProcessReturnForm({
   const [vendorInvoiceValue, setVendorInvoiceValue] = useState(initialReturn?.vendor_invoice_value || '');
   const [receivedDate, setReceivedDate] = useState(initialReturn?.received_date || new Date().toISOString().split('T')[0]);
 
-  const [fabricQuality, setFabricQuality] = useState(() => {
-    if (initialReturn?.fabric_quality) return initialReturn.fabric_quality;
-    if (availablePOs && availablePOs.length > 0) {
-      return availablePOs[0].fabric_quality || availablePOs[0].items?.[0]?.fabric_name || '100x100 Voile Solid Dye';
-    }
-    return '100x100 Voile Solid Dye';
-  });
+  const [fabricQuality, setFabricQuality] = useState(initialReturn?.fabric_quality || '');
 
-  const [width, setWidth] = useState(initialReturn?.width || '48');
-  const [weight, setWeight] = useState(initialReturn?.weight || '122.5');
+  const [width, setWidth] = useState(initialReturn?.width || '');
+  const [weight, setWeight] = useState(initialReturn?.weight || '');
   const [foldingStandard, setFoldingStandard] = useState(initialReturn?.folding_standard || 'Fold 100');
 
   // Stated vs Entered Validation (Section 5.2)
@@ -82,9 +67,13 @@ export default function ProcessReturnForm({
   const [vendorDeclaredPieces, setVendorDeclaredPieces] = useState(initialReturn?.vendor_declared_pieces || '');
 
   // Section 5.3: Dedicated Grey Fabric Return & Open Bale
-  const [greyFabricReturned, setGreyFabricReturned] = useState(initialReturn?.grey_fabric_returned_meters || 0);
+  const [greyFabricReturned, setGreyFabricReturned] = useState(
+    initialReturn?.grey_fabric_returned_meters !== undefined && initialReturn?.grey_fabric_returned_meters !== null
+      ? initialReturn.grey_fabric_returned_meters
+      : ''
+  );
   const [targetInvoiceForGrey, setTargetInvoiceForGrey] = useState(
-    initialReturn?.target_invoice_for_grey || 'INV-MS-0091 (M.S. Textiles - Auto Assigned Largest Balance)'
+    initialReturn?.target_invoice_for_grey || ''
   );
   const [isManualInvoiceOverride, setIsManualInvoiceOverride] = useState(false);
 
@@ -125,12 +114,7 @@ export default function ProcessReturnForm({
     if (initialReturn?.pieces && initialReturn.pieces.length > 0) {
       return initialReturn.pieces;
     }
-    return [
-      { id: 1, piece_no: 1, meters: 63.10, color_name: 'Beige', folding: 'Fold 100' },
-      { id: 2, piece_no: 2, meters: 104.10, color_name: 'Beige', folding: 'Fold 100' },
-      { id: 3, piece_no: 3, meters: 184.60, color_name: 'Beige', folding: 'Fold 100' },
-      { id: 4, piece_no: 4, meters: 119.60, color_name: 'Beige', folding: 'Fold 100' }
-    ];
+    return [];
   });
 
   // Calculate grid sum
@@ -146,22 +130,20 @@ export default function ProcessReturnForm({
   };
 
   const addPieceRow = () => {
-    setPieces([
-      ...pieces,
+    setPieces(prev => [
+      ...prev,
       {
-        id: Date.now(),
-        piece_no: pieces.length + 1,
+        id: Date.now() + Math.random(),
+        piece_no: prev.length + 1,
         meters: '',
-        color_name: pieces[pieces.length - 1]?.color_name || 'Beige',
-        folding: foldingStandard
+        color_name: prev[prev.length - 1]?.color_name || (colorMasterList[0]?.name || ''),
+        folding: foldingStandard || 'Fold 100'
       }
     ]);
   };
 
   const removePieceRow = (idx) => {
-    if (pieces.length <= 1) return;
-    const filtered = pieces.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 }));
-    setPieces(filtered);
+    setPieces(prev => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 })));
   };
 
   const handleSubmit = (e, andRunQC = false) => {
@@ -430,7 +412,20 @@ export default function ProcessReturnForm({
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={linkedPoId}
                     disabled={!isSectionEditable('header')}
-                    onChange={(e) => setLinkedPoId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLinkedPoId(val);
+                      if (val) {
+                        const poObj = availablePOs.find(p => String(p.po_number) === String(val) || String(p.id) === String(val));
+                        if (poObj) {
+                          if (poObj.vendor_id) setVendorId(poObj.vendor_id);
+                          if (poObj.vendor_name) setVendorName(poObj.vendor_name);
+                          if (poObj.fabric_quality || poObj.items?.[0]?.fabric_name) {
+                            setFabricQuality(poObj.fabric_quality || poObj.items?.[0]?.fabric_name);
+                          }
+                        }
+                      }
+                    }}
                   >
                     <option value="">-- Select Linked PO --</option>
                     {availablePOs.map(po => (
@@ -448,7 +443,23 @@ export default function ProcessReturnForm({
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={linkedChallanId}
                     disabled={!isSectionEditable('header')}
-                    onChange={(e) => setLinkedChallanId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLinkedChallanId(val);
+                      if (val) {
+                        const chObj = availableChallans.find(c => String(c.challan_number) === String(val) || String(c.id) === String(val));
+                        if (chObj) {
+                          if (chObj.vendor_id) setVendorId(chObj.vendor_id);
+                          if (chObj.vendor_name) setVendorName(chObj.vendor_name);
+                          if (chObj.items?.[0]?.fabric_name) {
+                            setFabricQuality(chObj.items[0].fabric_name);
+                          }
+                          if (chObj.folding_notation) {
+                            setFoldingStandard(chObj.folding_notation);
+                          }
+                        }
+                      }
+                    }}
                   >
                     <option value="">-- Select Challan --</option>
                     {availableChallans.map(ch => (
@@ -608,77 +619,86 @@ export default function ProcessReturnForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {pieces.map((p, idx) => (
-                      <tr key={p.id || idx}>
-                        <td className="text-center fw-bold text-muted font-monospace">{idx + 1}</td>
-                        <td>
-                          <select
-                            className="form-select form-select-sm bg-white fs-12"
-                            style={{ borderColor: '#cbd5e1' }}
-                            value={p.color_name}
-                            disabled={!isSectionEditable('pieces')}
-                            onChange={(e) => {
-                              const updated = [...pieces];
-                              updated[idx].color_name = e.target.value;
-                              setPieces(updated);
-                            }}
-                          >
-                            {colorMasterList.map(c => (
-                              <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                            ))}
-                          </select>
+                    {pieces.length === 0 ? (
+                      <tr>
+                        <td colSpan={isSectionEditable('pieces') ? 6 : 5} className="text-center py-4 text-muted">
+                          <i className="ti ti-receipt-off fs-24 d-block mb-1 text-secondary opacity-50"></i>
+                          No piece / than entries recorded yet. Click <strong>"+ Add Piece / Than"</strong> above to enter received rolls.
                         </td>
-                        <td>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm fs-12"
-                            style={{ borderColor: '#cbd5e1' }}
-                            value={p.folding || foldingStandard}
-                            disabled={!isSectionEditable('pieces')}
-                            onChange={(e) => {
-                              const updated = [...pieces];
-                              updated[idx].folding = e.target.value;
-                              setPieces(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="form-control form-control-sm text-end fw-bold text-dark fs-12"
-                            style={{ borderColor: '#cbd5e1' }}
-                            value={p.meters}
-                            disabled={!isSectionEditable('pieces')}
-                            onChange={(e) => handlePieceMeterChange(idx, e.target.value)}
-                            placeholder="0.00"
-                            required
-                          />
-                        </td>
-                        <td className="text-center">
-                          <span className={`badge fs-10 ${
-                            p.qc_status === 'Accepted' ? 'bg-success-subtle text-success border border-success-subtle' :
-                            p.qc_status === 'Rejected - Reprocess' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
-                            'bg-light text-secondary border'
-                          }`}>
-                            {p.qc_status || 'Pending QC'}
-                          </span>
-                        </td>
-                        {isSectionEditable('pieces') && (
-                          <td className="text-center">
-                            <button
-                              type="button"
-                              className="btn btn-link text-danger p-0"
-                              onClick={() => removePieceRow(idx)}
-                              disabled={pieces.length <= 1}
-                              title="Delete than"
-                            >
-                              <i className="ti ti-trash fs-15"></i>
-                            </button>
-                          </td>
-                        )}
                       </tr>
-                    ))}
+                    ) : (
+                      pieces.map((p, idx) => (
+                        <tr key={p.id || idx}>
+                          <td className="text-center fw-bold text-muted font-monospace">{idx + 1}</td>
+                          <td>
+                            <select
+                              className="form-select form-select-sm bg-white fs-12"
+                              style={{ borderColor: '#cbd5e1' }}
+                              value={p.color_name}
+                              disabled={!isSectionEditable('pieces')}
+                              onChange={(e) => {
+                                const updated = [...pieces];
+                                updated[idx].color_name = e.target.value;
+                                setPieces(updated);
+                              }}
+                            >
+                              <option value="">Select Color...</option>
+                              {colorMasterList.map(c => (
+                                <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm fs-12"
+                              style={{ borderColor: '#cbd5e1' }}
+                              value={p.folding || foldingStandard}
+                              disabled={!isSectionEditable('pieces')}
+                              onChange={(e) => {
+                                const updated = [...pieces];
+                                updated[idx].folding = e.target.value;
+                                setPieces(updated);
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="form-control form-control-sm text-end fw-bold text-dark fs-12"
+                              style={{ borderColor: '#cbd5e1' }}
+                              value={p.meters}
+                              disabled={!isSectionEditable('pieces')}
+                              onChange={(e) => handlePieceMeterChange(idx, e.target.value)}
+                              placeholder="0.00"
+                              required
+                            />
+                          </td>
+                          <td className="text-center">
+                            <span className={`badge fs-10 ${
+                              p.qc_status === 'Accepted' ? 'bg-success-subtle text-success border border-success-subtle' :
+                              p.qc_status === 'Rejected - Reprocess' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
+                              'bg-light text-secondary border'
+                            }`}>
+                              {p.qc_status || 'Pending QC'}
+                            </span>
+                          </td>
+                          {isSectionEditable('pieces') && (
+                            <td className="text-center">
+                              <button
+                                type="button"
+                                className="btn btn-link text-danger p-0"
+                                onClick={() => removePieceRow(idx)}
+                                title="Delete than"
+                              >
+                                <i className="ti ti-trash fs-15"></i>
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))
+                    )}
                   </tbody>
 
                   <tfoot className="table-light">
@@ -785,8 +805,14 @@ export default function ProcessReturnForm({
                     </select>
                   ) : (
                     <div className="form-control form-control-sm bg-light text-dark fs-13 d-flex align-items-center gap-2" style={{ height: '38px', borderRadius: '6px' }}>
-                      <i className="ti ti-sparkles text-warning"></i>
-                      <span><strong>Auto-Assigned:</strong> INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)</span>
+                      {parseFloat(greyFabricReturned) > 0 ? (
+                        <>
+                          <i className="ti ti-sparkles text-warning"></i>
+                          <span><strong>Auto-Assigned:</strong> {targetInvoiceForGrey || 'INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)'}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted">Not applicable (0 Metres returned)</span>
+                      )}
                     </div>
                   )}
                 </div>

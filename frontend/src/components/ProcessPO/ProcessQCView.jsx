@@ -20,59 +20,55 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
 
   // Currently inspected piece state
   const [selectedPiece, setSelectedPiece] = useState({
-    id: 'PQC-0001',
-    piece_no: 10,
-    original_length: 63.10,
-    color_name: 'Beige',
-    vendor_challan_ref: 'Challan #2196 (Raju Dyeing)'
+    id: '',
+    piece_no: 1,
+    original_length: '',
+    color_name: '',
+    vendor_challan_ref: ''
   });
 
   // Decision Tree States
   const [qcOutcome, setQcOutcome] = useState('Accepted'); // 'Accepted' | 'Full Rejection'
   const [rejectionAction, setRejectionAction] = useState('Reprocess'); // 'Reprocess' | 'Scrap'
-  const [divisionType, setDivisionType] = useState('Piece Division'); // 'None' | 'Piece Division' | 'Lot Division'
+  const [divisionType, setDivisionType] = useState('None'); // 'None' | 'Piece Division' | 'Lot Division'
 
   // Piece Division (Stitch Cuts)
-  const [pieceSplits, setPieceSplits] = useState([
-    { piece_suffix: 'A', meters: 30.00, notes: 'Continuous machine join cut 1' },
-    { piece_suffix: 'B', meters: 33.10, notes: 'Continuous machine join cut 2' }
-  ]);
+  const [pieceSplits, setPieceSplits] = useState([]);
 
   // Lot Division (Shade Sorting)
   const [lotBatchId, setLotBatchId] = useState('Batch 1 - Standard Shade');
 
   // Defect Log & Yield Adjustments (Section 6.2 D & Page 25 pink slip)
-  const [paperDefectPhoto, setPaperDefectPhoto] = useState(
-    'https://images.unsplash.com/photo-1586769852044-692d6e3703f0?w=400&h=300&fit=crop'
-  );
-  const [adjustedYield, setAdjustedYield] = useState(24);
-  const [notes, setNotes] = useState('Middle machine stitch join discovered at 30.00m. Split into two clean cuts.');
+  const [paperDefectPhoto, setPaperDefectPhoto] = useState(null);
+  const [adjustedYield, setAdjustedYield] = useState('');
+  const [notes, setNotes] = useState('');
 
   // Color Fastness Test
-  const [colorFastness, setColorFastness] = useState('Pass'); // 'Pass' | 'Fail'
+  const [colorFastness, setColorFastness] = useState(''); // '' | 'Pass' | 'Fail'
   const [colorFastnessProof, setColorFastnessProof] = useState(null);
 
   // Open a specific piece for inspection
   const handleOpenPieceQC = (record) => {
     setSelectedPiece({
       id: record.id || `PQC-${Date.now().toString().slice(-4)}`,
+      return_id: record.return_id || '',
       piece_no: record.piece_no || 1,
-      original_length: parseFloat(record.original_length) || 100.00,
-      color_name: record.color_name || 'Beige',
-      vendor_challan_ref: record.vendor_challan_ref || `Return ${record.return_id || '#PRN-2196'}`
+      original_length: record.original_length ? parseFloat(record.original_length) : '',
+      color_name: record.color_name || '',
+      vendor_challan_ref: record.vendor_challan_ref || (record.return_id ? `Return ${record.return_id}` : '')
     });
 
     setQcOutcome(record.qc_outcome || 'Accepted');
     setRejectionAction(record.rejection_action || 'Reprocess');
-    setDivisionType(record.division_type || (record.qc_outcome === 'Accepted' ? 'None' : 'None'));
+    setDivisionType(record.division_type || 'None');
     setPieceSplits(record.piece_splits && record.piece_splits.length > 0 ? record.piece_splits : [
-      { piece_suffix: 'A', meters: Number((record.original_length / 2).toFixed(2)) || 50, notes: 'Split cut 1' },
-      { piece_suffix: 'B', meters: Number((record.original_length / 2).toFixed(2)) || 50, notes: 'Split cut 2' }
+      { piece_suffix: 'A', meters: '', notes: '' },
+      { piece_suffix: 'B', meters: '', notes: '' }
     ]);
     setLotBatchId(record.lot_batch_id || 'Batch 1 - Standard Shade');
     setPaperDefectPhoto(record.paper_qc_report_photo || null);
-    setAdjustedYield(record.adjusted_yield || Math.floor((record.original_length || 100) / 2.6));
-    setColorFastness(record.color_fastness || 'Pass');
+    setAdjustedYield(record.adjusted_yield !== undefined && record.adjusted_yield !== null && record.adjusted_yield !== '' ? String(record.adjusted_yield) : '');
+    setColorFastness(record.color_fastness || '');
     setColorFastnessProof(record.color_fastness_proof_photo || null);
     setNotes(record.notes || '');
 
@@ -231,11 +227,13 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                     handleOpenPieceQC({
                       id: `PQC-${Date.now().toString().slice(-4)}`,
                       piece_no: qcRecords.length + 1,
-                      original_length: 100.00,
-                      color_name: 'Beige',
-                      vendor_challan_ref: 'Challan #2196 (Raju Dyeing)',
+                      original_length: '',
+                      color_name: '',
+                      vendor_challan_ref: '',
                       qc_outcome: 'Accepted',
-                      division_type: 'None'
+                      division_type: 'None',
+                      adjusted_yield: '',
+                      color_fastness: ''
                     });
                   }}
                 >
@@ -816,6 +814,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                     className="form-control form-control-sm fw-bold text-primary fs-13"
                     style={{ borderColor: '#cbd5e1', height: '36px', borderRadius: '6px' }}
                     value={adjustedYield}
+                    placeholder="Enter yield pcs"
                     onChange={(e) => setAdjustedYield(e.target.value)}
                   />
                   <small className="text-muted fs-10 mt-1 d-block">Estimated pcs after defect bypass</small>
@@ -827,8 +826,12 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                   </label>
                   <div className="d-flex gap-2">
                     <select
-                      className={`form-select form-select-sm fw-bold fs-13 ${colorFastness === 'Pass' ? 'text-success border-success' : 'text-danger border-danger'}`}
-                      style={{ height: '36px', borderRadius: '6px' }}
+                      className={`form-select form-select-sm fw-bold fs-13 ${
+                        colorFastness === 'Pass' ? 'text-success border-success' :
+                        colorFastness === 'Fail' ? 'text-danger border-danger' :
+                        'text-secondary'
+                      }`}
+                      style={{ height: '36px', borderRadius: '6px', borderColor: '#cbd5e1' }}
                       value={colorFastness}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -839,6 +842,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                         }
                       }}
                     >
+                      <option value="">-- Select Test Outcome --</option>
                       <option value="Pass">PASS (Clean Swatch)</option>
                       <option value="Fail">FAIL (Staining / Crocking)</option>
                     </select>
