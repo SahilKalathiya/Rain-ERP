@@ -2944,7 +2944,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                           </div>
                         </div>
 
-                                                {/* Colors for this Customer with Seasonal / Collection Tabs */}
+                        {/* Colors for this Customer with Seasonal / Collection Tabs */}
                         <div className="mb-4">
                           <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <div>
@@ -3366,11 +3366,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
                                               onClick={() => setCustomerConfigMode(ci, {
-                                                  ...configMode,
-                                                  connectionType: 'all',
-                                                  connectedArticleIds: [...assignedArticleIds],
-                                                  sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
-                                                })}
+                                                ...configMode,
+                                                connectionType: 'all',
+                                                connectedArticleIds: [...assignedArticleIds],
+                                                sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                              })}
                                             >
                                               {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
                                               ⚡ Complete {assignedArticleIds.length}-Piece Set
@@ -3381,11 +3381,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'custom' ? '#2e37a4' : '#fff' }}
                                               onClick={() => {
                                                 setCustomerConfigMode(ci, {
-                                                    ...configMode,
-                                                    connectionType: 'custom',
-                                                    connectedArticleIds: assignedArticleIds.slice(0, 2),
-                                                    sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
-                                                  });
+                                                  ...configMode,
+                                                  connectionType: 'custom',
+                                                  connectedArticleIds: assignedArticleIds.slice(0, 2),
+                                                  sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                                });
                                               }}
                                             >
                                               {configMode.connectionType === 'custom' && <i className="ti ti-check me-1"></i>}
@@ -3413,11 +3413,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               className={`btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
                                               onClick={() => setCustomerConfigMode(ci, {
-                                                  ...configMode,
-                                                  connectionType: 'all',
-                                                  connectedArticleIds: [...assignedArticleIds],
-                                                  sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
-                                                })}
+                                                ...configMode,
+                                                connectionType: 'all',
+                                                connectedArticleIds: [...assignedArticleIds],
+                                                sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                              })}
                                             >
                                               {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
                                               ⚡ Matching Set (1:1 Jodi)
@@ -3623,7 +3623,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                         </span>
                                         <div>
                                           <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
-                                            Do articles have the same value / piece quantities (1:1 Ratio)?
+                                            Do articles have the same value / piece quantities?
                                           </div>
                                           <small className="text-muted">
                                             {configMode.sameValue === true
