@@ -30453,7 +30453,7 @@
         value: seriesFormData.name,
         onChange: (e) => setSeriesFormData({ ...seriesFormData, name: autoCapitalizeWords7(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Active Status"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-check form-switch pt-1" }, /* @__PURE__ */ import_react13.default.createElement(
+    )), /* @__PURE__ */ import_react13.default.createElement("div", { className: "col-md-4" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Active Status"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-check form-switch pt-1" }, /* @__PURE__ */ import_react13.default.createElement(
       "input",
       {
         className: "form-check-input",
@@ -30586,7 +30586,7 @@
         value: newSizeForm.displayName,
         onChange: (e) => setNewSizeForm({ ...newSizeForm, displayName: autoCapitalizeWords7(e.target.value) })
       }
-    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Description (Multiline)"), /* @__PURE__ */ import_react13.default.createElement(
+    )), /* @__PURE__ */ import_react13.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement("label", { className: "form-label small fw-semibold text-muted" }, "Description (Multiline)"), /* @__PURE__ */ import_react13.default.createElement(
       "textarea",
       {
         className: "form-control",
@@ -31683,7 +31683,7 @@
           onChange: (e) => setFormData({ ...formData, name: autoCapitalizeWords8(e.target.value) }),
           style: { height: "42px", borderRadius: "8px" }
         }
-      ), isNameDuplicate ? /* @__PURE__ */ import_react14.default.createElement("div", { className: "invalid-feedback d-block text-danger fw-semibold small mt-1" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-alert-circle me-1" }), 'Duplicate name not allowed: An accessory named "', formData.name.trim(), '" already exists.') : /* @__PURE__ */ import_react14.default.createElement("div", { className: "form-text small text-muted" }, "All capital letters (UPPERCASE)")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Category ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
+      ), isNameDuplicate && /* @__PURE__ */ import_react14.default.createElement("div", { className: "invalid-feedback d-block text-danger fw-semibold small mt-1" }, /* @__PURE__ */ import_react14.default.createElement("i", { className: "ti ti-alert-circle me-1" }), 'Duplicate name not allowed: An accessory named "', formData.name.trim(), '" already exists.')), /* @__PURE__ */ import_react14.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react14.default.createElement("label", { className: "form-label fw-semibold text-dark small mb-1.5" }, "Category ", /* @__PURE__ */ import_react14.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react14.default.createElement(
         "select",
         {
           className: "form-select",

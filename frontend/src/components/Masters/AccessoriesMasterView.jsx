@@ -1330,13 +1330,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           onChange={(e) => setFormData({ ...formData, name: autoCapitalizeWords(e.target.value) })}
                           style={{ height: '42px', borderRadius: '8px' }}
                         />
-                        {isNameDuplicate ? (
+                        {isNameDuplicate && (
                           <div className="invalid-feedback d-block text-danger fw-semibold small mt-1">
                             <i className="ti ti-alert-circle me-1"></i>
                             Duplicate name not allowed: An accessory named &quot;{formData.name.trim()}&quot; already exists.
                           </div>
-                        ) : (
-                          <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                         )}
                       </div>
                       <div className="col-md-6">
@@ -1560,7 +1558,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                         const val = autoCapitalizeWords(e.target.value);
                                         const nextRows = [...rows];
                                         nextRows[i] = { ...(nextRows[i] || {}), size: val };
-                                        
+
                                         const validSizes = nextRows.map(row => (row.size || '').trim()).filter(Boolean);
                                         setFormData({
                                           ...formData,
@@ -3162,13 +3160,11 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                                 value={sectionFormData.name || ''}
                                 onChange={(e) => setSectionFormData({ ...sectionFormData, name: autoCapitalizeWords(e.target.value) })}
                               />
-                              {isSectionNameDuplicate ? (
+                              {isSectionNameDuplicate && (
                                 <div className="invalid-feedback d-block text-danger fw-semibold small mt-1">
                                   <i className="ti ti-alert-circle me-1"></i>
                                   Duplicate name not allowed: An accessory named &quot;{sectionFormData.name.trim()}&quot; already exists.
                                 </div>
-                              ) : (
-                                <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                               )}
                             </div>
                             <div className="row g-2">

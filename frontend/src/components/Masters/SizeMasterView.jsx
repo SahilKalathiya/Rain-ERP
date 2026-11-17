@@ -780,7 +780,6 @@ export default function SizeMasterView() {
                         value={seriesFormData.name}
                         onChange={(e) => setSeriesFormData({ ...seriesFormData, name: autoCapitalizeWords(e.target.value) })}
                       />
-                      <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label small fw-semibold text-muted">Active Status</label>
@@ -991,7 +990,6 @@ export default function SizeMasterView() {
                       value={newSizeForm.displayName}
                       onChange={(e) => setNewSizeForm({ ...newSizeForm, displayName: autoCapitalizeWords(e.target.value) })}
                     />
-                    <div className="form-text small text-muted">All capital letters (UPPERCASE)</div>
                   </div>
 
                   <div className="mb-3">
