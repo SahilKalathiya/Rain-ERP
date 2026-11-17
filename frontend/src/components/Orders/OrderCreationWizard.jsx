@@ -746,11 +746,47 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
 
     const mode = cust?.configMode || {};
     const isMatchingSet = Boolean(
+      mode.connectionType &&
       mode.connectionType !== 'independent' &&
       mode.sameSize !== false &&
-      mode.sameValue !== false &&
-      (mode.sameColor === true || mode.sameValue === true || mode.connectionType === 'all' || mode.connectionType === 'custom')
+      (mode.connectionType === 'all' || mode.connectionType === 'custom')
     );
+
+    if (mode.connectionType === 'custom') {
+      const connected = (Array.isArray(mode.connectedArticleIds) && mode.connectedArticleIds.length >= 2)
+        ? mode.connectedArticleIds.filter(id => assigned.includes(id))
+        : assigned.slice(0, 2);
+      const remaining = assigned.filter(aId => !connected.includes(aId));
+
+      const groups = [];
+      if (connected.length > 0) {
+        const comboNames = connected.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
+        groups.push({
+          groupKey: connected.join('___'),
+          groupArtIds: [...connected],
+          leadArtId: connected[0],
+          isSet: true,
+          isMatrixTable: false,
+          label: comboNames.join(' + '),
+          badgeLabel: mode.sameValue === false
+            ? `✂️ Combo Set (${connected.length} Articles • Custom Qty)`
+            : `✂️ 1:1 Combo Set (${connected.length} Articles)`
+        });
+      }
+      remaining.forEach(aId => {
+        const art = addedArticles.find(a => a.id === aId);
+        groups.push({
+          groupKey: aId,
+          groupArtIds: [aId],
+          leadArtId: aId,
+          isSet: false,
+          isMatrixTable: false,
+          label: art?.name || 'Article',
+          badgeLabel: '📦 Separate Article'
+        });
+      });
+      return groups;
+    }
 
     if (!isMatchingSet || assigned.length <= 1) {
       return assigned.map(aId => {
@@ -760,54 +796,25 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
           groupArtIds: [aId],
           leadArtId: aId,
           isSet: false,
+          isMatrixTable: false,
           label: art?.name || 'Article',
           badgeLabel: null
         };
       });
     }
 
-    if (mode.connectionType !== 'custom') {
-      const names = assigned.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
-      return [{
-        groupKey: assigned.join('___'),
-        groupArtIds: [...assigned],
-        leadArtId: assigned[0],
-        isSet: true,
-        label: names.join(' + '),
-        badgeLabel: `⚡ 1:1 Matching Set (${assigned.length} Articles)`
-      }];
-    }
-
-    const connected = (Array.isArray(mode.connectedArticleIds) && mode.connectedArticleIds.length >= 2)
-      ? mode.connectedArticleIds.filter(id => assigned.includes(id))
-      : assigned.slice(0, 2);
-    const remaining = assigned.filter(aId => !connected.includes(aId));
-
-    const groups = [];
-    if (connected.length > 0) {
-      const comboNames = connected.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
-      groups.push({
-        groupKey: connected.join('___'),
-        groupArtIds: [...connected],
-        leadArtId: connected[0],
-        isSet: true,
-        label: comboNames.join(' + '),
-        badgeLabel: `✂️ 1:1 Combo Set (${connected.length} Articles)`
-      });
-    }
-    remaining.forEach(aId => {
-      const art = addedArticles.find(a => a.id === aId);
-      groups.push({
-        groupKey: aId,
-        groupArtIds: [aId],
-        leadArtId: aId,
-        isSet: false,
-        label: art?.name || 'Article',
-        badgeLabel: '📦 Separate Article'
-      });
-    });
-
-    return groups;
+    const names = assigned.map(aId => addedArticles.find(a => a.id === aId)?.name).filter(Boolean);
+    return [{
+      groupKey: assigned.join('___'),
+      groupArtIds: [...assigned],
+      leadArtId: assigned[0],
+      isSet: true,
+      isMatrixTable: false,
+      label: names.join(' + '),
+      badgeLabel: mode.sameValue === false
+        ? `⚖️ Multi-Article Box (${assigned.length} Articles • Custom Values)`
+        : `⚡ 1:1 Matching Set (${assigned.length} Articles)`
+    }];
   };
 
   const setCustomerConfigMode = (cIdx, newMode) => {
@@ -1404,10 +1411,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
 
   // Update individual size quantity in a series
   const updateIndividualSizeQtyForPairSeries = (cIdx, artId, colorName, seriesId, sz, qty) => {
-    const key = getSizeConfigKey(artId, colorName);
+    const colors = Array.isArray(colorName) ? colorName : [colorName];
+    const leadCol = colors[0];
     setOrderCustomers(prev => prev.map((c, idx) => {
       if (idx !== cIdx) return c;
-      const curList = getPairSeriesConfigs(c, artId, colorName);
+      const curList = getPairSeriesConfigs(c, artId, leadCol);
       const updatedList = curList.map(sc => {
         if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
         return {
@@ -1420,13 +1428,16 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       });
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
-      const syncedCardKeys = getSyncedCardKeys(c, key);
-      syncedCardKeys.forEach(k => {
-        nextConfigs[k] = {
-          ...nextConfigs[k],
-          seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
-          sizeQtys: { ...combinedQtys }
-        };
+      colors.forEach(col => {
+        const key = getSizeConfigKey(artId, col);
+        const syncedCardKeys = getSyncedCardKeys(c, key);
+        syncedCardKeys.forEach(k => {
+          nextConfigs[k] = {
+            ...nextConfigs[k],
+            seriesConfigs: JSON.parse(JSON.stringify(updatedList)),
+            sizeQtys: { ...combinedQtys }
+          };
+        });
       });
       return { ...c, sizeConfigs: nextConfigs };
     }));
@@ -1479,14 +1490,37 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
       const updatedList = [...curList, newSeriesEntry];
       const combinedQtys = computeCombinedSizeQtys(updatedList);
       const nextConfigs = { ...(c.sizeConfigs || {}) };
+      const isIndependentQty = c.configMode?.connectionType === 'independent' || c.configMode?.sameValue === false;
       colorsToUpdate.forEach(cName => {
         groupArtIds.forEach(aId => {
           const key = getSizeConfigKey(aId, cName);
-          nextConfigs[key] = {
-            ...nextConfigs[key],
-            seriesConfigs: updatedList,
-            sizeQtys: combinedQtys
-          };
+          if (isIndependentQty && aId !== leadArtId) {
+            const existingCfg = nextConfigs[key] || {};
+            const existingSeries = existingCfg.seriesConfigs || [];
+            const mergedSeries = updatedList.map(newSc => {
+              const exSc = existingSeries.find(s => s.seriesId === newSc.seriesId || s.seriesName === newSc.seriesName);
+              const retainedQtys = { ...(exSc?.sizeQtys || {}) };
+              const cleanQtys = {};
+              (newSc.selectedSizes || []).forEach(sVal => {
+                if (retainedQtys[sVal] !== undefined) cleanQtys[sVal] = retainedQtys[sVal];
+              });
+              return {
+                ...newSc,
+                sizeQtys: cleanQtys
+              };
+            });
+            nextConfigs[key] = {
+              ...existingCfg,
+              seriesConfigs: mergedSeries,
+              sizeQtys: computeCombinedSizeQtys(mergedSeries)
+            };
+          } else {
+            nextConfigs[key] = {
+              ...nextConfigs[key],
+              seriesConfigs: updatedList,
+              sizeQtys: combinedQtys
+            };
+          }
         });
       });
       return { ...c, sizeConfigs: nextConfigs };
@@ -1783,7 +1817,67 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
     }));
   };
 
-    const openCopySizesForGroup = (cIdx, groupArtIds, sourceColor) => {
+  const updateIndividualSizeQtyForSingleArticle = (cIdx, artId, colorName, seriesId, sz, qty) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      colorsToUpdate.forEach(cName => {
+        const key = getSizeConfigKey(artId, cName);
+        const curList = getPairSeriesConfigs(c, artId, cName);
+        const updatedList = curList.map(sc => {
+          if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+          return {
+            ...sc,
+            sizeQtys: {
+              ...(sc.sizeQtys || {}),
+              [sz]: qty
+            }
+          };
+        });
+        const combinedQtys = computeCombinedSizeQtys(updatedList);
+        nextConfigs[key] = {
+          ...(nextConfigs[key] || {}),
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const copyArticleQuantities = (cIdx, fromArtId, toArtId, colorName, seriesId) => {
+    const colorsToUpdate = Array.isArray(colorName) ? colorName : [colorName];
+    setOrderCustomers(prev => prev.map((c, idx) => {
+      if (idx !== cIdx) return c;
+      const leadCol = colorsToUpdate[0];
+      const sourceList = getPairSeriesConfigs(c, fromArtId, leadCol);
+      const sourceSc = sourceList.find(s => s.seriesId === seriesId || s.seriesName === seriesId);
+      if (!sourceSc) return c;
+
+      const nextConfigs = { ...(c.sizeConfigs || {}) };
+      colorsToUpdate.forEach(cName => {
+        const targetKey = getSizeConfigKey(toArtId, cName);
+        const targetList = getPairSeriesConfigs(c, toArtId, cName);
+        const updatedList = targetList.map(sc => {
+          if (sc.seriesId !== seriesId && sc.seriesName !== seriesId) return sc;
+          return {
+            ...sc,
+            sizeQtys: { ...(sourceSc.sizeQtys || {}) }
+          };
+        });
+        const combinedQtys = computeCombinedSizeQtys(updatedList);
+        nextConfigs[targetKey] = {
+          ...(nextConfigs[targetKey] || {}),
+          seriesConfigs: updatedList,
+          sizeQtys: combinedQtys
+        };
+      });
+      return { ...c, sizeConfigs: nextConfigs };
+    }));
+  };
+
+  const openCopySizesForGroup = (cIdx, groupArtIds, sourceColor) => {
     const cust = orderCustomers[cIdx];
     const leadArtId = groupArtIds[0];
     const sourceCfg = cust?.sizeConfigs?.[getSizeConfigKey(leadArtId, sourceColor)];
@@ -3272,10 +3366,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               className={`btn px-3 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
                                               onClick={() => setCustomerConfigMode(ci, {
-                                                ...configMode,
-                                                connectionType: 'all',
-                                                connectedArticleIds: [...assignedArticleIds]
-                                              })}
+                                                  ...configMode,
+                                                  connectionType: 'all',
+                                                  connectedArticleIds: [...assignedArticleIds],
+                                                  sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                                })}
                                             >
                                               {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
                                               ⚡ Complete {assignedArticleIds.length}-Piece Set
@@ -3286,10 +3381,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'custom' ? '#2e37a4' : '#fff' }}
                                               onClick={() => {
                                                 setCustomerConfigMode(ci, {
-                                                  ...configMode,
-                                                  connectionType: 'custom',
-                                                  connectedArticleIds: assignedArticleIds.slice(0, 2)
-                                                });
+                                                    ...configMode,
+                                                    connectionType: 'custom',
+                                                    connectedArticleIds: assignedArticleIds.slice(0, 2),
+                                                    sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                                  });
                                               }}
                                             >
                                               {configMode.connectionType === 'custom' && <i className="ti ti-check me-1"></i>}
@@ -3302,7 +3398,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               onClick={() => setCustomerConfigMode(ci, {
                                                 ...configMode,
                                                 connectionType: 'independent',
-                                                connectedArticleIds: []
+                                                connectedArticleIds: [],
+                                                sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : false)
                                               })}
                                             >
                                               {configMode.connectionType === 'independent' && <i className="ti ti-check me-1"></i>}
@@ -3316,10 +3413,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               className={`btn px-3.5 py-1.5 fw-semibold ${configMode.connectionType === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
                                               style={{ fontSize: '12px', backgroundColor: configMode.connectionType === 'all' ? '#2e37a4' : '#fff' }}
                                               onClick={() => setCustomerConfigMode(ci, {
-                                                ...configMode,
-                                                connectionType: 'all',
-                                                connectedArticleIds: [...assignedArticleIds]
-                                              })}
+                                                  ...configMode,
+                                                  connectionType: 'all',
+                                                  connectedArticleIds: [...assignedArticleIds],
+                                                  sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : true)
+                                                })}
                                             >
                                               {configMode.connectionType === 'all' && <i className="ti ti-check me-1"></i>}
                                               ⚡ Matching Set (1:1 Jodi)
@@ -3331,7 +3429,8 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                               onClick={() => setCustomerConfigMode(ci, {
                                                 ...configMode,
                                                 connectionType: 'independent',
-                                                connectedArticleIds: []
+                                                connectedArticleIds: [],
+                                                sameValue: (configMode.sameValue !== undefined ? configMode.sameValue : false)
                                               })}
                                             >
                                               {configMode.connectionType === 'independent' && <i className="ti ti-check me-1"></i>}
@@ -3530,7 +3629,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                             {configMode.sameValue === true
                                               ? '⚡ Same Value (1:1 Auto-Sync) — quantities entered on one article automatically sync to connected articles'
                                               : configMode.sameValue === false
-                                                ? '⚖️ Different / Separate Values — enter independent quantities for each article (e.g. 100 Kurta, 50 Pant)'
+                                                ? '⚖️ Different / Separate Values — enter independent quantities for each article (e.g. 100 Kurta, 50 Pant, 75 Dupatta)'
                                                 : 'Choose whether articles share equal 1:1 piece quantities or have independent quantities'}
                                           </small>
                                         </div>
@@ -3539,7 +3638,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                         <button
                                           type="button"
                                           className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                          style={{ fontSize: '12px', backgroundColor: configMode.sameValue === true ? '#2e37a4' : '#fff' }}
+                                          style={{ fontSize: '12px', minWidth: '70px', backgroundColor: configMode.sameValue === true ? '#2e37a4' : '#fff' }}
                                           onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: true })}
                                         >
                                           {configMode.sameValue === true && <i className="ti ti-check me-1"></i>}
@@ -3548,7 +3647,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                         <button
                                           type="button"
                                           className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                          style={{ fontSize: '12px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
+                                          style={{ fontSize: '12px', minWidth: '70px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
                                           onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: false })}
                                         >
                                           {configMode.sameValue === false && <i className="ti ti-check me-1"></i>}
@@ -3559,6 +3658,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                   </div>
                                 );
                               })()}
+
                             </div>
 
                             {/* Active Setup Summary Bar */}
@@ -3678,7 +3778,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                             <div className="pt-3 border-top">
                               <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                 <div className="small text-secondary fw-semibold">Sizes &amp; quantities:</div>
-                                {configMode.sameValue && configMode.sameSize && (cust.assignedArticleIds || []).length > 1 && (
+                                {configMode.connectionType !== 'independent' && configMode.sameValue && configMode.sameSize && (cust.assignedArticleIds || []).length > 1 && (
                                   <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1" style={{ fontSize: '11px' }}>
                                     ✨ 1:1 Matching Set: Quantities entered below automatically create full matching sets
                                   </span>
@@ -3692,8 +3792,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
 
                                 if (groupColors.length === 0) return null;
 
-                                const isAllSameValue = configMode.sameValue !== false;
-                                const combineAllColors = Boolean(isAllSameColor && isAllSameValue && group.isSet);
+                                const combineAllColors = Boolean(configMode.sameColor === true);
                                 const cardsToRender = combineAllColors
                                   ? [{ colorsInCard: groupColors, isMultiColorCombined: groupColors.length > 1 }]
                                   : groupColors.map(cName => ({ colorsInCard: [cName], isMultiColorCombined: false }));
@@ -3706,10 +3805,35 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                   const colorObj = masterColors.find(c => c.name === leadColName) || { hex: '#333333' };
 
                                   let pairTotalPieces = 0;
-                                  if (cfg?.sizeQtys) {
-                                    Object.values(cfg.sizeQtys).forEach(q => {
-                                      pairTotalPieces += parseInt(q, 10) || 0;
+                                  let matrixTotalPieces = 0;
+                                  if (group.isMatrixTable) {
+                                    group.groupArtIds.forEach(aId => {
+                                      const aKey = getSizeConfigKey(aId, leadColName);
+                                      const aCfg = cust.sizeConfigs?.[aKey];
+                                      if (aCfg?.sizeQtys) {
+                                        Object.values(aCfg.sizeQtys).forEach(q => {
+                                          matrixTotalPieces += parseInt(q, 10) || 0;
+                                        });
+                                      }
                                     });
+                                  } else {
+                                    if (configMode.sameValue === false && group.groupArtIds.length > 1) {
+                                      group.groupArtIds.forEach(aId => {
+                                        const aKey = getSizeConfigKey(aId, leadColName);
+                                        const aCfg = cust.sizeConfigs?.[aKey];
+                                        if (aCfg?.sizeQtys) {
+                                          Object.values(aCfg.sizeQtys).forEach(q => {
+                                            pairTotalPieces += parseInt(q, 10) || 0;
+                                          });
+                                        }
+                                      });
+                                    } else {
+                                      if (cfg?.sizeQtys) {
+                                        Object.values(cfg.sizeQtys).forEach(q => {
+                                          pairTotalPieces += parseInt(q, 10) || 0;
+                                        });
+                                      }
+                                    }
                                   }
 
                                   const activeSeriesList = getPairSeriesConfigs(cust, group.leadArtId, colName);
@@ -3810,11 +3934,21 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                         {group.isSet && (
                                           <div
                                             className="d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-3 mb-3 border"
-                                            style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', fontSize: '12px', fontWeight: 500 }}
+                                            style={{
+                                              backgroundColor: configMode.sameValue === false ? '#fffbeb' : '#f0fdf4',
+                                              borderColor: configMode.sameValue === false ? '#fef3c7' : '#bbf7d0',
+                                              color: configMode.sameValue === false ? '#92400e' : '#166534',
+                                              fontSize: '12px',
+                                              fontWeight: 500
+                                            }}
                                           >
-                                            <i className="ti ti-wand"></i>
+                                            <i className={configMode.sameValue === false ? "ti ti-scale" : "ti ti-wand"}></i>
                                             <span>
-                                              {isMultiColorCombined ? (
+                                              {configMode.sameValue === false ? (
+                                                <>
+                                                  <strong>⚖️ Multi-Article Box:</strong> {group.groupArtIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(' + ')} share the same sizes and colors in this single box. You can enter or change quantities for each article independently below.
+                                                </>
+                                              ) : isMultiColorCombined ? (
                                                 <>
                                                   <strong>⚡ 1:1 Matching Across All {colorsInCard.length} Colors &amp; {group.groupArtIds.length} Articles:</strong>
                                                   {' '}{colorsInCard.length} colors ({colorsInCard.join(', ')}) &amp; {group.groupArtIds.length} articles ({group.groupArtIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(', ')}) are combined into this single box. Quantities entered below automatically apply across all of them.
@@ -4085,25 +4219,133 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                                         </div>
                                                       ) : null}
 
-                                                      {/* Individual Size Inputs */}
-                                                      <div className="d-flex flex-wrap gap-2.5">
-                                                        {(sc.selectedSizes || []).map((sz) => (
-                                                          <div key={sz} className="d-flex flex-column align-items-center">
-                                                            <span className="badge bg-light text-dark border mb-1 px-2 py-0.5" style={{ fontSize: '11px' }}>
-                                                              {sz}
+                                                      {/* In-box Option: Same Value vs Article-Wise Values */}
+                                                      {group.groupArtIds.length > 1 && (
+                                                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 p-2 px-3 rounded-3 border" style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+                                                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                            <span className="small fw-semibold text-secondary" style={{ fontSize: '12px' }}>
+                                                              Article Values:
                                                             </span>
-                                                            <input
-                                                              type="number"
-                                                              min="0"
-                                                              className="form-control form-control-sm text-center font-monospace fw-semibold"
-                                                              style={{ width: '70px', height: '32px', fontSize: '13px' }}
-                                                              placeholder="0"
-                                                              value={sc.sizeQtys?.[sz] !== undefined ? sc.sizeQtys[sz] : ''}
-                                                              onChange={(e) => updateIndividualSizeQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz, e.target.value)}
-                                                            />
+                                                            <div className="btn-group btn-group-sm" role="group">
+                                                              <button
+                                                                type="button"
+                                                                className={`btn btn-xs fw-semibold px-2.5 py-1 ${configMode.sameValue !== false ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                                                style={{ fontSize: '11.5px', backgroundColor: configMode.sameValue !== false ? '#2e37a4' : '#fff' }}
+                                                                onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: true })}
+                                                              >
+                                                                <span>⚡</span>
+                                                                <span>Same Value (1:1 Equal for All)</span>
+                                                              </button>
+                                                              <button
+                                                                type="button"
+                                                                className={`btn btn-xs fw-semibold px-2.5 py-1 ${configMode.sameValue === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
+                                                                style={{ fontSize: '11.5px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
+                                                                onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: false })}
+                                                              >
+                                                                <span>⚖️</span>
+                                                                <span>Different Value Per Article</span>
+                                                              </button>
+                                                            </div>
                                                           </div>
-                                                        ))}
-                                                      </div>
+                                                          <span className="small text-muted" style={{ fontSize: '11px' }}>
+                                                            {configMode.sameValue !== false
+                                                              ? '⚡ Single entry automatically syncs across all articles'
+                                                              : '✏️ Enter or tweak quantities for each article below'}
+                                                          </span>
+                                                        </div>
+                                                      )}
+
+                                                      {configMode.sameValue === false && group.groupArtIds.length > 1 ? (
+                                                        /* Article-Wise Rows: Kurta, Pant, Dupatta each have their own row */
+                                                        <div className="d-flex flex-column gap-3">
+                                                          {group.groupArtIds.map((artId, artIdx) => {
+                                                            const artObj = addedArticles.find(a => a.id === artId);
+                                                            const artSeriesList = getPairSeriesConfigs(cust, artId, leadColName);
+                                                            const artSc = artSeriesList.find(s => s.seriesId === sc.seriesId || s.seriesName === sc.seriesId || s.seriesName === sc.seriesName) || sc;
+                                                            const artTotal = Object.values(artSc.sizeQtys || {}).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
+                                                            const totalWithColors = isMultiColorCombined ? artTotal * colorsInCard.length : artTotal;
+
+                                                            return (
+                                                              <div
+                                                                key={artId}
+                                                                className="p-3 rounded-3 border bg-white shadow-xs"
+                                                                style={{ borderColor: artIdx === 0 ? '#c7d2fe' : '#e2e8f0', backgroundColor: '#ffffff' }}
+                                                              >
+                                                                <div className="d-flex justify-content-between align-items-center mb-2.5 flex-wrap gap-2">
+                                                                  <div className="d-flex align-items-center gap-2">
+                                                                    <span className="badge rounded-pill bg-light text-dark border px-2.5 py-1 fw-bold" style={{ fontSize: '12px' }}>
+                                                                      {artObj?.name || `Article ${artIdx + 1}`}
+                                                                    </span>
+                                                                    <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-0.5 font-monospace fw-semibold" style={{ fontSize: '11px' }}>
+                                                                      {isMultiColorCombined
+                                                                        ? `${artTotal} pcs / color × ${colorsInCard.length} colors = ${totalWithColors} pcs`
+                                                                        : `${artTotal} pcs`}
+                                                                    </span>
+                                                                  </div>
+                                                                  {artIdx > 0 && (
+                                                                    <button
+                                                                      type="button"
+                                                                      className="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1 shadow-xs"
+                                                                      style={{ fontSize: '11px' }}
+                                                                      onClick={() => copyArticleQuantities(ci, group.leadArtId, artId, colName, sc.seriesId)}
+                                                                    >
+                                                                      <i className="ti ti-copy small"></i>
+                                                                      <span>Copy from {addedArticles.find(a => a.id === group.leadArtId)?.name || 'First Article'}</span>
+                                                                    </button>
+                                                                  )}
+                                                                </div>
+
+                                                                <div className="d-flex flex-wrap gap-2.5">
+                                                                  {(sc.selectedSizes || []).map((sz) => (
+                                                                    <div key={sz} className="d-flex flex-column align-items-center">
+                                                                      <span className="badge bg-light text-secondary border mb-1 px-2 py-0.5" style={{ fontSize: '10.5px' }}>
+                                                                        {sz}
+                                                                      </span>
+                                                                      <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className="form-control form-control-sm text-center font-monospace fw-semibold"
+                                                                        style={{ width: '70px', height: '32px', fontSize: '13px' }}
+                                                                        placeholder="0"
+                                                                        value={artSc.sizeQtys?.[sz] !== undefined ? artSc.sizeQtys[sz] : ''}
+                                                                        onChange={(e) => updateIndividualSizeQtyForSingleArticle(ci, artId, colName, sc.seriesId, sz, e.target.value)}
+                                                                      />
+                                                                    </div>
+                                                                  ))}
+                                                                </div>
+                                                              </div>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      ) : (
+                                                        /* Unified 1:1 Row */
+                                                        <div>
+                                                          {group.groupArtIds.length > 1 && (
+                                                            <div className="small text-success fw-medium mb-2 d-flex align-items-center gap-1">
+                                                              <i className="ti ti-link"></i>
+                                                              <span>1:1 Equal Quantities — entering numbers below sets all articles ({group.groupArtIds.map(id => addedArticles.find(a => a.id === id)?.name).filter(Boolean).join(', ')}) together:</span>
+                                                            </div>
+                                                          )}
+                                                          <div className="d-flex flex-wrap gap-2.5">
+                                                            {(sc.selectedSizes || []).map((sz) => (
+                                                              <div key={sz} className="d-flex flex-column align-items-center">
+                                                                <span className="badge bg-light text-dark border mb-1 px-2 py-0.5" style={{ fontSize: '11px' }}>
+                                                                  {sz}
+                                                                </span>
+                                                                <input
+                                                                  type="number"
+                                                                  min="0"
+                                                                  className="form-control form-control-sm text-center font-monospace fw-semibold"
+                                                                  style={{ width: '70px', height: '32px', fontSize: '13px' }}
+                                                                  placeholder="0"
+                                                                  value={sc.sizeQtys?.[sz] !== undefined ? sc.sizeQtys[sz] : ''}
+                                                                  onChange={(e) => updateIndividualSizeQtyForGroupSeries(ci, group.groupArtIds, colName, sc.seriesId, sz, e.target.value)}
+                                                                />
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   ) : null}
                                                 </div>
