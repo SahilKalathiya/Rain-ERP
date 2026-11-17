@@ -721,7 +721,7 @@ export default function OrderDetailView({
   }, [addedAccessories]);
 
   const [accessorySearchQuery, setAccessorySearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('Buttons');
+  const [activeCategory, setActiveCategory] = useState('');
   const [selectedBomArticle, setSelectedBomArticle] = useState('');
   const [editingAccessoryIds, setEditingAccessoryIds] = useState({});
 
@@ -788,7 +788,8 @@ export default function OrderDetailView({
   }, [order]);
 
   const activeCategoryObj = useMemo(() => {
-    return ACCESSORY_CATEGORIES.find(c => matchesCategory(c.id, activeCategory)) || ACCESSORY_CATEGORIES[0];
+    if (!activeCategory) return null;
+    return ACCESSORY_CATEGORIES.find(c => matchesCategory(c.id, activeCategory)) || null;
   }, [ACCESSORY_CATEGORIES, activeCategory]);
 
 
@@ -3535,7 +3536,8 @@ export default function OrderDetailView({
         {articlesList.map((art, aIdx) => {
           const isExpanded = !!expandedArticles[aIdx];
           const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
-          const artIcon = art.icon || (isBottom ? '👖' : '👕');
+          const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
+          const artIcon = art.icon || (isBottom ? '👖' : isDupatta ? '🧣' : '👕');
           const hasFabric = Boolean(art.fabricQuality && art.fabricQuality.trim() !== '');
           const hasLength = Boolean(art.avgGarmentLength && String(art.avgGarmentLength).trim() !== '' && !isNaN(parseFloat(art.avgGarmentLength)));
 
@@ -3615,7 +3617,7 @@ export default function OrderDetailView({
                     >
                       <div className="d-flex align-items-center gap-2">
                         <span className="text-secondary small fw-medium">
-                          # Avg. Length:
+                          # Avg. Length {isDupatta ? '(mts)' : '(in)'}:
                         </span>
                         {editingLengthIdx === aIdx ? (
                           <div className="d-flex align-items-center gap-2">
@@ -3624,6 +3626,7 @@ export default function OrderDetailView({
                               step="0.01"
                               className="form-control form-control-sm"
                               style={{ width: '90px' }}
+                              placeholder={isDupatta ? "e.g. 2.25" : "e.g. 45"}
                               value={tempLengthVal}
                               onChange={(e) => setTempLengthVal(e.target.value)}
                               autoFocus
@@ -3642,7 +3645,7 @@ export default function OrderDetailView({
                           </div>
                         ) : (
                           <strong className="text-dark small">
-                            {parseFloat(art.avgGarmentLength).toFixed(2)} inches
+                            {parseFloat(art.avgGarmentLength).toFixed(2)} {isDupatta ? 'mts' : 'inches'}
                           </strong>
                         )}
                       </div>
@@ -5133,6 +5136,80 @@ export default function OrderDetailView({
           )}
         </div>
 
+        {/* ========================================================================= */}
+        {/* TOP ARTICLE TABS (Kurta, Pant, Dupatta) - Section 11                      */}
+        {/* ========================================================================= */}
+        {orderArticles.length > 0 && (
+          <div
+            className="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2.5 rounded-3 mb-3"
+            style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}
+          >
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <span className="text-secondary fw-bold px-1" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Select Article:
+              </span>
+              <div className="d-flex align-items-center flex-wrap gap-1.5">
+                {orderArticles.map(art => {
+                  const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
+                  const isDupatta = /dupatta|stole|scarf/i.test(art.name || '');
+                  const defaultIcon = isBottom ? '👖' : (isDupatta ? '🧣' : '👘');
+                  const isSelected = Boolean(selectedBomArticle && selectedBomArticle.toLowerCase() === (art.name || '').toLowerCase());
+
+                  // Count configured accessories for this article
+                  const countForArt = addedAccessories.filter(item =>
+                    getCardSelectedArticles(item).some(a => a.toLowerCase() === (art.name || '').toLowerCase())
+                  ).length;
+
+                  return (
+                    <button
+                      key={art.name}
+                      type="button"
+                      className={`btn btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 px-3.5 py-1.5 transition-all fw-semibold ${isSelected ? 'shadow-xs' : ''}`}
+                      style={{
+                        fontSize: '13px',
+                        backgroundColor: isSelected ? '#2e37a4' : '#ffffff',
+                        color: isSelected ? '#ffffff' : '#475569',
+                        border: isSelected ? '1.5px solid #2e37a4' : '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setSelectedBomArticle(prev => prev === art.name ? '' : art.name)}
+                    >
+                      <span>{art.icon || defaultIcon}</span>
+                      <span>{art.name}</span>
+                      <span
+                        className="badge rounded-pill ms-1"
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                          color: isSelected ? '#ffffff' : '#475569',
+                          fontSize: '11px',
+                          padding: '2px 7px'
+                        }}
+                      >
+                        {countForArt}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="text-muted small pe-1 d-flex align-items-center gap-1.5" style={{ fontSize: '12px' }}>
+              {selectedBomArticle ? (
+                <>
+                  <span>Configuring for:</span>
+                  <span className="badge rounded-2 px-2.5 py-1 fw-bold" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12px' }}>
+                    {selectedBomArticle}
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted fst-italic">
+                  Click an article to configure (e.g. Kurta, Pant, Dupatta)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div style={{ marginBottom: '20px' }}>
           <div className="input-group rounded-3 overflow-hidden shadow-xs border" style={{ borderColor: '#e2e8f0' }}>
@@ -5169,7 +5246,7 @@ export default function OrderDetailView({
           }}
         >
           {ACCESSORY_CATEGORIES.map((cat) => {
-            const isActive = matchesCategory(activeCategory, cat.id);
+            const isActive = Boolean(activeCategory && matchesCategory(activeCategory, cat.id));
             const categoryItems = addedAccessories.filter(item => matchesCategory(item.category, cat.id));
 
             return (
@@ -5188,7 +5265,7 @@ export default function OrderDetailView({
                   boxShadow: isActive ? '0 2px 8px rgba(46, 55, 164, 0.15)' : 'none',
                   cursor: 'pointer'
                 }}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => setActiveCategory(prev => prev === cat.id ? '' : cat.id)}
               >
                 <div
                   className="rounded-circle d-flex align-items-center justify-content-center mb-1"
@@ -5204,180 +5281,159 @@ export default function OrderDetailView({
                 <span style={{ fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '100%' }}>
                   {cat.name}
                 </span>
-                {categoryItems.length > 0 && (
-                  <span
-                    className="badge rounded-pill mt-0.5"
-                    style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      backgroundColor: isActive ? '#2e37a4' : '#f1f5f9',
-                      color: isActive ? '#ffffff' : '#64748b'
-                    }}
-                  >
-                    {categoryItems.length}
-                  </span>
-                )}
               </button>
             );
           })}
         </div>
 
         {/* 2. Active Category Action Bar & Quick Varieties */}
-        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 mt-2">
-          <div className="d-flex align-items-center gap-2">
-            <div
-              className="rounded-circle d-flex align-items-center justify-content-center"
-              style={{ width: '26px', height: '26px', minWidth: '26px', backgroundColor: '#eef2ff', color: '#2563eb' }}
-            >
-              <i className={activeCategoryObj.icon} style={{ fontSize: '14px' }}></i>
-            </div>
-            <span className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
-              {activeCategoryObj.name}
-            </span>
-            <span className="text-muted" style={{ fontSize: '12.5px' }}>
-              {(activeCategoryObj?.varieties?.length > 0) ? '— click a variety to add:' : ''}
-            </span>
-          </div>
-        </div>
-
-        {/* 3. Quick Variety Pills */}
-        <div className="position-relative d-flex flex-wrap align-items-center mb-4" style={{ gap: '8px' }}>
-          {(activeCategoryObj?.varieties || []).length === 0 ? (
-            <div className="text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '13px' }}>
-              <i className="ti ti-info-circle text-primary" style={{ fontSize: '16px' }}></i>
-              <span>No accessories added in <strong>{activeCategoryObj?.name || activeCategory} Master</strong> yet. Add items in Accessories Master to select them here.</span>
-            </div>
-          ) : (
-            (activeCategoryObj?.varieties || []).map((v, vIdx) => (
-              <button
-                key={vIdx}
-                type="button"
-                className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill shadow-xs transition-all"
-                style={{
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  padding: '5px 14px',
-                  backgroundColor: '#ffffff',
-                  borderColor: '#bfdbfe',
-                  borderWidth: '1.5px',
-                  borderStyle: 'solid',
-                  color: '#2563eb',
-                  cursor: 'pointer'
-                }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
-                  setPopoverState({
-                    catId: activeCategoryObj?.id || activeCategory,
-                    varName: v.name,
-                    x: rect.left - containerRect.left,
-                    y: rect.bottom - containerRect.top + 6
-                  });
-                }}
-                title={`Add ${v.name}`}
-              >
-                <i className="ti ti-plus" style={{ fontSize: '12px', fontWeight: 'bold' }}></i>
-                <span>{v.name}</span>
-              </button>
-            ))
-          )}
-
-          {/* How many to add? Popover */}
-          {popoverState && (
-            <div
-              className="position-absolute bg-white rounded-3 shadow-lg p-3"
-              style={{
-                zIndex: 1050,
-                width: '230px',
-                top: `${popoverState.y}px`,
-                left: `${Math.max(0, popoverState.x)}px`,
-                border: '1.5px solid #cbd5e1',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)'
-              }}
-            >
-              <div className="fw-bold text-dark small mb-2 text-center" style={{ fontSize: '13px' }}>
-                How many to add?
+        {activeCategoryObj ? (
+          <>
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 mt-2">
+              <div className="d-flex align-items-center gap-2">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center"
+                  style={{ width: '26px', height: '26px', minWidth: '26px', backgroundColor: '#eef2ff', color: '#2563eb' }}
+                >
+                  <i className={activeCategoryObj.icon} style={{ fontSize: '14px' }}></i>
+                </div>
+                <span className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
+                  {activeCategoryObj.name}
+                </span>
+                <span className="text-muted" style={{ fontSize: '12.5px' }}>
+                  {(activeCategoryObj?.varieties?.length > 0) ? '— click a variety to add:' : ''}
+                </span>
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(5, 1fr)',
-                  gap: '6px',
-                  marginBottom: '10px'
-                }}
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+            </div>
+
+            {/* 3. Quick Variety Pills */}
+            <div className="position-relative d-flex flex-wrap align-items-center mb-4" style={{ gap: '8px' }}>
+              {(activeCategoryObj?.varieties || []).length === 0 ? (
+                <div className="text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '13px' }}>
+                  <i className="ti ti-info-circle text-primary" style={{ fontSize: '16px' }}></i>
+                  <span>No accessories added in <strong>{activeCategoryObj?.name || activeCategory} Master</strong> yet. Add items in Accessories Master to select them here.</span>
+                </div>
+              ) : (
+                (activeCategoryObj?.varieties || []).map((v, vIdx) => (
                   <button
-                    key={num}
+                    key={vIdx}
                     type="button"
-                    className="btn btn-sm btn-outline-secondary p-1 fw-bold transition-all"
-                    style={{ fontSize: '13px', borderRadius: '6px' }}
-                    onClick={() => {
-                      handleAddMultipleAccessories(popoverState.catId, popoverState.varName, num);
-                      setPopoverState(null);
+                    className="btn btn-sm d-inline-flex align-items-center gap-1.5 rounded-pill shadow-xs transition-all"
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      padding: '5px 14px',
+                      backgroundColor: '#ffffff',
+                      borderColor: '#bfdbfe',
+                      borderWidth: '1.5px',
+                      borderStyle: 'solid',
+                      color: '#2563eb',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
+                      setPopoverState({
+                        catId: activeCategoryObj?.id || activeCategory,
+                        varName: v.name,
+                        x: rect.left - containerRect.left,
+                        y: rect.bottom - containerRect.top + 6
+                      });
+                    }}
+                    title={`Add ${v.name}`}
+                  >
+                    <i className="ti ti-plus" style={{ fontSize: '12px', fontWeight: 'bold' }}></i>
+                    <span>{v.name}</span>
+                  </button>
+                ))
+              )}
+
+              {/* How many to add? Popover */}
+              {popoverState && (
+                <div
+                  className="position-absolute bg-white rounded-3 shadow-lg p-3"
+                  style={{
+                    zIndex: 1050,
+                    width: '230px',
+                    top: `${popoverState.y}px`,
+                    left: `${Math.max(0, popoverState.x)}px`,
+                    border: '1.5px solid #cbd5e1',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)'
+                  }}
+                >
+                  <div className="fw-bold text-dark small mb-2 text-center" style={{ fontSize: '13px' }}>
+                    How many to add?
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(5, 1fr)',
+                      gap: '6px',
+                      marginBottom: '10px'
                     }}
                   >
-                    {num}
-                  </button>
-                ))}
-              </div>
-              <div className="text-center">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
-                  style={{ fontSize: '12px' }}
-                  onClick={() => setPopoverState(null)}
-                >
-                  Cancel
-                </button>
-              </div>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                      <button
+                        key={num}
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary p-1 fw-bold transition-all"
+                        style={{ fontSize: '13px', borderRadius: '6px' }}
+                        onClick={() => {
+                          handleAddMultipleAccessories(popoverState.catId, popoverState.varName, num);
+                          setPopoverState(null);
+                        }}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                      style={{ fontSize: '12px' }}
+                      onClick={() => setPopoverState(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* 4. Filter By Article Pills */}
-        {orderArticles.length > 1 && (
-          <div className="d-flex align-items-center flex-wrap gap-2 mb-3 pb-2 border-bottom">
-            <span className="text-muted fw-semibold me-1" style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Filter by Article:
-            </span>
-            <button
-              type="button"
-              className={`btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${!selectedBomArticle ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white'}`}
-              style={!selectedBomArticle ? { backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '12px' } : { fontSize: '12px' }}
-              onClick={() => setSelectedBomArticle('')}
-            >
-              All Articles ({addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory))).length})
-            </button>
-            {orderArticles.map(art => {
-              const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || '');
-              const countForArt = addedAccessories.filter(item =>
-                matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)) &&
-                getCardSelectedArticles(item).some(a => a.toLowerCase() === (art.name || '').toLowerCase())
-              ).length;
-              const isSelected = selectedBomArticle === art.name;
-              return (
-                <button
-                  key={art.name}
-                  type="button"
-                  className={`btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${isSelected ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white'}`}
-                  style={isSelected ? { backgroundColor: '#2e37a4', borderColor: '#2e37a4', fontSize: '12px' } : { fontSize: '12px' }}
-                  onClick={() => setSelectedBomArticle(isSelected ? '' : art.name)}
-                >
-                  <span>{art.icon || (isBottom ? '👖' : '👘')}</span>
-                  <span className="ms-1">{art.name}</span>
-                  <span className="badge rounded-pill ms-1.5" style={{ backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', fontSize: '10.5px' }}>
-                    {countForArt}
-                  </span>
-                </button>
-              );
-            })}
+          </>
+        ) : (
+          <div className="text-muted small py-2.5 px-3 rounded-3 d-flex align-items-center gap-2 mb-4" style={{ backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '12.5px' }}>
+            <i className="ti ti-hand-click text-primary" style={{ fontSize: '15px' }}></i>
+            <span>Click any category above (e.g. <strong>Buttons, Lace, Tassels, Thread</strong>) to select and configure its varieties.</span>
           </div>
         )}
 
-        {/* 5. Configured Accessories List or Empty State */}
+        {/* 4. Configured Accessories List or Empty State */}
         {(() => {
-          let categoryItems = addedAccessories.filter(item => matchesCategory(item.category, (activeCategoryObj?.id || activeCategory)));
+          if (!selectedBomArticle) {
+            return (
+              <div
+                className="rounded-3 p-4 text-center my-3"
+                style={{
+                  border: '1.5px dashed #cbd5e1',
+                  backgroundColor: '#f8fafc',
+                  color: '#64748b'
+                }}
+              >
+                <div className="small fw-medium">
+                  Please select an article above (<strong>{orderArticles.map(a => a.name).join(', ') || 'Kurta, Pant, Dupatta'}</strong>) to configure its accessories.
+                </div>
+              </div>
+            );
+          }
+
+          let categoryItems = addedAccessories.filter(item =>
+            getCardSelectedArticles(item).some(a => a.toLowerCase() === selectedBomArticle.toLowerCase())
+          );
+
+          if (activeCategory) {
+            categoryItems = categoryItems.filter(item => matchesCategory(item.category, activeCategory));
+          }
 
           if (accessorySearchQuery && accessorySearchQuery.trim()) {
             const q = accessorySearchQuery.toLowerCase().trim();
@@ -5385,12 +5441,6 @@ export default function OrderDetailView({
               (item.varietyName && item.varietyName.toLowerCase().includes(q)) ||
               (item.category && item.category.toLowerCase().includes(q)) ||
               (item.placement && item.placement.toLowerCase().includes(q))
-            );
-          }
-
-          if (selectedBomArticle) {
-            categoryItems = categoryItems.filter(item =>
-              getCardSelectedArticles(item).some(a => a.toLowerCase() === selectedBomArticle.toLowerCase())
             );
           }
 
@@ -5405,9 +5455,9 @@ export default function OrderDetailView({
                 }}
               >
                 <div className="small fw-medium">
-                  {selectedBomArticle
-                    ? `No ${activeCategoryObj?.name || activeCategory} configured for ${selectedBomArticle} yet. Click a variety above to add.`
-                    : `No accessories configured yet — pick a category and click a variety above to add.`}
+                  {activeCategoryObj
+                    ? `No ${activeCategoryObj.name} configured for ${selectedBomArticle} yet. Click a variety above to add for ${selectedBomArticle}.`
+                    : `No accessories configured for ${selectedBomArticle} yet. Click a category above (e.g. Buttons, Lace, Tassels) to add.`}
                 </div>
               </div>
             );
@@ -5491,7 +5541,10 @@ export default function OrderDetailView({
 
                     {/* Category-Specific Table Layout */}
                     <div>
-                      {renderCategoryCardTable(activeCategoryObj, item, selectedArticles, isEditing)}
+                      {(() => {
+                        const itemCatObj = ACCESSORY_CATEGORIES.find(c => matchesCategory(c.id, item.category)) || activeCategoryObj || ACCESSORY_CATEGORIES[0];
+                        return renderCategoryCardTable(itemCatObj, item, selectedArticles, isEditing);
+                      })()}
                     </div>
 
                     {/* Card Bottom Actions: Edit/Save & Delete (Neatly at bottom right) */}

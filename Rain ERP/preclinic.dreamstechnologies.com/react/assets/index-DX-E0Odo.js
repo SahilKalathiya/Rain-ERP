@@ -18131,7 +18131,7 @@
       return Math.round(sum);
     }, [addedAccessories]);
     const [accessorySearchQuery, setAccessorySearchQuery] = (0, import_react5.useState)("");
-    const [activeCategory, setActiveCategory] = (0, import_react5.useState)("Buttons");
+    const [activeCategory, setActiveCategory] = (0, import_react5.useState)("");
     const [selectedBomArticle, setSelectedBomArticle] = (0, import_react5.useState)("");
     const [editingAccessoryIds, setEditingAccessoryIds] = (0, import_react5.useState)({});
     const formatDateWithTime = (dateStr) => {
@@ -18192,7 +18192,8 @@
       return list;
     }, [order]);
     const activeCategoryObj = (0, import_react5.useMemo)(() => {
-      return ACCESSORY_CATEGORIES2.find((c) => matchesCategory2(c.id, activeCategory)) || ACCESSORY_CATEGORIES2[0];
+      if (!activeCategory) return null;
+      return ACCESSORY_CATEGORIES2.find((c) => matchesCategory2(c.id, activeCategory)) || null;
     }, [ACCESSORY_CATEGORIES2, activeCategory]);
     const availableArticleColors = (0, import_react5.useMemo)(() => {
       const cols = [];
@@ -20313,7 +20314,8 @@
       articlesList.map((art, aIdx) => {
         const isExpanded = !!expandedArticles[aIdx];
         const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || "");
-        const artIcon = art.icon || (isBottom ? "\u{1F456}" : "\u{1F455}");
+        const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
+        const artIcon = art.icon || (isBottom ? "\u{1F456}" : isDupatta ? "\u{1F9E3}" : "\u{1F455}");
         const hasFabric = Boolean(art.fabricQuality && art.fabricQuality.trim() !== "");
         const hasLength = Boolean(art.avgGarmentLength && String(art.avgGarmentLength).trim() !== "" && !isNaN(parseFloat(art.avgGarmentLength)));
         return /* @__PURE__ */ import_react5.default.createElement("div", { key: aIdx, className: "border rounded-4 overflow-hidden mb-3", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
@@ -20355,13 +20357,14 @@
             className: "p-2.5 px-3 rounded-3 d-flex justify-content-between align-items-center border",
             style: { backgroundColor: "#f8fafc", borderColor: "#e2e8f0" }
           },
-          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary small fw-medium" }, "# Avg. Length:"), editingLengthIdx === aIdx ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
+          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary small fw-medium" }, "# Avg. Length ", isDupatta ? "(mts)" : "(in)", ":"), editingLengthIdx === aIdx ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
             "input",
             {
               type: "number",
               step: "0.01",
               className: "form-control form-control-sm",
               style: { width: "90px" },
+              placeholder: isDupatta ? "e.g. 2.25" : "e.g. 45",
               value: tempLengthVal,
               onChange: (e) => setTempLengthVal(e.target.value),
               autoFocus: true
@@ -20378,7 +20381,7 @@
               }
             },
             "Save"
-          )) : /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small" }, parseFloat(art.avgGarmentLength).toFixed(2), " inches")),
+          )) : /* @__PURE__ */ import_react5.default.createElement("strong", { className: "text-dark small" }, parseFloat(art.avgGarmentLength).toFixed(2), " ", isDupatta ? "mts" : "inches")),
           editingLengthIdx !== aIdx && /* @__PURE__ */ import_react5.default.createElement(
             "button",
             {
@@ -21587,6 +21590,54 @@
         },
         co.customerName
       )))),
+      orderArticles.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
+        "div",
+        {
+          className: "d-flex align-items-center justify-content-between flex-wrap gap-2 p-2.5 rounded-3 mb-3",
+          style: { backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }
+        },
+        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-secondary fw-bold px-1", style: { fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Select Article:"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-1.5" }, orderArticles.map((art) => {
+          const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || "");
+          const isDupatta = /dupatta|stole|scarf/i.test(art.name || "");
+          const defaultIcon = isBottom ? "\u{1F456}" : isDupatta ? "\u{1F9E3}" : "\u{1F458}";
+          const isSelected = Boolean(selectedBomArticle && selectedBomArticle.toLowerCase() === (art.name || "").toLowerCase());
+          const countForArt = addedAccessories.filter(
+            (item) => getCardSelectedArticles(item).some((a) => a.toLowerCase() === (art.name || "").toLowerCase())
+          ).length;
+          return /* @__PURE__ */ import_react5.default.createElement(
+            "button",
+            {
+              key: art.name,
+              type: "button",
+              className: `btn btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 px-3.5 py-1.5 transition-all fw-semibold ${isSelected ? "shadow-xs" : ""}`,
+              style: {
+                fontSize: "13px",
+                backgroundColor: isSelected ? "#2e37a4" : "#ffffff",
+                color: isSelected ? "#ffffff" : "#475569",
+                border: isSelected ? "1.5px solid #2e37a4" : "1px solid #cbd5e1",
+                cursor: "pointer"
+              },
+              onClick: () => setSelectedBomArticle((prev) => prev === art.name ? "" : art.name)
+            },
+            /* @__PURE__ */ import_react5.default.createElement("span", null, art.icon || defaultIcon),
+            /* @__PURE__ */ import_react5.default.createElement("span", null, art.name),
+            /* @__PURE__ */ import_react5.default.createElement(
+              "span",
+              {
+                className: "badge rounded-pill ms-1",
+                style: {
+                  backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0",
+                  color: isSelected ? "#ffffff" : "#475569",
+                  fontSize: "11px",
+                  padding: "2px 7px"
+                }
+              },
+              countForArt
+            )
+          );
+        }))),
+        /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small pe-1 d-flex align-items-center gap-1.5", style: { fontSize: "12px" } }, selectedBomArticle ? /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("span", null, "Configuring for:"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge rounded-2 px-2.5 py-1 fw-bold", style: { backgroundColor: "#eef2ff", color: "#2e37a4", border: "1px solid #c7d2fe", fontSize: "12px" } }, selectedBomArticle)) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted fst-italic" }, "Click an article to configure (e.g. Kurta, Pant, Dupatta)"))
+      ),
       /* @__PURE__ */ import_react5.default.createElement("div", { style: { marginBottom: "20px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "input-group rounded-3 overflow-hidden shadow-xs border", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "input-group-text bg-white border-0 text-muted ps-3" }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-search", style: { fontSize: "16px" } })), /* @__PURE__ */ import_react5.default.createElement(
         "input",
         {
@@ -21617,7 +21668,7 @@
           }
         },
         ACCESSORY_CATEGORIES2.map((cat) => {
-          const isActive = matchesCategory2(activeCategory, cat.id);
+          const isActive = Boolean(activeCategory && matchesCategory2(activeCategory, cat.id));
           const categoryItems = addedAccessories.filter((item) => matchesCategory2(item.category, cat.id));
           return /* @__PURE__ */ import_react5.default.createElement(
             "button",
@@ -21636,7 +21687,7 @@
                 boxShadow: isActive ? "0 2px 8px rgba(46, 55, 164, 0.15)" : "none",
                 cursor: "pointer"
               },
-              onClick: () => setActiveCategory(cat.id)
+              onClick: () => setActiveCategory((prev) => prev === cat.id ? "" : cat.id)
             },
             /* @__PURE__ */ import_react5.default.createElement(
               "div",
@@ -21651,32 +21702,18 @@
               },
               /* @__PURE__ */ import_react5.default.createElement("i", { className: cat.icon, style: { fontSize: "14px" } })
             ),
-            /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "12px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", maxWidth: "100%" } }, cat.name),
-            categoryItems.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
-              "span",
-              {
-                className: "badge rounded-pill mt-0.5",
-                style: {
-                  fontSize: "10px",
-                  padding: "1px 6px",
-                  backgroundColor: isActive ? "#2e37a4" : "#f1f5f9",
-                  color: isActive ? "#ffffff" : "#64748b"
-                }
-              },
-              categoryItems.length
-            )
+            /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "12px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", maxWidth: "100%" } }, cat.name)
           );
         })
       ),
-      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 mt-2" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
+      activeCategoryObj ? /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 mt-2" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react5.default.createElement(
         "div",
         {
           className: "rounded-circle d-flex align-items-center justify-content-center",
           style: { width: "26px", height: "26px", minWidth: "26px", backgroundColor: "#eef2ff", color: "#2563eb" }
         },
         /* @__PURE__ */ import_react5.default.createElement("i", { className: activeCategoryObj.icon, style: { fontSize: "14px" } })
-      ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, activeCategoryObj.name), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "12.5px" } }, activeCategoryObj?.varieties?.length > 0 ? "\u2014 click a variety to add:" : ""))),
-      /* @__PURE__ */ import_react5.default.createElement("div", { className: "position-relative d-flex flex-wrap align-items-center mb-4", style: { gap: "8px" } }, (activeCategoryObj?.varieties || []).length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2", style: { backgroundColor: "#f8fafc", border: "1px dashed #cbd5e1", color: "#64748b", fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-info-circle text-primary", style: { fontSize: "16px" } }), /* @__PURE__ */ import_react5.default.createElement("span", null, "No accessories added in ", /* @__PURE__ */ import_react5.default.createElement("strong", null, activeCategoryObj?.name || activeCategory, " Master"), " yet. Add items in Accessories Master to select them here.")) : (activeCategoryObj?.varieties || []).map((v, vIdx) => /* @__PURE__ */ import_react5.default.createElement(
+      ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, activeCategoryObj.name), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "12.5px" } }, activeCategoryObj?.varieties?.length > 0 ? "\u2014 click a variety to add:" : ""))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "position-relative d-flex flex-wrap align-items-center mb-4", style: { gap: "8px" } }, (activeCategoryObj?.varieties || []).length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small py-2 px-3 rounded-3 d-flex align-items-center gap-2", style: { backgroundColor: "#f8fafc", border: "1px dashed #cbd5e1", color: "#64748b", fontSize: "13px" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-info-circle text-primary", style: { fontSize: "16px" } }), /* @__PURE__ */ import_react5.default.createElement("span", null, "No accessories added in ", /* @__PURE__ */ import_react5.default.createElement("strong", null, activeCategoryObj?.name || activeCategory, " Master"), " yet. Add items in Accessories Master to select them here.")) : (activeCategoryObj?.varieties || []).map((v, vIdx) => /* @__PURE__ */ import_react5.default.createElement(
         "button",
         {
           key: vIdx,
@@ -21756,49 +21793,32 @@
           },
           "Cancel"
         ))
-      )),
-      orderArticles.length > 1 && /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center flex-wrap gap-2 mb-3 pb-2 border-bottom" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted fw-semibold me-1", style: { fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Filter by Article:"), /* @__PURE__ */ import_react5.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: `btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${!selectedBomArticle ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white"}`,
-          style: !selectedBomArticle ? { backgroundColor: "#2e37a4", borderColor: "#2e37a4", fontSize: "12px" } : { fontSize: "12px" },
-          onClick: () => setSelectedBomArticle("")
-        },
-        "All Articles (",
-        addedAccessories.filter((item) => matchesCategory2(item.category, activeCategoryObj?.id || activeCategory)).length,
-        ")"
-      ), orderArticles.map((art) => {
-        const isBottom = /pant|plazo|palazzo|pajama|salwar|bottom|trouser/i.test(art.name || "");
-        const countForArt = addedAccessories.filter(
-          (item) => matchesCategory2(item.category, activeCategoryObj?.id || activeCategory) && getCardSelectedArticles(item).some((a) => a.toLowerCase() === (art.name || "").toLowerCase())
-        ).length;
-        const isSelected = selectedBomArticle === art.name;
-        return /* @__PURE__ */ import_react5.default.createElement(
-          "button",
-          {
-            key: art.name,
-            type: "button",
-            className: `btn btn-xs rounded-pill px-3 py-1 fw-semibold transition-all ${isSelected ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white"}`,
-            style: isSelected ? { backgroundColor: "#2e37a4", borderColor: "#2e37a4", fontSize: "12px" } : { fontSize: "12px" },
-            onClick: () => setSelectedBomArticle(isSelected ? "" : art.name)
-          },
-          /* @__PURE__ */ import_react5.default.createElement("span", null, art.icon || (isBottom ? "\u{1F456}" : "\u{1F458}")),
-          /* @__PURE__ */ import_react5.default.createElement("span", { className: "ms-1" }, art.name),
-          /* @__PURE__ */ import_react5.default.createElement("span", { className: "badge rounded-pill ms-1.5", style: { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "#e2e8f0", color: isSelected ? "#ffffff" : "#475569", fontSize: "10.5px" } }, countForArt)
-        );
-      })),
+      ))) : /* @__PURE__ */ import_react5.default.createElement("div", { className: "text-muted small py-2.5 px-3 rounded-3 d-flex align-items-center gap-2 mb-4", style: { backgroundColor: "#f8fafc", border: "1px dashed #cbd5e1", color: "#64748b", fontSize: "12.5px" } }, /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-hand-click text-primary", style: { fontSize: "15px" } }), /* @__PURE__ */ import_react5.default.createElement("span", null, "Click any category above (e.g. ", /* @__PURE__ */ import_react5.default.createElement("strong", null, "Buttons, Lace, Tassels, Thread"), ") to select and configure its varieties.")),
       (() => {
-        let categoryItems = addedAccessories.filter((item) => matchesCategory2(item.category, activeCategoryObj?.id || activeCategory));
+        if (!selectedBomArticle) {
+          return /* @__PURE__ */ import_react5.default.createElement(
+            "div",
+            {
+              className: "rounded-3 p-4 text-center my-3",
+              style: {
+                border: "1.5px dashed #cbd5e1",
+                backgroundColor: "#f8fafc",
+                color: "#64748b"
+              }
+            },
+            /* @__PURE__ */ import_react5.default.createElement("div", { className: "small fw-medium" }, "Please select an article above (", /* @__PURE__ */ import_react5.default.createElement("strong", null, orderArticles.map((a) => a.name).join(", ") || "Kurta, Pant, Dupatta"), ") to configure its accessories.")
+          );
+        }
+        let categoryItems = addedAccessories.filter(
+          (item) => getCardSelectedArticles(item).some((a) => a.toLowerCase() === selectedBomArticle.toLowerCase())
+        );
+        if (activeCategory) {
+          categoryItems = categoryItems.filter((item) => matchesCategory2(item.category, activeCategory));
+        }
         if (accessorySearchQuery && accessorySearchQuery.trim()) {
           const q = accessorySearchQuery.toLowerCase().trim();
           categoryItems = categoryItems.filter(
             (item) => item.varietyName && item.varietyName.toLowerCase().includes(q) || item.category && item.category.toLowerCase().includes(q) || item.placement && item.placement.toLowerCase().includes(q)
-          );
-        }
-        if (selectedBomArticle) {
-          categoryItems = categoryItems.filter(
-            (item) => getCardSelectedArticles(item).some((a) => a.toLowerCase() === selectedBomArticle.toLowerCase())
           );
         }
         if (categoryItems.length === 0) {
@@ -21812,7 +21832,7 @@
                 color: "#64748b"
               }
             },
-            /* @__PURE__ */ import_react5.default.createElement("div", { className: "small fw-medium" }, selectedBomArticle ? `No ${activeCategoryObj?.name || activeCategory} configured for ${selectedBomArticle} yet. Click a variety above to add.` : `No accessories configured yet \u2014 pick a category and click a variety above to add.`)
+            /* @__PURE__ */ import_react5.default.createElement("div", { className: "small fw-medium" }, activeCategoryObj ? `No ${activeCategoryObj.name} configured for ${selectedBomArticle} yet. Click a variety above to add for ${selectedBomArticle}.` : `No accessories configured for ${selectedBomArticle} yet. Click a category above (e.g. Buttons, Lace, Tassels) to add.`)
           );
         }
         return /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-3 mb-4" }, categoryItems.map((item) => {
@@ -21868,7 +21888,10 @@
                 /* @__PURE__ */ import_react5.default.createElement("i", { className: isSelected ? "ti ti-check" : "ti ti-plus", style: { fontSize: "11px", fontWeight: "bold" } })
               );
             })),
-            /* @__PURE__ */ import_react5.default.createElement("div", null, renderCategoryCardTable(activeCategoryObj, item, selectedArticles, isEditing)),
+            /* @__PURE__ */ import_react5.default.createElement("div", null, (() => {
+              const itemCatObj = ACCESSORY_CATEGORIES2.find((c) => matchesCategory2(c.id, item.category)) || activeCategoryObj || ACCESSORY_CATEGORIES2[0];
+              return renderCategoryCardTable(itemCatObj, item, selectedArticles, isEditing);
+            })()),
             /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center justify-content-end gap-2 mt-3 pt-2.5", style: { borderTop: "1px solid #f1f5f9" } }, isEditing ? /* @__PURE__ */ import_react5.default.createElement(
               "button",
               {
@@ -27097,8 +27120,13 @@
           const bufferPct = rawBuf !== void 0 && rawBuf !== null && rawBuf !== "" ? parseFloat(String(rawBuf).replace("%", "")) || 0 : 2;
           let dyedPerPiece = "";
           const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
+          const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
           if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
-            dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
+            if (isDupatta) {
+              dyedPerPiece = Number(rawAvgLen.toFixed(3));
+            } else {
+              dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
+            }
           } else if (fr.consumption !== void 0 && fr.consumption !== null && fr.consumption !== "") {
             dyedPerPiece = parseFloat(fr.consumption) || "";
           } else if (art.consumption !== void 0 && art.consumption !== null && art.consumption !== "") {
@@ -27552,16 +27580,20 @@
         onChange: (e) => updateArticleName(art.id, autoCapitalizeWords6(e.target.value)),
         onBlur: (e) => updateArticleName(art.id, autoCapitalizeWords6((e.target.value || "").trim()))
       }
-    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold" }, "Avg length (in)"), /* @__PURE__ */ import_react10.default.createElement(
-      "input",
-      {
-        type: "number",
-        className: "form-control form-control-sm bg-white",
-        placeholder: "e.g. 45",
-        value: art.avgLength ?? "",
-        onChange: (e) => updateArticleAvgLength(art.id, e.target.value)
-      }
-    ))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-muted mb-2 fw-medium" }, "Fabric requirement \u2014 add a row per fabric this article needs (e.g. Outer + Lining for a kurta):"), (art.fabrics || []).map((fr, fi) => /* @__PURE__ */ import_react10.default.createElement("div", { key: fi, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Role"), /* @__PURE__ */ import_react10.default.createElement(
+    )), /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, (() => {
+      const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || "");
+      return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1 fw-semibold d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react10.default.createElement("span", null, isDupatta ? "Avg length (mts)" : "Avg length (in)"), isDupatta && /* @__PURE__ */ import_react10.default.createElement("span", { className: "badge bg-primary-subtle text-primary border", style: { fontSize: "10px" } }, "in meters")), /* @__PURE__ */ import_react10.default.createElement(
+        "input",
+        {
+          type: "number",
+          step: isDupatta ? "0.01" : "0.5",
+          className: "form-control form-control-sm bg-white",
+          placeholder: isDupatta ? "e.g. 2.25" : "e.g. 45",
+          value: art.avgLength ?? "",
+          onChange: (e) => updateArticleAvgLength(art.id, e.target.value)
+        }
+      ), isDupatta && /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted d-block mt-0.5", style: { fontSize: "10.5px" } }, "Order sheet: Dupatta length measured in mts"));
+    })())), /* @__PURE__ */ import_react10.default.createElement("div", { className: "small text-muted mb-2 fw-medium" }, "Fabric requirement \u2014 add a row per fabric this article needs (e.g. Outer + Lining for a kurta):"), (art.fabrics || []).map((fr, fi) => /* @__PURE__ */ import_react10.default.createElement("div", { key: fi, className: "row g-2 align-items-end mb-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react10.default.createElement("label", { className: "form-label small text-muted mb-1" }, "Role"), /* @__PURE__ */ import_react10.default.createElement(
       "input",
       {
         type: "text",

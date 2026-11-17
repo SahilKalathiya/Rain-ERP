@@ -1825,9 +1825,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         // Default or parsed dyed length in meters
         let dyedPerPiece = '';
         const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
+        const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
         if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
-          // If entered in inches, convert to meters (1 in = 0.0254 m)
-          dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
+          if (isDupatta) {
+            // Order sheet rule: Dupatta length measured in mts
+            dyedPerPiece = Number(rawAvgLen.toFixed(3));
+          } else {
+            // If entered in inches, convert to meters (1 in = 0.0254 m)
+            dyedPerPiece = Number((rawAvgLen * 0.0254).toFixed(3));
+          }
         } else if (fr.consumption !== undefined && fr.consumption !== null && fr.consumption !== '') {
           dyedPerPiece = parseFloat(fr.consumption) || '';
         } else if (art.consumption !== undefined && art.consumption !== null && art.consumption !== '') {
@@ -2430,14 +2436,34 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                     />
                   </div>
                   <div className="col-12 col-md-3">
-                    <label className="form-label small text-muted mb-1 fw-semibold">Avg length (in)</label>
-                    <input
-                      type="number"
-                      className="form-control form-control-sm bg-white"
-                      placeholder="e.g. 45"
-                      value={art.avgLength ?? ''}
-                      onChange={(e) => updateArticleAvgLength(art.id, e.target.value)}
-                    />
+                    {(() => {
+                      const isDupatta = /dupatta|stole|chunri|scarf/i.test(art.name || '');
+                      return (
+                        <>
+                          <label className="form-label small text-muted mb-1 fw-semibold d-flex align-items-center justify-content-between">
+                            <span>{isDupatta ? 'Avg length (mts)' : 'Avg length (in)'}</span>
+                            {isDupatta && (
+                              <span className="badge bg-primary-subtle text-primary border" style={{ fontSize: '10px' }}>
+                                in meters
+                              </span>
+                            )}
+                          </label>
+                          <input
+                            type="number"
+                            step={isDupatta ? '0.01' : '0.5'}
+                            className="form-control form-control-sm bg-white"
+                            placeholder={isDupatta ? 'e.g. 2.25' : 'e.g. 45'}
+                            value={art.avgLength ?? ''}
+                            onChange={(e) => updateArticleAvgLength(art.id, e.target.value)}
+                          />
+                          {isDupatta && (
+                            <small className="text-muted d-block mt-0.5" style={{ fontSize: '10.5px' }}>
+                              Order sheet: Dupatta length measured in mts
+                            </small>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
