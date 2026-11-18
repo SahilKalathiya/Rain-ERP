@@ -26,11 +26,12 @@ export default function ProcessChallanForm({
   readOnlyDefault = false,
   returns = []
 }) {
-  const isEditing = Boolean(initialChallan && initialChallan.id);
+  const isExistingSaved = Boolean(initialChallan && initialChallan.id && !initialChallan.is_draft);
+  const isEditing = isExistingSaved;
 
-  // Workflow Locking: Challan cannot be edited once Inbound Return (GRN) has been recorded
+  // Workflow Locking: Challan cannot be edited once saved & dispatched, or once Inbound Return (GRN) has been recorded
   const isLocked = Boolean(
-    initialChallan && (
+    isExistingSaved && (
       initialChallan.is_locked ||
       initialChallan.status === 'Completed' ||
       initialChallan.status === 'Inwarded' ||
@@ -38,8 +39,8 @@ export default function ProcessChallanForm({
     )
   );
 
-  const [isReadOnly, setIsReadOnly] = useState(readOnlyDefault || Boolean(initialChallan) || isLocked);
-  const [editingSection, setEditingSection] = useState((readOnlyDefault || initialChallan || isLocked) ? null : 'all');
+  // Once saved and sent for challan, it is permanent/dispatched and cannot be edited
+  const isReadOnly = isExistingSaved || isLocked;
 
   // Available Warehouse Rolls for Stock Picking (FIFO & Invoice Batch)
   const warehouseStockPool = [
@@ -82,7 +83,7 @@ export default function ProcessChallanForm({
   const [customerBrand, setCustomerBrand] = useState(initialChallan?.customer_brand || '');
 
   // Folding Notation (e.g. "L100")
-  const [foldingNotation, setFoldingNotation] = useState(initialChallan?.folding_notation || 'L100');
+  const [foldingNotation, setFoldingNotation] = useState(initialChallan?.folding_notation || '');
 
   // Remarks
   const [remarks, setRemarks] = useState(initialChallan?.remarks || '');
@@ -146,7 +147,7 @@ export default function ProcessChallanForm({
                   original_piece_meters: parseFloat(it.quantity_meters) || 100,
                   dispatched_meters: parseFloat(it.quantity_meters) || 100,
                   is_partial_cut: false,
-                  folding: foldingNotation || 'L100'
+                  folding: foldingNotation || ''
                 });
               });
             }
@@ -190,7 +191,7 @@ export default function ProcessChallanForm({
       original_piece_meters: roll.meters,
       dispatched_meters: roll.meters,
       is_partial_cut: false,
-      folding: foldingNotation || 'L100'
+      folding: foldingNotation || ''
     };
 
     setItems([...items, newItem]);
@@ -209,7 +210,7 @@ export default function ProcessChallanForm({
         original_piece_meters: '',
         dispatched_meters: '',
         is_partial_cut: false,
-        folding: foldingNotation || 'L100'
+        folding: foldingNotation || ''
       }
     ]);
   };
@@ -277,7 +278,8 @@ export default function ProcessChallanForm({
       remarks,
       receiver_signature: receiverSignature,
       company_representative: companyRep,
-      status: initialChallan?.status || 'Dispatched',
+      status: (initialChallan?.status && initialChallan.status !== 'Draft') ? initialChallan.status : 'Dispatched',
+      is_draft: false,
       created_by: initialChallan?.created_by || 'Saksham Garg',
       created_at: initialChallan?.created_at || new Date().toISOString(),
       items
@@ -287,9 +289,9 @@ export default function ProcessChallanForm({
   };
 
   const isSectionEditable = (sectionKey) => {
-    if (isLocked) return false;
-    if (!isReadOnly) return true;
-    return editingSection === sectionKey || editingSection === 'all';
+    // If it's already a saved/dispatched challan or locked by GRN, editing is not permitted
+    if (isExistingSaved || isLocked) return false;
+    return true;
   };
 
   return (
@@ -309,24 +311,28 @@ export default function ProcessChallanForm({
           <div>
             <div className="d-flex align-items-center gap-2">
               <h5 className="card-title mb-0 fw-bold text-dark fs-18">
-                {isEditing ? (isReadOnly ? `Process Challan #${challanNumber} (View Mode)` : `Edit Challan #${challanNumber}`) : 'Create Process Dispatch Challan'}
+                {isExistingSaved ? `Process Challan #${challanNumber}` : 'Create Process Dispatch Challan'}
               </h5>
               <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${
                 isLocked
-                  ? 'bg-secondary text-white border border-secondary shadow-xs'
+                  ? 'bg-white text-dark border shadow-xs'
                   : isEmergencyDispatch
                     ? 'bg-danger text-white border border-danger shadow-xs'
-                    : selectedPOs.length > 0
+                    : isExistingSaved
                       ? 'bg-success-subtle text-success border border-success-subtle'
-                      : 'bg-light text-secondary border'
+                      : selectedPOs.length > 0
+                        ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                        : 'bg-light text-secondary border'
               }`}>
                 {isLocked
-                  ? '🔒 Locked (GRN Inwarded)'
+                  ? 'Locked'
                   : isEmergencyDispatch
                     ? '⚠ Pending PO Link (Emergency)'
-                    : selectedPOs.length > 0
-                      ? '● PO Linked'
-                      : 'Draft (Select PO)'}
+                    : isExistingSaved
+                      ? '● Dispatched to Vendor'
+                      : selectedPOs.length > 0
+                        ? '● PO Linked'
+                        : 'Draft (Select PO)'}
               </span>
             </div>
             <div className="text-muted fs-12 mt-0.5 d-flex align-items-center gap-2">
@@ -337,13 +343,25 @@ export default function ProcessChallanForm({
           </div>
         </div>
 
-        {/* Action Controls & Mode Switcher */}
+        {/* Action Controls */}
         <div className="d-flex align-items-center gap-2">
-          {onPrintChallan && (
+          {isExistingSaved && (
+            <button
+              type="button"
+              className="btn btn-light btn-sm px-3 rounded-2 border shadow-xs d-flex align-items-center gap-1.5 text-secondary"
+              onClick={onCancel}
+              title="Back to Challans list"
+            >
+              <i className="ti ti-arrow-left fs-15"></i>
+              <span>Back to Challans</span>
+            </button>
+          )}
+
+          {onPrintChallan && isExistingSaved && (
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
-              onClick={() => onPrintChallan(initialChallan || { challan_number: challanNumber, date, vendor_name: vendorName, linked_pos: selectedPOs, items, grand_total_meters: grandTotalMeters, folding_notation: foldingNotation, company_representative: companyRep, receiver_signature: receiverSignature })}
+              onClick={() => onPrintChallan(initialChallan)}
               title="Print Job Challan Slip matching Page 15 paper format"
             >
               <i className="ti ti-printer fs-15"></i>
@@ -351,69 +369,20 @@ export default function ProcessChallanForm({
             </button>
           )}
 
-          {!isLocked && (
-            isReadOnly ? (
-              <>
-                {onRecordReturn && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm px-3 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                    style={{ background: '#059669', borderColor: '#059669' }}
-                    title="Record Inbound Return when goods return from dyeing"
-                    onClick={() => onRecordReturn(initialChallan)}
-                  >
-                    <i className="ti ti-receipt-refund fs-15"></i>
-                    <span>+ Inward Return (GRN)</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
-                  onClick={() => {
-                    setIsReadOnly(false);
-                    setEditingSection('all');
-                  }}
-                >
-                  <i className="ti ti-edit fs-15"></i>
-                  <span>Edit Record</span>
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
-                onClick={() => {
-                  setIsReadOnly(true);
-                  setEditingSection(null);
-                }}
-              >
-                <i className="ti ti-eye fs-15"></i>
-                <span>View Mode</span>
-              </button>
-            )
+          {!isLocked && isExistingSaved && onRecordReturn && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm px-3 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+              style={{ background: '#059669', borderColor: '#059669' }}
+              title="Record Inbound Return when goods return from dyeing"
+              onClick={() => onRecordReturn(initialChallan)}
+            >
+              <i className="ti ti-receipt-refund fs-15"></i>
+              <span>+ Inward Return (GRN)</span>
+            </button>
           )}
         </div>
       </div>
-
-      {/* Lock Banner if Inward GRN already received */}
-      {isLocked && (
-        <div className="alert alert-warning border-warning d-flex align-items-center justify-content-between p-3 m-4 mb-0 rounded-3 shadow-xs">
-          <div className="d-flex align-items-center gap-3">
-            <div className="rounded-circle bg-warning text-dark p-2 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-              <i className="ti ti-lock fs-20"></i>
-            </div>
-            <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">Challan Workflow Locked — Read Only</h6>
-              <p className="mb-0 fs-12 text-secondary">
-                This Process Challan is locked because Inbound GRN has already been recorded against it. Dispatch roll quantities and fabric data cannot be altered.
-              </p>
-            </div>
-          </div>
-          <span className="badge bg-warning text-dark fs-12 px-3 py-2 fw-bold">
-            <i className="ti ti-lock me-1"></i> LOCKED
-          </span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4" style={{ background: '#f8fafc' }}>
@@ -473,25 +442,6 @@ export default function ProcessChallanForm({
                     Emergency Dispatch (No PO)
                   </label>
                 </div>
-
-                {isReadOnly && editingSection !== 'header' && (
-                  <button
-                    type="button"
-                    className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
-                    onClick={() => setEditingSection('header')}
-                  >
-                    <i className="ti ti-edit me-1"></i> Edit Header
-                  </button>
-                )}
-                {isReadOnly && editingSection === 'header' && (
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold"
-                    onClick={() => setEditingSection(null)}
-                  >
-                    <i className="ti ti-check me-1"></i> Done
-                  </button>
-                )}
               </div>
             </div>
 
@@ -660,25 +610,6 @@ export default function ProcessChallanForm({
                       <i className="ti ti-plus fs-14"></i> Manual Row
                     </button>
                   </>
-                )}
-
-                {isReadOnly && editingSection !== 'items' && (
-                  <button
-                    type="button"
-                    className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
-                    onClick={() => setEditingSection('items')}
-                  >
-                    <i className="ti ti-edit me-1"></i> Edit Stock Lines
-                  </button>
-                )}
-                {isReadOnly && editingSection === 'items' && (
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold"
-                    onClick={() => setEditingSection(null)}
-                  >
-                    <i className="ti ti-check me-1"></i> Done
-                  </button>
                 )}
               </div>
             </div>
@@ -877,24 +808,6 @@ export default function ProcessChallanForm({
               <span className="fw-bold text-dark fs-13">
                 <i className="ti ti-writing-sign me-1.5 text-secondary"></i> Signatures &amp; Dispatch Remarks (Page 15)
               </span>
-              {isReadOnly && editingSection !== 'terms' && (
-                <button
-                  type="button"
-                  className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
-                  onClick={() => setEditingSection('terms')}
-                >
-                  <i className="ti ti-edit me-1"></i> Edit Signatures
-                </button>
-              )}
-              {isReadOnly && editingSection === 'terms' && (
-                <button
-                  type="button"
-                  className="btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold"
-                  onClick={() => setEditingSection(null)}
-                >
-                  <i className="ti ti-check me-1"></i> Done
-                </button>
-              )}
             </div>
 
             <div className="p-4">
@@ -953,31 +866,37 @@ export default function ProcessChallanForm({
         {/* Footer Actions */}
         <div className="card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center">
           <div className="text-muted fs-12">
-            Stock will be deducted from warehouse inventory and tracked as <strong>"Out for Processing"</strong> against {vendorName || 'Vendor'}.
+            {isExistingSaved ? (
+              <span>This Process Challan is finalized and dispatched to <strong>{vendorName || 'Vendor'}</strong>. Fabric is tracked as <strong>"Out for Processing"</strong>.</span>
+            ) : (
+              <span>Stock will be deducted from warehouse inventory and tracked as <strong>"Out for Processing"</strong> against {vendorName || 'Vendor'}.</span>
+            )}
           </div>
           <div className="d-flex gap-2">
             <button type="button" className="btn btn-light btn-sm border text-secondary px-3" onClick={onCancel}>
-              Cancel
+              {isExistingSaved ? 'Back to Challans' : 'Cancel'}
             </button>
-            {!isReadOnly && (
-              <>
-                <button type="submit" className="btn btn-outline-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5">
-                  <i className="ti ti-device-floppy fs-14"></i>
-                  <span>Save Challan</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm px-3.5 shadow-sm d-flex align-items-center gap-1.5"
-                  style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
-                  title="Save challan and proceed immediately to record vendor return when goods arrive back"
-                  onClick={(e) => handleSubmit(e, true)}
-                >
-                  <i className="ti ti-receipt-refund fs-14"></i>
-                  <span>Save &amp; Inward Return (GRN) →</span>
-                </button>
-              </>
+            {isExistingSaved && onPrintChallan && (
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
+                onClick={() => onPrintChallan(initialChallan)}
+              >
+                <i className="ti ti-printer fs-14"></i>
+                <span>Print Challan Slip</span>
+              </button>
             )}
-            {isReadOnly && onRecordReturn && (
+            {!isExistingSaved && (
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm px-4 py-1.5 shadow-sm d-flex align-items-center gap-1.5"
+                style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+              >
+                <i className="ti ti-truck-delivery fs-15"></i>
+                <span>Save &amp; Dispatch Challan</span>
+              </button>
+            )}
+            {isExistingSaved && onRecordReturn && !isLocked && (
               <button
                 type="button"
                 className="btn btn-success btn-sm px-3.5 shadow-sm d-flex align-items-center gap-1.5"

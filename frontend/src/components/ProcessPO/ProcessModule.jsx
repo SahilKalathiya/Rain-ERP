@@ -108,7 +108,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
       dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
       is_partial_cut: false,
-      folding: 'L100'
+      folding: ''
     })) : [
       {
         id: Date.now(),
@@ -119,7 +119,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         original_piece_meters: parseFloat(po.total_meters) || 100,
         dispatched_meters: parseFloat(po.total_meters) || 100,
         is_partial_cut: false,
-        folding: 'L100'
+        folding: ''
       }
     ];
 
@@ -136,35 +136,21 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       customer_brand: po.customer_brand_name || po.customer_brand || '',
       po_link_status: 'Linked',
       admin_alert_triggered: false,
-      folding_notation: 'L100',
+      folding_notation: '',
       total_bales: 1,
       total_pieces: challanItems.length,
       grand_total_meters: Number(grandTotal.toFixed(2)),
       remarks: `Dispatch Challan for PO #${poNum}`,
       receiver_signature: '',
       company_representative: 'Saksham Garg',
-      status: 'Dispatched',
+      status: 'Draft',
       created_by: 'Saksham Garg',
       created_at: new Date().toISOString(),
-      items: challanItems
+      items: challanItems,
+      is_draft: true
     };
 
-    // 1. Immediately create and save the Challan record
-    const updatedChallans = [generatedChallan, ...challans.filter(c => c.id !== challanId)];
-    setChallans(updatedChallans);
-    saveStoredProcessChallans(updatedChallans);
-
-    // 2. Update linked PO status to 'Sent to Vendor'
-    setPos(prevPOs => {
-      const exists = prevPOs.some(p => p.id === po.id || p.po_number === po.po_number);
-      const updated = exists
-        ? prevPOs.map(p => (p.id === po.id || p.po_number === po.po_number ? { ...p, status: 'Sent to Vendor' } : p))
-        : [{ ...po, status: 'Sent to Vendor' }, ...prevPOs];
-      saveStoredProcessPOs(updated);
-      return updated;
-    });
-
-    // 3. Switch directly to Challan Tab with the created challan open
+    // Open Challan creation form pre-filled with PO data (do not save prematurely)
     setEditingChallan(generatedChallan);
     setActiveTab('challans');
     setShowChallanForm(true);
@@ -172,9 +158,12 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
   // 2. Process Challan Handlers
   const handleSaveChallan = (challanData, andRecordReturn = false) => {
-    const toSave = andRecordReturn
-      ? { ...challanData, is_locked: true, status: 'Inwarded' }
-      : challanData;
+    const toSave = {
+      ...challanData,
+      is_draft: false,
+      status: andRecordReturn ? 'Inwarded' : (challanData.status === 'Draft' ? 'Dispatched' : (challanData.status || 'Dispatched')),
+      is_locked: andRecordReturn ? true : Boolean(challanData.is_locked)
+    };
 
     let updated;
     const existingIndex = challans.findIndex(c => c.id === toSave.id);
@@ -201,8 +190,9 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     setShowChallanForm(false);
     setEditingChallan(null);
+    setActiveTab('challans');
 
-    // If requested, immediately transition to Record Inward Return
+    // If requested explicitly, transition to Record Inward Return
     if (andRecordReturn) {
       handleRecordReturnFromChallan(toSave);
     }
@@ -228,10 +218,10 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
           piece_no: idx + 1,
           meters: it.dispatched_meters || it.original_piece_meters || 100,
           color_name: it.color_name || 'Standard',
-          folding: it.folding || 'Fold 100'
+          folding: it.folding || ''
         }))
       : [
-          { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: 'Fold 100' }
+          { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: '' }
         ];
 
     setEditingReturn({
@@ -241,7 +231,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       linked_po_id: challan.linked_pos?.[0] || 'PPO-7611',
       fabric_quality: challan.items?.[0]?.fabric_name || '100x100 Voile (Grey)',
       width: '48',
-      folding_standard: challan.folding_notation || 'Fold 100',
+      folding_standard: '',
       vendor_declared_meters: challan.grand_total_meters || defaultPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0),
       vendor_declared_pieces: defaultPieces.length,
       pieces: defaultPieces
@@ -322,7 +312,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         styles_info: ['Graphic Boota Kurta'],
         po_link_status: 'Reprocess In Loop',
         admin_alert_triggered: false,
-        folding_notation: 'L100',
+        folding_notation: '',
         total_bales: 1,
         total_pieces: 1,
         grand_total_meters: qcData.original_length || 119.60,
@@ -342,7 +332,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             original_piece_meters: qcData.original_length || 119.60,
             dispatched_meters: qcData.original_length || 119.60,
             is_partial_cut: false,
-            folding: 'L100'
+            folding: ''
           }
         ]
       };

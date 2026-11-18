@@ -60,7 +60,7 @@ export default function ProcessReturnForm({
 
   const [width, setWidth] = useState(initialReturn?.width || '');
   const [weight, setWeight] = useState(initialReturn?.weight || '');
-  const [foldingStandard, setFoldingStandard] = useState(initialReturn?.folding_standard || 'Fold 100');
+  const [foldingStandard, setFoldingStandard] = useState(initialReturn?.folding_standard || '');
 
   // Stated vs Entered Validation (Section 5.2)
   const [vendorDeclaredMeters, setVendorDeclaredMeters] = useState(initialReturn?.vendor_declared_meters || '');
@@ -102,7 +102,7 @@ export default function ProcessReturnForm({
           if (!list.some(existing => existing.name?.toLowerCase() === c.name?.toLowerCase())) list.push(c);
         });
       }
-    } catch (e) {}
+    } catch (e) { }
     return list;
   });
 
@@ -112,7 +112,10 @@ export default function ProcessReturnForm({
   // Piece-Wise Grid Data
   const [pieces, setPieces] = useState(() => {
     if (initialReturn?.pieces && initialReturn.pieces.length > 0) {
-      return initialReturn.pieces;
+      return initialReturn.pieces.map(p => ({
+        ...p,
+        folding: isExistingSavedReturn ? (p.folding || '') : (initialReturn.folding_standard || '')
+      }));
     }
     return [];
   });
@@ -137,7 +140,7 @@ export default function ProcessReturnForm({
         piece_no: prev.length + 1,
         meters: '',
         color_name: prev[prev.length - 1]?.color_name || (colorMasterList[0]?.name || ''),
-        folding: foldingStandard || 'Fold 100'
+        folding: foldingStandard || ''
       }
     ]);
   };
@@ -223,14 +226,13 @@ export default function ProcessReturnForm({
           <div>
             <div className="d-flex align-items-center gap-2">
               <h5 className="card-title mb-0 fw-bold text-dark fs-18">
-                {isExistingSavedReturn ? (isReadOnly ? `Vendor Return #${externalChallanNo} (View Mode)` : `Edit Return #${externalChallanNo}`) : 'Record Inward Return (Vendor GRN)'}
+                {isExistingSavedReturn ? `Vendor Return #${externalChallanNo}` : 'Record Inward Return (Vendor GRN)'}
               </h5>
-              <span className={`badge px-2 py-0.5 fs-11 fw-bold ${
-                isLocked
-                  ? 'bg-secondary text-white border border-secondary shadow-xs'
-                  : 'bg-primary-subtle text-primary border border-primary-subtle'
-              }`}>
-                {isLocked ? '🔒 Locked (QC Inspected)' : 'Job Work Series'}
+              <span className={`badge px-2 py-0.5 fs-11 fw-bold ${isLocked
+                ? 'bg-white text-dark border shadow-xs'
+                : 'bg-primary-subtle text-primary border border-primary-subtle'
+                }`}>
+                {isLocked ? 'Locked' : 'Job Work Series'}
               </span>
             </div>
             <div className="text-muted fs-12 mt-0.5 d-flex align-items-center gap-2">
@@ -242,34 +244,6 @@ export default function ProcessReturnForm({
         </div>
 
         <div className="d-flex align-items-center gap-2">
-          {!isLocked && (
-            isReadOnly ? (
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
-                onClick={() => {
-                  setIsReadOnly(false);
-                  setEditingSection('all');
-                }}
-              >
-                <i className="ti ti-edit fs-15"></i>
-                <span>Edit Return</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5"
-                onClick={() => {
-                  setIsReadOnly(true);
-                  setEditingSection(null);
-                }}
-              >
-                <i className="ti ti-eye fs-15"></i>
-                <span>View Mode</span>
-              </button>
-            )
-          )}
-
           <button
             type="button"
             className="btn btn-light btn-sm border px-3 rounded-2 d-flex align-items-center gap-1.5 text-secondary"
@@ -280,26 +254,6 @@ export default function ProcessReturnForm({
           </button>
         </div>
       </div>
-
-      {/* Lock Banner if QC Completed */}
-      {isLocked && (
-        <div className="alert alert-warning border-warning d-flex align-items-center justify-content-between p-3 m-4 mb-0 rounded-3 shadow-xs">
-          <div className="d-flex align-items-center gap-3">
-            <div className="rounded-circle bg-warning text-dark p-2 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-              <i className="ti ti-lock fs-20"></i>
-            </div>
-            <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">Return / GRN Workflow Locked — Read Only</h6>
-              <p className="mb-0 fs-12 text-secondary">
-                This Inbound Return (GRN) is locked because Quality Control Inspection has already been completed. Piece-wise breakdown and grey return quantities cannot be modified.
-              </p>
-            </div>
-          </div>
-          <span className="badge bg-warning text-dark fs-12 px-3 py-2 fw-bold">
-            <i className="ti ti-lock me-1"></i> LOCKED
-          </span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit}>
         <div className="card-body p-4" style={{ background: '#f8fafc' }}>
@@ -484,18 +438,22 @@ export default function ProcessReturnForm({
 
                 <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">Folding Standard</label>
-                  <select
-                    className="form-select form-select-sm bg-white fs-13"
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-white fs-13"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={foldingStandard}
                     disabled={!isSectionEditable('header')}
-                    onChange={(e) => setFoldingStandard(e.target.value)}
-                  >
-                    <option value="Fold 100">Fold 100 (Standard)</option>
-                    <option value="Fold 98">Fold 98</option>
-                    <option value="Fold 97">Fold 97</option>
-                    <option value="L100">L100</option>
-                  </select>
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFoldingStandard(val);
+                      setPieces(prev => prev.map(p => ({
+                        ...p,
+                        folding: val
+                      })));
+                    }}
+                    placeholder="Enter folding (e.g. L100, Fold 98)"
+                  />
                 </div>
               </div>
             </div>
@@ -651,15 +609,16 @@ export default function ProcessReturnForm({
                           <td>
                             <input
                               type="text"
-                              className="form-control form-control-sm fs-12"
+                              className="form-control form-control-sm fs-12 text-center"
                               style={{ borderColor: '#cbd5e1' }}
-                              value={p.folding || foldingStandard}
+                              value={p.folding || ''}
                               disabled={!isSectionEditable('pieces')}
                               onChange={(e) => {
                                 const updated = [...pieces];
                                 updated[idx].folding = e.target.value;
                                 setPieces(updated);
                               }}
+                              placeholder="—"
                             />
                           </td>
                           <td>
@@ -676,11 +635,10 @@ export default function ProcessReturnForm({
                             />
                           </td>
                           <td className="text-center">
-                            <span className={`badge fs-10 ${
-                              p.qc_status === 'Accepted' ? 'bg-success-subtle text-success border border-success-subtle' :
+                            <span className={`badge fs-10 ${p.qc_status === 'Accepted' ? 'bg-success-subtle text-success border border-success-subtle' :
                               p.qc_status === 'Rejected - Reprocess' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
-                              'bg-light text-secondary border'
-                            }`}>
+                                'bg-light text-secondary border'
+                              }`}>
                               {p.qc_status || 'Pending QC'}
                             </span>
                           </td>

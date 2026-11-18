@@ -53,147 +53,59 @@ export default function ProcessPOForm({
   // Starting Direction Choice
   const [startDirection, setStartDirection] = useState('style');
 
-  // Dynamic Sales Orders (Loaded from Order Master Store with Seed Fallback)
+  // Dynamic Sales Orders (Loaded strictly from system's real Sales Orders)
   const loadDynamicSalesOrders = () => {
-    const seed = [
-      {
-        id: 'ORD-2026-001',
-        customer: 'Zara India (Inditex Retail)',
-        brand: 'Raindrop Signature',
-        deliveryDate: '2026-09-10',
-        status: 'In Production',
-        styles: ['Graphic Boota Kurta', 'A-Line Festive Kurta'],
-        items: [
-          {
-            id: 'ORD1-IT1',
-            style: 'Graphic Boota Kurta',
-            fabric: '100x100 Voile (Grey)',
-            fabricId: 'FAB-001',
-            color: 'Beige',
-            colorHex: '#F5F5DC',
-            article: 'Kurta',
-            width: '48',
-            requiredMeters: 525.00,
-            alreadyReceivedMeters: 471.40,
-            orderedMeters: 525.00,
-            pendingMeters: 0.00,
-            status: 'Already Ordered',
-            consumption: 2.60,
-            shrinkage: 4.0
-          },
-          {
-            id: 'ORD1-IT2',
-            style: 'Graphic Boota Kurta',
-            fabric: 'Rayon 14kg Liva',
-            fabricId: 'FAB-002',
-            color: 'Navy Blue',
-            colorHex: '#000080',
-            article: 'Kurta Set',
-            width: '58',
-            requiredMeters: 800.00,
-            alreadyReceivedMeters: 300.00,
-            orderedMeters: 500.00,
-            pendingMeters: 300.00,
-            status: 'Partially Ordered',
-            consumption: 2.80,
-            shrinkage: 5.0
-          },
-          {
-            id: 'ORD1-IT3',
-            style: 'A-Line Festive Kurta',
-            fabric: 'Cotton Cambric 60*60',
-            fabricId: 'FAB-003',
-            color: 'Dusty Rose',
-            colorHex: '#DCAE96',
-            article: 'Kurta',
-            width: '44',
-            requiredMeters: 450.00,
-            alreadyReceivedMeters: 0.00,
-            orderedMeters: 0.00,
-            pendingMeters: 450.00,
-            status: 'Not Ordered',
-            consumption: 2.50,
-            shrinkage: 3.5
-          }
-        ]
-      },
-      {
-        id: 'ORD-2026-002',
-        customer: 'FabIndia Overseas',
-        brand: 'Raindrop Ethnic',
-        deliveryDate: '2026-09-18',
-        status: 'Cutting Ready',
-        styles: ['Straight Cut Kurti', 'Casual Printed Top'],
-        items: [
-          {
-            id: 'ORD2-IT1',
-            style: 'Straight Cut Kurti',
-            fabric: '100x100 Voile (Grey)',
-            fabricId: 'FAB-001',
-            color: 'White',
-            colorHex: '#FFFFFF',
-            article: 'Top',
-            width: '48',
-            requiredMeters: 300.00,
-            alreadyReceivedMeters: 0.00,
-            orderedMeters: 0.00,
-            pendingMeters: 300.00,
-            status: 'Not Ordered',
-            consumption: 2.20,
-            shrinkage: 4.0
-          }
-        ]
-      }
-    ];
-
     try {
       const stored = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
       if (Array.isArray(stored) && stored.length > 0) {
-        const mapped = stored.map(o => {
+        return stored.map(o => {
           const styles = Array.isArray(o.styles) && o.styles.length > 0
             ? o.styles
-            : (o.styleName ? [o.styleName] : ['Standard Style']);
+            : (o.styleName ? [o.styleName] : []);
+
+          const custName = (Array.isArray(o.customerOrders) && o.customerOrders.length > 0)
+            ? o.customerOrders.map(c => c.customerName).filter(Boolean).join(', ')
+            : (o.customerName || o.customer || o.buyerName || '');
+
           const items = [];
           if (Array.isArray(o.fabricConsumptions)) {
             o.fabricConsumptions.forEach((fc, idx) => {
-              const req = parseFloat(fc.totalFabricMeters || fc.requiredMeters || 500);
+              const req = parseFloat(fc.totalFabricMeters || fc.requiredMeters || 0);
               const ord = parseFloat(fc.orderedMeters || 0);
               const rec = parseFloat(fc.receivedMeters || 0);
               items.push({
                 id: `${o.id}-IT${idx + 1}`,
-                style: fc.styleName || o.styleName || styles[0],
+                style: fc.styleName || o.styleName || (styles[0] || ''),
                 fabric: fc.fabricQuality || fc.fabricName || 'Fabric',
                 fabricId: fc.fabricId || 'FAB-001',
-                color: fc.color || fc.colorName || 'Standard',
+                color: fc.color || fc.colorName || '',
                 colorHex: fc.colorHex || '#cbd5e1',
-                article: fc.article || fc.articleName || 'Kurta',
+                article: fc.article || fc.articleName || '',
                 width: String(fc.width || '44').replace(/"/g, ''),
                 requiredMeters: req,
                 alreadyReceivedMeters: rec,
                 orderedMeters: ord,
                 pendingMeters: Math.max(0, req - ord),
                 status: ord >= req ? 'Already Ordered' : (ord > 0 ? 'Partially Ordered' : 'Not Ordered'),
-                consumption: parseFloat(fc.consumption || 2.60),
+                consumption: parseFloat(fc.consumption || 2.50),
                 shrinkage: parseFloat(fc.shrinkage || 4.0)
               });
             });
           }
           return {
             id: o.id,
-            customer: o.customerName || o.customer || 'Customer',
-            brand: o.brandName || o.brand || 'Raindrop Brand',
-            deliveryDate: o.deliveryDate || '',
-            status: o.status || 'In Production',
+            customer: custName,
+            brand: o.brandName || o.brand || '',
+            styleName: o.styleName || (styles[0] || ''),
+            deliveryDate: o.expectedDelivery || o.deliveryDate || '',
+            status: o.status || '',
             styles: styles,
-            items: items.length > 0 ? items : seed[0].items
+            items: items
           };
         });
-        const existingIds = new Set(mapped.map(m => m.id));
-        const filteredSeed = seed.filter(s => !existingIds.has(s.id));
-        return [...mapped, ...filteredSeed];
       }
-    } catch (e) {}
-    return seed;
+    } catch (e) { }
+    return [];
   };
 
   const [availableSalesOrders, setAvailableSalesOrders] = useState(loadDynamicSalesOrders);
@@ -224,7 +136,7 @@ export default function ProcessPOForm({
           }));
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [
       { id: 'FAB-001', name: '100x100 Voile (Grey)', widths: ['44', '48', '58'], defaultRate: '', shrinkage: 4.0 },
       { id: 'FAB-002', name: 'Rayon 14kg Liva', widths: ['44', '48', '58'], defaultRate: '', shrinkage: 5.0 },
@@ -258,7 +170,7 @@ export default function ProcessPOForm({
           })).filter(a => Boolean(a.name));
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [
       { id: 'ART-001', name: 'Kurta' },
       { id: 'ART-002', name: 'Pant' },
@@ -278,7 +190,7 @@ export default function ProcessPOForm({
         const parsed = JSON.parse(s);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return initialVendors;
   };
 
@@ -316,9 +228,38 @@ export default function ProcessPOForm({
   const [showInlineColorModal, setShowInlineColorModal] = useState(false);
   const [activeColorRowIndex, setActiveColorRowIndex] = useState(null);
 
-  // Header State - Zero Pre-filled defaults when creating new
+  const handleVendorSaved = (newVendor) => {
+    if (!newVendor) {
+      setShowInlineVendorModal(false);
+      return;
+    }
+    const vName = (newVendor.name || newVendor.vendorName || '').trim();
+    const vId = newVendor.id || '';
+    if (!vName) {
+      setShowInlineVendorModal(false);
+      return;
+    }
+
+    const updated = [newVendor, ...vendorList.filter(v => v.id !== vId && (v.name || v.vendorName) !== vName)];
+    setVendorList(updated);
+    try {
+      localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
+      window.dispatchEvent(new Event('raindrop_vendors_updated'));
+    } catch (e) { }
+
+    if (api && api.saveVendor) {
+      api.saveVendor(newVendor).catch(() => { });
+    }
+
+    setVendorId(vId);
+    setVendorName(vName);
+    setShowAllVendors(true);
+    setShowInlineVendorModal(false);
+  };
+
+  // Header State - Zero Pre-filled defaults when creating new (PDF Section 3.1)
   const [poNumber, setPoNumber] = useState(
-    initialPO?.po_number || `${Math.floor(1000 + Math.random() * 9000)}`
+    initialPO?.po_number ? String(initialPO.po_number).replace(/^PPO-/, '') : ''
   );
   const [date, setDate] = useState(
     initialPO?.date || new Date().toISOString().split('T')[0]
@@ -326,22 +267,8 @@ export default function ProcessPOForm({
   const [issueDate, setIssueDate] = useState(
     initialPO?.issue_date || initialPO?.date || new Date().toISOString().split('T')[0]
   );
-  const [processType, setProcessType] = useState(
-    initialPO?.process_type || initialPO?.processType || ''
-  );
-  const [showAllVendors, setShowAllVendors] = useState(false);
   const [vendorId, setVendorId] = useState(initialPO?.vendor_id || '');
   const [vendorName, setVendorName] = useState(initialPO?.vendor_name || '');
-
-  // Requirement 2: Filter vendors strictly based on selected Purchase Order / Process Type
-  const displayedVendors = React.useMemo(() => {
-    if (showAllVendors || !processType || processType === 'All') return vendorList;
-    return vendorList.filter((v) =>
-      vendorMatchesType(v, processType) ||
-      (v.name || v.vendorName) === vendorName ||
-      v.id === vendorId
-    );
-  }, [vendorList, processType, showAllVendors, vendorName, vendorId]);
 
   // Order Linkage
   const [isOrderLinked, setIsOrderLinked] = useState(
@@ -374,7 +301,7 @@ export default function ProcessPOForm({
   // Terms State - Zero Pre-filled text by default
   const [terms, setTerms] = useState(initialPO?.terms || '');
 
-  // Line Items Template
+  // Line Items Template (PDF Section 3.1 & 3.2 - Clean empty defaults)
   const createBlankRow = (customStyle = '') => ({
     id: Date.now() + Math.random(),
     style_name: customStyle || (selectedStyles[0] || ''),
@@ -409,23 +336,49 @@ export default function ProcessPOForm({
 
   const currentSelectedOrder = availableSalesOrders.find(o => o.id === linkedOrderId) || null;
 
-  // Master Style Options (compiled dynamically)
+  // Custom Styles Added by User
+  const [customStyleInput, setCustomStyleInput] = useState('');
+  const [addedCustomStyles, setAddedCustomStyles] = useState([]);
+  const [draggedStyleIdx, setDraggedStyleIdx] = useState(null);
+  const [dragOverStyleIdx, setDragOverStyleIdx] = useState(null);
+
+  // Master Style Options (strictly dynamic from linked sales order, masters & user added styles)
   const masterStyleOptions = Array.from(new Set([
+    ...(currentSelectedOrder?.styles || []),
     ...availableSalesOrders.flatMap(o => o.styles || []),
     ...articleList.map(a => a.name),
-    'Graphic Boota Kurta',
-    'A-Line Festive Kurta',
-    'Straight Cut Kurti',
-    'Festive Anarkali Suit',
-    'Casual Printed Top'
+    ...addedCustomStyles
   ])).filter(Boolean);
+
+  const handleAddCustomStyle = () => {
+    if (isLocked) return;
+    const trimmed = customStyleInput.trim();
+    if (!trimmed) return;
+    if (!addedCustomStyles.includes(trimmed)) {
+      setAddedCustomStyles(prev => [...prev, trimmed]);
+    }
+    if (styleCountOption === '1') {
+      setSelectedStyles([trimmed]);
+      setItems(prev => prev.map(it => ({ ...it, style_name: trimmed })));
+    } else {
+      setSelectedStyles(prev => [...prev.filter(Boolean), trimmed]);
+      if (items.length > 0 && !items[0].style_name) {
+        updateItem(0, { style_name: trimmed });
+      }
+    }
+    setCustomStyleInput('');
+  };
 
   // Style handlers
   const handleStyleCountChange = (opt) => {
     if (isLocked) return;
     setStyleCountOption(opt);
     if (opt === '1') {
-      setSelectedStyles(selectedStyles.length > 0 ? [selectedStyles[0]] : ['']);
+      const single = selectedStyles.length > 0 ? selectedStyles[0] : '';
+      setSelectedStyles(single ? [single] : ['']);
+      if (single) {
+        setItems(prev => prev.map(it => ({ ...it, style_name: single })));
+      }
     } else if (selectedStyles.length < 2) {
       setSelectedStyles([selectedStyles[0] || '', '']);
     }
@@ -436,6 +389,9 @@ export default function ProcessPOForm({
     const updated = [...selectedStyles];
     updated[idx] = value;
     setSelectedStyles(updated);
+    if (styleCountOption === '1') {
+      setItems(prev => prev.map(it => ({ ...it, style_name: value })));
+    }
   };
 
   const handleAddStyleSlot = () => {
@@ -452,13 +408,12 @@ export default function ProcessPOForm({
     }
   };
 
-  const handleMoveStyleOrder = (fromIdx, toIdx) => {
-    if (isLocked) return;
-    if (toIdx < 0 || toIdx >= selectedStyles.length) return;
+  const handleReorderStyle = (fromIdx, toIdx) => {
+    if (isLocked || fromIdx === toIdx) return;
+    if (fromIdx < 0 || fromIdx >= selectedStyles.length || toIdx < 0 || toIdx >= selectedStyles.length) return;
     const updated = [...selectedStyles];
-    const temp = updated[fromIdx];
-    updated[fromIdx] = updated[toIdx];
-    updated[toIdx] = temp;
+    const [movedItem] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, movedItem);
     setSelectedStyles(updated);
   };
 
@@ -495,7 +450,72 @@ export default function ProcessPOForm({
     return ['44', '48', '50', '54', '58', '60'];
   };
 
-  // Row update calculation
+  // =========================================================================
+  // PDF SECTION 3.2: SEARCH NARROWING LOGIC
+  // - "Selecting styles narrows every subsequent selection automatically: only fabric
+  //    qualities actually used by the selected style(s) are offered"
+  // - "Selecting fabric then narrows the colour list to colours actually ordered in that fabric"
+  // - "Selecting colour narrows the article list the same way"
+  // - "When not linked to an order, full master data is available"
+  // =========================================================================
+  const getFilteredFabrics = (item) => {
+    if (isOrderLinked && currentSelectedOrder && Array.isArray(currentSelectedOrder.items) && currentSelectedOrder.items.length > 0) {
+      const activeStyles = selectedStyles.filter(Boolean);
+      let relevantItems = currentSelectedOrder.items;
+      if (item.style_name) {
+        relevantItems = relevantItems.filter(it => it.style === item.style_name);
+      } else if (activeStyles.length > 0) {
+        relevantItems = relevantItems.filter(it => activeStyles.includes(it.style));
+      }
+      const orderFabricNames = Array.from(new Set(relevantItems.map(it => it.fabric).filter(Boolean)));
+      if (orderFabricNames.length > 0) {
+        const matched = fabricList.filter(f => orderFabricNames.includes(f.name));
+        if (matched.length > 0) return matched;
+      }
+    }
+    return fabricList;
+  };
+
+  const getFilteredColors = (item) => {
+    if (isOrderLinked && currentSelectedOrder && Array.isArray(currentSelectedOrder.items) && currentSelectedOrder.items.length > 0) {
+      let relevantItems = currentSelectedOrder.items;
+      if (item.style_name) {
+        relevantItems = relevantItems.filter(it => it.style === item.style_name);
+      }
+      if (item.fabric_name) {
+        relevantItems = relevantItems.filter(it => it.fabric === item.fabric_name);
+      }
+      const orderColorNames = Array.from(new Set(relevantItems.map(it => it.color).filter(Boolean)));
+      if (orderColorNames.length > 0) {
+        const matched = colorList.filter(c => orderColorNames.includes(c.name));
+        if (matched.length > 0) return matched;
+      }
+    }
+    return colorList;
+  };
+
+  const getFilteredArticles = (item) => {
+    if (isOrderLinked && currentSelectedOrder && Array.isArray(currentSelectedOrder.items) && currentSelectedOrder.items.length > 0) {
+      let relevantItems = currentSelectedOrder.items;
+      if (item.style_name) {
+        relevantItems = relevantItems.filter(it => it.style === item.style_name);
+      }
+      if (item.fabric_name) {
+        relevantItems = relevantItems.filter(it => it.fabric === item.fabric_name);
+      }
+      if (item.color_name) {
+        relevantItems = relevantItems.filter(it => it.color === item.color_name);
+      }
+      const orderArticleNames = Array.from(new Set(relevantItems.map(it => it.article).filter(Boolean)));
+      if (orderArticleNames.length > 0) {
+        const matched = articleList.filter(a => orderArticleNames.includes(a.name));
+        if (matched.length > 0) return matched;
+      }
+    }
+    return articleList;
+  };
+
+  // Row update calculation using exact PDF Section 3.2 formulas
   const updateItem = (index, updates) => {
     if (isLocked) return;
     const updated = [...items];
@@ -513,31 +533,52 @@ export default function ProcessPOForm({
     }
 
     const shrinkage = parseFloat(item.shrinkage_percent) || 0;
-    const consumption = parseFloat(item.consumption_per_piece) || 2.60;
+    const consumption = parseFloat(item.consumption_per_piece) || 0;
 
-    // Bi-directional calculation
+    // Bi-directional calculation (PDF Section 3.2 Quantity Calculations):
+    // If consumption is specified:
+    // 1) Metres entered -> Pieces = Math.floor(meters / consumption) (rounded down to whole garments)
+    // 2) Pieces entered -> Metres = pieces * consumption
+    // 3) Raw fabric metres = Metres * (1 + shrinkage / 100)
     if ('quantity_meters' in updates) {
       const meters = parseFloat(updates.quantity_meters);
       if (!isNaN(meters) && meters > 0) {
-        item.quantity_pieces = Math.round(meters / consumption);
+        if (consumption > 0) {
+          item.quantity_pieces = Math.floor(meters / consumption);
+        }
         item.raw_fabric_meters = Number((meters * (1 + shrinkage / 100)).toFixed(2));
       } else {
-        item.quantity_pieces = '';
+        if (!('quantity_pieces' in updates)) item.quantity_pieces = '';
         item.raw_fabric_meters = '';
       }
     } else if ('quantity_pieces' in updates) {
       const pcs = parseFloat(updates.quantity_pieces);
       if (!isNaN(pcs) && pcs > 0) {
-        const calculatedMeters = Number((pcs * consumption).toFixed(2));
-        item.quantity_meters = calculatedMeters;
-        item.raw_fabric_meters = Number((calculatedMeters * (1 + shrinkage / 100)).toFixed(2));
+        if (consumption > 0) {
+          const calculatedMeters = Number((pcs * consumption).toFixed(2));
+          item.quantity_meters = calculatedMeters;
+          item.raw_fabric_meters = Number((calculatedMeters * (1 + shrinkage / 100)).toFixed(2));
+        }
       } else {
-        item.quantity_meters = '';
+        if (!('quantity_meters' in updates)) item.quantity_meters = '';
         item.raw_fabric_meters = '';
+      }
+    } else if ('consumption_per_piece' in updates || 'shrinkage_percent' in updates) {
+      const meters = parseFloat(item.quantity_meters);
+      const pcs = parseFloat(item.quantity_pieces);
+      if (consumption > 0) {
+        if (!isNaN(meters) && meters > 0) {
+          item.quantity_pieces = Math.floor(meters / consumption);
+          item.raw_fabric_meters = Number((meters * (1 + shrinkage / 100)).toFixed(2));
+        } else if (!isNaN(pcs) && pcs > 0) {
+          const calculatedMeters = Number((pcs * consumption).toFixed(2));
+          item.quantity_meters = calculatedMeters;
+          item.raw_fabric_meters = Number((calculatedMeters * (1 + shrinkage / 100)).toFixed(2));
+        }
       }
     }
 
-    // Cost calculations
+    // Cost calculations: Total Actual Cost = Fabric Purchase Rate + Dyeing/Job Work Rate per Metre
     const fabRate = parseFloat(item.fabric_rate) || 0;
     const dyeRate = parseFloat(item.dyeing_rate) || 0;
     const totalCostPerMeter = fabRate + dyeRate;
@@ -561,9 +602,15 @@ export default function ProcessPOForm({
     setItems(remaining.length > 0 ? remaining : [createBlankRow()]);
   };
 
-  // Add Item from Order Requirement
+  // Add Item from Order Requirement (PDF Section 3.2: auto-populate from Order)
   const handleSelectOrderItem = (orderItem) => {
     if (isLocked) return;
+    const cons = parseFloat(orderItem.consumption) || 2.50;
+    const reqMeters = parseFloat(orderItem.pendingMeters || orderItem.requiredMeters || 0);
+    const shrink = parseFloat(orderItem.shrinkage) || 4.0;
+    const calculatedPcs = reqMeters > 0 ? Math.floor(reqMeters / cons) : '';
+    const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : '';
+
     const newRow = {
       id: Date.now() + Math.random(),
       style_name: orderItem.style || selectedStyles[0] || '',
@@ -574,11 +621,11 @@ export default function ProcessPOForm({
       color_hex: orderItem.colorHex || '#F5F5DC',
       article_name: orderItem.article || 'Kurta',
       width: String(orderItem.width || '48').replace(/"/g, ''),
-      quantity_meters: orderItem.pendingMeters || orderItem.requiredMeters || '',
-      quantity_pieces: Math.round((orderItem.pendingMeters || orderItem.requiredMeters || 0) / (orderItem.consumption || 2.60)) || '',
-      consumption_per_piece: orderItem.consumption || 2.60,
-      shrinkage_percent: orderItem.shrinkage || 4.0,
-      raw_fabric_meters: Number(((orderItem.pendingMeters || orderItem.requiredMeters || 0) * (1 + (orderItem.shrinkage || 4) / 100)).toFixed(2)) || '',
+      quantity_meters: reqMeters || '',
+      quantity_pieces: calculatedPcs,
+      consumption_per_piece: cons,
+      shrinkage_percent: shrink,
+      raw_fabric_meters: rawMtrs,
       fabric_rate: '',
       dyeing_rate: '',
       total_actual_cost: 0,
@@ -589,19 +636,6 @@ export default function ProcessPOForm({
     };
 
     setItems([...items, newRow]);
-  };
-
-  // Auto-recommend dyeing rate
-  const handleAutoRecommendRate = (index) => {
-    if (isLocked) return;
-    const item = items[index];
-    let recommended = 22.00;
-    const w = String(item.width || '').replace(/"/g, '');
-    if (w === '58' || w === '60') recommended = 28.50;
-    else if (w === '48' || w === '50') recommended = 25.00;
-    else if (w === '44') recommended = 22.00;
-
-    updateItem(index, { dyeing_rate: recommended });
   };
 
   // Standard terms insertion
@@ -615,12 +649,13 @@ export default function ProcessPOForm({
   const grandTotalPieces = items.reduce((acc, it) => acc + (parseInt(it.quantity_pieces, 10) || 0), 0);
   const grandTotalCost = items.reduce((acc, it) => acc + (parseFloat(it.total_amount) || 0), 0);
 
-  // Submit Handler
+  // Submit Handler (PDF Section 3.1 & 3.2)
   const handleSubmit = (andCreateChallan = false) => {
     if (isLocked) return;
 
-    if (!processType) {
-      alert('Please select a Process Type.');
+    const cleanPoNum = poNumber ? String(poNumber).trim() : '';
+    if (!cleanPoNum) {
+      alert('Please enter a Process PO Number.');
       return;
     }
     if (!vendorName) {
@@ -632,10 +667,11 @@ export default function ProcessPOForm({
       return;
     }
 
+    const fullPoId = cleanPoNum.startsWith('PPO-') ? cleanPoNum : `PPO-${cleanPoNum}`;
     const payload = {
-      id: initialPO?.id || `PPO-${poNumber}`,
-      po_number: poNumber,
-      process_type: processType,
+      id: initialPO?.id || fullPoId,
+      po_number: cleanPoNum.replace(/^PPO-/, ''),
+      process_type: 'Job Work',
       date: date,
       issue_date: issueDate,
       vendor_id: vendorId,
@@ -644,7 +680,7 @@ export default function ProcessPOForm({
       customer_brand_name: customerBrandName,
       delivery_date: deliveryDate,
       style_names: selectedStyles.filter(Boolean),
-      fabric_quality: items[0]?.fabric_name || '100x100 Voile (Grey)',
+      fabric_quality: items[0]?.fabric_name || 'Fabric',
       total_meters: Number(grandTotalMeters.toFixed(2)),
       total_pieces: grandTotalPieces,
       total_estimated_cost: Number(grandTotalCost.toFixed(2)),
@@ -680,18 +716,31 @@ export default function ProcessPOForm({
                 <h5 className="mb-0 fw-bold text-dark fs-16">
                   {initialPO ? `Process PO #${poNumber}` : 'New Process PO'}
                 </h5>
-                <span className={`badge px-2.5 py-1 fs-11 ${
-                  isLocked ? 'bg-secondary text-white' : (initialPO?.status === 'Sent to Vendor' ? 'bg-primary-subtle text-primary border' : 'bg-success-subtle text-success border')
-                }`}>
-                  {isLocked ? '🔒 Locked (Workflow Progressed)' : (initialPO?.status || 'Draft')}
-                </span>
+                {initialPO && (
+                  isLocked ? (
+                    <span
+                      className="badge bg-white text-dark border px-2.5 py-1 fs-11 fw-semibold shadow-xs"
+                      style={{ borderColor: '#cbd5e1' }}
+                    >
+                      <i className="ti ti-lock me-1 text-secondary"></i>Locked
+                    </span>
+                  ) : (
+                    <span className={`badge px-2.5 py-1 fs-11 ${
+                      initialPO?.status === 'Sent to Vendor'
+                        ? 'bg-primary-subtle text-primary border'
+                        : 'bg-success-subtle text-success border'
+                    }`}>
+                      {initialPO?.status || 'Draft'}
+                    </span>
+                  )
+                )}
               </div>
               <p className="text-muted fs-11 mb-0">Job Work Procurement &amp; Fabric Dyeing Order</p>
             </div>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            {initialPO && (
+          {initialPO && (
+            <div className="d-flex align-items-center gap-2">
               <button
                 type="button"
                 className="btn btn-outline-secondary btn-sm px-3 d-flex align-items-center gap-1.5 rounded-2 shadow-xs"
@@ -700,58 +749,13 @@ export default function ProcessPOForm({
                 <i className="ti ti-printer fs-14"></i>
                 <span>Print Slip</span>
               </button>
-            )}
-
-            {!isLocked && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm px-3.5 d-flex align-items-center gap-1.5 rounded-2 shadow-xs"
-                  onClick={() => handleSubmit(false)}
-                >
-                  <i className="ti ti-device-floppy fs-14"></i>
-                  <span className="fw-semibold">Save PO</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-dark btn-sm px-3.5 d-flex align-items-center gap-1.5 rounded-2 shadow-xs"
-                  onClick={() => handleSubmit(true)}
-                  title="Saves this PO and immediately opens Dispatch Challan"
-                >
-                  <i className="ti ti-truck-delivery fs-14"></i>
-                  <span className="fw-semibold">Save &amp; Create Challan</span>
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* WORKFLOW LOCK BANNER (If Record is Locked)                                */}
-      {/* ========================================================================= */}
-      {isLocked && (
-        <div className="alert alert-warning border-warning d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-xs">
-          <div className="d-flex align-items-center gap-3">
-            <div className="rounded-circle bg-warning text-dark p-2 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-              <i className="ti ti-lock fs-20"></i>
-            </div>
-            <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">PO Workflow Locked — Read Only</h6>
-              <p className="mb-0 fs-12 text-secondary">
-                This Process PO has already progressed in the workflow (Challan Dispatched / Sent to Vendor). In accordance with ERP audit rules, modifications to this PO are permanently disabled.
-              </p>
-            </div>
-          </div>
-          <span className="badge bg-warning text-dark fs-12 px-3 py-2 fw-bold">
-            <i className="ti ti-lock me-1"></i> LOCKED
-          </span>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SECTION: BASIC DETAILS & PROCESS TYPE                                     */}
+      {/* SECTION: PO PARAMETERS & ORDER DETAILS (PDF SECTION 3.1 & 3.2)             */}
       {/* ========================================================================= */}
       <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
         <div className="p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ background: '#fafbfc' }}>
@@ -760,8 +764,8 @@ export default function ProcessPOForm({
               <i className="ti ti-file-description fs-16"></i>
             </div>
             <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">Basic Details &amp; Process Type</h6>
-              <p className="text-muted fs-11 mb-0">Header information, Job Work {processType && processType !== 'All' ? `${processType} ` : ''}Vendor &amp; optional Sales Order Link</p>
+              <h6 className="mb-0 fw-bold text-dark fs-14">PO Parameters &amp; Order Association</h6>
+              <p className="text-muted fs-11 mb-0">PO Number, Date, Issue Date, Job Work Vendor &amp; optional Sales Order Link (PDF Section 3.1 &amp; 3.2)</p>
             </div>
           </div>
 
@@ -786,220 +790,225 @@ export default function ProcessPOForm({
         </div>
 
         <div className="p-4">
-          <div className="row g-3">
-            {/* Process Type */}
-            <div className="col-md-2">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                Process Type <span className="text-danger">*</span>
+          {/* Top Row: 4 Primary PO Parameters from PDF Section 3.1 */}
+          <div className="row g-3 mb-3 pb-3 border-bottom" style={{ borderColor: '#f1f5f9' }}>
+            {/* Process PO Number */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
+                <span>Process PO Number</span>
+                <span className="text-danger">*</span>
               </label>
-              <select
-                className="form-select form-select-sm bg-white fw-semibold text-dark fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px', color: '#0f172a' }}
-                value={processType}
+              <input
+                type="text"
+                className="form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                placeholder="e.g. 7613"
+                value={poNumber}
                 disabled={!isSectionEditable('header')}
-                onChange={(e) => {
-                  const newType = e.target.value;
-                  setProcessType(newType);
-                  setShowAllVendors(false);
-                  // If current selected vendor doesn't support the new process type, clear selection
-                  if (vendorName) {
-                    const currentMatched = vendorList.find(
-                      (v) => (v.name || v.vendorName) === vendorName
-                    );
-                    if (currentMatched && newType && newType !== 'All' && !vendorMatchesType(currentMatched, newType)) {
-                      setVendorName('');
-                      setVendorId('');
-                    }
-                  }
-                }}
-              >
-                <option value="" style={{ color: '#0f172a' }}>-- Select Process Type --</option>
-                <option value="Dyeing" style={{ color: '#0f172a' }}>Dyeing</option>
-                <option value="Printing" style={{ color: '#0f172a' }}>Printing</option>
-                <option value="Processing" style={{ color: '#0f172a' }}>Processing</option>
-                <option value="Embroidery" style={{ color: '#0f172a' }}>Embroidery</option>
-                <option value="Washing" style={{ color: '#0f172a' }}>Washing</option>
-                <option value="Stitching / Job Worker" style={{ color: '#0f172a' }}>Stitching / Job Worker</option>
-                <option value="All" style={{ color: '#0f172a' }}>All Processes</option>
-              </select>
+                onChange={(e) => setPoNumber(e.target.value)}
+              />
             </div>
 
-            {/* PO Number */}
-            <div className="col-md-2">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                Process PO Number <span className="text-danger">*</span>
-              </label>
-              <div className="input-group input-group-sm">
-                <span className="input-group-text bg-light text-muted border-end-0 font-monospace">PPO-</span>
-                <input
-                  type="text"
-                  className="form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13"
-                  style={{ borderColor: '#cbd5e1', height: '36px' }}
-                  value={poNumber}
-                  disabled={!isSectionEditable('header')}
-                  onChange={(e) => setPoNumber(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Date */}
-            <div className="col-md-2">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                PO Date <span className="text-danger">*</span>
+            {/* PO Date */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
+                <span>PO Date</span>
+                <span className="text-danger">*</span>
               </label>
               <input
                 type="date"
                 className="form-control form-control-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px' }}
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
                 value={date}
                 disabled={!isSectionEditable('header')}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
 
-            {/* Job Work Vendor - Filtered based on Process Type */}
-            <div className="col-md-4">
-              <div className="d-flex align-items-center justify-content-between mb-1">
-                <label className="form-label fs-12 fw-semibold text-secondary mb-0">
-                  {(!processType || processType === 'All') ? 'Process Vendor' : `${processType} Vendor`} <span className="text-danger">*</span>
-                </label>
-                <div className="d-flex align-items-center gap-2">
-                  {processType && processType !== 'All' && (
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm p-0 text-decoration-none fs-11"
-                      style={{ color: showAllVendors ? '#4f46e5' : '#64748b' }}
-                      onClick={() => setShowAllVendors((prev) => !prev)}
-                      title={showAllVendors ? `Filter by ${processType}` : 'Show all vendors'}
-                    >
-                      {showAllVendors ? `Filter ${processType} (${displayedVendors.length})` : `Show all (${vendorList.length})`}
-                    </button>
-                  )}
-                  {isSectionEditable('header') && (
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11 fw-semibold"
-                      onClick={() => setShowInlineVendorModal(true)}
-                    >
-                      + New
-                    </button>
-                  )}
-                </div>
-              </div>
-              <select
-                className="form-select form-select-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px', color: '#0f172a' }}
-                value={vendorName}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => {
-                  setVendorName(e.target.value);
-                  const matched = vendorList.find((v) => (v.name || v.vendorName) === e.target.value);
-                  if (matched) setVendorId(matched.id || '');
-                }}
-              >
-                <option value="" style={{ color: '#0f172a' }}>
-                  -- Select {(!processType || processType === 'All') ? 'Vendor' : `${processType} Vendor`} --
-                </option>
-                {displayedVendors.length === 0 && processType && processType !== 'All' ? (
-                  <option value="" disabled style={{ color: '#dc2626' }}>
-                    No {processType} vendors found in Master (click "+ New" to add)
-                  </option>
-                ) : (
-                  displayedVendors.map((v) => {
-                    const vTypes = getVendorTypes(v);
-                    const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
-                    const cityText = v.city ? ` (${v.city})` : '';
-                    return (
-                      <option key={v.id || v.name} value={v.name || v.vendorName} style={{ color: '#0f172a' }}>
-                        {v.name || v.vendorName}{typeBadge}{cityText}
-                      </option>
-                    );
-                  })
-                )}
-              </select>
-            </div>
-
-            {/* Delivery Date */}
-            <div className="col-md-2">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1">Target Delivery Date</label>
+            {/* Issue Date (PDF Section 3.1) */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                Issue Date <small className="text-muted fw-normal">(Section 3.1)</small>
+              </label>
               <input
                 type="date"
                 className="form-control form-control-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '36px' }}
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                value={issueDate}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => setIssueDate(e.target.value)}
+              />
+            </div>
+
+            {/* Target Delivery Date (PDF Section 3.1) */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                Target Delivery Date
+              </label>
+              <input
+                type="date"
+                className="form-control form-control-sm bg-white fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
                 value={deliveryDate}
                 disabled={!isSectionEditable('header')}
                 onChange={(e) => setDeliveryDate(e.target.value)}
               />
             </div>
+          </div>
 
-            {/* Link Sales Order Toggle */}
-            <div className="col-md-6 mt-3">
-              <div className="p-3 border rounded bg-light d-flex align-items-center justify-content-between" style={{ borderColor: '#e2e8f0' }}>
+          {/* Bottom Row: 2 cards for Job Work Vendor & Sales Order Association */}
+          <div className="row g-3">
+            {/* Vendor Panel */}
+            <div className="col-12 col-lg-6">
+              <div
+                className="p-3 border rounded-3 h-100 d-flex flex-column justify-content-between shadow-xs"
+                style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}
+              >
                 <div>
-                  <span className="fw-semibold text-dark fs-13 d-block">Link to Sales Order</span>
-                  <small className="text-muted fs-11">Automatically tracks Required vs Received balance per Order</small>
-                </div>
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="linkOrderSwitch"
-                    style={{ width: '38px', height: '20px', cursor: 'pointer' }}
-                    checked={isOrderLinked}
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <label className="form-label fs-12 fw-bold text-dark mb-0 d-flex align-items-center gap-1.5">
+                      <i className="ti ti-building-store fs-15 text-primary"></i>
+                      <span>Job Work Vendor</span>
+                      <span className="text-danger">*</span>
+                    </label>
+                    {isSectionEditable('header') && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-12 fw-semibold d-flex align-items-center gap-1"
+                        onClick={() => setShowInlineVendorModal(true)}
+                      >
+                        <i className="ti ti-plus fs-13"></i>
+                        <span>New Vendor</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    className="form-select form-select-sm bg-white fs-13"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px', color: '#0f172a' }}
+                    value={vendorName}
                     disabled={!isSectionEditable('header')}
                     onChange={(e) => {
-                      setIsOrderLinked(e.target.checked);
-                      if (!e.target.checked) setLinkedOrderId('');
+                      setVendorName(e.target.value);
+                      const matched = vendorList.find((v) => (v.name || v.vendorName) === e.target.value);
+                      if (matched) setVendorId(matched.id || '');
                     }}
-                  />
+                  >
+                    <option value="" style={{ color: '#0f172a' }}>
+                      -- Select Vendor --
+                    </option>
+                    {vendorName && !vendorList.some(v => (v.name || v.vendorName) === vendorName) && (
+                      <option value={vendorName} style={{ color: '#0f172a' }}>
+                        {vendorName}
+                      </option>
+                    )}
+                    {vendorList.map((v) => {
+                      const vTypes = getVendorTypes(v);
+                      const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
+                      const cityText = v.city ? ` (${v.city})` : '';
+                      return (
+                        <option key={v.id || v.name} value={v.name || v.vendorName} style={{ color: '#0f172a' }}>
+                          {v.name || v.vendorName}{typeBadge}{cityText}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="mt-2 text-muted fs-11 d-flex align-items-center gap-1">
+                  <i className="ti ti-info-circle fs-13 text-secondary"></i>
+                  <span>Job work processor or dyeing mill from Vendor Master</span>
                 </div>
               </div>
             </div>
 
-            {/* Order Select Dropdown (If Linked) */}
-            <div className="col-md-6 mt-3">
-              {isOrderLinked ? (
+            {/* Sales Order / Customer Panel */}
+            <div className="col-12 col-lg-6">
+              <div
+                className="p-3 border rounded-3 h-100 d-flex flex-column justify-content-between shadow-xs"
+                style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}
+              >
                 <div>
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Select Sales Order to Link <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    className="form-select form-select-sm bg-white fs-13"
-                    style={{ borderColor: '#cbd5e1', height: '36px' }}
-                    value={linkedOrderId}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => handleSelectOrder(e.target.value)}
-                  >
-                    <option value="">-- Select Order --</option>
-                    {availableSalesOrders.map(ord => (
-                      <option key={ord.id} value={ord.id}>
-                        {ord.id} — {ord.customer} ({ord.brand || 'Raindrop'})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <label className="form-label fs-12 fw-bold text-dark mb-0 d-flex align-items-center gap-1.5">
+                      <i className="ti ti-link fs-15 text-primary"></i>
+                      <span>Sales Order Association</span>
+                    </label>
+
+                    <div className="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="linkOrderSwitch"
+                        style={{ width: '34px', height: '18px', cursor: 'pointer' }}
+                        checked={isOrderLinked}
+                        disabled={!isSectionEditable('header')}
+                        onChange={(e) => {
+                          setIsOrderLinked(e.target.checked);
+                          if (!e.target.checked) setLinkedOrderId('');
+                        }}
+                      />
+                      <label
+                        className="form-check-label fs-11 fw-semibold text-secondary cursor-pointer"
+                        htmlFor="linkOrderSwitch"
+                      >
+                        {isOrderLinked ? 'Linked to Order' : 'Direct (No Order)'}
+                      </label>
+                    </div>
+                  </div>
+
+                  {isOrderLinked ? (
+                    <div>
+                      <select
+                        className="form-select form-select-sm bg-white fs-13"
+                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                        value={linkedOrderId}
+                        disabled={!isSectionEditable('header')}
+                        onChange={(e) => handleSelectOrder(e.target.value)}
+                      >
+                        <option value="">-- Select Sales Order to Link --</option>
+                        {availableSalesOrders.length === 0 ? (
+                          <option value="" disabled>No active sales orders found</option>
+                        ) : (
+                          availableSalesOrders.map(ord => (
+                            <option key={ord.id} value={ord.id}>
+                              {ord.id}{ord.customer ? ` — ${ord.customer}` : ''}{ord.styleName ? ` • ${ord.styleName}` : ''}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm bg-white fs-13"
+                        placeholder="Enter brand or customer reference (e.g. Zara, FabIndia)..."
+                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                        value={customerBrandName}
+                        disabled={!isSectionEditable('header')}
+                        onChange={(e) => setCustomerBrandName(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div>
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Customer / Brand Name</label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm bg-white fs-13"
-                    placeholder="Enter brand or customer reference..."
-                    style={{ borderColor: '#cbd5e1', height: '36px' }}
-                    value={customerBrandName}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setCustomerBrandName(e.target.value)}
-                  />
+
+                <div className="mt-2 text-muted fs-11 d-flex align-items-center gap-1">
+                  <i className="ti ti-info-circle fs-13 text-secondary"></i>
+                  <span>
+                    {isOrderLinked
+                      ? 'Automatically synchronizes required vs received meterage'
+                      : 'Optional manual customer / brand tag for independent tracking'}
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* SECTION: STYLE SCOPE & GARMENT ASSOCIATION                                */}
+      {/* SECTION: STYLE PARAMETERS & SELECTION NARROWING (PDF SECTION 3.2)         */}
       {/* ========================================================================= */}
       <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
         <div className="p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ background: '#fafbfc' }}>
@@ -1008,38 +1017,12 @@ export default function ProcessPOForm({
               <i className="ti ti-hanger fs-16"></i>
             </div>
             <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">Style Scope &amp; Garment Association</h6>
-              <p className="text-muted fs-11 mb-0">Define single garment style or multi-piece combo set (Top, Bottom, Layer)</p>
+              <h6 className="mb-0 fw-bold text-dark fs-14">Style Parameters &amp; Selection Narrowing</h6>
+              <p className="text-muted fs-11 mb-0">PDF Section 3.2: User is asked how many styles this PO covers, opening corresponding style boxes</p>
             </div>
           </div>
 
-          <div className="d-flex align-items-center gap-3">
-            {/* Redesigned Style Count Selector */}
-            <div className="btn-group btn-group-sm p-1 bg-light border rounded-2" style={{ borderColor: '#e2e8f0' }}>
-              <button
-                type="button"
-                disabled={!isSectionEditable('styles')}
-                className={`btn btn-sm px-3 rounded-1 d-flex align-items-center gap-1.5 ${
-                  styleCountOption === '1' ? 'btn-primary text-white shadow-xs fw-semibold' : 'btn-light text-secondary border-0'
-                }`}
-                onClick={() => handleStyleCountChange('1')}
-              >
-                <i className="ti ti-shirt fs-13"></i>
-                <span>Single Style</span>
-              </button>
-              <button
-                type="button"
-                disabled={!isSectionEditable('styles')}
-                className={`btn btn-sm px-3 rounded-1 d-flex align-items-center gap-1.5 ${
-                  styleCountOption === '2+' ? 'btn-primary text-white shadow-xs fw-semibold' : 'btn-light text-secondary border-0'
-                }`}
-                onClick={() => handleStyleCountChange('2+')}
-              >
-                <i className="ti ti-layers-subtract fs-13"></i>
-                <span>Multi-Style Set (Combo)</span>
-              </button>
-            </div>
-
+          <div className="d-flex align-items-center gap-2">
             {!isLocked && isReadOnly && editingSection !== 'styles' && (
               <button
                 type="button"
@@ -1062,50 +1045,137 @@ export default function ProcessPOForm({
         </div>
 
         <div className="p-4">
+          {/* Question directly from PDF Section 3.2:
+              "The user is asked how many styles this PO covers (one, or more); that count determines how many Style input boxes open" */}
+          <div className="p-3 mb-3 border rounded-3 bg-light d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ borderColor: '#e2e8f0' }}>
+            <div className="d-flex align-items-center gap-2.5">
+              <span className="badge rounded-circle bg-primary text-white p-1 d-flex align-items-center justify-content-center fs-12 fw-bold" style={{ width: '24px', height: '24px' }}>
+                ?
+              </span>
+              <div>
+                <span className="fw-bold text-dark fs-13 d-block">
+                  How many styles does this PO cover?
+                </span>
+                <span className="text-muted fs-11">
+                  (PDF Section 3.2: Determines how many Style input boxes open)
+                </span>
+              </div>
+            </div>
+
+            <div className="btn-group btn-group-sm p-1 bg-white border rounded-2" style={{ borderColor: '#cbd5e1' }}>
+              <button
+                type="button"
+                disabled={!isSectionEditable('styles')}
+                className={`btn btn-sm px-3 rounded-1 d-flex align-items-center gap-1.5 ${styleCountOption === '1' ? 'btn-primary text-white shadow-xs fw-semibold' : 'btn-light text-secondary border-0'}`}
+                onClick={() => handleStyleCountChange('1')}
+              >
+                <i className="ti ti-shirt fs-13"></i>
+                <span>One Style</span>
+              </button>
+              <button
+                type="button"
+                disabled={!isSectionEditable('styles')}
+                className={`btn btn-sm px-3 rounded-1 d-flex align-items-center gap-1.5 ${styleCountOption === '2+' ? 'btn-primary text-white shadow-xs fw-semibold' : 'btn-light text-secondary border-0'}`}
+                onClick={() => handleStyleCountChange('2+')}
+              >
+                <i className="ti ti-layers-subtract fs-13"></i>
+                <span>More than One (2+ Styles)</span>
+              </button>
+            </div>
+          </div>
+
           {/* Dynamic Style Inputs */}
           {styleCountOption === '1' ? (
             /* Single Style Layout */
-            <div className="p-3 border rounded-3 bg-light-subtle" style={{ borderColor: '#e2e8f0' }}>
-              <label className="form-label fs-12 fw-semibold text-secondary mb-2 d-flex align-items-center justify-content-between">
-                <span>Garment Style Name</span>
+            <div className="p-3 border rounded-3 bg-white" style={{ borderColor: '#e2e8f0' }}>
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <label className="form-label fs-12 fw-semibold text-secondary mb-0 d-flex align-items-center gap-1.5">
+                  <i className="ti ti-shirt text-primary fs-15"></i>
+                  <span>Style Name</span>
+                  <span className="text-danger">*</span>
+                </label>
                 <span className="badge bg-indigo-subtle text-primary border border-indigo-200 fs-11">
-                  🎯 Primary Style
+                  Single Style Mode
                 </span>
-              </label>
+              </div>
               <div className="row g-2 align-items-center">
-                <div className="col-md-6">
+                <div className="col-12 col-md-6">
                   <select
                     className="form-select form-select-sm bg-white fs-13"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
                     value={selectedStyles[0] || ''}
                     disabled={!isSectionEditable('styles')}
-                    onChange={(e) => handleUpdateStyleAt(0, e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleUpdateStyleAt(0, val);
+                    }}
                   >
-                    <option value="">-- Choose Style from Masters / Order --</option>
-                    {masterStyleOptions.map(st => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
+                    <option value="">-- Choose Style from Order / Masters --</option>
+                    {masterStyleOptions.length === 0 ? (
+                      <option value="" disabled>No styles found — Type custom name and click Add</option>
+                    ) : (
+                      masterStyleOptions.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))
+                    )}
                   </select>
                 </div>
-                <div className="col-md-6">
-                  <input
-                    type="text"
-                    className="form-control form-control-sm bg-white fs-13"
-                    placeholder="Or type custom style name here..."
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={selectedStyles[0] || ''}
-                    disabled={!isSectionEditable('styles')}
-                    onChange={(e) => handleUpdateStyleAt(0, e.target.value)}
-                  />
+                <div className="col-12 col-md-6">
+                  <div className="input-group input-group-sm">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm bg-white fs-13"
+                      placeholder="Type custom style name (e.g. Kurta)..."
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}
+                      value={customStyleInput}
+                      disabled={!isSectionEditable('styles')}
+                      onChange={(e) => setCustomStyleInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomStyle();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm px-3 d-flex align-items-center gap-1"
+                      style={{ height: '38px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}
+                      disabled={!isSectionEditable('styles') || !customStyleInput.trim()}
+                      onClick={handleAddCustomStyle}
+                    >
+                      <i className="ti ti-plus fs-13"></i>
+                      <span>Add Style</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+              {selectedStyles[0] && (
+                <div className="mt-2.5 pt-2 border-top d-flex align-items-center justify-content-between fs-12">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="text-muted">Active Style:</span>
+                    <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 fs-12 fw-semibold">
+                      {selectedStyles[0]}
+                    </span>
+                  </div>
+                  {isSectionEditable('styles') && (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm text-danger p-0 text-decoration-none fs-11"
+                      onClick={() => handleUpdateStyleAt(0, '')}
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
-            /* Multi-Style Combo Set Layout */
+            /* Multi-Style Layout (PDF: "user sets which style displays on top or bottom") */
             <div>
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <span className="fs-12 fw-semibold text-secondary">
-                  Combo Set Components (Sets Top vs Bottom display order priority)
+                  Style Components (PDF: User sets which style displays on top or bottom)
                 </span>
                 {isSectionEditable('styles') && (
                   <button
@@ -1114,39 +1184,94 @@ export default function ProcessPOForm({
                     onClick={handleAddStyleSlot}
                   >
                     <i className="ti ti-plus fs-13"></i>
-                    <span>Add Component</span>
+                    <span>+ Add Another Style</span>
                   </button>
                 )}
               </div>
 
               <div className="d-flex flex-column gap-2.5">
                 {selectedStyles.map((styleVal, sIdx) => {
-                  const roleLabel = sIdx === 0 ? 'Top / Upper Garment' : (sIdx === 1 ? 'Bottom / Lower Garment' : 'Layer / Accent');
+                  const positionLabel = sIdx === 0 ? 'Top Style' : (sIdx === 1 ? 'Bottom Style' : `Style #${sIdx + 1}`);
+                  const isDragging = draggedStyleIdx === sIdx;
+                  const isOver = dragOverStyleIdx === sIdx && !isDragging;
+
                   return (
                     <div
                       key={sIdx}
-                      className="p-3 border rounded-3 bg-white d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-2xs"
-                      style={{ borderColor: '#e2e8f0' }}
+                      draggable={isSectionEditable('styles')}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', String(sIdx));
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDraggedStyleIdx(sIdx);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverStyleIdx !== sIdx) {
+                          setDragOverStyleIdx(sIdx);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverStyleIdx === sIdx) {
+                          setDragOverStyleIdx(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        if (!isNaN(fromIndex) && fromIndex !== sIdx) {
+                          handleReorderStyle(fromIndex, sIdx);
+                        }
+                        setDraggedStyleIdx(null);
+                        setDragOverStyleIdx(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedStyleIdx(null);
+                        setDragOverStyleIdx(null);
+                      }}
+                      className={`p-3 border rounded-3 bg-white d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-2xs ${isDragging ? 'opacity-50' : ''
+                        } ${isOver ? 'border-primary border-2 bg-primary-subtle' : ''
+                        }`}
+                      style={{
+                        borderColor: isOver ? '#3b82f6' : '#e2e8f0',
+                        cursor: isSectionEditable('styles') ? 'grab' : 'default',
+                        transition: 'all 0.15s ease'
+                      }}
                     >
-                      <div className="d-flex align-items-center gap-2" style={{ minWidth: '180px' }}>
+                      <div className="d-flex align-items-center gap-2.5" style={{ minWidth: '180px' }}>
+                        {isSectionEditable('styles') && (
+                          <div
+                            className="text-secondary d-flex align-items-center"
+                            style={{ cursor: 'grab', userSelect: 'none' }}
+                            title="Drag & Drop to reorder style position"
+                          >
+                            <i className="ti ti-grip-vertical fs-18"></i>
+                          </div>
+                        )}
                         <span className="badge bg-primary text-white px-2.5 py-1.5 fs-11 font-monospace rounded-pill">
                           #{sIdx + 1}
                         </span>
                         <div>
-                          <span className="fw-semibold text-dark fs-13 d-block">{roleLabel}</span>
-                          <small className="text-muted fs-11">Display priority {sIdx + 1}</small>
+                          <span className="fw-semibold text-dark fs-13 d-block">{positionLabel}</span>
+                          <small className="text-muted fs-11">Display Priority {sIdx + 1}</small>
                         </div>
                       </div>
 
-                      <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: '300px' }}>
+                      <div
+                        className="d-flex align-items-center gap-2 flex-grow-1"
+                        style={{ minWidth: '300px' }}
+                        draggable={false}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDragStart={(e) => e.stopPropagation()}
+                      >
                         <select
                           className="form-select form-select-sm bg-white fs-13 flex-grow-1"
-                          style={{ borderColor: '#cbd5e1', height: '36px', borderRadius: '6px' }}
+                          style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                           value={styleVal}
                           disabled={!isSectionEditable('styles')}
                           onChange={(e) => handleUpdateStyleAt(sIdx, e.target.value)}
                         >
-                          <option value="">-- Choose from Master --</option>
+                          <option value="">-- Choose from Master / Order --</option>
                           {masterStyleOptions.map(st => (
                             <option key={st} value={st}>{st}</option>
                           ))}
@@ -1155,42 +1280,24 @@ export default function ProcessPOForm({
                         <input
                           type="text"
                           className="form-control form-control-sm bg-white fs-13 flex-grow-1"
-                          placeholder="Or type custom name..."
-                          style={{ borderColor: '#cbd5e1', height: '36px', borderRadius: '6px' }}
+                          placeholder="Or type custom style..."
+                          style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                           value={styleVal}
                           disabled={!isSectionEditable('styles')}
                           onChange={(e) => handleUpdateStyleAt(sIdx, e.target.value)}
                         />
                       </div>
 
-                      {/* Display Order Controls (Top/Bottom) */}
-                      {isSectionEditable('styles') && (
-                        <div className="d-flex align-items-center gap-1.5">
+                      {/* Right Action: Delete Button only (Top/Bottom buttons removed, drag & drop enabled) */}
+                      {isSectionEditable('styles') && selectedStyles.length > 1 && (
+                        <div className="d-flex align-items-center">
                           <button
                             type="button"
-                            className="btn btn-light btn-sm border px-2 py-1 rounded"
-                            disabled={sIdx === 0}
-                            title="Move to Higher Priority"
-                            onClick={() => handleMoveStyleOrder(sIdx, sIdx - 1)}
-                          >
-                            <i className="ti ti-arrow-up fs-13 text-secondary"></i>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-light btn-sm border px-2 py-1 rounded"
-                            disabled={sIdx === selectedStyles.length - 1}
-                            title="Move to Lower Priority"
-                            onClick={() => handleMoveStyleOrder(sIdx, sIdx + 1)}
-                          >
-                            <i className="ti ti-arrow-down fs-13 text-secondary"></i>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-light btn-sm border text-danger px-2 py-1 rounded"
-                            title="Remove this component"
+                            className="btn btn-light btn-sm border text-danger px-2.5 py-1.5 rounded"
+                            title="Remove this style slot"
                             onClick={() => handleRemoveStyleSlot(sIdx)}
                           >
-                            <i className="ti ti-trash fs-13"></i>
+                            <i className="ti ti-trash fs-14"></i>
                           </button>
                         </div>
                       )}
@@ -1337,15 +1444,36 @@ export default function ProcessPOForm({
         <div className="p-0">
           {/* Table Responsive Wrapper with Min-Width Guarantee */}
           <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <style>{`
+              .line-items-po-table th,
+              .line-items-po-table td {
+                padding: 6px 6px !important;
+                vertical-align: middle;
+              }
+              .line-items-po-table input::-webkit-outer-spin-button,
+              .line-items-po-table input::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+              }
+              .line-items-po-table input[type=number] {
+                -moz-appearance: textfield !important;
+              }
+              .line-items-po-table .form-select-clean {
+                background-position: right 6px center !important;
+                background-size: 10px 8px !important;
+                padding-right: 20px !important;
+                padding-left: 8px !important;
+              }
+            `}</style>
             <table
-              className="table table-bordered align-middle mb-0"
-              style={{ minWidth: '1440px', tableLayout: 'fixed', fontSize: '13px' }}
+              className="table table-bordered align-middle mb-0 line-items-po-table"
+              style={{ minWidth: '1540px', tableLayout: 'fixed', fontSize: '13px' }}
             >
               <thead style={{ background: '#f8fafc' }}>
                 <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th className="text-center py-2" style={{ width: '45px' }}>#</th>
-                  <th style={{ width: '240px' }}>
-                    <div className="d-flex align-items-center justify-content-between">
+                  <th className="text-center py-2" style={{ width: '38px' }}>#</th>
+                  <th style={{ width: '220px' }}>
+                    <div className="d-flex align-items-center justify-content-between text-nowrap">
                       <span>FABRIC QUALITY *</span>
                       {!isLocked && isSectionEditable('items') && (
                         <button
@@ -1358,8 +1486,8 @@ export default function ProcessPOForm({
                       )}
                     </div>
                   </th>
-                  <th style={{ width: '220px' }}>
-                    <div className="d-flex align-items-center justify-content-between">
+                  <th style={{ width: '195px' }}>
+                    <div className="d-flex align-items-center justify-content-between text-nowrap">
                       <span>COLOR SHADE *</span>
                       {!isLocked && isSectionEditable('items') && (
                         <button
@@ -1377,22 +1505,23 @@ export default function ProcessPOForm({
                   </th>
                   <th style={{ width: '170px' }}>ARTICLE</th>
                   <th style={{ width: '110px' }}>WIDTH</th>
-                  <th style={{ width: '120px' }} className="text-end text-primary">METRES *</th>
-                  <th style={{ width: '110px' }} className="text-end text-dark">PIECES *</th>
-                  <th style={{ width: '110px' }} className="text-end">FAB RATE (₹)</th>
-                  <th style={{ width: '135px' }} className="text-end">DYE RATE (₹)</th>
-                  <th style={{ width: '110px' }} className="text-end">TOTAL/M (₹)</th>
-                  <th style={{ width: '130px' }} className="text-end text-success">TOTAL AMOUNT (₹)</th>
-                  <th style={{ width: '75px' }} className="text-center">SWATCH</th>
+                  <th style={{ width: '100px' }} className="text-center" title="Consumption per garment piece in metres">CONS (M)</th>
+                  <th style={{ width: '115px' }} className="text-end text-primary">METRES *</th>
+                  <th style={{ width: '100px' }} className="text-end text-dark">PIECES *</th>
+                  <th style={{ width: '100px' }} className="text-end">FAB RATE (₹)</th>
+                  <th style={{ width: '105px' }} className="text-end">DYE RATE (₹)</th>
+                  <th style={{ width: '105px' }} className="text-end text-nowrap">TOTAL/M (₹)</th>
+                  <th style={{ width: '120px' }} className="text-end text-success text-nowrap">TOTAL AMOUNT (₹)</th>
+                  <th style={{ width: '80px' }} className="text-center text-nowrap">SWATCH</th>
                   {!isLocked && isSectionEditable('items') && (
-                    <th style={{ width: '50px' }} className="text-center">ACT</th>
+                    <th style={{ width: '75px' }} className="text-center text-nowrap">ACTION</th>
                   )}
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={!isLocked && isSectionEditable('items') ? 13 : 12} className="text-center py-5 bg-white">
+                    <td colSpan={!isLocked && isSectionEditable('items') ? 14 : 13} className="text-center py-5 bg-white">
                       <div className="py-4">
                         <div className="rounded-circle bg-light d-inline-flex align-items-center justify-content-center p-3 mb-2 text-muted" style={{ width: '54px', height: '54px' }}>
                           <i className="ti ti-layers-linked fs-24"></i>
@@ -1414,15 +1543,18 @@ export default function ProcessPOForm({
                 ) : (
                   items.map((item, idx) => {
                     const rowWidthOptions = getAvailableWidthsForItem(item);
+                    const filteredFabrics = getFilteredFabrics(item);
+                    const filteredColors = getFilteredColors(item);
+                    const filteredArticles = getFilteredArticles(item);
 
                     return (
                       <tr key={item.id || idx}>
                         <td className="text-center fw-bold text-muted">{idx + 1}</td>
 
-                        {/* Fabric Quality from Master */}
+                        {/* Fabric Quality from Master (Search Narrowing via PDF Section 3.2) */}
                         <td>
                           <select
-                            className="form-select form-select-sm fs-13 bg-white w-100"
+                            className="form-select form-select-sm fs-13 bg-white w-100 form-select-clean"
                             value={item.fabric_id || ''}
                             disabled={!isSectionEditable('items')}
                             style={{ borderColor: '#cbd5e1', height: '36px' }}
@@ -1439,17 +1571,36 @@ export default function ProcessPOForm({
                               }
                             }}
                           >
-                            <option value="">-- Select Fabric from Master --</option>
-                            {fabricList.map(fab => (
+                            <option value="">Select Fabric Quality</option>
+                            {filteredFabrics.map(fab => (
                               <option key={fab.id} value={fab.id}>{fab.name}</option>
                             ))}
                           </select>
-                          <div className="text-muted fs-11 mt-1 text-truncate">
-                            Style: <strong className="text-dark">{item.style_name || selectedStyles[0] || 'Standard'}</strong>
-                          </div>
+                          {selectedStyles.filter(Boolean).length > 1 ? (
+                            <div className="d-flex align-items-center gap-1 mt-1 text-nowrap">
+                              <span className="text-muted fs-11">Style:</span>
+                              <select
+                                className="form-select form-select-xs border-0 p-0 fs-11 fw-semibold text-primary bg-transparent"
+                                style={{ outline: 'none', cursor: 'pointer', maxWidth: '140px' }}
+                                value={item.style_name || selectedStyles[0] || ''}
+                                disabled={!isSectionEditable('items')}
+                                onChange={(e) => updateItem(idx, { style_name: e.target.value })}
+                              >
+                                {selectedStyles.filter(Boolean).map(st => (
+                                  <option key={st} value={st}>{st}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            Boolean((item.style_name || selectedStyles[0]) && (item.style_name || selectedStyles[0]) !== 'Standard') && (
+                              <div className="text-muted fs-11 mt-1 text-truncate" title={item.style_name || selectedStyles[0]}>
+                                Style: <strong className="text-dark">{item.style_name || selectedStyles[0]}</strong>
+                              </div>
+                            )
+                          )}
                         </td>
 
-                        {/* Color Shade from Master */}
+                        {/* Color Shade from Master (Search Narrowing via PDF Section 3.2) */}
                         <td>
                           <div className="d-flex align-items-center bg-white border rounded px-2 w-100" style={{ borderColor: '#cbd5e1', height: '36px' }}>
                             <span style={{ width: '16px', height: '16px', borderRadius: '3px', background: item.color_hex || '#cbd5e1', marginRight: '8px', border: '1px solid #999', flexShrink: 0 }} />
@@ -1467,25 +1618,25 @@ export default function ProcessPOForm({
                                 }
                               }}
                             >
-                              <option value="">Select Color from Master...</option>
-                              {colorList.map(c => (
+                              <option value="">Select Color</option>
+                              {filteredColors.map(c => (
                                 <option key={c.id || c.name} value={c.name}>{c.name}</option>
                               ))}
                             </select>
                           </div>
                         </td>
 
-                        {/* Article from Master */}
+                        {/* Article from Master (Search Narrowing via PDF Section 3.2) */}
                         <td>
                           <select
-                            className="form-select form-select-sm bg-white fs-13 w-100"
+                            className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
                             style={{ borderColor: '#cbd5e1', height: '36px' }}
                             value={item.article_name || ''}
                             disabled={!isSectionEditable('items')}
                             onChange={(e) => updateItem(idx, { article_name: e.target.value })}
                           >
-                            <option value="">Select Article...</option>
-                            {articleList.map(a => (
+                            <option value="">Select Article</option>
+                            {filteredArticles.map(a => (
                               <option key={a.id || a.name} value={a.name}>{a.name}</option>
                             ))}
                           </select>
@@ -1494,7 +1645,7 @@ export default function ProcessPOForm({
                         {/* Width from Fabric Master */}
                         <td>
                           <select
-                            className="form-select form-select-sm bg-white fs-13 w-100"
+                            className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
                             style={{ borderColor: '#cbd5e1', height: '36px' }}
                             value={item.width || ''}
                             disabled={!isSectionEditable('items')}
@@ -1508,7 +1659,22 @@ export default function ProcessPOForm({
                           </select>
                         </td>
 
-                        {/* Metres */}
+                        {/* Dynamic Consumption Formula Input (PDF Section 3.2) */}
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="m/pc"
+                            className="form-control form-control-sm text-center bg-white fs-13 w-100"
+                            style={{ borderColor: '#cbd5e1', height: '36px' }}
+                            value={item.consumption_per_piece}
+                            disabled={!isSectionEditable('items')}
+                            title="Fabric consumption per piece in metres (e.g. 2.60)"
+                            onChange={(e) => updateItem(idx, { consumption_per_piece: e.target.value })}
+                          />
+                        </td>
+
+                        {/* Metres (PDF Section 3.2: entering metres auto-computes pieces) */}
                         <td>
                           <input
                             type="number"
@@ -1521,13 +1687,13 @@ export default function ProcessPOForm({
                             onChange={(e) => updateItem(idx, { quantity_meters: e.target.value })}
                           />
                           {parseFloat(item.quantity_meters) > 0 && (
-                            <div className="text-muted text-end fs-10 mt-0.5">
-                              Raw: {item.raw_fabric_meters}m ({item.shrinkage_percent}%)
+                            <div className="text-muted text-end fs-10 mt-0.5 text-nowrap" title="Raw fabric required factoring shrinkage">
+                              Raw: {item.raw_fabric_meters}m ({item.shrinkage_percent || 0}%)
                             </div>
                           )}
                         </td>
 
-                        {/* Pieces (Calculated / Editable) */}
+                        {/* Pieces (PDF Section 3.2: entering pieces auto-computes metres) */}
                         <td>
                           <input
                             type="number"
@@ -1538,7 +1704,6 @@ export default function ProcessPOForm({
                             disabled={!isSectionEditable('items')}
                             onChange={(e) => updateItem(idx, { quantity_pieces: e.target.value })}
                           />
-                          <div className="text-muted text-end fs-10 mt-0.5">@2.60m/pc</div>
                         </td>
 
                         {/* Fabric Rate */}
@@ -1555,33 +1720,21 @@ export default function ProcessPOForm({
                           />
                         </td>
 
-                        {/* Dyeing Rate with Auto-Recommend Button */}
+                        {/* Dyeing Rate */}
                         <td>
-                          <div className="input-group input-group-sm w-100">
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0.00"
-                              className="form-control form-control-sm text-end bg-white fs-13"
-                              style={{ borderColor: '#cbd5e1', height: '36px' }}
-                              value={item.dyeing_rate}
-                              disabled={!isSectionEditable('items')}
-                              onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
-                            />
-                            {!isLocked && isSectionEditable('items') && (
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary px-2"
-                                title="Auto-recommend dyeing rate based on Width"
-                                onClick={() => handleAutoRecommendRate(idx)}
-                              >
-                                <i className="ti ti-wand fs-13"></i>
-                              </button>
-                            )}
-                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            className="form-control form-control-sm text-end bg-white fs-13 w-100"
+                            style={{ borderColor: '#cbd5e1', height: '36px' }}
+                            value={item.dyeing_rate}
+                            disabled={!isSectionEditable('items')}
+                            onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
+                          />
                         </td>
 
-                        {/* Total per Metre */}
+                        {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) */}
                         <td className="text-end fw-semibold text-dark fs-13">
                           ₹{Number(item.total_actual_cost || 0).toFixed(2)}
                         </td>
@@ -1635,7 +1788,7 @@ export default function ProcessPOForm({
               {items.length > 0 && (
                 <tfoot style={{ background: '#f8fafc', fontWeight: 'bold' }}>
                   <tr>
-                    <td colSpan={5} className="text-end text-secondary fs-12 py-2">
+                    <td colSpan={6} className="text-end text-secondary fs-12 py-2">
                       GRAND TOTALS:
                     </td>
                     <td className="text-end text-primary fs-13 py-2">
@@ -1668,8 +1821,8 @@ export default function ProcessPOForm({
               {items.map((it, i) => (
                 <div key={i} className="badge bg-white text-dark border p-2 d-flex align-items-center gap-2 shadow-2xs" style={{ borderColor: '#cbd5e1' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: it.color_hex || '#cbd5e1', border: '1px solid #999' }} />
-                  <span><strong>{it.color_name || 'Standard'}</strong>:</span>
-                  <span>{it.fabric_name || 'Voile'} ({it.width || '48'}")</span>
+                  <span><strong>{it.color_name || 'Item'}</strong>:</span>
+                  <span>{it.fabric_name ? `${it.fabric_name} ${it.width ? `(${it.width}")` : ''}` : '(No Fabric)'}</span>
                   <span className="text-primary fw-bold">[{it.quantity_meters || 0}m / {it.quantity_pieces || 0}pcs]</span>
                 </div>
               ))}
@@ -1687,15 +1840,6 @@ export default function ProcessPOForm({
             <i className="ti ti-notes text-secondary fs-16"></i>
             <h6 className="mb-0 fw-bold text-dark fs-14">Terms, Special Instructions &amp; Remarks</h6>
           </div>
-          {!isLocked && (
-            <button
-              type="button"
-              className="btn btn-link btn-sm text-primary text-decoration-none p-0 fs-11 fw-semibold"
-              onClick={handleInsertStandardTerms}
-            >
-              + Insert Standard Terms
-            </button>
-          )}
         </div>
         <div className="p-4">
           <textarea
@@ -1766,21 +1910,16 @@ export default function ProcessPOForm({
         <VendorMasterView
           isInline={true}
           vendors={vendorList}
-          defaultTypes={processType && processType !== 'All' ? [processType] : []}
-          onCloseInline={() => setShowInlineVendorModal(false)}
-          onSaveVendor={(newVendor) => {
-            const updated = [newVendor, ...vendorList.filter(v => v.id !== newVendor.id)];
-            setVendorList(updated);
-            try {
-              localStorage.setItem('raindrop_vendors_v1', JSON.stringify(updated));
-              window.dispatchEvent(new Event('raindrop_vendors_updated'));
-            } catch (e) {}
-            if (api && api.saveVendor) {
-              api.saveVendor(newVendor).catch(() => {});
+          defaultTypes={[]}
+          onCloseInline={(saved) => {
+            if (saved && (saved.name || saved.vendorName)) {
+              handleVendorSaved(saved);
+            } else {
+              setShowInlineVendorModal(false);
             }
-            setVendorId(newVendor.id);
-            setVendorName(newVendor.name || newVendor.vendorName);
-            setShowInlineVendorModal(false);
+          }}
+          onSaveVendor={(newVendor) => {
+            handleVendorSaved(newVendor);
           }}
         />
       )}

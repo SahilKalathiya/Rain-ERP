@@ -385,18 +385,18 @@ export default function ProcessChallanList({
                           className="d-inline-flex align-items-center gap-1.5"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {/* View / Edit Button */}
+                          {/* View Button */}
                           <button
                             type="button"
                             className="btn btn-light btn-sm p-1.5 rounded-2 text-dark border shadow-xs"
-                            title={isChallanLocked(c) ? "View Locked Challan" : "Open & Edit Challan Details"}
+                            title={isChallanLocked(c) ? "View Locked Challan" : "View Dispatched Challan Details"}
                             style={{ borderColor: '#cbd5e1' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRowClick(c);
                             }}
                           >
-                            <i className={`ti ${isChallanLocked(c) ? 'ti-eye' : 'ti-pencil'} fs-14`}></i>
+                            <i className="ti ti-eye fs-14"></i>
                           </button>
 
                           {/* Print Button */}
