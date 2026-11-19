@@ -88,16 +88,23 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setShowPOForm(true);
   };
 
+  const handleIssuePO = (po) => {
+    const updated = pos.map(p =>
+      (p.id === po.id || p.po_number === po.po_number)
+        ? { ...p, status: 'Issued' }
+        : p
+    );
+    setPos(updated);
+    saveStoredProcessPOs(updated);
+  };
+
   const handlePrintPO = (po) => {
     setPrintModalConfig({ type: 'PO', data: po });
   };
 
   const handleCreateChallanFromPO = (po) => {
-    const chNum = `${Math.floor(4000 + Math.random() * 1000)}`;
-    const chNo = `CH-${chNum}`;
-    const challanId = `PCH-${chNum}`;
-    const poNum = po.po_number || String(po.id).replace(/\D/g, '') || chNum;
-    const poRef = po.id || `PPO-${poNum}`;
+    const poNum = po.po_number || String(po.id).replace(/\D/g, '') || '';
+    const poRef = po.id || (poNum ? `PPO-${poNum}` : '');
 
     const challanItems = po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
       id: Date.now() + idx,
@@ -126,12 +133,12 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     const grandTotal = challanItems.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
 
     const generatedChallan = {
-      id: challanId,
-      challan_number: chNo,
+      id: null,
+      challan_number: '',
       date: new Date().toISOString().split('T')[0],
       vendor_id: po.vendor_id || '',
       vendor_name: po.vendor_name || '',
-      linked_pos: [poNum, poRef, po.id].filter(Boolean),
+      linked_pos: [po.po_number || po.id].filter(Boolean),
       styles_info: po.style_names || [],
       customer_brand: po.customer_brand_name || po.customer_brand || '',
       po_link_status: 'Linked',
@@ -241,7 +248,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   // 3. Process Return Handlers
-  const handleSaveReturn = (returnData) => {
+  const handleSaveReturn = (returnData, andInspectQC = false) => {
     let updated;
     const existingIndex = returns.findIndex(r => r.id === returnData.id);
     if (existingIndex >= 0) {
@@ -289,8 +296,12 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     setShowReturnForm(false);
     setEditingReturn(null);
-    if (onNavigate) onNavigate('/process-qc');
-    else setActiveTab('qc'); // Proceed directly to QC
+    if (andInspectQC) {
+      if (onNavigate) onNavigate('/process-qc');
+      else setActiveTab('qc'); // Proceed directly to QC
+    } else {
+      setActiveTab('returns');
+    }
   };
 
   // 4. QC Handlers
@@ -396,6 +407,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
             }}
             onViewPO={handleViewPO}
             onPrintPO={handlePrintPO}
+            onIssuePO={handleIssuePO}
             onCreateChallanFromPO={handleCreateChallanFromPO}
             challans={challans}
           />
@@ -405,7 +417,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       {activeTab === 'challans' && (
         showChallanForm ? (
           <ProcessChallanForm
-            availablePOs={pos}
+            availablePOs={pos.filter(p => p.status !== 'Draft')}
             initialChallan={editingChallan}
             onSave={handleSaveChallan}
             onRecordReturn={handleRecordReturnFromChallan}

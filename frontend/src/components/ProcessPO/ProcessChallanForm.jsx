@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { initialVendors } from '../../data/procurementData';
 
 /**
@@ -56,9 +56,9 @@ export default function ProcessChallanForm({
     { baleNo: 'Roll 7710-A', invoiceNo: 'INV-CAM-304', fabric: 'Cotton Cambric 60*60', color: 'Dusty Rose', meters: 650.00, arrivalDate: '2026-08-05', ageDays: 7 }
   ];
 
-  // Challan Number (Auto unique e.g. CH-4903)
+  // Challan Number (Manual input - blank on new challan)
   const [challanNumber, setChallanNumber] = useState(
-    initialChallan?.challan_number || `CH-${Math.floor(4000 + Math.random() * 1000)}`
+    initialChallan?.challan_number || ''
   );
 
   // Dispatch Date
@@ -71,8 +71,18 @@ export default function ProcessChallanForm({
     initialChallan ? (initialChallan.po_link_status === 'Pending PO Link' || Boolean(initialChallan.admin_alert_triggered)) : false
   );
 
-  // Multi-PO selection (e.g. PO #7611, #7612, #7613)
-  const [selectedPOs, setSelectedPOs] = useState(initialChallan?.linked_pos || []);
+  // Multi-PO selection (e.g. PO #7611, #7612, #7613) - deduplicate
+  const [selectedPOs, setSelectedPOs] = useState(() => {
+    const raw = initialChallan?.linked_pos || [];
+    const unique = [];
+    raw.forEach(ref => {
+      const clean = String(ref).replace(/^PPO-/, '');
+      if (!unique.some(u => String(u).replace(/^PPO-/, '') === clean)) {
+        unique.push(clean);
+      }
+    });
+    return unique;
+  });
 
   // Vendor (Auto-carried from PO or selectable in emergency)
   const [vendorId, setVendorId] = useState(initialChallan?.vendor_id || '');
@@ -98,6 +108,21 @@ export default function ProcessChallanForm({
   // Modal states for Link PO (Emergency resolution)
   const [showLinkPOModal, setShowLinkPOModal] = useState(false);
   const [showStockPickerModal, setShowStockPickerModal] = useState(false);
+
+  // Multi-PO Bundling Dropdown states
+  const [showPODropdown, setShowPODropdown] = useState(false);
+  const [poSearchTerm, setPoSearchTerm] = useState('');
+  const poDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (poDropdownRef.current && !poDropdownRef.current.contains(event.target)) {
+        setShowPODropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Helper: Match PO
   const isPOMatched = (po, idOrRef) => {
@@ -165,6 +190,18 @@ export default function ProcessChallanForm({
     if (isAlreadySelected) {
       setSelectedPOs(selectedPOs.filter(ref => !isPOMatched(po, ref)));
     } else {
+      // Enforce PDF Sec 4.2: Same vendor rule
+      if (vendorName && po.vendor_name && vendorName !== po.vendor_name && selectedPOs.length > 0) {
+        if (!window.confirm(`Warning: This shipment is bound to Vendor "${vendorName}". PO #${po.po_number || po.id} belongs to "${po.vendor_name}". A single Process Challan cannot bundle different vendors (PDF Section 4.2).\n\nDo you want to switch the shipment to "${po.vendor_name}"?`)) {
+          return;
+        }
+        setVendorName(po.vendor_name);
+        if (po.vendor_id) setVendorId(po.vendor_id);
+        setSelectedPOs([poKey]);
+        return;
+      }
+      if (po.vendor_name) setVendorName(po.vendor_name);
+      if (po.vendor_id) setVendorId(po.vendor_id);
       setSelectedPOs([...selectedPOs, poKey]);
     }
   };
@@ -236,6 +273,12 @@ export default function ProcessChallanForm({
   const handleSubmit = (e, andRecordReturn = false) => {
     if (e && e.preventDefault) e.preventDefault();
 
+    const trimmedChallanNo = (challanNumber || '').trim();
+    if (!trimmedChallanNo) {
+      alert('Please enter a Challan Number.');
+      return;
+    }
+
     if (!isEmergencyDispatch && selectedPOs.length === 0) {
       alert('Please select at least one Process PO or switch to Emergency Dispatch.');
       return;
@@ -261,8 +304,8 @@ export default function ProcessChallanForm({
     }
 
     const challanPayload = {
-      id: initialChallan?.id || `PCH-${challanNumber}`,
-      challan_number: challanNumber,
+      id: initialChallan?.id || `PCH-${trimmedChallanNo}`,
+      challan_number: trimmedChallanNo,
       date,
       vendor_id: vendorId,
       vendor_name: vendorName,
@@ -313,17 +356,16 @@ export default function ProcessChallanForm({
               <h5 className="card-title mb-0 fw-bold text-dark fs-18">
                 {isExistingSaved ? `Process Challan #${challanNumber}` : 'Create Process Dispatch Challan'}
               </h5>
-              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${
-                isLocked
-                  ? 'bg-white text-dark border shadow-xs'
-                  : isEmergencyDispatch
-                    ? 'bg-danger text-white border border-danger shadow-xs'
-                    : isExistingSaved
-                      ? 'bg-success-subtle text-success border border-success-subtle'
-                      : selectedPOs.length > 0
-                        ? 'bg-primary-subtle text-primary border border-primary-subtle'
-                        : 'bg-light text-secondary border'
-              }`}>
+              <span className={`badge rounded-pill fs-11 fw-bold px-2.5 py-1 ${isLocked
+                ? 'bg-white text-dark border shadow-xs'
+                : isEmergencyDispatch
+                  ? 'bg-danger text-white border border-danger shadow-xs'
+                  : isExistingSaved
+                    ? 'bg-success-subtle text-success border border-success-subtle'
+                    : selectedPOs.length > 0
+                      ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                      : 'bg-light text-secondary border'
+                }`}>
                 {isLocked
                   ? 'Locked'
                   : isEmergencyDispatch
@@ -337,8 +379,12 @@ export default function ProcessChallanForm({
             </div>
             <div className="text-muted fs-12 mt-0.5 d-flex align-items-center gap-2">
               <span>Fabric Dispatch to Job Work Vendor</span>
-              <span>•</span>
-              <span className="fw-semibold text-primary">{vendorName || 'Vendor Assignment'}</span>
+              {vendorName && (
+                <>
+                  <span>•</span>
+                  <span className="fw-semibold text-dark">{vendorName}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -448,74 +494,234 @@ export default function ProcessChallanForm({
             <div className="p-4">
               {/* Multi-PO Bundling Selector (Section 4.2 & Page 15: PO=7611, 7612, 7613) */}
               {!isEmergencyDispatch && (
-                <div className="mb-3 pb-3 border-bottom">
+                <div className="mb-3 pb-3 border-bottom" ref={poDropdownRef}>
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                    <span>Bundled Process POs (Multi-Select) <span className="text-danger">*</span></span>
+                    <span>Link by Vendor / Party Name &amp; Process POs (Multi-Select) <span className="text-danger">*</span></span>
                     <span className="text-muted fs-11">Page 15 slip: Bundles multiple POs to same vendor in one shipment</span>
                   </label>
 
-                  {availablePOs.length === 0 ? (
-                    <div className="text-muted fs-12 p-2 bg-light border rounded">No active Process POs found.</div>
-                  ) : (
-                    <div className="d-flex flex-wrap gap-2">
-                      {availablePOs.map((po) => {
-                        const isSelected = selectedPOs.some(ref => isPOMatched(po, ref));
-                        return (
-                          <button
-                            type="button"
-                            key={po.id || po.po_number}
-                            disabled={!isSectionEditable('header')}
-                            onClick={() => togglePOSelection(po)}
-                            className={`btn btn-sm d-flex align-items-center gap-1.5 rounded-2 px-3 py-1.5 transition-all ${isSelected
-                                ? 'btn-primary text-white shadow-xs'
-                                : 'btn-light bg-white border text-secondary'
-                              }`}
-                            style={{ fontSize: '12.5px' }}
-                          >
-                            <i className={`ti ${isSelected ? 'ti-check' : 'ti-plus'} fs-14`}></i>
-                            <span>PO #{po.po_number || po.id}</span>
-                            <span className={isSelected ? 'text-indigo-200 fs-11' : 'text-muted fs-11'}>
-                              • {po.vendor_name} ({po.total_meters}m)
+                  {/* Dropdown Trigger Box */}
+                  <div className="position-relative">
+                    <button
+                      type="button"
+                      className="form-select form-select-sm bg-white fs-13 d-flex align-items-center justify-content-between text-start shadow-xs"
+                      style={{
+                        borderColor: '#cbd5e1',
+                        height: '40px',
+                        borderRadius: '6px',
+                        cursor: isSectionEditable('header') ? 'pointer' : 'not-allowed',
+                        color: selectedPOs.length > 0 ? '#0f172a' : '#94a3b8'
+                      }}
+                      disabled={!isSectionEditable('header')}
+                      onClick={() => setShowPODropdown(!showPODropdown)}
+                    >
+                      <span className="text-truncate pe-3">
+                        {selectedPOs.length === 0 ? (
+                          <span className="text-muted">-- Select Vendor Name / Process PO(s) to bundle --</span>
+                        ) : selectedPOs.length === 1 ? (
+                          (() => {
+                            const po = availablePOs.find(p => isPOMatched(p, selectedPOs[0]));
+                            const vName = po?.vendor_name || vendorName || 'Vendor';
+                            const pNum = po ? (po.po_number || po.id) : selectedPOs[0];
+                            const meters = po?.total_meters ? ` (${po.total_meters}m)` : '';
+                            return (
+                              <span>
+                                <strong className="text-dark">{vName}</strong>
+                                <span className="text-secondary ms-1.5 fs-12">• PO #{pNum}{meters}</span>
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          (() => {
+                            const selectedObjs = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)));
+                            const vNames = [...new Set(selectedObjs.map(p => p.vendor_name).filter(Boolean))];
+                            const pNums = selectedPOs.map(r => `#${r}`).join(', ');
+                            return (
+                              <span className="fw-semibold text-dark">
+                                {vNames.length > 0 ? vNames.join(', ') : 'Bundled'}: <span className="text-primary">{pNums}</span> ({selectedPOs.length} POs)
+                              </span>
+                            );
+                          })()
+                        )}
+                      </span>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showPODropdown && isSectionEditable('header') && (
+                      <div
+                        className="position-absolute bg-white border rounded-3 shadow-lg p-2"
+                        style={{
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 1050,
+                          marginTop: '4px',
+                          maxHeight: '320px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {/* Search Input inside Dropdown */}
+                        <div className="mb-2 px-1">
+                          <div className="input-group input-group-sm">
+                            <span className="input-group-text bg-light border-end-0">
+                              <i className="ti ti-search fs-12 text-muted"></i>
                             </span>
-                          </button>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm border-start-0 fs-12"
+                              placeholder="Search by Vendor / Party Name, PO #, or fabric..."
+                              value={poSearchTerm}
+                              onChange={(e) => setPoSearchTerm(e.target.value)}
+                              autoFocus
+                            />
+                            {poSearchTerm && (
+                              <button
+                                className="btn btn-sm btn-light border"
+                                type="button"
+                                onClick={() => setPoSearchTerm('')}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* List of Available POs with checkboxes */}
+                        {(() => {
+                          const eligiblePOs = availablePOs.filter(p => p.status !== 'Draft');
+                          const filtered = eligiblePOs.filter(po => {
+                            if (!poSearchTerm.trim()) return true;
+                            const term = poSearchTerm.toLowerCase();
+                            const poNum = String(po.po_number || po.id || '').toLowerCase();
+                            const vendor = String(po.vendor_name || '').toLowerCase();
+                            const fabric = String(po.fabric_quality || '').toLowerCase();
+                            return poNum.includes(term) || vendor.includes(term) || fabric.includes(term);
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="text-muted fs-12 p-3 text-center">
+                                No eligible Process POs found.
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="d-flex flex-column gap-1">
+                              {filtered.map((po) => {
+                                const isSelected = selectedPOs.some(ref => isPOMatched(po, ref));
+                                return (
+                                  <div
+                                    key={po.id || po.po_number}
+                                    className={`d-flex align-items-center justify-content-between p-2 rounded-2 fs-12 transition-all ${isSelected
+                                      ? 'bg-primary-subtle text-primary fw-semibold border border-primary-subtle'
+                                      : 'hover-bg-light text-dark'
+                                      }`}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                    onClick={() => togglePOSelection(po)}
+                                  >
+                                    <div className="d-flex align-items-center gap-2.5">
+                                      <input
+                                        type="checkbox"
+                                        className="form-check-input mt-0"
+                                        checked={isSelected}
+                                        onChange={() => { }}
+                                        style={{ cursor: 'pointer' }}
+                                      />
+                                      <div>
+                                        <div className="d-flex align-items-center gap-1.5">
+                                          <span className="fw-bold text-dark fs-13">{po.vendor_name || 'Vendor'}</span>
+                                          <span className="badge bg-light text-secondary border font-monospace fs-11 px-1.5 py-0.5">
+                                            PO #{po.po_number || po.id}
+                                          </span>
+                                        </div>
+                                        <div className="text-muted fs-11 mt-0.5">
+                                          {po.fabric_quality ? `${po.fabric_quality} • ` : ''}
+                                          {po.total_meters ? `${po.total_meters}m` : ''}
+                                          {Array.isArray(po.style_names) && po.style_names.length > 0 ? ` • Style: ${po.style_names.join(', ')}` : ''}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {isSelected && (
+                                      <span className="badge bg-primary text-white fs-10 px-1.5 py-0.5 rounded">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected PO Badges/Chips */}
+                  {selectedPOs.length > 0 && (
+                    <div className="d-flex flex-wrap gap-1.5 align-items-center mt-2.5">
+                      <span className="text-muted fs-11 me-1">Selected Party / PO(s):</span>
+                      {selectedPOs.map((poRef) => {
+                        const po = availablePOs.find(p => isPOMatched(p, poRef));
+                        const poNum = po ? (po.po_number || po.id) : poRef;
+                        const vendor = po?.vendor_name || vendorName || '';
+                        const meters = po?.total_meters ? `${po.total_meters}m` : '';
+                        return (
+                          <span
+                            key={poRef}
+                            className="badge bg-primary text-white d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill fs-12 shadow-xs"
+                          >
+                            <i className="ti ti-check fs-12"></i>
+                            <span className="fw-bold">{vendor || 'Vendor'}</span>
+                            <span className="opacity-90 fs-11">• PO #{poNum}</span>
+                            {meters && <span className="opacity-80 fs-11">({meters})</span>}
+                            {isSectionEditable('header') && (
+                              <button
+                                type="button"
+                                className="btn-close btn-close-white p-0 ms-1"
+                                style={{ fontSize: '8px', cursor: 'pointer' }}
+                                onClick={() => {
+                                  if (po) togglePOSelection(po);
+                                  else setSelectedPOs(selectedPOs.filter(r => r !== poRef));
+                                }}
+                                title="Remove from shipment"
+                              />
+                            )}
+                          </span>
                         );
                       })}
-                    </div>
-                  )}
-
-                  {selectedPOs.length > 0 && vendorName && (
-                    <div className="mt-2.5 pt-2 border-top d-flex flex-wrap align-items-center gap-3 fs-12 text-muted">
-                      <span>Vendor: <strong className="text-dark">{vendorName}</strong></span>
-                      {stylesInfo.length > 0 && <span>• Styles: <strong className="text-dark">{stylesInfo.join(', ')}</strong></span>}
-                      {customerBrand && <span>• Brand: <strong className="text-dark">{customerBrand}</strong></span>}
                     </div>
                   )}
                 </div>
               )}
 
+              {/* Data Fields strictly matching Section 4.1 Data Structure */}
               <div className="row g-3">
-                <div className="col-12 col-md-3">
+                {/* 1. Challan Number */}
+                <div className="col-12 col-md-4">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Challan Number <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-primary"
+                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={challanNumber}
                     disabled={!isSectionEditable('header')}
                     onChange={(e) => setChallanNumber(e.target.value)}
+                    placeholder="e.g. CH-4903"
                     required
                   />
                 </div>
 
-                <div className="col-12 col-md-3">
+                {/* 2. Date */}
+                <div className="col-12 col-md-4">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Dispatch Date <span className="text-danger">*</span>
+                    Date of Dispatch <span className="text-danger">*</span>
                   </label>
                   <input
                     type="date"
-                    className="form-control form-control-sm bg-white fs-13"
+                    className="form-control form-control-sm bg-white fs-13 text-dark"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={date}
                     disabled={!isSectionEditable('header')}
@@ -524,53 +730,104 @@ export default function ProcessChallanForm({
                   />
                 </div>
 
-                <div className="col-12 col-md-3">
+                {/* 3. Vendor */}
+                <div className="col-12 col-md-4">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Vendor <span className="text-danger">*</span>
+                    Vendor (Job Worker) <span className="text-danger">*</span>
                   </label>
-                  {isEmergencyDispatch ? (
-                    <select
-                      className="form-select form-select-sm bg-white fs-13"
-                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                      value={vendorId}
-                      disabled={!isSectionEditable('header')}
-                      onChange={(e) => {
-                        setVendorId(e.target.value);
-                        const v = initialVendors.find(vend => vend.id === e.target.value);
-                        if (v) setVendorName(v.name);
-                      }}
-                      required
-                    >
-                      <option value="">Select Vendor...</option>
-                      {initialVendors.map(v => (
-                        <option key={v.id} value={v.id}>{v.name} ({v.city})</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      className="form-control form-control-sm bg-white fs-13"
-                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                      value={vendorName}
-                      placeholder="Auto-carried from PO"
-                      readOnly
-                    />
-                  )}
+                  <select
+                    className="form-select form-select-sm bg-white fs-13 text-dark fw-semibold"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={vendorName || ''}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => {
+                      const chosenName = e.target.value;
+                      setVendorName(chosenName);
+                      const v = initialVendors.find(vend => vend.name === chosenName);
+                      if (v) setVendorId(v.id);
+                      if (selectedPOs.length > 0) {
+                        const mismatch = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)) && p.vendor_name !== chosenName);
+                        if (mismatch.length > 0) {
+                          setSelectedPOs(selectedPOs.filter(ref => {
+                            const po = availablePOs.find(p => isPOMatched(p, ref));
+                            return po && po.vendor_name === chosenName;
+                          }));
+                        }
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">-- Select Vendor Name --</option>
+                    {Array.from(new Set([
+                      ...initialVendors.map(v => v.name),
+                      ...availablePOs.map(p => p.vendor_name).filter(Boolean)
+                    ])).map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="col-12 col-md-3">
+                {/* 4. Style / Customer / Brand */}
+                <div className="col-12 col-md-4">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Style / Customer / Brand
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-light fs-13 text-dark"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={[
+                      stylesInfo && stylesInfo.length > 0 ? stylesInfo.join(', ') : '',
+                      customerBrand ? `(${customerBrand})` : ''
+                    ].filter(Boolean).join(' ') || 'Auto-carried from PO'}
+                    placeholder="Auto-carried from PO"
+                    readOnly
+                  />
+                </div>
+
+                {/* 5. Folding Notation */}
+                <div className="col-12 col-md-4">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Folding Notation (e.g. L100)
                   </label>
                   <input
                     type="text"
-                    className="form-control form-control-sm bg-white fs-13"
+                    className="form-control form-control-sm bg-white fs-13 text-dark"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={foldingNotation}
                     disabled={!isSectionEditable('header')}
-                    onChange={(e) => setFoldingNotation(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFoldingNotation(val);
+                      setItems(prev => prev.map(it => ({
+                        ...it,
+                        folding: (!it.folding || it.folding === foldingNotation) ? val : it.folding
+                      })));
+                    }}
                     placeholder="e.g. L100 / Fold 98"
                   />
+                </div>
+
+                {/* 6. PO Link Status */}
+                <div className="col-12 col-md-4">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    PO Link Status
+                  </label>
+                  <div className="d-flex align-items-center" style={{ height: '38px' }}>
+                    <span className={`badge px-3 py-2 fs-12 fw-bold rounded-2 ${
+                      isEmergencyDispatch
+                        ? 'bg-danger text-white border border-danger shadow-xs'
+                        : selectedPOs.length > 0
+                          ? 'bg-success-subtle text-success border border-success-subtle'
+                          : 'bg-light text-secondary border'
+                    }`}>
+                      {isEmergencyDispatch
+                        ? '⚠ Pending PO Link (Emergency)'
+                        : selectedPOs.length > 0
+                          ? '✓ Linked to PO'
+                          : 'Draft (No PO)'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -624,9 +881,9 @@ export default function ProcessChallanForm({
                       <th style={{ minWidth: '140px' }}>Stock Invoice Ref *</th>
                       <th style={{ minWidth: '160px' }}>Fabric Quality</th>
                       <th style={{ minWidth: '120px' }}>Color Shade</th>
-                      <th style={{ width: '130px' }} className="text-center">Dispatch Mode</th>
+                      <th style={{ width: '160px', minWidth: '155px' }} className="text-center">Dispatch Mode</th>
                       <th style={{ width: '110px' }} className="text-end">Original (m)</th>
-                      <th style={{ width: '130px' }} className="text-end text-primary">Dispatched (m) *</th>
+                      <th style={{ width: '130px' }} className="text-end text-dark">Dispatched (m) *</th>
                       <th style={{ width: '90px' }} className="text-center">Folding</th>
                       {isSectionEditable('items') && <th style={{ width: '40px' }} className="text-center">Act</th>}
                     </tr>
@@ -697,23 +954,23 @@ export default function ProcessChallanForm({
                             />
                           </td>
 
-                          {/* Scenario A vs Scenario B: Full Roll vs Cut Piece */}
-                          <td className="text-center">
-                            <button
-                              type="button"
+                          {/* Dispatch Mode Dropdown: Scenario A vs Scenario B */}
+                          <td className="text-center" style={{ minWidth: '155px' }}>
+                            <select
+                              className={`form-select form-select-sm fs-11 fw-semibold ${it.is_partial_cut ? 'border-warning bg-warning-subtle text-dark' : 'bg-white text-dark'}`}
+                              style={{ borderColor: '#cbd5e1', height: '32px', borderRadius: '5px' }}
+                              value={it.is_partial_cut ? 'cut' : 'full'}
                               disabled={!isSectionEditable('items')}
-                              onClick={() => handleItemFieldChange(idx, 'is_partial_cut', !it.is_partial_cut)}
-                              className={`badge border px-2 py-1 ${it.is_partial_cut
-                                  ? 'bg-warning-subtle text-dark border-warning'
-                                  : 'bg-light text-secondary border'
-                                }`}
-                              style={{ cursor: isSectionEditable('items') ? 'pointer' : 'default', fontSize: '11px' }}
-                              title="Toggle Full Roll (Scenario A) / Cut Piece (Scenario B)"
+                              onChange={(e) => {
+                                const isCut = e.target.value === 'cut';
+                                handleItemFieldChange(idx, 'is_partial_cut', isCut);
+                              }}
                             >
-                              {it.is_partial_cut ? 'Scenario B: Cut Piece' : 'Scenario A: Full Roll'}
-                            </button>
+                              <option value="full">Scenario A: Full Roll</option>
+                              <option value="cut">Scenario B: Cut Piece</option>
+                            </select>
                             {it.is_partial_cut && (
-                              <div className="text-muted fs-10 mt-0.5">Remaining stays in stock</div>
+                              <div className="text-muted mt-0.5" style={{ fontSize: '10px' }}>Remaining stays in stock</div>
                             )}
                           </td>
 
@@ -736,8 +993,8 @@ export default function ProcessChallanForm({
                             <input
                               type="number"
                               step="0.01"
-                              className="form-control form-control-sm text-end fw-bold text-primary fs-12 px-2"
-                              style={{ borderColor: '#3b82f6' }}
+                              className="form-control form-control-sm text-end fw-bold text-dark fs-12 px-2"
+                              style={{ borderColor: '#cbd5e1' }}
                               value={it.dispatched_meters}
                               disabled={!isSectionEditable('items')}
                               onChange={(e) => {
@@ -758,9 +1015,10 @@ export default function ProcessChallanForm({
                               type="text"
                               className="form-control form-control-sm text-center fs-12 px-1"
                               style={{ borderColor: '#cbd5e1' }}
-                              value={it.folding || foldingNotation}
+                              value={it.folding || foldingNotation || ''}
                               disabled={!isSectionEditable('items')}
                               onChange={(e) => handleItemFieldChange(idx, 'folding', e.target.value)}
+                              placeholder="—"
                             />
                           </td>
 
@@ -787,7 +1045,7 @@ export default function ProcessChallanForm({
                       <td colSpan={7} className="text-end text-uppercase text-secondary py-2 fs-12">
                         Grand Total Dispatched:
                       </td>
-                      <td className="text-end text-primary fs-13 py-2">
+                      <td className="text-end text-dark fs-13 py-2">
                         {Number(grandTotalMeters).toFixed(2)} m
                       </td>
                       <td colSpan={isSectionEditable('items') ? 2 : 1} className="text-muted fs-11 py-2 text-center">

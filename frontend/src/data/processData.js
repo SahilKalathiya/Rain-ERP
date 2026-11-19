@@ -162,7 +162,7 @@ export const initialProcessChallans = [
     styles_info: ['Graphic Boota Kurta', 'Stock Cambric Plain'],
     po_link_status: 'Linked',
     admin_alert_triggered: false,
-    folding_notation: 'L100',
+    folding_notation: '',
     total_bales: 1,
     total_pieces: 7,
     grand_total_meters: 2418.80,
@@ -173,13 +173,13 @@ export const initialProcessChallans = [
     created_by: 'Saksham Garg',
     created_at: '2026-08-12T14:30:00Z',
     items: [
-      { id: 1, bale_roll_no: 'Roll 12304', fabric_name: '100x100 Voile (Grey)', color_name: 'Off White', invoice_no: 'INV-MS-0091', original_piece_meters: 1065.50, dispatched_meters: 1065.50, is_partial_cut: false, folding: 'L100' },
-      { id: 2, bale_roll_no: 'Roll 2376-A', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 119.30, dispatched_meters: 119.30, is_partial_cut: false, folding: 'L100' },
-      { id: 3, bale_roll_no: 'Roll 2376-B', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 111.00, dispatched_meters: 111.00, is_partial_cut: false, folding: 'L100' },
-      { id: 4, bale_roll_no: 'Roll 2376-C', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 78.40, dispatched_meters: 78.40, is_partial_cut: false, folding: 'L100' },
-      { id: 5, bale_roll_no: 'Roll 2376-D', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 97.80, dispatched_meters: 97.80, is_partial_cut: false, folding: 'L100' },
-      { id: 6, bale_roll_no: 'Roll 2376-E', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 113.30, dispatched_meters: 113.30, is_partial_cut: false, folding: 'L100' },
-      { id: 7, bale_roll_no: 'Roll 2376-F (Cut)', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 134.00, dispatched_meters: 20.00, is_partial_cut: true, folding: 'L100' }
+      { id: 1, bale_roll_no: 'Roll 12304', fabric_name: '100x100 Voile (Grey)', color_name: 'Off White', invoice_no: 'INV-MS-0091', original_piece_meters: 1065.50, dispatched_meters: 1065.50, is_partial_cut: false, folding: '' },
+      { id: 2, bale_roll_no: 'Roll 2376-A', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 119.30, dispatched_meters: 119.30, is_partial_cut: false, folding: '' },
+      { id: 3, bale_roll_no: 'Roll 2376-B', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 111.00, dispatched_meters: 111.00, is_partial_cut: false, folding: '' },
+      { id: 4, bale_roll_no: 'Roll 2376-C', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 78.40, dispatched_meters: 78.40, is_partial_cut: false, folding: '' },
+      { id: 5, bale_roll_no: 'Roll 2376-D', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 97.80, dispatched_meters: 97.80, is_partial_cut: false, folding: '' },
+      { id: 6, bale_roll_no: 'Roll 2376-E', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 113.30, dispatched_meters: 113.30, is_partial_cut: false, folding: '' },
+      { id: 7, bale_roll_no: 'Roll 2376-F (Cut)', fabric_name: '100x100 Voile (Grey)', color_name: 'Beige', invoice_no: 'INV-MS-0091', original_piece_meters: 134.00, dispatched_meters: 20.00, is_partial_cut: true, folding: '' }
     ]
   }
 ];

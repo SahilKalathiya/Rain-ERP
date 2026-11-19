@@ -439,11 +439,8 @@ export default function ProcessTrackingDashboard({ pos = [], challans = [], retu
                       {/* Order Ref */}
                       <td className="ps-3 py-3">
                         <span
-                          className="badge font-monospace fw-bold px-2 py-1"
+                          className="badge font-monospace fw-bold px-2 py-1 bg-light text-dark border"
                           style={{
-                            background: 'rgba(79, 70, 229, 0.08)',
-                            color: '#4338ca',
-                            border: '1px solid rgba(79, 70, 229, 0.2)',
                             fontSize: '11.5px'
                           }}
                         >

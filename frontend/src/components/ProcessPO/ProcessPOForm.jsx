@@ -668,6 +668,16 @@ export default function ProcessPOForm({
     }
 
     const fullPoId = cleanPoNum.startsWith('PPO-') ? cleanPoNum : `PPO-${cleanPoNum}`;
+
+    let finalStatus = 'Issued';
+    if (andCreateChallan === 'draft') {
+      finalStatus = 'Draft';
+    } else if (andCreateChallan === 'challan' || andCreateChallan === true) {
+      finalStatus = 'Issued';
+    } else {
+      finalStatus = (initialPO?.status && initialPO.status !== 'Draft') ? initialPO.status : 'Issued';
+    }
+
     const payload = {
       id: initialPO?.id || fullPoId,
       po_number: cleanPoNum.replace(/^PPO-/, ''),
@@ -684,14 +694,14 @@ export default function ProcessPOForm({
       total_meters: Number(grandTotalMeters.toFixed(2)),
       total_pieces: grandTotalPieces,
       total_estimated_cost: Number(grandTotalCost.toFixed(2)),
-      status: initialPO?.status || 'Draft',
+      status: finalStatus,
       terms: terms,
       items: items,
       created_by: 'Saksham Garg',
       created_at: initialPO?.created_at || new Date().toISOString()
     };
 
-    onSave(payload, andCreateChallan);
+    onSave(payload, andCreateChallan === true || andCreateChallan === 'challan');
   };
 
   return (
@@ -727,8 +737,10 @@ export default function ProcessPOForm({
                   ) : (
                     <span className={`badge px-2.5 py-1 fs-11 ${
                       initialPO?.status === 'Sent to Vendor'
-                        ? 'bg-primary-subtle text-primary border'
-                        : 'bg-success-subtle text-success border'
+                        ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                        : initialPO?.status === 'Draft'
+                          ? 'bg-light text-secondary border'
+                          : 'bg-success-subtle text-success border border-success-subtle'
                     }`}>
                       {initialPO?.status || 'Draft'}
                     </span>
@@ -772,7 +784,7 @@ export default function ProcessPOForm({
           {!isLocked && isReadOnly && editingSection !== 'header' && (
             <button
               type="button"
-              className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+              className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
               onClick={() => setEditingSection('header')}
             >
               <i className="ti ti-edit me-1"></i> Edit Header
@@ -1026,7 +1038,7 @@ export default function ProcessPOForm({
             {!isLocked && isReadOnly && editingSection !== 'styles' && (
               <button
                 type="button"
-                className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+                className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
                 onClick={() => setEditingSection('styles')}
               >
                 <i className="ti ti-edit me-1"></i> Edit Styles
@@ -1184,7 +1196,7 @@ export default function ProcessPOForm({
                     onClick={handleAddStyleSlot}
                   >
                     <i className="ti ti-plus fs-13"></i>
-                    <span>+ Add Another Style</span>
+                    <span>Add Another Style</span>
                   </button>
                 )}
               </div>
@@ -1354,7 +1366,7 @@ export default function ProcessPOForm({
                           <td>{ordIt.width}"</td>
                           <td className="text-end fw-semibold">{ordIt.requiredMeters.toFixed(2)}</td>
                           <td className="text-end text-success">{ordIt.alreadyReceivedMeters.toFixed(2)}</td>
-                          <td className="text-end fw-bold text-primary">{ordIt.pendingMeters.toFixed(2)}</td>
+                          <td className="text-end fw-bold text-dark">{ordIt.pendingMeters.toFixed(2)}</td>
                           <td className="text-center">
                             {isFullyOrdered ? (
                               <span className="badge bg-secondary-subtle text-secondary border fs-10">
@@ -1423,7 +1435,7 @@ export default function ProcessPOForm({
             {!isLocked && isReadOnly && editingSection !== 'items' && (
               <button
                 type="button"
-                className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+                className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
                 onClick={() => setEditingSection('items')}
               >
                 <i className="ti ti-edit me-1"></i> Edit Items
@@ -1506,7 +1518,7 @@ export default function ProcessPOForm({
                   <th style={{ width: '170px' }}>ARTICLE</th>
                   <th style={{ width: '110px' }}>WIDTH</th>
                   <th style={{ width: '100px' }} className="text-center" title="Consumption per garment piece in metres">CONS (M)</th>
-                  <th style={{ width: '115px' }} className="text-end text-primary">METRES *</th>
+                  <th style={{ width: '115px' }} className="text-end text-dark">METRES *</th>
                   <th style={{ width: '100px' }} className="text-end text-dark">PIECES *</th>
                   <th style={{ width: '100px' }} className="text-end">FAB RATE (₹)</th>
                   <th style={{ width: '105px' }} className="text-end">DYE RATE (₹)</th>
@@ -1580,7 +1592,7 @@ export default function ProcessPOForm({
                             <div className="d-flex align-items-center gap-1 mt-1 text-nowrap">
                               <span className="text-muted fs-11">Style:</span>
                               <select
-                                className="form-select form-select-xs border-0 p-0 fs-11 fw-semibold text-primary bg-transparent"
+                                className="form-select form-select-xs border-0 p-0 fs-11 fw-semibold text-dark bg-transparent"
                                 style={{ outline: 'none', cursor: 'pointer', maxWidth: '140px' }}
                                 value={item.style_name || selectedStyles[0] || ''}
                                 disabled={!isSectionEditable('items')}
@@ -1680,7 +1692,7 @@ export default function ProcessPOForm({
                             type="number"
                             step="any"
                             placeholder="0.00"
-                            className="form-control form-control-sm text-end fw-semibold text-primary bg-white fs-13 w-100"
+                            className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13 w-100"
                             style={{ borderColor: '#cbd5e1', height: '36px' }}
                             value={item.quantity_meters}
                             disabled={!isSectionEditable('items')}
@@ -1791,7 +1803,7 @@ export default function ProcessPOForm({
                     <td colSpan={6} className="text-end text-secondary fs-12 py-2">
                       GRAND TOTALS:
                     </td>
-                    <td className="text-end text-primary fs-13 py-2">
+                    <td className="text-end text-dark fs-13 py-2">
                       {grandTotalMeters.toFixed(2)} m
                     </td>
                     <td className="text-end text-dark fs-13 py-2">
@@ -1823,7 +1835,7 @@ export default function ProcessPOForm({
                   <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: it.color_hex || '#cbd5e1', border: '1px solid #999' }} />
                   <span><strong>{it.color_name || 'Item'}</strong>:</span>
                   <span>{it.fabric_name ? `${it.fabric_name} ${it.width ? `(${it.width}")` : ''}` : '(No Fabric)'}</span>
-                  <span className="text-primary fw-bold">[{it.quantity_meters || 0}m / {it.quantity_pieces || 0}pcs]</span>
+                  <span className="text-dark fw-bold">[{it.quantity_meters || 0}m / {it.quantity_pieces || 0}pcs]</span>
                 </div>
               ))}
             </div>
@@ -1883,17 +1895,30 @@ export default function ProcessPOForm({
             <>
               <button
                 type="button"
-                className="btn btn-primary px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                onClick={() => handleSubmit(false)}
+                className="btn btn-light border px-3.5 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                style={{ borderColor: '#cbd5e1' }}
+                onClick={() => handleSubmit('draft')}
+                title="Save as Draft (keep in draft state, not ready for Challan)"
               >
-                <i className="ti ti-device-floppy fs-15"></i>
-                <span>Save Process PO</span>
+                <i className="ti ti-file-text fs-15 text-muted"></i>
+                <span>Save as Draft</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                onClick={() => handleSubmit('issue')}
+                title="Save & Issue PO (official PO ready for Challan dispatch)"
+              >
+                <i className="ti ti-check fs-15"></i>
+                <span>Save &amp; Issue PO</span>
               </button>
 
               <button
                 type="button"
                 className="btn btn-dark px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                onClick={() => handleSubmit(true)}
+                onClick={() => handleSubmit('challan')}
+                title="Save PO and immediately create Dispatch Challan"
               >
                 <i className="ti ti-truck-delivery fs-15"></i>
                 <span>Save &amp; Create Dispatch Challan</span>

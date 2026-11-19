@@ -328,12 +328,12 @@ export default function ProcessChallanList({
                           className="badge bg-light text-dark border px-2 py-1 font-monospace"
                           style={{ borderColor: '#cbd5e1', fontSize: '11px' }}
                         >
-                          {c.folding_notation || 'L100'}
+                          {c.folding_notation || '—'}
                         </span>
                       </td>
 
                       {/* Dispatched Mtrs */}
-                      <td className="text-end fw-bold fs-14" style={{ color: '#4f46e5' }}>
+                      <td className="text-end fw-bold fs-14 text-dark">
                         {Number(c.grand_total_meters || 0).toFixed(2)} m
                       </td>
 

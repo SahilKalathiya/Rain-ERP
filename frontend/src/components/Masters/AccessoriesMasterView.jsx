@@ -1363,7 +1363,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         >
                           {ACCESSORY_CATEGORIES.map((c) => (
                             <option key={c} value={c}>
-                              {c}
+                              {c}2
                             </option>
                           ))}
                         </select>

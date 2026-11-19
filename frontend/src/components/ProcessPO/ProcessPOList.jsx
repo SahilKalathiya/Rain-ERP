@@ -6,7 +6,7 @@ import React, { useState } from 'react';
  * Screen-fitted responsive table with ZERO horizontal overflow (No left-right scroll)
  * Fully clickable table rows to view/edit record directly
  */
-export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, onCreateChallanFromPO, challans = [] }) {
+export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, onIssuePO, onCreateChallanFromPO, challans = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [vendorFilter, setVendorFilter] = useState('ALL');
@@ -67,6 +67,7 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
             >
               <option value="ALL">All Statuses</option>
               <option value="Draft">Draft</option>
+              <option value="Issued">Issued (Ready for Challan)</option>
               <option value="Sent to Vendor">Sent to Vendor</option>
               <option value="Partially Dispatched">Partially Dispatched</option>
               <option value="Completed">Completed</option>
@@ -113,6 +114,7 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                   if (po.status === 'Sent to Vendor') badgeClass = 'bg-primary-subtle text-primary border border-primary-subtle';
                   if (po.status === 'Partially Dispatched') badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
                   if (po.status === 'Completed') badgeClass = 'bg-success-subtle text-success border border-success-subtle';
+                  if (po.status === 'Issued' || po.status === 'Open' || po.status === 'Approved') badgeClass = 'bg-success-subtle text-success border border-success-subtle';
                   if (po.status === 'Draft') badgeClass = 'bg-light text-secondary border';
 
                   return (
@@ -194,7 +196,26 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                       {/* Actions with stopPropagation */}
                       <td className="text-end" onClick={(e) => e.stopPropagation()}>
                         <div className="d-flex align-items-center justify-content-end gap-1.5">
-                          {!isPoLocked(po) && (
+                          {/* If PO is in Draft: do NOT show +Challan; show Issue PO button instead */}
+                          {!isPoLocked(po) && po.status === 'Draft' && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-success btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs"
+                              style={{
+                                fontSize: '11.5px',
+                                height: '28px',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Issue / Confirm this Process PO so it is ready for dispatch"
+                              onClick={() => onIssuePO && onIssuePO(po)}
+                            >
+                              <i className="ti ti-check fs-13"></i>
+                              <span className="fw-semibold">Issue PO</span>
+                            </button>
+                          )}
+
+                          {/* If PO is Issued / Active and not locked: show +Challan button */}
+                          {!isPoLocked(po) && po.status !== 'Draft' && (
                             <button
                               type="button"
                               className="btn btn-primary btn-sm px-2 py-1 rounded-2 d-flex align-items-center gap-1 shadow-xs"
@@ -225,10 +246,10 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                             type="button"
                             className="btn btn-outline-primary btn-sm p-1 rounded-2"
                             style={{ width: '28px', height: '28px' }}
-                            title={isPoLocked(po) ? "View Locked PO" : "View / Edit PO"}
+                            title={isPoLocked(po) ? "View Locked PO" : (po.status === 'Draft' ? "Edit Draft PO" : "View / Edit PO")}
                             onClick={() => onViewPO(po)}
                           >
-                            <i className={`ti ${isPoLocked(po) ? 'ti-lock-access' : 'ti-eye'} fs-14`}></i>
+                            <i className={`ti ${isPoLocked(po) ? 'ti-lock-access' : (po.status === 'Draft' ? 'ti-pencil' : 'ti-eye')} fs-14`}></i>
                           </button>
                         </div>
                       </td>

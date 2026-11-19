@@ -195,7 +195,7 @@ export default function ProcessPrintModal({ type = 'PO', data, onClose }) {
                   {isChallan ? (
                     <div>
                       <div><span className="text-muted">Linked PO(s):</span> <strong className="text-primary">{Array.isArray(data.linked_pos) ? data.linked_pos.join(', ') : 'PPO-7611, PPO-7612, PPO-7613'}</strong></div>
-                      <div><span className="text-muted">Folding Notation:</span> <strong>{data.folding_notation || 'L100'}</strong></div>
+                      <div><span className="text-muted">Folding Notation:</span> <strong>{data.folding_notation || '—'}</strong></div>
                       <div><span className="text-muted">Total Bales / Rolls:</span> <strong>{data.total_bales || 1} Bale ({data.total_pieces || 7} Pcs)</strong></div>
                     </div>
                   ) : (
@@ -243,7 +243,7 @@ export default function ProcessPrintModal({ type = 'PO', data, onClose }) {
                         <td>{item.fabric_name}</td>
                         <td>{item.color_name}</td>
                         <td>{item.invoice_no || 'INV-MS-0091'}</td>
-                        <td className="text-center">{item.folding || 'L100'}</td>
+                        <td className="text-center">{item.folding || data.folding_notation || '—'}</td>
                         <td className="text-end fw-bold">{Number(item.dispatched_meters || item.meters || 0).toFixed(2)}</td>
                       </tr>
                     ))

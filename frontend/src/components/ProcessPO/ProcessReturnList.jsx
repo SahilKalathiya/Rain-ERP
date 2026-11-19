@@ -142,7 +142,7 @@ export default function ProcessReturnList({
               onClick={onNewReturn}
             >
               <i className="ti ti-plus fs-15"></i>
-              <span>+ Record Inward Return</span>
+              <span>Record Inward Return</span>
             </button>
           </div>
         </div>
@@ -220,9 +220,9 @@ export default function ProcessReturnList({
                       <span
                         className="badge font-monospace fw-bold px-2 py-1.5"
                         style={{
-                          background: 'rgba(79, 70, 229, 0.08)',
-                          color: '#4338ca',
-                          border: '1px solid rgba(79, 70, 229, 0.2)',
+                          background: '#f1f5f9',
+                          color: '#0f172a',
+                          border: '1px solid #cbd5e1',
                           fontSize: '12px'
                         }}
                       >

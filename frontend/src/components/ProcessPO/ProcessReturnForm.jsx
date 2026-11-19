@@ -50,6 +50,65 @@ export default function ProcessReturnForm({
   const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || '');
   const [vendorName, setVendorName] = useState(initialReturn?.vendor_name || '');
 
+  // Vendor Master & Dynamic Harvest
+  const loadVendorsFromMaster = () => {
+    const list = [];
+    const names = new Set();
+
+    try {
+      const s = localStorage.getItem('raindrop_vendors_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(v => {
+            const vName = v.name || v.vendor_name;
+            if (vName && !names.has(vName)) {
+              names.add(vName);
+              list.push({ id: v.id || vName, name: vName, city: v.city || '' });
+            }
+          });
+        }
+      }
+    } catch (e) { }
+
+    (availablePOs || []).forEach(p => {
+      const vName = p.vendor_name;
+      if (vName && !names.has(vName)) {
+        names.add(vName);
+        list.push({ id: p.vendor_id || vName, name: vName, city: '' });
+      }
+    });
+
+    (availableChallans || []).forEach(c => {
+      const vName = c.vendor_name;
+      if (vName && !names.has(vName)) {
+        names.add(vName);
+        list.push({ id: c.vendor_id || vName, name: vName, city: '' });
+      }
+    });
+
+    initialVendors.forEach(v => {
+      if (v.name && !names.has(v.name)) {
+        names.add(v.name);
+        list.push(v);
+      }
+    });
+
+    if (list.length === 0) {
+      ['Raju Dyeing (Krishna Dyeing)', 'Surat Rayon & Silk Mills', 'Sahil Ka', 'Sahil Po', 'N'].forEach((n, idx) => {
+        list.push({ id: `VEND-000${idx + 1}`, name: n, city: 'Surat' });
+      });
+    }
+
+    return list;
+  };
+
+  const [vendorList, setVendorList] = useState(loadVendorsFromMaster);
+
+  useEffect(() => {
+    setVendorList(loadVendorsFromMaster());
+  }, [availablePOs, availableChallans]);
+
   const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '');
   const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || new Date().toISOString().split('T')[0]);
   const [vendorInvoiceNo, setVendorInvoiceNo] = useState(initialReturn?.vendor_invoice_no || '');
@@ -152,6 +211,11 @@ export default function ProcessReturnForm({
   const handleSubmit = (e, andRunQC = false) => {
     if (e && e.preventDefault) e.preventDefault();
 
+    if (!vendorName && !vendorId) {
+      alert("Please select a Vendor (Job Worker) or link a Process PO.");
+      return;
+    }
+
     if (!externalChallanNo) {
       alert("Please enter the Vendor's External Challan Number (e.g. #2196).");
       return;
@@ -166,7 +230,7 @@ export default function ProcessReturnForm({
 
     const returnPayload = {
       id: initialReturn?.id || `PRN-${externalChallanNo}`,
-      vendor_id: vendorId,
+      vendor_id: vendorId || vendorName,
       vendor_name: vendorName,
       vendor_external_challan_no: externalChallanNo,
       vendor_challan_date: externalChallanDate,
@@ -198,12 +262,13 @@ export default function ProcessReturnForm({
       created_at: initialReturn?.created_at || new Date().toISOString(),
       pieces: pieces.map(p => ({
         ...p,
+        folding: p.folding || foldingStandard || '',
         meters: parseFloat(p.meters) || 0,
         qc_status: p.qc_status || 'Pending'
       }))
     };
 
-    onSave(returnPayload);
+    onSave(returnPayload, andRunQC);
   };
 
   const isSectionEditable = (sectionKey) => {
@@ -238,7 +303,7 @@ export default function ProcessReturnForm({
             <div className="text-muted fs-12 mt-0.5 d-flex align-items-center gap-2">
               <span>Vendor physical challan entry</span>
               <span>•</span>
-              <span className="fw-semibold text-primary">{vendorName || 'Vendor Assignment'}</span>
+              <span className="fw-semibold text-dark">{vendorName || 'Vendor Assignment'}</span>
             </div>
           </div>
         </div>
@@ -276,7 +341,7 @@ export default function ProcessReturnForm({
               {isReadOnly && editingSection !== 'header' && (
                 <button
                   type="button"
-                  className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+                  className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
                   onClick={() => setEditingSection('header')}
                 >
                   <i className="ti ti-edit me-1"></i> Edit Header
@@ -302,18 +367,24 @@ export default function ProcessReturnForm({
                   <select
                     className="form-select form-select-sm bg-white fs-13 fw-semibold text-dark"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={vendorId}
+                    value={vendorName || vendorId || ''}
                     disabled={!isSectionEditable('header')}
                     onChange={(e) => {
-                      setVendorId(e.target.value);
-                      const v = initialVendors.find(vend => vend.id === e.target.value);
-                      if (v) setVendorName(v.name);
+                      const chosen = e.target.value;
+                      setVendorName(chosen);
+                      const v = vendorList.find(vend => vend.name === chosen || vend.id === chosen);
+                      if (v) {
+                        setVendorId(v.id || v.name);
+                        setVendorName(v.name);
+                      } else {
+                        setVendorId(chosen);
+                      }
                     }}
                     required
                   >
                     <option value="">Select Vendor...</option>
-                    {initialVendors.map(v => (
-                      <option key={v.id} value={v.id}>{v.name} ({v.city})</option>
+                    {vendorList.map(v => (
+                      <option key={v.id || v.name} value={v.name}>{v.name} {v.city ? `(${v.city})` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -324,7 +395,7 @@ export default function ProcessReturnForm({
                   </label>
                   <input
                     type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-primary font-monospace"
+                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={externalChallanNo}
                     disabled={!isSectionEditable('header')}
@@ -372,8 +443,10 @@ export default function ProcessReturnForm({
                       if (val) {
                         const poObj = availablePOs.find(p => String(p.po_number) === String(val) || String(p.id) === String(val));
                         if (poObj) {
-                          if (poObj.vendor_id) setVendorId(poObj.vendor_id);
-                          if (poObj.vendor_name) setVendorName(poObj.vendor_name);
+                          if (poObj.vendor_name) {
+                            setVendorName(poObj.vendor_name);
+                            setVendorId(poObj.vendor_id || poObj.vendor_name);
+                          }
                           if (poObj.fabric_quality || poObj.items?.[0]?.fabric_name) {
                             setFabricQuality(poObj.fabric_quality || poObj.items?.[0]?.fabric_name);
                           }
@@ -381,10 +454,10 @@ export default function ProcessReturnForm({
                       }
                     }}
                   >
-                    <option value="">-- Select Linked PO --</option>
+                    <option value="">-- Select Linked PO by Vendor Name --</option>
                     {availablePOs.map(po => (
                       <option key={po.id || po.po_number} value={po.po_number || po.id}>
-                        PO #{po.po_number || po.id} ({po.vendor_name})
+                        {po.vendor_name || 'Vendor'} — PO #{po.po_number || po.id} ({po.total_meters}m)
                       </option>
                     ))}
                   </select>
@@ -403,22 +476,28 @@ export default function ProcessReturnForm({
                       if (val) {
                         const chObj = availableChallans.find(c => String(c.challan_number) === String(val) || String(c.id) === String(val));
                         if (chObj) {
-                          if (chObj.vendor_id) setVendorId(chObj.vendor_id);
-                          if (chObj.vendor_name) setVendorName(chObj.vendor_name);
+                          if (chObj.vendor_name) {
+                            setVendorName(chObj.vendor_name);
+                            setVendorId(chObj.vendor_id || chObj.vendor_name);
+                          }
                           if (chObj.items?.[0]?.fabric_name) {
                             setFabricQuality(chObj.items[0].fabric_name);
                           }
                           if (chObj.folding_notation) {
                             setFoldingStandard(chObj.folding_notation);
+                            setPieces(prev => prev.map(p => ({
+                              ...p,
+                              folding: p.folding || chObj.folding_notation
+                            })));
                           }
                         }
                       }
                     }}
                   >
-                    <option value="">-- Select Challan --</option>
+                    <option value="">-- Select Linked Challan by Vendor Name --</option>
                     {availableChallans.map(ch => (
                       <option key={ch.id || ch.challan_number} value={ch.challan_number || ch.id}>
-                        CH #{ch.challan_number || ch.id} ({ch.vendor_name})
+                        {ch.vendor_name || 'Vendor'} — CH #{ch.challan_number || ch.id}
                       </option>
                     ))}
                   </select>
@@ -482,14 +561,14 @@ export default function ProcessReturnForm({
                     onClick={addPieceRow}
                   >
                     <i className="ti ti-plus fs-14"></i>
-                    <span>+ Add Piece / Than</span>
+                    <span>Add Piece / Than</span>
                   </button>
                 )}
 
                 {isReadOnly && editingSection !== 'pieces' && (
                   <button
                     type="button"
-                    className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+                    className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
                     onClick={() => setEditingSection('pieces')}
                   >
                     <i className="ti ti-edit me-1"></i> Edit Pieces
@@ -533,7 +612,7 @@ export default function ProcessReturnForm({
                     <input
                       type="number"
                       step="0.01"
-                      className="form-control form-control-sm bg-white fs-13 text-end fw-bold text-primary"
+                      className="form-control form-control-sm bg-white fs-13 text-end fw-bold text-dark"
                       style={{ width: '160px', height: '36px', borderColor: '#cbd5e1' }}
                       value={vendorDeclaredMeters}
                       disabled={!isSectionEditable('pieces')}
@@ -571,7 +650,7 @@ export default function ProcessReturnForm({
                       <th className="text-center" style={{ width: '40px' }}>Than #</th>
                       <th style={{ minWidth: '150px' }}>Color Shade</th>
                       <th style={{ width: '140px' }}>Folding</th>
-                      <th style={{ width: '160px' }} className="text-end text-primary">Length (Metres) *</th>
+                      <th style={{ width: '160px' }} className="text-end text-dark">Length (Metres) *</th>
                       <th style={{ width: '130px' }} className="text-center">QC Status</th>
                       {isSectionEditable('pieces') && <th style={{ width: '45px' }} className="text-center">Act</th>}
                     </tr>
@@ -664,7 +743,7 @@ export default function ProcessReturnForm({
                       <td colSpan={3} className="text-end text-uppercase text-secondary py-2 fs-12">
                         Total Recorded Pieces &amp; Metres:
                       </td>
-                      <td className="text-end text-primary fs-13 py-2">
+                      <td className="text-end text-dark fs-13 py-2">
                         {Number(calculatedTotalMeters).toFixed(2)} m
                       </td>
                       <td colSpan={isSectionEditable('pieces') ? 2 : 1} className="text-muted fs-11 py-2 text-center">
@@ -695,7 +774,7 @@ export default function ProcessReturnForm({
               {isReadOnly && editingSection !== 'grey' && (
                 <button
                   type="button"
-                  className="btn btn-light btn-sm border text-primary px-2.5 py-1 rounded fs-12 fw-semibold"
+                  className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
                   onClick={() => setEditingSection('grey')}
                 >
                   <i className="ti ti-edit me-1"></i> Edit Grey Return
@@ -739,7 +818,7 @@ export default function ProcessReturnForm({
                     {isSectionEditable('grey') && (
                       <button
                         type="button"
-                        className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
+                        className="btn btn-link btn-sm p-0 text-dark text-decoration-none fs-11"
                         onClick={() => setIsManualInvoiceOverride(!isManualInvoiceOverride)}
                       >
                         {isManualInvoiceOverride ? 'Switch to Auto-Assign' : 'Manual Override'}
@@ -863,7 +942,11 @@ export default function ProcessReturnForm({
             </button>
             {!isReadOnly && (
               <>
-                <button type="submit" className="btn btn-outline-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5">
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
+                  onClick={(e) => handleSubmit(e, false)}
+                >
                   <i className="ti ti-device-floppy fs-14"></i>
                   <span>Save Inbound Return</span>
                 </button>

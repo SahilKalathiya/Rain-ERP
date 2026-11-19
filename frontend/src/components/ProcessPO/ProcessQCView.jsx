@@ -110,7 +110,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
 
     const payload = {
       id: selectedPiece.id || `PQC-${Date.now().toString().slice(-4)}`,
-      return_id: 'PRN-2196',
+      return_id: selectedPiece.return_id || 'PRN-2196',
       piece_no: selectedPiece.piece_no,
       original_length: selectedPiece.original_length,
       qc_outcome: finalOutcome,
@@ -238,7 +238,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                   }}
                 >
                   <i className="ti ti-plus fs-15"></i>
-                  <span>+ Inspect New Than</span>
+                  <span>Inspect New Than</span>
                 </button>
               </div>
             </div>
@@ -265,19 +265,27 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
             </div>
 
             <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
+              <style>{`
+                .qc-no-hover-table tbody tr td {
+                  background-color: #ffffff !important;
+                }
+                .qc-no-hover-table tbody tr:hover td {
+                  background-color: #ffffff !important;
+                }
+              `}</style>
+              <table className="table align-middle mb-0 qc-no-hover-table" style={{ width: '100%', fontSize: '12.5px', tableLayout: 'auto' }}>
                 <thead style={{ background: '#f8fafc' }}>
-                  <tr style={{ color: '#475569', fontSize: '11.5px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    <th className="py-2.5 ps-3" style={{ width: '120px' }}>QC ID</th>
-                    <th style={{ width: '120px' }}>Than (Piece)</th>
-                    <th style={{ width: '110px' }}>Length (m)</th>
-                    <th style={{ width: '130px' }}>QC Outcome</th>
-                    <th style={{ minWidth: '170px' }}>Division / Batch</th>
-                    <th style={{ width: '110px' }}>Garment Yield</th>
-                    <th style={{ width: '120px' }}>Fastness Rub</th>
-                    <th style={{ width: '130px' }}>Inspector</th>
-                    <th style={{ minWidth: '180px' }}>Notes</th>
-                    <th className="text-end pe-3" style={{ width: '120px' }}>Actions</th>
+                  <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    <th className="py-2.5 ps-3" style={{ width: '85px' }}>QC ID</th>
+                    <th style={{ width: '95px' }}>Than (Piece)</th>
+                    <th style={{ width: '85px' }}>Length (m)</th>
+                    <th style={{ width: '115px' }}>QC Outcome</th>
+                    <th style={{ width: '125px' }}>Division / Batch</th>
+                    <th style={{ width: '85px' }}>Garment Yield</th>
+                    <th style={{ width: '80px' }}>Fastness Rub</th>
+                    <th style={{ width: '100px' }}>Inspector</th>
+                    <th style={{ minWidth: '160px' }}>Notes</th>
+                    <th className="text-end pe-3" style={{ width: '85px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -303,18 +311,17 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                         onClick={() => handleOpenPieceQC(q)}
                         style={{
                           cursor: 'pointer',
-                          transition: 'background-color 0.15s ease'
+                          backgroundColor: '#ffffff'
                         }}
-                        title="Click anywhere to inspect or edit this piece"
                       >
                         {/* QC ID */}
                         <td className="ps-3 py-3">
                           <span
                             className="badge font-monospace fw-bold px-2 py-1.5"
                             style={{
-                              background: 'rgba(79, 70, 229, 0.08)',
-                              color: '#4338ca',
-                              border: '1px solid rgba(79, 70, 229, 0.2)',
+                              background: '#f1f5f9',
+                              color: '#0f172a',
+                              border: '1px solid #cbd5e1',
                               fontSize: '12px'
                             }}
                           >
@@ -329,7 +336,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                         </td>
 
                         {/* Length */}
-                        <td className="fw-semibold text-primary fs-13">
+                        <td className="fw-semibold text-dark fs-13">
                           {Number(q.original_length).toFixed(2)} m
                         </td>
 
@@ -425,8 +432,17 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                         </td>
 
                         {/* Notes */}
-                        <td className="text-muted fs-12 text-truncate" style={{ maxWidth: '220px' }}>
-                          {q.notes || '-'}
+                        <td
+                          className="fs-12"
+                          style={{
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word',
+                            minWidth: '160px',
+                            color: '#334155',
+                            lineHeight: '1.4'
+                          }}
+                        >
+                          {q.notes || <span className="text-muted">-</span>}
                         </td>
 
                         {/* Actions */}
@@ -492,8 +508,8 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
             </div>
 
             <span
-              className="badge px-3 py-1.5 rounded-pill fw-semibold fs-12"
-              style={{ background: 'rgba(79, 70, 229, 0.1)', color: '#4338ca', border: '1px solid rgba(79, 70, 229, 0.2)' }}
+              className="badge px-3 py-1.5 rounded-pill fw-semibold fs-12 bg-light text-dark border"
+              style={{ borderColor: '#cbd5e1' }}
             >
               <i className="ti ti-user-check me-1"></i> Inspector: Priya Sharma
             </span>
@@ -655,7 +671,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                           onChange={() => setDivisionType('Piece Division')}
                         />
                         <label className="form-check-label ms-2" htmlFor="divPiece">
-                          <strong className="text-primary d-block fs-13">Piece Division (Stitch Cuts)</strong>
+                          <strong className="text-dark d-block fs-13">Piece Division (Stitch Cuts)</strong>
                           <small className="text-muted fs-11">Split join e.g. 63.1m → 30m + 33.1m</small>
                         </label>
                       </div>
@@ -811,7 +827,7 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                   </label>
                   <input
                     type="number"
-                    className="form-control form-control-sm fw-bold text-primary fs-13"
+                    className="form-control form-control-sm fw-bold text-dark fs-13"
                     style={{ borderColor: '#cbd5e1', height: '36px', borderRadius: '6px' }}
                     value={adjustedYield}
                     placeholder="Enter yield pcs"
@@ -826,11 +842,10 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
                   </label>
                   <div className="d-flex gap-2">
                     <select
-                      className={`form-select form-select-sm fw-bold fs-13 ${
-                        colorFastness === 'Pass' ? 'text-success border-success' :
-                        colorFastness === 'Fail' ? 'text-danger border-danger' :
-                        'text-secondary'
-                      }`}
+                      className={`form-select form-select-sm fw-bold fs-13 ${colorFastness === 'Pass' ? 'text-success border-success' :
+                          colorFastness === 'Fail' ? 'text-danger border-danger' :
+                            'text-secondary'
+                        }`}
                       style={{ height: '36px', borderRadius: '6px', borderColor: '#cbd5e1' }}
                       value={colorFastness}
                       onChange={(e) => {
