@@ -97,7 +97,7 @@ export function getVendorTypes(vendor) {
  * e.g. 'dyeing' matches 'Dyeing', 'Processing', 'Dyeing & Printing'
  */
 export function vendorMatchesType(vendor, targetType) {
-  if (!targetType || targetType === 'All' || targetType === '*') return true;
+  if (!targetType || targetType === 'All' || targetType === '*' || targetType === 'All Processes' || targetType === 'All Job Work Processes') return true;
   if (!vendor) return false;
 
   const vendorTypes = getVendorTypes(vendor);

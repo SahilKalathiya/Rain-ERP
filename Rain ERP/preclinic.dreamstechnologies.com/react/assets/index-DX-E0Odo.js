@@ -15533,7 +15533,7 @@
     return deduped;
   }
   function vendorMatchesType(vendor, targetType) {
-    if (!targetType || targetType === "All" || targetType === "*") return true;
+    if (!targetType || targetType === "All" || targetType === "*" || targetType === "All Processes" || targetType === "All Job Work Processes") return true;
     if (!vendor) return false;
     const vendorTypes = getVendorTypes(vendor);
     if (vendorTypes.length === 0) return false;
@@ -15823,14 +15823,14 @@
       });
       return list;
     }, [vendors]);
-    const [showAllVendors, setShowAllVendors2] = (0, import_react4.useState)(false);
+    const [showAllVendors, setShowAllVendors] = (0, import_react4.useState)(false);
     const targetCategoryType = config.categoryName;
     const displayedVendors = (0, import_react4.useMemo)(() => {
       if (showAllVendors) return allVendors;
       const filtered = allVendors.filter(
         (v) => vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
       );
-      return filtered.length > 0 ? filtered : allVendors;
+      return filtered;
     }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
     const orderArticles = (0, import_react4.useMemo)(() => {
       if (Array.isArray(order?.articles) && order.articles.length > 0) {
@@ -16248,7 +16248,7 @@
               "button",
               {
                 type: "button",
-                onClick: () => setShowAllVendors2((prev) => !prev),
+                onClick: () => setShowAllVendors((prev) => !prev),
                 style: {
                   background: "none",
                   border: "none",
@@ -16277,8 +16277,11 @@
                   color: "#1e293b"
                 }
               },
-              /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, "-- Select ", config.categoryName, " Vendor --"),
-              displayedVendors.map((v) => /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 ", v.type || "Supplier"))
+              /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, displayedVendors.length === 0 ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --` : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`),
+              displayedVendors.map((v) => {
+                const vTypes = getVendorTypes(v);
+                return /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 [", vTypes.length > 0 ? vTypes.join(", ") : v.type || "Supplier", "]");
+              })
             )),
             /* @__PURE__ */ import_react4.default.createElement(
               "button",
@@ -16597,14 +16600,14 @@
       });
       return list;
     }, [vendors]);
-    const [showAllVendors, setShowAllVendors2] = (0, import_react4.useState)(false);
+    const [showAllVendors, setShowAllVendors] = (0, import_react4.useState)(false);
     const targetCategoryType = config.categoryName;
     const displayedVendors = (0, import_react4.useMemo)(() => {
       if (showAllVendors) return allVendors;
       const filtered = allVendors.filter(
         (v) => vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
       );
-      return filtered.length > 0 ? filtered : allVendors;
+      return filtered;
     }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
     const orderArticles = (0, import_react4.useMemo)(() => {
       if (Array.isArray(order?.articles) && order.articles.length > 0) {
@@ -16913,7 +16916,7 @@
           "button",
           {
             type: "button",
-            onClick: () => setShowAllVendors2((prev) => !prev),
+            onClick: () => setShowAllVendors((prev) => !prev),
             style: {
               background: "none",
               border: "none",
@@ -16941,8 +16944,11 @@
               color: "#1e293b"
             }
           },
-          /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, "-- Select ", config.categoryName, " Vendor --"),
-          displayedVendors.map((v) => /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 ", v.type || "Supplier"))
+          /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, displayedVendors.length === 0 ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --` : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`),
+          displayedVendors.map((v) => {
+            const vTypes = getVendorTypes(v);
+            return /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 [", vTypes.length > 0 ? vTypes.join(", ") : v.type || "Supplier", "]");
+          })
         ))), /* @__PURE__ */ import_react4.default.createElement("div", { style: { border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden", backgroundColor: "#ffffff" } }, /* @__PURE__ */ import_react4.default.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "13px" } }, /* @__PURE__ */ import_react4.default.createElement("thead", null, /* @__PURE__ */ import_react4.default.createElement("tr", { style: { backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 14px", textAlign: "left", fontSize: "12px", color: "#475569" } }, "Article"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "No. of Garments"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Tassels/Pc"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total Required"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra Qty"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#b45309", backgroundColor: "#fef3c7" } }, "Total PO Qty"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Colour"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Rate"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#b45309", backgroundColor: "#fef3c7" } }, "Total Value"))), /* @__PURE__ */ import_react4.default.createElement("tbody", null, items.map((row, idx) => /* @__PURE__ */ import_react4.default.createElement("tr", { key: idx, style: { borderBottom: "1px solid #f1f5f9" } }, /* @__PURE__ */ import_react4.default.createElement("td", { style: { padding: "10px 14px", fontWeight: 600, color: "#1e293b" } }, row.articleName), /* @__PURE__ */ import_react4.default.createElement("td", { style: { padding: "10px 12px", textAlign: "center" } }, /* @__PURE__ */ import_react4.default.createElement(
           "input",
           {
@@ -17080,14 +17086,14 @@
       });
       return list;
     }, [vendors]);
-    const [showAllVendors, setShowAllVendors2] = (0, import_react4.useState)(false);
+    const [showAllVendors, setShowAllVendors] = (0, import_react4.useState)(false);
     const targetCategoryType = config.categoryName;
     const displayedVendors = (0, import_react4.useMemo)(() => {
       if (showAllVendors) return allVendors;
       const filtered = allVendors.filter(
         (v) => vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
       );
-      return filtered.length > 0 ? filtered : allVendors;
+      return filtered;
     }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
     const orderArticles = (0, import_react4.useMemo)(() => {
       if (Array.isArray(order?.articles) && order.articles.length > 0) {
@@ -17347,7 +17353,7 @@
           "button",
           {
             type: "button",
-            onClick: () => setShowAllVendors2((prev) => !prev),
+            onClick: () => setShowAllVendors((prev) => !prev),
             style: {
               background: "none",
               border: "none",
@@ -17375,8 +17381,11 @@
               color: "#1e293b"
             }
           },
-          /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, "-- Select ", config.categoryName, " Vendor --"),
-          displayedVendors.map((v) => /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 ", v.type || "Supplier"))
+          /* @__PURE__ */ import_react4.default.createElement("option", { value: "" }, displayedVendors.length === 0 ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --` : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`),
+          displayedVendors.map((v) => {
+            const vTypes = getVendorTypes(v);
+            return /* @__PURE__ */ import_react4.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", " \u2014 [", vTypes.length > 0 ? vTypes.join(", ") : v.type || "Supplier", "]");
+          })
         ))), /* @__PURE__ */ import_react4.default.createElement("div", { style: { border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden", backgroundColor: "#ffffff" } }, /* @__PURE__ */ import_react4.default.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "13px" } }, /* @__PURE__ */ import_react4.default.createElement("thead", null, /* @__PURE__ */ import_react4.default.createElement("tr", { style: { backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 14px", textAlign: "left", fontSize: "12px", color: "#475569" } }, "Article"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Garments"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "m/Pc"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Total m"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Box Size (m)"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Boxes Req"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Extra Boxes"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#e11d48", backgroundColor: "#ffe4e6" } }, "Total Boxes"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "left", fontSize: "12px", color: "#475569" } }, "Brand / Colour #"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#475569" } }, "Rate/Box"), /* @__PURE__ */ import_react4.default.createElement("th", { style: { padding: "10px 12px", textAlign: "center", fontSize: "12px", color: "#e11d48", backgroundColor: "#ffe4e6" } }, "Total Value"))), /* @__PURE__ */ import_react4.default.createElement("tbody", null, items.map((row, idx) => /* @__PURE__ */ import_react4.default.createElement("tr", { key: idx, style: { borderBottom: "1px solid #f1f5f9" } }, /* @__PURE__ */ import_react4.default.createElement("td", { style: { padding: "10px 14px", fontWeight: 600, color: "#1e293b" } }, row.articleName), /* @__PURE__ */ import_react4.default.createElement("td", { style: { padding: "10px 12px", textAlign: "center" } }, /* @__PURE__ */ import_react4.default.createElement(
           "input",
           {
@@ -18643,6 +18652,19 @@
       };
       const updatedHistory = [newHistoryEntry, ...orderHistory];
       setOrderHistory(updatedHistory);
+      const updatedArticles = Array.isArray(order.articles) ? order.articles.map((art) => {
+        const artName = art.name;
+        const updatedFabrics = Array.isArray(art.fabrics) ? art.fabrics.map((f) => {
+          const matchRow = consumptionRows.find(
+            (r) => (r.articleName || "").toLowerCase() === (artName || "").toLowerCase() && (!f.fabricQuality || (r.fabricQuality || "").toLowerCase() === (f.fabricQuality || "").toLowerCase())
+          );
+          if (matchRow && matchRow.width) {
+            return { ...f, width: matchRow.width };
+          }
+          return f;
+        }) : art.fabrics;
+        return { ...art, fabrics: updatedFabrics };
+      }) : order.articles;
       const updatedOrder = {
         ...order,
         status: newStatus,
@@ -18651,6 +18673,10 @@
         draftStep: isDraft ? "detail" : null,
         accessories: addedAccessories,
         fabricConsumptions: consumptionRows,
+        articles: updatedArticles,
+        widthDyedRates,
+        groupSelectedWidths,
+        groupPoWidths,
         articleSourcing,
         history: updatedHistory
       };
@@ -19077,12 +19103,19 @@
           const artFab = (art.fabrics || []).find((f) => (f.fabricQuality || f.fabricName || "").toLowerCase() === (fc.fabricQuality || "").toLowerCase()) || art.fabrics?.[0] || {};
           const fabQuality = fc.fabricQuality || fc.fabricName || artFab.fabricQuality || artFab.fabricName || artFab.quality || art.fabricQuality || "";
           let initialWidth = "";
-          if (fc._userSelectedWidth) {
+          if (fc.width && fc.width !== "\u2014") {
             initialWidth = resolveWidth(fc.width);
           } else if (resolveWidth(artFab.width)) {
             initialWidth = resolveWidth(artFab.width);
-          } else if (resolveWidth(fc.width) && resolveWidth(fc.width) !== '44"' && resolveWidth(fc.width) !== '47"') {
-            initialWidth = resolveWidth(fc.width);
+          }
+          if (!initialWidth && order?.groupSelectedWidths && typeof order.groupSelectedWidths === "object") {
+            const k = `${artName}___${fabQuality}___${fc.role || ""}`;
+            const gw = order.groupSelectedWidths[k];
+            if (Array.isArray(gw) && gw[0]) {
+              initialWidth = resolveWidth(gw[0]);
+            } else if (typeof gw === "string" && gw) {
+              initialWidth = resolveWidth(gw);
+            }
           }
           const masterShrink = getFabricMasterShrinkage(fabQuality);
           const shrink = masterShrink;
@@ -19420,11 +19453,26 @@
         const pcs = parseInt(r.pcs, 10) || 0;
         return sum + greigeRate * pcs;
       }, 0);
+      const updatedArticles = Array.isArray(order.articles) ? order.articles.map((art) => {
+        const artName = art.name;
+        const updatedFabrics = Array.isArray(art.fabrics) ? art.fabrics.map((f) => {
+          const matchRow = consumptionRows.find(
+            (r) => (r.articleName || "").toLowerCase() === (artName || "").toLowerCase() && (!f.fabricQuality || (r.fabricQuality || "").toLowerCase() === (f.fabricQuality || "").toLowerCase())
+          );
+          if (matchRow && matchRow.width) {
+            return { ...f, width: matchRow.width };
+          }
+          return f;
+        }) : art.fabrics;
+        return { ...art, fabrics: updatedFabrics };
+      }) : order.articles;
       const updatedOrder = {
         ...order,
         fabricConsumptions: consumptionRows,
+        articles: updatedArticles,
         widthDyedRates,
         groupSelectedWidths,
+        groupPoWidths,
         accessories: addedAccessories,
         totalFabricGreige: parseFloat(totalGreigeCalculated.toFixed(1)) || order.totalFabricGreige || 0,
         totalFabricDyed: parseFloat(totalDyedCalculated.toFixed(1)) || order.totalFabricDyed || 0,
@@ -19459,6 +19507,9 @@
       }
       if (order?.groupSelectedWidths && typeof order.groupSelectedWidths === "object") {
         setGroupSelectedWidths({ ...order.groupSelectedWidths });
+      }
+      if (order?.groupPoWidths && typeof order.groupPoWidths === "object") {
+        setGroupPoWidths({ ...order.groupPoWidths });
       }
       setIsConsumptionEditing(false);
       setShowRateCalculation(false);
@@ -19531,6 +19582,20 @@
       });
       return initial;
     });
+    const [groupPoWidths, setGroupPoWidths] = (0, import_react5.useState)(() => {
+      const initial = {};
+      if (order?.groupPoWidths && typeof order.groupPoWidths === "object") {
+        Object.assign(initial, order.groupPoWidths);
+      }
+      const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
+      rows.forEach((r) => {
+        const k = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}`;
+        if (!initial[k] && r.width && r.width !== "\u2014") {
+          initial[k] = r.width;
+        }
+      });
+      return initial;
+    });
     const [activeWidthDropdownKey, setActiveWidthDropdownKey] = (0, import_react5.useState)(null);
     const [widthDropdownPos, setWidthDropdownPos] = (0, import_react5.useState)(null);
     const [activeWidthGroupData, setActiveWidthGroupData] = (0, import_react5.useState)(null);
@@ -19554,13 +19619,77 @@
     const getSelectedWidthsForGroup = (grp, options = []) => {
       const k = `${grp.articleName}___${grp.fabricQuality || ""}___${grp.role || ""}`;
       const stored = groupSelectedWidths[k];
-      if (Array.isArray(stored)) {
+      if (!isConsumptionEditing) {
+        if (groupPoWidths[k] && groupPoWidths[k] !== "\u2014") {
+          return [groupPoWidths[k]];
+        }
+        if (Array.isArray(stored) && stored.length > 0) {
+          return [stored[0]];
+        }
+        if (grp.width && grp.width !== "\u2014") {
+          return [grp.width];
+        }
+        return [];
+      }
+      if (Array.isArray(stored) && stored.length > 0) {
         return stored;
+      }
+      if (groupPoWidths[k] && groupPoWidths[k] !== "\u2014") {
+        return [groupPoWidths[k]];
       }
       if (grp.width && grp.width !== "\u2014" && (options.length === 0 || options.includes(grp.width))) {
         return [grp.width];
       }
       return [];
+    };
+    const getPOWidthForGroup = (grp, selectedWidths = []) => {
+      const k = `${grp.articleName}___${grp.fabricQuality || ""}___${grp.role || ""}`;
+      if (groupPoWidths[k]) {
+        return groupPoWidths[k];
+      }
+      if (selectedWidths.length > 0) {
+        return selectedWidths[0];
+      }
+      if (grp.width && grp.width !== "\u2014") {
+        return grp.width;
+      }
+      return "";
+    };
+    const handleSetPOWidthForGroup = (artName, fabricQuality, role, targetWidth) => {
+      const cleanWidth = targetWidth === "\u2014" ? "" : targetWidth;
+      const k = `${artName}___${fabricQuality || ""}___${role || ""}`;
+      setGroupPoWidths((prev) => ({
+        ...prev,
+        [k]: cleanWidth
+      }));
+      if (cleanWidth) {
+        setGroupSelectedWidths((prev) => {
+          const cur = prev[k] || [];
+          if (!cur.includes(cleanWidth)) {
+            return { ...prev, [k]: [...cur, cleanWidth] };
+          }
+          return prev;
+        });
+      }
+      const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${cleanWidth}`;
+      const storedRate = widthDyedRates[rateKey];
+      setConsumptionRows((prev) => prev.map((r) => {
+        const matchArt = r.articleName === artName;
+        const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
+        const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
+        if (matchArt && matchFab && matchRole) {
+          const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
+          return {
+            ...r,
+            width: cleanWidth,
+            poWidth: cleanWidth,
+            selectedWidth: cleanWidth,
+            dyedRate: nextDyed,
+            _userSelectedWidth: Boolean(cleanWidth)
+          };
+        }
+        return r;
+      }));
     };
     const handleToggleGroupWidth = (artName, fabricQuality, role, targetWidth, options) => {
       const cleanWidth = targetWidth === "\u2014" ? "" : targetWidth;
@@ -19584,13 +19713,21 @@
       } else {
         nextList = [...currentList, cleanWidth];
       }
-      const primaryW = nextList[0] || "";
-      const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${primaryW}`;
-      const storedRate = widthDyedRates[rateKey];
       setGroupSelectedWidths((prev) => ({
         ...prev,
         [k]: nextList
       }));
+      const curPO = groupPoWidths[k];
+      let newPO = curPO;
+      if (!nextList.includes(curPO)) {
+        newPO = nextList[0] || "";
+        setGroupPoWidths((prev) => ({
+          ...prev,
+          [k]: newPO
+        }));
+      }
+      const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${newPO}`;
+      const storedRate = widthDyedRates[rateKey];
       setConsumptionRows((prevRows) => prevRows.map((r) => {
         const matchArt = r.articleName === artName;
         const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
@@ -19599,39 +19736,19 @@
           const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
           return {
             ...r,
-            width: primaryW,
+            width: newPO,
+            poWidth: newPO,
+            selectedWidth: newPO,
             selectedWidths: nextList,
             dyedRate: nextDyed,
-            _userSelectedWidth: Boolean(primaryW)
+            _userSelectedWidth: Boolean(newPO)
           };
         }
         return r;
       }));
     };
     const handleSelectWidthForGroup = (artName, newWidth, fabricQuality, role) => {
-      const cleanWidth = newWidth === "\u2014" ? "" : newWidth;
-      const k = `${artName}___${fabricQuality || ""}___${role || ""}`;
-      const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${cleanWidth}`;
-      const storedRate = widthDyedRates[rateKey];
-      setGroupSelectedWidths((prev) => ({
-        ...prev,
-        [k]: cleanWidth ? [cleanWidth] : []
-      }));
-      setConsumptionRows((prev) => prev.map((r) => {
-        const matchArt = r.articleName === artName;
-        const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
-        const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
-        if (matchArt && matchFab && matchRole) {
-          const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
-          return {
-            ...r,
-            width: cleanWidth,
-            dyedRate: nextDyed,
-            _userSelectedWidth: Boolean(cleanWidth)
-          };
-        }
-        return r;
-      }));
+      handleSetPOWidthForGroup(artName, fabricQuality, role, newWidth);
     };
     const handleUpdateWidthDyedRate = (artName, fabricQuality, role, width, val) => {
       const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${width}`;
@@ -20715,7 +20832,7 @@
               border: "1px solid #cbd5e1"
             }
           },
-          /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", null, /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Fabric"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Width", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(in)")), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Dyed", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(m/pc)")), showShrinkColumn && /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Shrink %"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Greige", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(m/pc)")), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Pcs"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Total Dyed"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Total Greige"))),
+          /* @__PURE__ */ import_react5.default.createElement("thead", null, /* @__PURE__ */ import_react5.default.createElement("tr", null, /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Article"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Fabric"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 10px", textAlign: "left" } }, "Colour"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Width", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(in)")), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Dyed", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(m/pc)")), showShrinkColumn && /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Shrink %"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Greige", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#64748b" } }, "(m/pc)")), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Pcs"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Total Dyed"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center" } }, "Total Greige"), /* @__PURE__ */ import_react5.default.createElement("th", { style: { fontWeight: 600, fontSize: "11.5px", color: "#166534", textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 8px", textAlign: "center", backgroundColor: "#f0fdf4" } }, "Select for PO", /* @__PURE__ */ import_react5.default.createElement("br", null), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: "10px", fontWeight: 500, color: "#15803d" } }, "(Print / Process PO)")))),
           /* @__PURE__ */ import_react5.default.createElement("tbody", null, articleSections.map((section) => {
             let isFirstRowOfArticle = true;
             return section.fabricGroups.map((group, gIdx) => {
@@ -20904,120 +21021,116 @@
                           title: "Click to select widths"
                         },
                         /* @__PURE__ */ import_react5.default.createElement("span", null, "Select \u25BE")
-                      ) : selectedWidths.length === 1 ? /* @__PURE__ */ import_react5.default.createElement(
-                        "button",
-                        {
-                          type: "button",
-                          className: "btn btn-sm d-inline-flex align-items-center justify-content-between font-monospace fw-bold",
-                          style: {
-                            minWidth: "68px",
-                            height: "28px",
-                            padding: "2px 8px",
-                            fontSize: "12px",
-                            borderColor: activeWidthDropdownKey === groupKey ? "#1d4ed8" : "#2563eb",
-                            backgroundColor: "#eff6ff",
-                            color: "#1d4ed8",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            boxShadow: activeWidthDropdownKey === groupKey ? "0 0 0 2px rgba(37, 99, 235, 0.2)" : "none",
-                            borderWidth: "1.5px",
-                            borderStyle: "solid",
-                            gap: "6px"
-                          },
-                          onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
-                          title: "Click to select or add widths"
-                        },
-                        /* @__PURE__ */ import_react5.default.createElement("span", null, selectedWidths[0]),
-                        /* @__PURE__ */ import_react5.default.createElement(
-                          "i",
+                      ) : selectedWidths.map((w) => {
+                        const currentPoWidth = getPOWidthForGroup(group, selectedWidths);
+                        const isPoW = currentPoWidth === w;
+                        return /* @__PURE__ */ import_react5.default.createElement(
+                          "div",
                           {
-                            className: `ti ti-chevron-${activeWidthDropdownKey === groupKey ? "up" : "down"}`,
-                            style: { fontSize: "11px", color: "#2563eb" }
-                          }
-                        )
-                      ) : selectedWidths.map((w) => /* @__PURE__ */ import_react5.default.createElement(
-                        "div",
-                        {
-                          key: w,
-                          className: "d-inline-flex align-items-center justify-content-between font-monospace fw-bold",
-                          style: {
-                            minWidth: "68px",
-                            height: "28px",
-                            padding: "2px 6px",
-                            fontSize: "12px",
-                            color: "#1d4ed8",
-                            backgroundColor: "#eff6ff",
-                            border: "1.5px solid #2563eb",
-                            borderRadius: "4px",
-                            gap: "4px"
-                          }
-                        },
-                        /* @__PURE__ */ import_react5.default.createElement(
-                          "span",
-                          {
-                            style: { cursor: "pointer" },
-                            onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
-                            title: "Click to select or add widths"
-                          },
-                          w
-                        ),
-                        /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react5.default.createElement(
-                          "button",
-                          {
-                            type: "button",
-                            className: "btn p-0 border-0 bg-transparent text-primary",
-                            style: { fontSize: "10px", lineHeight: 1 },
-                            onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
-                            title: "Open width options"
-                          },
-                          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-chevron-down", style: { fontSize: "10px" } })
-                        ), /* @__PURE__ */ import_react5.default.createElement(
-                          "button",
-                          {
-                            type: "button",
-                            className: "btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center",
-                            style: { width: "12px", height: "12px", lineHeight: 1 },
-                            title: `Remove ${w}`,
-                            onClick: (e) => {
-                              e.stopPropagation();
-                              handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions);
+                            key: w,
+                            className: "d-inline-flex align-items-center justify-content-between font-monospace fw-bold",
+                            style: {
+                              minWidth: "82px",
+                              height: "28px",
+                              padding: "2px 6px",
+                              fontSize: "12px",
+                              color: isPoW ? "#1d4ed8" : "#334155",
+                              backgroundColor: isPoW ? "#eff6ff" : "#f8fafc",
+                              border: isPoW ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                              borderRadius: "4px",
+                              gap: "4px"
                             }
                           },
-                          /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "10px", fontWeight: "bold" } })
-                        ))
-                      )) : selectedWidths.length === 0 ? /* @__PURE__ */ import_react5.default.createElement(
+                          /* @__PURE__ */ import_react5.default.createElement(
+                            "div",
+                            {
+                              className: "d-inline-flex align-items-center gap-1",
+                              style: { cursor: "pointer" },
+                              onClick: () => handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w),
+                              title: isPoW ? "Active width for Purchase Order (Print PO)" : "Click to select for Purchase Order (Print PO)"
+                            },
+                            /* @__PURE__ */ import_react5.default.createElement(
+                              "i",
+                              {
+                                className: isPoW ? "ti ti-circle-check-filled text-primary" : "ti ti-circle text-muted",
+                                style: { fontSize: "13px" }
+                              }
+                            ),
+                            /* @__PURE__ */ import_react5.default.createElement("span", null, w),
+                            isPoW && /* @__PURE__ */ import_react5.default.createElement(
+                              "span",
+                              {
+                                className: "badge bg-primary text-white",
+                                style: { fontSize: "8.5px", padding: "1px 3px", lineHeight: 1 }
+                              },
+                              "PO"
+                            )
+                          ),
+                          /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react5.default.createElement(
+                            "button",
+                            {
+                              type: "button",
+                              className: "btn p-0 border-0 bg-transparent text-primary",
+                              style: { fontSize: "10px", lineHeight: 1 },
+                              onClick: (e) => handleOpenWidthDropdown(e, groupKey, groupData),
+                              title: "Open width options"
+                            },
+                            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-chevron-down", style: { fontSize: "10px" } })
+                          ), /* @__PURE__ */ import_react5.default.createElement(
+                            "button",
+                            {
+                              type: "button",
+                              className: "btn p-0 border-0 bg-transparent text-danger d-inline-flex align-items-center justify-content-center",
+                              style: { width: "12px", height: "12px", lineHeight: 1 },
+                              title: `Remove ${w}`,
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                handleToggleGroupWidth(group.articleName, group.fabricQuality, group.role, w, widthOptions);
+                              }
+                            },
+                            /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "10px", fontWeight: "bold" } })
+                          ))
+                        );
+                      }) : selectedWidths.length === 0 ? /* @__PURE__ */ import_react5.default.createElement(
                         "div",
                         {
-                          className: "d-inline-flex align-items-center justify-content-center font-monospace",
-                          style: {
-                            minWidth: "58px",
-                            height: "26px",
-                            padding: "1px 6px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#94a3b8"
-                          }
+                          className: "d-inline-flex align-items-center justify-content-center font-monospace text-muted",
+                          style: { minWidth: "58px", height: "26px", fontSize: "12px" }
                         },
-                        /* @__PURE__ */ import_react5.default.createElement("span", null, "\u2014")
-                      ) : selectedWidths.map((w) => /* @__PURE__ */ import_react5.default.createElement(
-                        "div",
-                        {
-                          key: w,
-                          className: "d-inline-flex align-items-center justify-content-center font-monospace",
-                          style: {
-                            minWidth: "58px",
-                            height: "26px",
-                            padding: "1px 6px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#1d4ed8",
-                            backgroundColor: "#eff6ff",
-                            border: "1.5px solid #2563eb",
-                            borderRadius: "2px"
-                          }
-                        },
-                        /* @__PURE__ */ import_react5.default.createElement("span", null, w)
-                      )))
+                        "\u2014"
+                      ) : selectedWidths.map((w) => {
+                        const currentPoWidth = getPOWidthForGroup(group, selectedWidths);
+                        const isPoW = currentPoWidth === w;
+                        return /* @__PURE__ */ import_react5.default.createElement(
+                          "div",
+                          {
+                            key: w,
+                            className: "d-inline-flex align-items-center justify-content-center font-monospace gap-1",
+                            style: {
+                              minWidth: "64px",
+                              height: "26px",
+                              padding: "1px 6px",
+                              fontSize: "12px",
+                              fontWeight: isPoW ? 700 : 500,
+                              color: isPoW ? "#1d4ed8" : "#475569",
+                              backgroundColor: isPoW ? "#eff6ff" : "#f8fafc",
+                              border: isPoW ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
+                              borderRadius: "2px"
+                            },
+                            title: isPoW ? "Selected width for Print PO" : `Width option: ${w}`
+                          },
+                          isPoW && /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-circle-check-filled text-primary", style: { fontSize: "11px" } }),
+                          /* @__PURE__ */ import_react5.default.createElement("span", null, w),
+                          isPoW && /* @__PURE__ */ import_react5.default.createElement(
+                            "span",
+                            {
+                              className: "badge bg-primary text-white",
+                              style: { fontSize: "8px", padding: "1px 3px", lineHeight: 1 }
+                            },
+                            "PO"
+                          )
+                        );
+                      }))
                     );
                   })(),
                   isFirstRow && /* @__PURE__ */ import_react5.default.createElement(
@@ -21249,7 +21362,60 @@
                         wTotalGreige > 0 ? `${wTotalGreige.toFixed(2)}m` : "0.00m"
                       );
                     }))
-                  )
+                  ),
+                  isFirstRow && (() => {
+                    const currentPoWidth = getPOWidthForGroup(group, selectedWidths);
+                    return /* @__PURE__ */ import_react5.default.createElement(
+                      "td",
+                      {
+                        rowSpan: group.rows.length,
+                        style: {
+                          verticalAlign: "middle",
+                          textAlign: "center",
+                          padding: "4px 6px",
+                          backgroundColor: "#fcfdfd",
+                          borderLeft: "1px solid #e2e8f0"
+                        }
+                      },
+                      /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column align-items-center justify-content-center", style: { gap: "4px" } }, widthsToRender.map((w, wIdx) => {
+                        const isPoW = currentPoWidth === w;
+                        if (!w) {
+                          return /* @__PURE__ */ import_react5.default.createElement("div", { key: `no_w_${wIdx}`, className: "text-muted font-monospace", style: { height: "26px", display: "flex", alignItems: "center" } }, "\u2014");
+                        }
+                        return /* @__PURE__ */ import_react5.default.createElement(
+                          "div",
+                          {
+                            key: w || `po_${wIdx}`,
+                            role: "button",
+                            tabIndex: 0,
+                            className: "d-inline-flex align-items-center gap-1.5 font-monospace fw-semibold transition-all",
+                            style: {
+                              minWidth: "94px",
+                              height: "26px",
+                              padding: "0 8px",
+                              borderRadius: "4px",
+                              backgroundColor: isPoW ? "#dcfce7" : "#ffffff",
+                              border: isPoW ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
+                              color: isPoW ? "#15803d" : "#64748b",
+                              fontSize: "11.5px",
+                              cursor: "pointer",
+                              userSelect: "none"
+                            },
+                            onClick: () => handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w),
+                            title: isPoW ? `Selected for Purchase Order (${w})` : `Click to select ${w} for Print / Process PO`
+                          },
+                          /* @__PURE__ */ import_react5.default.createElement(
+                            "i",
+                            {
+                              className: isPoW ? "ti ti-circle-check-filled text-success" : "ti ti-circle text-muted",
+                              style: { fontSize: "13px" }
+                            }
+                          ),
+                          /* @__PURE__ */ import_react5.default.createElement("span", null, isPoW ? `PO (${w})` : `Use ${w}`)
+                        );
+                      }))
+                    );
+                  })()
                 );
               });
             });
@@ -21345,7 +21511,8 @@
                 }
               },
               fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0) > 0 ? `${fabricSummaryRows.reduce((sum, fs) => sum + (fs.hasValues ? fs.totalGreige || 0 : 0), 0).toFixed(2)}m` : "0.00m"
-            )))
+            ))),
+            /* @__PURE__ */ import_react5.default.createElement("td", { className: "text-center text-muted small py-2" }, "\u2014")
           ))
         )
       ),
@@ -21951,6 +22118,14 @@
         },
         activeWidthGroupData.widthOptions
       );
+      const currentPoWidth = getPOWidthForGroup(
+        {
+          articleName: activeWidthGroupData.articleName,
+          fabricQuality: activeWidthGroupData.fabricQuality,
+          role: activeWidthGroupData.role
+        },
+        selectedWidths
+      );
       return /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement(
         "div",
         {
@@ -21979,8 +22154,8 @@
             top: widthDropdownPos ? `${widthDropdownPos.top}px` : "50%",
             left: widthDropdownPos ? `${widthDropdownPos.left}px` : "50%",
             transform: widthDropdownPos ? "translateX(-50%)" : "translate(-50%, -50%)",
-            minWidth: "220px",
-            maxWidth: "260px",
+            minWidth: "240px",
+            maxWidth: "280px",
             zIndex: 9999,
             borderRadius: "12px",
             border: "1px solid #cbd5e1",
@@ -22005,7 +22180,7 @@
               style: { width: "22px", height: "22px", backgroundColor: "#2e37a4", fontSize: "11px" }
             },
             /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-ruler-2" })
-          ), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "13px", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 } }, "Select Widths"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "10.5px", color: "#64748b" } }, selectedWidths.length > 0 ? `${selectedWidths.length} selected` : "Choose fabric widths"))),
+          ), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "13px", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 } }, "Select Widths"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: "10.5px", color: "#64748b" } }, selectedWidths.length > 0 ? `${selectedWidths.length} in table | PO: ${currentPoWidth || "\u2014"}` : "Choose fabric widths"))),
           /* @__PURE__ */ import_react5.default.createElement(
             "button",
             {
@@ -22022,8 +22197,9 @@
             /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-x", style: { fontSize: "11px" } })
           )
         ),
-        /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxHeight: "210px", overflowY: "auto", padding: "8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-1.5" }, (activeWidthGroupData.widthOptions || []).map((opt) => {
+        /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxHeight: "230px", overflowY: "auto", padding: "8px" } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex flex-column gap-1.5" }, (activeWidthGroupData.widthOptions || []).map((opt) => {
           const isSelected = selectedWidths.includes(opt);
+          const isPoW = currentPoWidth === opt;
           return /* @__PURE__ */ import_react5.default.createElement(
             "div",
             {
@@ -22034,8 +22210,8 @@
               style: {
                 cursor: "pointer",
                 userSelect: "none",
-                backgroundColor: isSelected ? "#eff6ff" : "#f8fafc",
-                border: isSelected ? "1.5px solid #2e37a4" : "1px solid #e2e8f0",
+                backgroundColor: isPoW ? "#eff6ff" : isSelected ? "#f8fafc" : "#ffffff",
+                border: isPoW ? "1.5px solid #2563eb" : isSelected ? "1px solid #93c5fd" : "1px solid #e2e8f0",
                 color: isSelected ? "#1e293b" : "#334155"
               },
               onClick: (e) => {
@@ -22049,45 +22225,64 @@
                 );
               },
               onMouseEnter: (e) => {
-                if (!isSelected) {
+                if (!isPoW && !isSelected) {
                   e.currentTarget.style.backgroundColor = "#f1f5f9";
                   e.currentTarget.style.borderColor = "#cbd5e1";
                 }
               },
               onMouseLeave: (e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = "#f8fafc";
+                if (!isPoW && !isSelected) {
+                  e.currentTarget.style.backgroundColor = "#ffffff";
                   e.currentTarget.style.borderColor = "#e2e8f0";
                 }
               }
             },
-            /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2.5", style: { pointerEvents: "none" } }, /* @__PURE__ */ import_react5.default.createElement(
+            /* @__PURE__ */ import_react5.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react5.default.createElement(
               "span",
               {
-                className: "rounded-circle d-inline-flex align-items-center justify-content-center transition-all",
+                className: "rounded d-inline-flex align-items-center justify-content-center transition-all",
                 style: {
-                  width: "20px",
-                  height: "20px",
+                  width: "18px",
+                  height: "18px",
                   fontSize: "11px",
-                  backgroundColor: isSelected ? "#2e37a4" : "#ffffff",
+                  backgroundColor: isSelected ? "#2563eb" : "#ffffff",
                   color: isSelected ? "#ffffff" : "#94a3b8",
-                  border: isSelected ? "1.5px solid #2e37a4" : "1.5px solid #cbd5e1"
+                  border: isSelected ? "1.5px solid #2563eb" : "1.5px solid #cbd5e1"
                 }
               },
               isSelected ? /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-check", style: { strokeWidth: 3 } }) : null
             ), /* @__PURE__ */ import_react5.default.createElement("span", { className: "font-monospace fw-bold", style: { fontSize: "13.5px" } }, opt)),
-            /* @__PURE__ */ import_react5.default.createElement("div", { style: { pointerEvents: "none" } }, isSelected ? /* @__PURE__ */ import_react5.default.createElement(
+            /* @__PURE__ */ import_react5.default.createElement("div", null, isSelected ? isPoW ? /* @__PURE__ */ import_react5.default.createElement(
               "span",
               {
                 className: "badge rounded-pill fw-bold text-white shadow-xs",
                 style: {
-                  backgroundColor: "#2e37a4",
+                  backgroundColor: "#16a34a",
                   fontSize: "10px",
                   padding: "3px 8px"
                 }
               },
-              "Active"
-            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px", fontWeight: 500 } }, "Select"))
+              /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-circle-check-filled me-1" }),
+              "Selected for PO"
+            ) : /* @__PURE__ */ import_react5.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-sm btn-outline-primary py-0 px-2 font-monospace",
+                style: { fontSize: "10.5px", height: "22px", lineHeight: "20px" },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  handleSetPOWidthForGroup(
+                    activeWidthGroupData.articleName,
+                    activeWidthGroupData.fabricQuality,
+                    activeWidthGroupData.role,
+                    opt
+                  );
+                },
+                title: "Set this as the width for Print / Process PO"
+              },
+              "Set for PO"
+            ) : /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-muted", style: { fontSize: "11px", fontWeight: 500 } }, "+ Add to table"))
           );
         })), selectedWidths.length > 0 && /* @__PURE__ */ import_react5.default.createElement(
           "div",
@@ -22105,12 +22300,17 @@
             },
             onClick: (e) => {
               e.stopPropagation();
-              handleSelectWidthForGroup(
+              const k = `${activeWidthGroupData.articleName}___${activeWidthGroupData.fabricQuality || ""}___${activeWidthGroupData.role || ""}`;
+              setGroupSelectedWidths((prev) => ({ ...prev, [k]: [] }));
+              handleSetPOWidthForGroup(
                 activeWidthGroupData.articleName,
-                "",
                 activeWidthGroupData.fabricQuality,
-                activeWidthGroupData.role
+                activeWidthGroupData.role,
+                ""
               );
+              setActiveWidthDropdownKey(null);
+              setWidthDropdownPos(null);
+              setActiveWidthGroupData(null);
             },
             onMouseEnter: (e) => {
               e.currentTarget.style.backgroundColor = "#fee2e2";
@@ -22120,7 +22320,7 @@
             }
           },
           /* @__PURE__ */ import_react5.default.createElement("i", { className: "ti ti-trash", style: { fontSize: "12px" } }),
-          /* @__PURE__ */ import_react5.default.createElement("span", null, "Clear selection (", selectedWidths.length, ")")
+          /* @__PURE__ */ import_react5.default.createElement("span", null, "Clear selection")
         )),
         /* @__PURE__ */ import_react5.default.createElement("div", { className: "border-top p-2 px-2.5 bg-light d-flex align-items-center justify-content-between gap-2", style: { borderTop: "1px solid #e2e8f0" } }, /* @__PURE__ */ import_react5.default.createElement(
           "button",
@@ -22149,8 +22349,7 @@
               setActiveWidthGroupData(null);
             }
           },
-          "Done ",
-          selectedWidths.length > 0 ? `(${selectedWidths.length})` : ""
+          "Done"
         ))
       ));
     })(), activePOModalCategory === "TASSEL" ? /* @__PURE__ */ import_react5.default.createElement(
@@ -27511,6 +27710,7 @@
           let dyedPerPiece = "";
           const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
           const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || "").trim());
+          const isBottom = /pant|bottom|salwar|trouser|plazo|palazzo|skirt/i.test((art.name || "").trim());
           if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
             dyedPerPiece = isDupatta ? Number(rawAvgLen.toFixed(3)) : Number((rawAvgLen * 0.0254).toFixed(3));
           } else if (fr.consumption !== void 0 && fr.consumption !== null && fr.consumption !== "") {
@@ -27518,7 +27718,8 @@
           } else if (art.consumption !== void 0 && art.consumption !== null && art.consumption !== "") {
             dyedPerPiece = parseFloat(art.consumption) || "";
           } else {
-            dyedPerPiece = "";
+            const fallbackLen = isDupatta ? 2.25 : isBottom ? 38 : 45;
+            dyedPerPiece = isDupatta ? fallbackLen : Number((fallbackLen * 0.0254).toFixed(3));
           }
           const usedColors = /* @__PURE__ */ new Set();
           orderCustomers.forEach((c) => {
@@ -27543,12 +27744,15 @@
               key: `${art.id}_${frIdx}_${colName}`,
               articleId: art.id,
               articleName: art.name,
+              article: art.name,
               role: autoCapitalizeWords6(fr.role || "Main"),
               fabricId: fab?.id,
               fabricQuality: fab?.qualityName || fab?.quality || fab?.name || fr.fabricQuality || "Suh Cotton",
+              fabricName: fab?.qualityName || fab?.quality || fab?.name || fr.fabricQuality || "Suh Cotton",
               source: fr.source || "Greige Fabric",
               width: widthVal,
               colorName: colName,
+              color: colName,
               colorHex: usedColors.size > 0 ? colorObj.hex : "#94a3b8",
               dyedPerPiece,
               shrinkPct,
@@ -27558,7 +27762,11 @@
               isMainFabric,
               totalDyed,
               totalGreige,
-              orderQty
+              totalFabricMeters: totalGreige,
+              requiredMeters: totalGreige,
+              orderQty,
+              consumption: dyedPerPiece || greigeLengthPerPiece || 0,
+              shrinkage: shrinkPct
             });
           });
         });
@@ -28609,53 +28817,7 @@
               configMode.sameSize === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
               "No"
             )))
-          ), (() => {
-            const isAnswered = configMode.sameValue !== void 0 && configMode.sameValue !== null;
-            return /* @__PURE__ */ import_react10.default.createElement(
-              "div",
-              {
-                className: "p-3.5 rounded-3 border transition",
-                style: {
-                  backgroundColor: isAnswered ? configMode.sameValue ? "#f8faff" : "#fffbeb" : "#ffffff",
-                  borderColor: isAnswered ? "#c7d2fe" : "#e2e8f0"
-                }
-              },
-              /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center gap-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react10.default.createElement(
-                "span",
-                {
-                  className: "badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0",
-                  style: {
-                    width: "26px",
-                    height: "26px",
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    backgroundColor: isAnswered ? "#2e37a4" : "#94a3b8"
-                  }
-                },
-                "4"
-              ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Do articles have the same value / piece quantities?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameValue === true ? "\u26A1 Same Value (1:1 Auto-Sync) \u2014 quantities entered on one article automatically sync to connected articles" : configMode.sameValue === false ? "\u2696\uFE0F Different / Separate Values \u2014 enter independent quantities for each article (e.g. 100 Kurta, 50 Pant, 75 Dupatta)" : "Choose whether articles share equal 1:1 piece quantities or have independent quantities"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
-                "button",
-                {
-                  type: "button",
-                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === true ? "btn-primary text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                  style: { fontSize: "12px", minWidth: "70px", backgroundColor: configMode.sameValue === true ? "#2e37a4" : "#fff" },
-                  onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: true })
-                },
-                configMode.sameValue === true && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-                "Yes"
-              ), /* @__PURE__ */ import_react10.default.createElement(
-                "button",
-                {
-                  type: "button",
-                  className: `btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === false ? "btn-dark text-white shadow-xs" : "btn-outline-secondary bg-white text-dark"}`,
-                  style: { fontSize: "12px", minWidth: "70px", backgroundColor: configMode.sameValue === false ? "#1e293b" : "#fff" },
-                  onClick: () => setCustomerConfigMode(ci, { ...configMode, sameValue: false })
-                },
-                configMode.sameValue === false && /* @__PURE__ */ import_react10.default.createElement("i", { className: "ti ti-check me-1" }),
-                "No"
-              )))
-            );
-          })()),
+          )),
           (() => {
             const hasAnySelection = configMode.connectionType !== void 0 || configMode.sameColor !== void 0 || configMode.sameSize !== void 0 || configMode.sameValue !== void 0;
             if (!hasAnySelection) {
@@ -35176,13 +35338,13 @@
         const stored = localStorage.getItem("raindrop_user_vendor_types_v2");
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return Array.from(/* @__PURE__ */ new Set([...STANDARD_VENDOR_TYPES, ...parsed]));
           }
         }
       } catch (e) {
       }
-      return [];
+      return [...STANDARD_VENDOR_TYPES];
     });
     import_react18.default.useEffect(() => {
       if (Array.isArray(vendors) && vendors.length > 0) {
@@ -35195,10 +35357,14 @@
           const stored = localStorage.getItem("raindrop_user_vendor_types_v2");
           if (stored !== null) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) setAvailableTypes(parsed);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAvailableTypes(Array.from(/* @__PURE__ */ new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+              return;
+            }
           }
         } catch (err) {
         }
+        setAvailableTypes([...STANDARD_VENDOR_TYPES]);
       };
       window.addEventListener("storage", syncTypes);
       window.addEventListener("raindrop_vendor_types_updated", syncTypes);
@@ -35290,7 +35456,9 @@
         const stored = localStorage.getItem("raindrop_user_vendor_types_v2");
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setAvailableTypes(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAvailableTypes(Array.from(/* @__PURE__ */ new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+          }
         }
       } catch (e) {
       }
@@ -35327,7 +35495,9 @@
         const stored = localStorage.getItem("raindrop_user_vendor_types_v2");
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setAvailableTypes(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAvailableTypes(Array.from(/* @__PURE__ */ new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+          }
         }
       } catch (e) {
       }
@@ -35395,6 +35565,10 @@
       });
     };
     const handleDeleteAvailableType = (typeToDelete) => {
+      if (STANDARD_VENDOR_TYPES.some((st) => st.toLowerCase() === typeToDelete.toLowerCase())) {
+        handleRemoveType(typeToDelete);
+        return;
+      }
       setAvailableTypes((prev) => {
         const updated = prev.filter((t) => t.toLowerCase() !== typeToDelete.toLowerCase());
         try {
@@ -35407,9 +35581,9 @@
       handleRemoveType(typeToDelete);
     };
     const handleResetAvailableTypes = () => {
-      setAvailableTypes([]);
+      setAvailableTypes([...STANDARD_VENDOR_TYPES]);
       try {
-        localStorage.setItem("raindrop_user_vendor_types_v2", JSON.stringify([]));
+        localStorage.setItem("raindrop_user_vendor_types_v2", JSON.stringify([...STANDARD_VENDOR_TYPES]));
         window.dispatchEvent(new Event("raindrop_vendor_types_updated"));
       } catch (e) {
       }
@@ -35815,6 +35989,7 @@
         const isSelected = (formData.types || []).some(
           (t) => t.toLowerCase() === typeItem.toLowerCase()
         );
+        const isStandardType = STANDARD_VENDOR_TYPES.some((st) => st.toLowerCase() === typeItem.toLowerCase());
         return /* @__PURE__ */ import_react18.default.createElement(
           "div",
           {
@@ -35826,7 +36001,7 @@
               borderRadius: "16px",
               border: isSelected ? "1.5px solid #3b82f6" : "1px solid #cbd5e1",
               backgroundColor: isSelected ? "#eff6ff" : "#ffffff",
-              color: "#0f172a",
+              color: isSelected ? "#1d4ed8" : "#0f172a",
               height: "30px",
               boxShadow: isSelected ? "0 1px 3px rgba(37, 99, 235, 0.12)" : "0 1px 2px rgba(0,0,0,0.03)",
               overflow: "hidden"
@@ -35835,7 +36010,7 @@
           /* @__PURE__ */ import_react18.default.createElement(
             "div",
             {
-              className: "d-inline-flex align-items-center py-0 ps-2.5 pe-1",
+              className: `d-inline-flex align-items-center py-0 ps-2.5 ${isStandardType ? "pe-2.5" : "pe-1"}`,
               style: { cursor: "pointer", gap: "5px", height: "100%" },
               onClick: () => toggleVendorType(typeItem),
               title: isSelected ? `Click to unselect ${typeItem}` : `Click to select ${typeItem}`
@@ -35847,9 +36022,9 @@
                 style: { fontSize: "11px", fontWeight: "bold" }
               }
             ),
-            /* @__PURE__ */ import_react18.default.createElement("span", { style: { color: "#0f172a", fontWeight: isSelected ? 600 : 500 } }, typeItem)
+            /* @__PURE__ */ import_react18.default.createElement("span", { style: { color: isSelected ? "#1d4ed8" : "#0f172a", fontWeight: isSelected ? 600 : 500 } }, typeItem)
           ),
-          /* @__PURE__ */ import_react18.default.createElement(
+          !isStandardType && /* @__PURE__ */ import_react18.default.createElement(
             "button",
             {
               type: "button",
@@ -35873,7 +36048,7 @@
                 e.currentTarget.style.backgroundColor = "transparent";
                 e.currentTarget.style.color = "#94a3b8";
               },
-              title: `Delete "${typeItem}"`,
+              title: `Delete custom type "${typeItem}"`,
               onClick: (e) => {
                 e.stopPropagation();
                 handleDeleteAvailableType(typeItem);
@@ -36752,7 +36927,7 @@
         }
       ]
     }));
-    const [showAllVendors, setShowAllVendors2] = (0, import_react19.useState)(false);
+    const [showAllVendors, setShowAllVendors] = (0, import_react19.useState)(false);
     const displayedVendors = (0, import_react19.useMemo)(() => {
       if (showAllVendors) {
         return vendors.filter((v) => v.active !== false || v.id === formData.vendorId);
@@ -36760,7 +36935,7 @@
       const filtered = vendors.filter(
         (v) => (v.active !== false || v.id === formData.vendorId) && (vendorMatchesType(v, ["Fabric Supplier", "Fabric"]) || v.id === formData.vendorId)
       );
-      return filtered.length > 0 ? filtered : vendors.filter((v) => v.active !== false || v.id === formData.vendorId);
+      return filtered;
     }, [vendors, showAllVendors, formData.vendorId]);
     const poNumbersToCheck = [
       po?.id,
@@ -37303,7 +37478,7 @@
         {
           type: "button",
           className: "btn btn-link btn-sm p-0 text-decoration-none fs-11 text-muted",
-          onClick: () => setShowAllVendors2((prev) => !prev),
+          onClick: () => setShowAllVendors((prev) => !prev),
           title: showAllVendors ? "Switch back to Fabric suppliers" : "Show all vendors"
         },
         showAllVendors ? "Filter Fabric" : `Show all (${vendors.length})`
@@ -37324,8 +37499,12 @@
           onChange: (e) => handleVendorChange(e.target.value)
         },
         /* @__PURE__ */ import_react19.default.createElement("option", { value: "" }, "Select Fabric Supplier..."),
-        displayedVendors.map((v) => /* @__PURE__ */ import_react19.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "")),
-        formData.vendorId && !displayedVendors.some((v) => v.id === formData.vendorId) && /* @__PURE__ */ import_react19.default.createElement("option", { value: formData.vendorId }, formData.vendorName || formData.vendorId)
+        displayedVendors.length === 0 ? /* @__PURE__ */ import_react19.default.createElement("option", { value: "", disabled: true }, "No Fabric Suppliers found in Vendor Master (", vendors.length, " total vendors)") : displayedVendors.map((v) => {
+          const vTypes = getVendorTypes(v);
+          const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(", ")}]` : "";
+          return /* @__PURE__ */ import_react19.default.createElement("option", { key: v.id, value: v.id }, v.name, " ", v.city ? `(${v.city})` : "", typeBadge);
+        }),
+        formData.vendorId && !displayedVendors.some((v) => v.id === formData.vendorId) && /* @__PURE__ */ import_react19.default.createElement("option", { value: formData.vendorId }, formData.vendorName || formData.vendorId, " (Currently Selected)")
       ) : /* @__PURE__ */ import_react19.default.createElement("div", { className: "fw-semibold text-dark fs-14" }, formData.vendorName || vendors.find((v) => v.id === formData.vendorId)?.name || "\u2014")))
     ), isExisting && /* @__PURE__ */ import_react19.default.createElement(
       "div",
@@ -44533,29 +44712,31 @@
       challan_number: "4903",
       date: "2026-08-12",
       vendor_id: "VEND-0003",
-      vendor_name: "Raju Dyeing (Krishna Dyeing)",
-      linked_pos: ["PPO-7611", "PPO-7612", "PPO-7613"],
+      vendor_name: "Raju dyeing",
+      linked_pos: ["7611", "7612", "7613"],
       styles_info: ["Graphic Boota Kurta", "Stock Cambric Plain"],
+      particulars: '100x100 Voil [48"] gray - fab issue for dying',
       po_link_status: "Linked",
       admin_alert_triggered: false,
-      folding_notation: "",
+      folding_notation: "L100",
       total_bales: 1,
-      total_pieces: 7,
+      total_pieces: "1 Bale + 7 th",
       grand_total_meters: 2418.8,
       remarks: "Fab. issue for dyeing. Handed over to Raju Dyeing driver.",
-      receiver_signature: "Raju Dyeing Rep",
+      receiver_signature: "Anurag",
       company_representative: "Anurag",
       status: "Partially Returned",
-      created_by: "Saksham Garg",
+      created_by: "Anurag",
       created_at: "2026-08-12T14:30:00Z",
       items: [
-        { id: 1, bale_roll_no: "Roll 12304", fabric_name: "100x100 Voile (Grey)", color_name: "Off White", invoice_no: "INV-MS-0091", original_piece_meters: 1065.5, dispatched_meters: 1065.5, is_partial_cut: false, folding: "" },
-        { id: 2, bale_roll_no: "Roll 2376-A", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 119.3, dispatched_meters: 119.3, is_partial_cut: false, folding: "" },
-        { id: 3, bale_roll_no: "Roll 2376-B", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 111, dispatched_meters: 111, is_partial_cut: false, folding: "" },
-        { id: 4, bale_roll_no: "Roll 2376-C", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 78.4, dispatched_meters: 78.4, is_partial_cut: false, folding: "" },
-        { id: 5, bale_roll_no: "Roll 2376-D", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 97.8, dispatched_meters: 97.8, is_partial_cut: false, folding: "" },
-        { id: 6, bale_roll_no: "Roll 2376-E", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 113.3, dispatched_meters: 113.3, is_partial_cut: false, folding: "" },
-        { id: 7, bale_roll_no: "Roll 2376-F (Cut)", fabric_name: "100x100 Voile (Grey)", color_name: "Beige", invoice_no: "INV-MS-0091", original_piece_meters: 134, dispatched_meters: 20, is_partial_cut: true, folding: "" }
+        { id: 1, bale_roll_no: "Bale 12384", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 1865.5, dispatched_meters: 1865.5, is_partial_cut: false, folding: "L100" },
+        { id: 2, bale_roll_no: "Roll 2376-A", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 119.3, dispatched_meters: 119.3, is_partial_cut: false, folding: "L100" },
+        { id: 3, bale_roll_no: "Roll 2376-B", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 111, dispatched_meters: 111, is_partial_cut: false, folding: "L100" },
+        { id: 4, bale_roll_no: "Roll 2376-C", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 78.4, dispatched_meters: 78.4, is_partial_cut: false, folding: "L100" },
+        { id: 5, bale_roll_no: "Roll 2376-D", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 97.8, dispatched_meters: 97.8, is_partial_cut: false, folding: "L100" },
+        { id: 6, bale_roll_no: "Roll 2376-E", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 113.3, dispatched_meters: 113.3, is_partial_cut: false, folding: "L100" },
+        { id: 7, bale_roll_no: "Roll 2376-F (Cut)", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 134, dispatched_meters: 20, is_partial_cut: true, folding: "L100" },
+        { id: 8, bale_roll_no: "Roll 2376-G", fabric_name: "100x100 Voile (Grey)", color_name: "Grey", invoice_no: "INV-MS-0091", original_piece_meters: 13.5, dispatched_meters: 13.5, is_partial_cut: false, folding: "L100" }
       ]
     }
   ];
@@ -48688,7 +48869,7 @@
           className: "transition-all",
           title: "Click row to open and view/edit details"
         },
-        /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle font-monospace fw-bold fs-12" }, "#", po.po_number || po.id), /* @__PURE__ */ import_react35.default.createElement("div", { className: "text-muted fs-11 mt-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-calendar fs-12" }), /* @__PURE__ */ import_react35.default.createElement("span", null, po.date))),
+        /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle font-monospace fw-bold fs-12" }, "#", po.po_number || po.id), po.process_type && po.process_type !== "Job Work" && /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-info-subtle text-info border border-info-subtle fs-10 fw-medium" }, po.process_type)), /* @__PURE__ */ import_react35.default.createElement("div", { className: "text-muted fs-11 mt-1 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react35.default.createElement("i", { className: "ti ti-calendar fs-12" }), /* @__PURE__ */ import_react35.default.createElement("span", null, po.date))),
         /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "fw-semibold text-dark fs-13" }, po.vendor_name), /* @__PURE__ */ import_react35.default.createElement("small", { className: "text-muted fs-11" }, po.customer_brand_name || "Raindrop Signature")),
         /* @__PURE__ */ import_react35.default.createElement("td", null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "fw-medium text-dark fs-12.5 text-truncate", style: { maxWidth: "180px" } }, po.style_names?.[0] || "\u2014"), po.style_names && po.style_names.length > 1 && /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-light text-secondary border fs-10 mt-0.5" }, "+", po.style_names.length - 1, " more bundled")),
         /* @__PURE__ */ import_react35.default.createElement("td", { className: "text-center" }, po.linked_sales_order_id ? /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-indigo-subtle text-primary border border-indigo-200 fs-11 font-monospace" }, po.linked_sales_order_id) : /* @__PURE__ */ import_react35.default.createElement("span", { className: "badge bg-light text-muted border fs-11" }, "Stock PO")),
@@ -48778,32 +48959,249 @@
     const loadDynamicSalesOrders = () => {
       try {
         const stored = JSON.parse(localStorage.getItem("erp_sales_orders_v1") || "[]");
+        let storedPOs = [];
+        try {
+          const rawPOs = localStorage.getItem("erp_process_pos_v1") || localStorage.getItem("erp_process_pos");
+          if (rawPOs) storedPOs = JSON.parse(rawPOs);
+        } catch (e) {
+        }
         if (Array.isArray(stored) && stored.length > 0) {
           return stored.map((o) => {
             const styles = Array.isArray(o.styles) && o.styles.length > 0 ? o.styles : o.styleName ? [o.styleName] : [];
             const custName = Array.isArray(o.customerOrders) && o.customerOrders.length > 0 ? o.customerOrders.map((c) => c.customerName).filter(Boolean).join(", ") : o.customerName || o.customer || o.buyerName || "";
             const items2 = [];
             if (Array.isArray(o.fabricConsumptions)) {
+              const groupsMap = /* @__PURE__ */ new Map();
               o.fabricConsumptions.forEach((fc, idx) => {
-                const req = parseFloat(fc.totalFabricMeters || fc.requiredMeters || 0);
-                const ord = parseFloat(fc.orderedMeters || 0);
+                let req = parseFloat(
+                  fc.totalFabricMeters || fc.requiredMeters || fc.totalGreige || fc.orderQty || fc.totalDyed || fc.meters || 0
+                );
+                if (req <= 0 && fc.pcs && parseInt(fc.pcs, 10) > 0) {
+                  const isDup = /dupatta|stole|chunri|scarf/i.test((fc.articleName || fc.article || "").trim());
+                  const isBot = /pant|bottom|salwar|trouser|plazo|palazzo/i.test((fc.articleName || fc.article || "").trim());
+                  const defDyed = isDup ? 2.25 : isBot ? 38 * 0.0254 : 45 * 0.0254;
+                  const shrink = parseFloat(fc.shrinkPct || fc.shrinkage || 3.5);
+                  req = Number((parseInt(fc.pcs, 10) * defDyed * (1 + shrink / 100)).toFixed(2));
+                }
                 const rec = parseFloat(fc.receivedMeters || 0);
+                let resolvedWidth = "";
+                const artName = String(fc.article || fc.articleName || "").trim();
+                const fabName = String(fc.fabricQuality || fc.fabricName || "").trim();
+                const roleName = String(fc.role || "").trim();
+                if (o.groupPoWidths && typeof o.groupPoWidths === "object") {
+                  const kExact = `${artName}___${fabName}___${roleName}`;
+                  const kNoRole = `${artName}___${fabName}___`;
+                  const kAnyRole = Object.keys(o.groupPoWidths).find(
+                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                  );
+                  const pow = o.groupPoWidths[kExact] || o.groupPoWidths[kNoRole] || (kAnyRole ? o.groupPoWidths[kAnyRole] : null);
+                  if (pow && pow !== "\u2014" && pow !== "-") {
+                    resolvedWidth = String(pow);
+                  }
+                }
+                if (!resolvedWidth) {
+                  if (fc.poWidth && fc.poWidth !== "\u2014" && fc.poWidth !== "-") {
+                    resolvedWidth = String(fc.poWidth);
+                  } else if (fc.width && fc.width !== "\u2014" && fc.width !== "-") {
+                    resolvedWidth = String(fc.width);
+                  } else if (fc.selectedWidth && fc.selectedWidth !== "\u2014" && fc.selectedWidth !== "-") {
+                    resolvedWidth = String(fc.selectedWidth);
+                  } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths[0] && fc.selectedWidths[0] !== "\u2014") {
+                    resolvedWidth = String(fc.selectedWidths[0]);
+                  }
+                }
+                if (!resolvedWidth && o.groupSelectedWidths && typeof o.groupSelectedWidths === "object") {
+                  const kExact = `${artName}___${fabName}___${roleName}`;
+                  const kNoRole = `${artName}___${fabName}___`;
+                  const kAnyRole = Object.keys(o.groupSelectedWidths).find(
+                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                  );
+                  const gw = o.groupSelectedWidths[kExact] || o.groupSelectedWidths[kNoRole] || (kAnyRole ? o.groupSelectedWidths[kAnyRole] : null);
+                  if (Array.isArray(gw) && gw[0] && gw[0] !== "\u2014") {
+                    resolvedWidth = String(gw[0]);
+                  } else if (typeof gw === "string" && gw && gw !== "\u2014") {
+                    resolvedWidth = gw;
+                  }
+                }
+                if (!resolvedWidth && Array.isArray(o.articles)) {
+                  const artMatch = o.articles.find(
+                    (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
+                  );
+                  if (artMatch) {
+                    const fabMatch = (artMatch.fabrics || []).find(
+                      (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
+                    ) || artMatch.fabrics?.[0];
+                    if (fabMatch && fabMatch.width) {
+                      resolvedWidth = String(fabMatch.width);
+                    }
+                  }
+                }
+                if (!resolvedWidth && o.widthDyedRates && typeof o.widthDyedRates === "object") {
+                  const matchingKey = Object.keys(o.widthDyedRates).find(
+                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                  );
+                  if (matchingKey) {
+                    const parts = matchingKey.split("___");
+                    if (parts.length >= 4 && parts[3]) {
+                      resolvedWidth = parts[3];
+                    }
+                  }
+                }
+                const cleanWidthStr = resolvedWidth ? resolvedWidth.replace(/"/g, "").trim() : "44";
+                const colName = String(fc.color || fc.colorName || "").trim();
+                const itemStyle = fc.styleName || o.styleName || (styles[0] || "");
+                const groupKey = `${(fabName || "").toLowerCase().trim()}___${(colName || "").toLowerCase().trim()}___${cleanWidthStr}`;
+                let currentPcs = parseInt(fc.pcs || fc.quantity_pieces || fc.totalPieces || fc.orderQty || 0, 10) || 0;
+                if (currentPcs === 0 && Array.isArray(o.articles)) {
+                  const artMatch = o.articles.find((a) => String(a.name || "").toLowerCase() === artName.toLowerCase());
+                  if (artMatch && (artMatch.totalPieces || artMatch.pieces || artMatch.quantity)) {
+                    currentPcs = parseInt(artMatch.totalPieces || artMatch.pieces || artMatch.quantity, 10) || 0;
+                  }
+                }
+                const currentCons = parseFloat(fc.dyedPerPiece || fc.greigeLengthPerPiece || fc.consumption || 0);
+                const currentShrink = parseFloat(fc.shrinkPct || fc.shrinkage || 4);
+                let itemRate = 0;
+                if (fc.dyedRate && parseFloat(fc.dyedRate) > 0) {
+                  itemRate = parseFloat(fc.dyedRate);
+                } else if (fc.rate && parseFloat(fc.rate) > 0) {
+                  itemRate = parseFloat(fc.rate);
+                } else if (fc.fabricRate && parseFloat(fc.fabricRate) > 0) {
+                  itemRate = parseFloat(fc.fabricRate);
+                } else if (fc.marketRate && parseFloat(fc.marketRate) > 0) {
+                  itemRate = parseFloat(fc.marketRate);
+                } else if (fc.price && parseFloat(fc.price) > 0) {
+                  itemRate = parseFloat(fc.price);
+                } else if (fc.cost && parseFloat(fc.cost) > 0) {
+                  itemRate = parseFloat(fc.cost);
+                }
+                if (!itemRate && o.widthDyedRates && typeof o.widthDyedRates === "object") {
+                  const kExact = `${artName}___${fabName}___${roleName}___${cleanWidthStr}`;
+                  const kNoRole = `${artName}___${fabName}______${cleanWidthStr}`;
+                  const kFuzzy = Object.keys(o.widthDyedRates).find((k) => {
+                    const lk = k.toLowerCase();
+                    return lk.includes(artName.toLowerCase()) && lk.includes(cleanWidthStr.toLowerCase());
+                  });
+                  const rVal = o.widthDyedRates[kExact] ?? o.widthDyedRates[kNoRole] ?? (kFuzzy ? o.widthDyedRates[kFuzzy] : null);
+                  if (rVal && parseFloat(rVal) > 0) {
+                    itemRate = parseFloat(rVal);
+                  }
+                }
+                if (!itemRate && o.customMarketRates && typeof o.customMarketRates === "object") {
+                  const cmVal = o.customMarketRates[`${artName}___${fabName}___${cleanWidthStr}`] || o.customMarketRates[`${fabName}_${cleanWidthStr}`] || o.customMarketRates[fabName];
+                  if (cmVal && parseFloat(cmVal) > 0) {
+                    itemRate = parseFloat(cmVal);
+                  }
+                }
+                if (!itemRate && Array.isArray(o.articles)) {
+                  const artMatch = o.articles.find(
+                    (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
+                  );
+                  if (artMatch) {
+                    const fabMatch = (artMatch.fabrics || []).find(
+                      (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
+                    ) || artMatch.fabrics?.[0];
+                    if (fabMatch && (fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate)) {
+                      itemRate = parseFloat(fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate) || 0;
+                    }
+                  }
+                }
+                if (!groupsMap.has(groupKey)) {
+                  groupsMap.set(groupKey, {
+                    id: `${o.id}-IT${idx + 1}`,
+                    style: itemStyle,
+                    fabric: fabName || "Fabric",
+                    fabricId: fc.fabricId || "FAB-001",
+                    color: colName,
+                    colorHex: fc.colorHex || "#cbd5e1",
+                    articles: artName ? [artName] : [],
+                    width: cleanWidthStr,
+                    rate: itemRate,
+                    requiredMeters: req,
+                    alreadyReceivedMeters: rec,
+                    pcs: currentPcs,
+                    totalCons: currentCons,
+                    maxShrinkage: currentShrink,
+                    count: 1,
+                    subItems: [fc]
+                  });
+                } else {
+                  const grp = groupsMap.get(groupKey);
+                  grp.requiredMeters += req;
+                  grp.alreadyReceivedMeters += rec;
+                  if ((!grp.rate || grp.rate === 0) && itemRate) {
+                    grp.rate = itemRate;
+                  }
+                  if (artName && !grp.articles.includes(artName)) {
+                    grp.articles.push(artName);
+                  }
+                  grp.pcs += currentPcs;
+                  grp.totalCons += currentCons;
+                  grp.maxShrinkage = Math.max(grp.maxShrinkage, currentShrink);
+                  grp.count += 1;
+                  grp.subItems.push(fc);
+                }
+              });
+              groupsMap.forEach((entry) => {
+                const req = Number(entry.requiredMeters.toFixed(2));
+                const rec = Number(entry.alreadyReceivedMeters.toFixed(2));
+                const joinedArticles = entry.articles.join(" + ") || "General";
+                let totalPcs = entry.pcs || 0;
+                if (Array.isArray(o.articles) && entry.articles.length > 0) {
+                  const sumFromArticles = entry.articles.reduce((sum, aName) => {
+                    const art = o.articles.find((a) => String(a.name || "").toLowerCase() === String(aName || "").toLowerCase());
+                    return sum + (parseInt(art?.totalPieces || art?.pieces || art?.quantity || 0, 10) || 0);
+                  }, 0);
+                  if (sumFromArticles > 0) {
+                    totalPcs = sumFromArticles;
+                  }
+                }
+                let ord = 0;
+                if (Array.isArray(storedPOs) && storedPOs.length > 0) {
+                  storedPOs.forEach((p) => {
+                    if (p.linked_sales_order_id === o.id && p.status !== "Cancelled") {
+                      (p.items || []).forEach((it) => {
+                        const itFab = String(it.fabric_name || it.fabric || "").toLowerCase().trim();
+                        const grpFab = String(entry.fabric || "").toLowerCase().trim();
+                        const itCol = String(it.color_name || it.color || "").toLowerCase().trim();
+                        const grpCol = String(entry.color || "").toLowerCase().trim();
+                        const itWidth = String(it.width || "").replace(/"/g, "").trim();
+                        const grpWidth = String(entry.width || "").replace(/"/g, "").trim();
+                        const itArt = String(it.article_name || it.article || "").toLowerCase().trim();
+                        const fabMatch = !itFab || !grpFab || itFab === grpFab;
+                        const colMatch = !itCol || !grpCol || itCol === grpCol;
+                        const widthMatch = !itWidth || !grpWidth || itWidth === grpWidth;
+                        const artMatch = !itArt || itArt === joinedArticles.toLowerCase() || entry.articles.some((a) => a.toLowerCase().trim() === itArt) || joinedArticles.toLowerCase().includes(itArt);
+                        if (fabMatch && colMatch && widthMatch && artMatch) {
+                          ord += parseFloat(it.quantity_meters) || 0;
+                        }
+                      });
+                    }
+                  });
+                }
+                ord = Number(ord.toFixed(2));
+                const isOrdered = req > 0 ? ord >= req - 0.01 : ord > 0;
+                const isPartiallyOrdered = req > 0 && ord > 0.01 && ord < req - 0.01;
+                const pending = req > 0 ? Math.max(0, Number((req - ord).toFixed(2))) : 0;
+                let finalCons = totalPcs > 0 ? Number((req / totalPcs).toFixed(3)) : entry.totalCons > 0 ? Number(entry.totalCons.toFixed(3)) : 2.5;
                 items2.push({
-                  id: `${o.id}-IT${idx + 1}`,
-                  style: fc.styleName || o.styleName || (styles[0] || ""),
-                  fabric: fc.fabricQuality || fc.fabricName || "Fabric",
-                  fabricId: fc.fabricId || "FAB-001",
-                  color: fc.color || fc.colorName || "",
-                  colorHex: fc.colorHex || "#cbd5e1",
-                  article: fc.article || fc.articleName || "",
-                  width: String(fc.width || "44").replace(/"/g, ""),
+                  id: entry.id,
+                  style: entry.style,
+                  fabric: entry.fabric,
+                  fabricId: entry.fabricId,
+                  color: entry.color,
+                  colorHex: entry.colorHex,
+                  article: joinedArticles,
+                  articlesList: entry.articles,
+                  width: entry.width,
+                  rate: entry.rate || 0,
                   requiredMeters: req,
                   alreadyReceivedMeters: rec,
                   orderedMeters: ord,
-                  pendingMeters: Math.max(0, req - ord),
-                  status: ord >= req ? "Already Ordered" : ord > 0 ? "Partially Ordered" : "Not Ordered",
-                  consumption: parseFloat(fc.consumption || 2.5),
-                  shrinkage: parseFloat(fc.shrinkage || 4)
+                  pendingMeters: pending,
+                  status: isOrdered ? "Already Ordered" : isPartiallyOrdered ? "Partially Ordered" : "Not Ordered",
+                  consumption: finalCons,
+                  shrinkage: entry.maxShrinkage || 4,
+                  pcs: totalPcs || (finalCons > 0 ? Math.floor(req / finalCons) : 0)
                 });
               });
             }
@@ -48955,17 +49353,63 @@
       setShowAllVendors(true);
       setShowInlineVendorModal(false);
     };
+    const generateProcessPONumber = (type = "Dyeing") => {
+      let prefix = "PPO";
+      const lower = (type || "").toLowerCase();
+      if (lower.includes("dye")) prefix = "DYE";
+      else if (lower.includes("print")) prefix = "PRN";
+      else if (lower.includes("process")) prefix = "PRC";
+      else if (lower.includes("embroid")) prefix = "EMB";
+      else if (lower.includes("wash")) prefix = "WSH";
+      else if (lower.includes("stitch")) prefix = "STC";
+      try {
+        const rawStored = localStorage.getItem("erp_process_pos_v1") || localStorage.getItem("erp_process_pos") || "[]";
+        const stored = JSON.parse(rawStored);
+        const existingNums = (Array.isArray(stored) ? stored : []).map(
+          (p) => String(p.po_number || p.id || "").toUpperCase().trim()
+        );
+        for (let i = 0; i < 30; i++) {
+          const rand4 = Math.floor(1e3 + Math.random() * 9e3);
+          const candidate = `${prefix}-${rand4}`;
+          if (!existingNums.includes(candidate) && !existingNums.includes(`PPO-${candidate}`) && !existingNums.includes(String(rand4))) {
+            return candidate;
+          }
+        }
+        return `${prefix}-${Math.floor(1e3 + Math.random() * 9e3)}`;
+      } catch (e) {
+        return `${prefix}-${Math.floor(1e3 + Math.random() * 9e3)}`;
+      }
+    };
+    const [processType, setProcessType] = (0, import_react36.useState)(initialPO?.process_type || "");
     const [poNumber, setPoNumber] = (0, import_react36.useState)(
-      initialPO?.po_number ? String(initialPO.po_number).replace(/^PPO-/, "") : ""
+      initialPO?.po_number ? String(initialPO.po_number).replace(/^PPO-/, "") : generateProcessPONumber(initialPO?.process_type || "")
     );
     const [date, setDate] = (0, import_react36.useState)(
       initialPO?.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
     );
     const [issueDate, setIssueDate] = (0, import_react36.useState)(
-      initialPO?.issue_date || initialPO?.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+      initialPO?.issue_date || ""
     );
     const [vendorId, setVendorId] = (0, import_react36.useState)(initialPO?.vendor_id || "");
     const [vendorName, setVendorName] = (0, import_react36.useState)(initialPO?.vendor_name || "");
+    const [showAllVendors, setShowAllVendors] = (0, import_react36.useState)(false);
+    const handleProcessTypeChange = (newType) => {
+      setProcessType(newType);
+      if (!initialPO || !initialPO.po_number) {
+        if (newType) {
+          setPoNumber(generateProcessPONumber(newType));
+        }
+      }
+    };
+    const displayedVendors = import_react36.default.useMemo(() => {
+      if (!processType || showAllVendors || processType === "All Processes") {
+        return vendorList.filter((v) => v.active !== false || (v.name || v.vendorName) === vendorName);
+      }
+      const filtered = vendorList.filter(
+        (v) => (v.active !== false || (v.name || v.vendorName) === vendorName) && (vendorMatchesType(v, processType) || (v.name || v.vendorName) === vendorName)
+      );
+      return filtered;
+    }, [vendorList, processType, showAllVendors, vendorName]);
     const [isOrderLinked, setIsOrderLinked] = (0, import_react36.useState)(
       initialPO ? Boolean(initialPO.linked_sales_order_id) : false
     );
@@ -49162,9 +49606,26 @@
         if (item.color_name) {
           relevantItems = relevantItems.filter((it) => it.color === item.color_name);
         }
-        const orderArticleNames = Array.from(new Set(relevantItems.map((it) => it.article).filter(Boolean)));
-        if (orderArticleNames.length > 0) {
-          const matched = articleList.filter((a) => orderArticleNames.includes(a.name));
+        const orderArticleNames = [];
+        relevantItems.forEach((it) => {
+          if (it.article) orderArticleNames.push(it.article);
+          if (Array.isArray(it.articlesList)) {
+            it.articlesList.forEach((a) => {
+              if (a) orderArticleNames.push(a);
+            });
+          }
+        });
+        const uniqueOrderArticles = Array.from(new Set(orderArticleNames.filter(Boolean)));
+        if (uniqueOrderArticles.length > 0) {
+          const matched = [];
+          uniqueOrderArticles.forEach((art) => {
+            const m = articleList.find((a) => (a.name || "").toLowerCase() === art.toLowerCase());
+            if (m) {
+              matched.push(m);
+            } else {
+              matched.push({ id: art, name: art });
+            }
+          });
           if (matched.length > 0) return matched;
         }
       }
@@ -49242,16 +49703,23 @@
     };
     const handleSelectOrderItem = (orderItem) => {
       if (isLocked) return;
-      const cons = parseFloat(orderItem.consumption) || 2.5;
       const reqMeters = parseFloat(orderItem.pendingMeters || orderItem.requiredMeters || 0);
+      const totalPcs = parseInt(orderItem.pcs, 10) || 0;
+      const cons = totalPcs > 0 && reqMeters > 0 ? Number((reqMeters / totalPcs).toFixed(3)) : parseFloat(orderItem.consumption) || 2.5;
       const shrink = parseFloat(orderItem.shrinkage) || 4;
-      const calculatedPcs = reqMeters > 0 ? Math.floor(reqMeters / cons) : "";
+      const calculatedPcs = totalPcs > 0 ? totalPcs : reqMeters > 0 && cons > 0 ? Math.floor(reqMeters / cons) : "";
       const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : "";
+      const itemRate = orderItem.rate ? parseFloat(orderItem.rate) : "";
+      const matchedFab = fabricList.find(
+        (f) => orderItem.fabricId && f.id === orderItem.fabricId || orderItem.fabric && f.name && f.name.toLowerCase().trim() === orderItem.fabric.toLowerCase().trim()
+      ) || fabricList.find(
+        (f) => orderItem.fabric && f.name && (f.name.toLowerCase().includes(orderItem.fabric.toLowerCase()) || orderItem.fabric.toLowerCase().includes(f.name.toLowerCase()))
+      );
       const newRow = {
         id: Date.now() + Math.random(),
         style_name: orderItem.style || selectedStyles[0] || "",
-        fabric_id: orderItem.fabricId || "FAB-001",
-        fabric_name: orderItem.fabric || "100x100 Voile (Grey)",
+        fabric_id: matchedFab ? matchedFab.id : orderItem.fabricId || "FAB-001",
+        fabric_name: matchedFab ? matchedFab.name : orderItem.fabric || "100x100 Voile (Grey)",
         color_id: "COL-001",
         color_name: orderItem.color || "Beige",
         color_hex: orderItem.colorHex || "#F5F5DC",
@@ -49262,15 +49730,19 @@
         consumption_per_piece: cons,
         shrinkage_percent: shrink,
         raw_fabric_meters: rawMtrs,
-        fabric_rate: "",
+        fabric_rate: itemRate !== "" ? itemRate : "",
         dyeing_rate: "",
-        total_actual_cost: 0,
-        total_amount: 0,
-        remarks: `Linked to Order requirement: ${orderItem.id}`,
+        total_actual_cost: itemRate !== "" ? itemRate : 0,
+        total_amount: reqMeters > 0 && itemRate !== "" ? Number((reqMeters * itemRate).toFixed(2)) : 0,
+        remarks: `Linked to Order requirement: ${orderItem.id} (${orderItem.article})`,
         sample_photo: null,
         status: "Partially Ordered"
       };
-      setItems([...items, newRow]);
+      if (items.length === 1 && !items[0].fabric_name && !items[0].quantity_meters) {
+        setItems([newRow]);
+      } else {
+        setItems([...items, newRow]);
+      }
     };
     const handleInsertStandardTerms = () => {
       if (isLocked) return;
@@ -49306,7 +49778,8 @@
       const payload = {
         id: initialPO?.id || fullPoId,
         po_number: cleanPoNum.replace(/^PPO-/, ""),
-        process_type: "Job Work",
+        process_type: processType || "Dyeing",
+        process_name: processType || "Dyeing",
         date,
         issue_date: issueDate,
         vendor_id: vendorId,
@@ -49354,7 +49827,7 @@
       },
       /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-printer fs-14" }),
       /* @__PURE__ */ import_react36.default.createElement("span", null, "Print Slip")
-    )))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(79, 70, 229, 0.1)", color: "#4f46e5" } }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-file-description fs-16" })), /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "PO Parameters & Order Association"), /* @__PURE__ */ import_react36.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "PO Number, Date, Issue Date, Job Work Vendor & optional Sales Order Link (PDF Section 3.1 & 3.2)"))), !isLocked && isReadOnly && editingSection !== "header" && /* @__PURE__ */ import_react36.default.createElement(
+    )))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(79, 70, 229, 0.1)", color: "#4f46e5" } }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-file-description fs-16" })), /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "PO Parameters & Order Association"), /* @__PURE__ */ import_react36.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "PO Number, Date, Issue Date, Job Work Vendor & optional Sales Order Link"))), !isLocked && isReadOnly && editingSection !== "header" && /* @__PURE__ */ import_react36.default.createElement(
       "button",
       {
         type: "button",
@@ -49372,54 +49845,40 @@
       },
       /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-check me-1" }),
       " Done"
-    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "row g-3 mb-3 pb-3 border-bottom", style: { borderColor: "#f1f5f9" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", null, "Process PO Number"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
-        placeholder: "e.g. 7613",
-        value: poNumber,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setPoNumber(e.target.value)
-      }
-    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", null, "PO Date"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement(
-      "input",
-      {
-        type: "date",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
-        value: date,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setDate(e.target.value)
-      }
-    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Issue Date ", /* @__PURE__ */ import_react36.default.createElement("small", { className: "text-muted fw-normal" }, "(Section 3.1)")), /* @__PURE__ */ import_react36.default.createElement(
-      "input",
-      {
-        type: "date",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
-        value: issueDate,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setIssueDate(e.target.value)
-      }
-    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Target Delivery Date"), /* @__PURE__ */ import_react36.default.createElement(
-      "input",
-      {
-        type: "date",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
-        value: deliveryDate,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setDeliveryDate(e.target.value)
-      }
-    ))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-lg-6" }, /* @__PURE__ */ import_react36.default.createElement(
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "row g-3 mb-3 pb-3 border-bottom", style: { borderColor: "#f1f5f9" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-lg-6" }, /* @__PURE__ */ import_react36.default.createElement(
       "div",
       {
         className: "p-3 border rounded-3 h-100 d-flex flex-column justify-content-between shadow-xs",
         style: { background: "#f8fafc", borderColor: "#e2e8f0" }
       },
-      /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-bold text-dark mb-0 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-building-store fs-15 text-primary" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Job Work Vendor"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), isSectionEditable("header") && /* @__PURE__ */ import_react36.default.createElement(
+      /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "mb-2.5" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-0 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-settings-cog text-primary fs-14" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Vendor Type"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold" }, displayedVendors.length, " ", processType ? processType === "All Processes" ? "" : `${processType} ` : "", "Vendor", displayedVendors.length === 1 ? "" : "s")), /* @__PURE__ */ import_react36.default.createElement(
+        "select",
+        {
+          className: "form-select form-select-sm bg-white fs-13 fw-semibold text-dark",
+          style: { borderColor: "#cbd5e1", height: "36px", borderRadius: "8px" },
+          value: processType,
+          disabled: !isSectionEditable("header"),
+          onChange: (e) => handleProcessTypeChange(e.target.value)
+        },
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "" }, "-- Select Vendor Type --"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Dyeing" }, "Dyeing (Dyeing Mill / Processor)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Printing" }, "Printing (Digital, Screen & Rotary Printing)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Processing" }, "Processing (Dyeing, Printing & Mill Finish)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Embroidery" }, "Embroidery (Computer / Machine Embroidery)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Washing" }, "Washing (Enzyme, Silicon & Garment Wash)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "Stitching / Job Worker" }, "Stitching / Job Worker (CMT, Tailoring)"),
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "All Processes" }, "All Processes (Show All Vendors)")
+      )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1.5" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-bold text-dark mb-0 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-building-store fs-15 text-primary" }), /* @__PURE__ */ import_react36.default.createElement("span", null, processType ? processType === "All Processes" ? "Job Work Vendor" : `${processType} Vendor` : "Vendor"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-sm btn-link p-0 text-muted text-decoration-none fs-11 d-flex align-items-center gap-1",
+          onClick: () => setShowAllVendors(!showAllVendors),
+          title: showAllVendors ? processType ? `Filter to ${processType} vendors only` : "Filter vendors" : `Show all ${vendorList.length} vendors`
+        },
+        /* @__PURE__ */ import_react36.default.createElement("i", { className: `ti ti-${showAllVendors ? "filter" : "list"} fs-12` }),
+        /* @__PURE__ */ import_react36.default.createElement("span", null, showAllVendors ? processType ? `Show only ${processType}` : "Filter by Type" : `Show All (${vendorList.length})`)
+      ), isSectionEditable("header") && /* @__PURE__ */ import_react36.default.createElement(
         "button",
         {
           type: "button",
@@ -49428,7 +49887,7 @@
         },
         /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-plus fs-13" }),
         /* @__PURE__ */ import_react36.default.createElement("span", null, "New Vendor")
-      )), /* @__PURE__ */ import_react36.default.createElement(
+      ))), /* @__PURE__ */ import_react36.default.createElement(
         "select",
         {
           className: "form-select form-select-sm bg-white fs-13",
@@ -49441,16 +49900,24 @@
             if (matched) setVendorId(matched.id || "");
           }
         },
-        /* @__PURE__ */ import_react36.default.createElement("option", { value: "", style: { color: "#0f172a" } }, "-- Select Vendor --"),
-        vendorName && !vendorList.some((v) => (v.name || v.vendorName) === vendorName) && /* @__PURE__ */ import_react36.default.createElement("option", { value: vendorName, style: { color: "#0f172a" } }, vendorName),
-        vendorList.map((v) => {
+        /* @__PURE__ */ import_react36.default.createElement("option", { value: "", style: { color: "#0f172a" } }, "-- Select ", processType ? processType === "All Processes" ? "Vendor" : `${processType} Vendor` : "Vendor", " --"),
+        vendorName && !displayedVendors.some((v) => (v.name || v.vendorName) === vendorName) && /* @__PURE__ */ import_react36.default.createElement("option", { value: vendorName, style: { color: "#0f172a" } }, vendorName, " (Currently Selected)"),
+        displayedVendors.length === 0 ? /* @__PURE__ */ import_react36.default.createElement("option", { value: "", disabled: true }, processType ? `No ${processType} vendors found in Vendor Master (${vendorList.length} total vendors)` : `No vendors found in Vendor Master (${vendorList.length} total vendors)`) : displayedVendors.map((v) => {
           const vTypes = getVendorTypes(v);
           const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(", ")}]` : "";
           const cityText = v.city ? ` (${v.city})` : "";
           return /* @__PURE__ */ import_react36.default.createElement("option", { key: v.id || v.name, value: v.name || v.vendorName, style: { color: "#0f172a" } }, v.name || v.vendorName, typeBadge, cityText);
         })
       )),
-      /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-2 text-muted fs-11 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-info-circle fs-13 text-secondary" }), /* @__PURE__ */ import_react36.default.createElement("span", null, "Job work processor or dyeing mill from Vendor Master"))
+      /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-2 text-muted fs-11 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-info-circle fs-13 text-secondary" }), /* @__PURE__ */ import_react36.default.createElement("span", null, !processType || processType === "All Processes" || showAllVendors ? `Listing all ${vendorList.length} vendors from Vendor Master` : `Filtered to ${processType} vendors (${displayedVendors.length} of ${vendorList.length})`)), !showAllVendors && processType && processType !== "All Processes" && /* @__PURE__ */ import_react36.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-link p-0 fs-11 text-primary text-decoration-none",
+          onClick: () => setShowAllVendors(true)
+        },
+        "Bypass filter"
+      ))
     )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-lg-6" }, /* @__PURE__ */ import_react36.default.createElement(
       "div",
       {
@@ -49503,6 +49970,47 @@
         }
       ))),
       /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-2 text-muted fs-11 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-info-circle fs-13 text-secondary" }), /* @__PURE__ */ import_react36.default.createElement("span", null, isOrderLinked ? "Automatically synchronizes required vs received meterage" : "Optional manual customer / brand tag for independent tracking"))
+    ))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", null, "Process PO Number"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
+        placeholder: "e.g. DYE-7613",
+        value: poNumber,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setPoNumber(e.target.value)
+      }
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", null, "PO Date"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement(
+      "input",
+      {
+        type: "date",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
+        value: date,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setDate(e.target.value)
+      }
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Issue Date"), /* @__PURE__ */ import_react36.default.createElement(
+      "input",
+      {
+        type: "date",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
+        value: issueDate,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setIssueDate(e.target.value)
+      }
+    )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5" }, "Target Delivery Date"), /* @__PURE__ */ import_react36.default.createElement(
+      "input",
+      {
+        type: "date",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
+        value: deliveryDate,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setDeliveryDate(e.target.value)
+      }
     ))))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(16, 185, 129, 0.1)", color: "#10b981" } }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-hanger fs-16" })), /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Style Parameters & Selection Narrowing"), /* @__PURE__ */ import_react36.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "PDF Section 3.2: User is asked how many styles this PO covers, opening corresponding style boxes"))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, !isLocked && isReadOnly && editingSection !== "styles" && /* @__PURE__ */ import_react36.default.createElement(
       "button",
       {
@@ -49706,9 +50214,9 @@
           ))
         );
       })))
-    ), isOrderLinked && currentSelectedOrder && /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-4 p-3 border rounded-3 bg-light", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for ", currentSelectedOrder.id, " (", currentSelectedOrder.customer, ")"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-white text-secondary border fs-11" }, "Required vs Received Balance")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react36.default.createElement("table", { className: "table table-sm table-bordered bg-white align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react36.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("th", null, "Style"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Article"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Width"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Required (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Already Received (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Pending (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center" }, "Status"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center", style: { width: "90px" } }, "Action"))), /* @__PURE__ */ import_react36.default.createElement("tbody", null, currentSelectedOrder.items.map((ordIt) => {
-      const isFullyOrdered = ordIt.status === "Already Ordered" || ordIt.pendingMeters <= 0;
-      return /* @__PURE__ */ import_react36.default.createElement("tr", { key: ordIt.id, className: isFullyOrdered ? "table-light text-muted" : "" }, /* @__PURE__ */ import_react36.default.createElement("td", { className: "fw-medium" }, ordIt.style), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.fabric), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", { style: { width: "10px", height: "10px", borderRadius: "2px", background: ordIt.colorHex, border: "1px solid #999" } }), ordIt.color)), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.article), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.width, '"'), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-semibold" }, ordIt.requiredMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-success" }, ordIt.alreadyReceivedMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-bold text-dark" }, ordIt.pendingMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isFullyOrdered ? /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border fs-10" }, "\u{1F512} Already Ordered") : /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-warning-subtle text-warning border fs-10" }, "Partially Ordered")), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isFullyOrdered ? /* @__PURE__ */ import_react36.default.createElement("button", { type: "button", className: "btn btn-sm btn-light border py-0 px-2 fs-11 text-muted", disabled: true }, "Locked") : /* @__PURE__ */ import_react36.default.createElement(
+    ), isOrderLinked && currentSelectedOrder && /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-4 p-3 border rounded-3 bg-light", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for ", currentSelectedOrder.id, " (", currentSelectedOrder.customer, ")"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-white text-secondary border fs-11" }, "Required vs Received Balance")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react36.default.createElement("table", { className: "table table-sm table-bordered bg-white align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react36.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("th", null, "Style"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Article"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Width"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Rate (\u20B9)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Required (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Already Received (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Pending (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center" }, "Status"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center", style: { width: "90px" } }, "Action"))), /* @__PURE__ */ import_react36.default.createElement("tbody", null, currentSelectedOrder.items.map((ordIt) => {
+      const isFullyOrdered = ordIt.requiredMeters > 0 ? ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === "Already Ordered" : ordIt.status === "Already Ordered" && ordIt.orderedMeters > 0;
+      return /* @__PURE__ */ import_react36.default.createElement("tr", { key: ordIt.id, className: isFullyOrdered ? "table-light text-muted" : "" }, /* @__PURE__ */ import_react36.default.createElement("td", { className: "fw-medium" }, ordIt.style), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.fabric), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "d-inline-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", { style: { width: "10px", height: "10px", borderRadius: "2px", background: ordIt.colorHex, border: "1px solid #999" } }), ordIt.color)), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.articlesList && ordIt.articlesList.length > 1 ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fw-semibold text-primary", title: ordIt.article }, ordIt.article), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-dark border fs-11", title: "Sum of pieces across all combined articles" }, ordIt.pcs, " pcs")) : /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("span", null, ordIt.article), ordIt.pcs > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-muted border fs-11" }, ordIt.pcs, " pcs"))), /* @__PURE__ */ import_react36.default.createElement("td", null, ordIt.width, '"'), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-semibold text-dark" }, ordIt.rate && parseFloat(ordIt.rate) > 0 ? `\u20B9${parseFloat(ordIt.rate).toFixed(2)}` : /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-muted" }, "\u2014")), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-semibold" }, ordIt.requiredMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-success" }, ordIt.alreadyReceivedMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-bold text-dark" }, ordIt.pendingMeters.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isFullyOrdered ? /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border fs-10" }, "\u{1F512} Already Ordered") : ordIt.orderedMeters > 0 ? /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-warning-subtle text-warning border fs-10" }, "Partially Ordered") : /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-secondary border fs-10" }, "Not Ordered")), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, isFullyOrdered ? /* @__PURE__ */ import_react36.default.createElement("button", { type: "button", className: "btn btn-sm btn-light border py-0 px-2 fs-11 text-muted", disabled: true }, "Locked") : /* @__PURE__ */ import_react36.default.createElement(
         "button",
         {
           type: "button",
@@ -49827,6 +50335,7 @@
             }
           },
           /* @__PURE__ */ import_react36.default.createElement("option", { value: "" }, "Select Fabric Quality"),
+          item.fabric_id && !filteredFabrics.some((fab) => fab.id === item.fabric_id) && /* @__PURE__ */ import_react36.default.createElement("option", { value: item.fabric_id }, item.fabric_name || item.fabric_id),
           filteredFabrics.map((fab) => /* @__PURE__ */ import_react36.default.createElement("option", { key: fab.id, value: fab.id }, fab.name))
         ), selectedStyles.filter(Boolean).length > 1 ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-1 mt-1 text-nowrap" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-muted fs-11" }, "Style:"), /* @__PURE__ */ import_react36.default.createElement(
           "select",
@@ -49866,6 +50375,7 @@
             onChange: (e) => updateItem(idx, { article_name: e.target.value })
           },
           /* @__PURE__ */ import_react36.default.createElement("option", { value: "" }, "Select Article"),
+          item.article_name && !filteredArticles.some((a) => (a.name || a) === item.article_name) && /* @__PURE__ */ import_react36.default.createElement("option", { value: item.article_name }, item.article_name),
           filteredArticles.map((a) => /* @__PURE__ */ import_react36.default.createElement("option", { key: a.id || a.name, value: a.name }, a.name))
         )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
           "select",
@@ -49877,6 +50387,7 @@
             onChange: (e) => updateItem(idx, { width: e.target.value })
           },
           /* @__PURE__ */ import_react36.default.createElement("option", { value: "" }, "Width"),
+          item.width && !rowWidthOptions.some((w) => String(w).replace(/"/g, "") === String(item.width).replace(/"/g, "")) && /* @__PURE__ */ import_react36.default.createElement("option", { value: String(item.width).replace(/"/g, "") }, String(item.width).replace(/"/g, ""), '"'),
           rowWidthOptions.map((w) => {
             const cleanW = String(w).replace(/"/g, "");
             return /* @__PURE__ */ import_react36.default.createElement("option", { key: cleanW, value: cleanW }, cleanW, '"');
@@ -49941,7 +50452,25 @@
             disabled: !isSectionEditable("items"),
             onChange: (e) => updateItem(idx, { dyeing_rate: e.target.value })
           }
-        )), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-semibold text-dark fs-13" }, "\u20B9", Number(item.total_actual_cost || 0).toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end fw-bold text-success fs-13" }, "\u20B9", Number(item.total_amount || 0).toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: `btn btn-sm btn-light border p-1 rounded-2 mb-0 ${isLocked ? "disabled" : ""}`, style: { cursor: isLocked ? "not-allowed" : "pointer" }, title: "Capture / Upload Fabric Swatch" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: `ti ${item.sample_photo ? "ti-photo-check text-success" : "ti-camera text-muted"} fs-15` }), !isLocked && /* @__PURE__ */ import_react36.default.createElement(
+        )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
+          "div",
+          {
+            className: "form-control form-control-sm text-end fw-semibold text-dark bg-light d-flex align-items-center justify-content-end fs-13 w-100",
+            style: { borderColor: "#cbd5e1", height: "36px", minWidth: "90px" },
+            title: "Total Actual Cost per Metre (Fabric Rate + Dyeing Rate)"
+          },
+          "\u20B9",
+          Number(item.total_actual_cost || 0).toFixed(2)
+        )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
+          "div",
+          {
+            className: "form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-flex align-items-center justify-content-end fs-13 w-100",
+            style: { borderColor: "#a7f3d0", height: "36px", minWidth: "100px" },
+            title: "Total Line Item Amount (Metres \xD7 Total Cost/m)"
+          },
+          "\u20B9",
+          Number(item.total_amount || 0).toFixed(2)
+        )), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: `btn btn-sm btn-light border p-1 rounded-2 mb-0 ${isLocked ? "disabled" : ""}`, style: { cursor: isLocked ? "not-allowed" : "pointer" }, title: "Capture / Upload Fabric Swatch" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: `ti ${item.sample_photo ? "ti-photo-check text-success" : "ti-camera text-muted"} fs-15` }), !isLocked && /* @__PURE__ */ import_react36.default.createElement(
           "input",
           {
             type: "file",
@@ -49968,7 +50497,16 @@
           /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-trash fs-14" })
         )));
       })),
-      items.length > 0 && /* @__PURE__ */ import_react36.default.createElement("tfoot", { style: { background: "#f8fafc", fontWeight: "bold" } }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 6, className: "text-end text-secondary fs-12 py-2" }, "GRAND TOTALS:"), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, grandTotalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, grandTotalPieces, " pcs"), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 2, className: "text-end text-secondary fs-12 py-2" }, "Total Actual Job Cost:"), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 2, className: "text-end text-success fs-14 py-2" }, "\u20B9", grandTotalCost.toFixed(2)), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: !isLocked && isSectionEditable("items") ? 2 : 1 })))
+      items.length > 0 && /* @__PURE__ */ import_react36.default.createElement("tfoot", { style: { background: "#f8fafc", fontWeight: "bold" } }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 6, className: "text-end text-secondary fs-12 py-2" }, "GRAND TOTALS:"), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, grandTotalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react36.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, grandTotalPieces, " pcs"), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 2, className: "text-end text-secondary fs-12 py-2" }, "Total Actual Job Cost:"), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: 2, className: "text-end py-2" }, /* @__PURE__ */ import_react36.default.createElement(
+        "div",
+        {
+          className: "form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-inline-flex align-items-center justify-content-end fs-13 px-3",
+          style: { borderColor: "#a7f3d0", height: "36px", minWidth: "110px" },
+          title: "Grand Total Actual Job Cost"
+        },
+        "\u20B9",
+        grandTotalCost.toFixed(2)
+      )), /* @__PURE__ */ import_react36.default.createElement("td", { colSpan: !isLocked && isSectionEditable("items") ? 2 : 1 })))
     ))), items.length > 0 && /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 border-top bg-light", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-11 fw-bold text-secondary text-uppercase d-block mb-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-table me-1" }), " Running PO Summary:"), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, items.map((it, i) => /* @__PURE__ */ import_react36.default.createElement("div", { key: i, className: "badge bg-white text-dark border p-2 d-flex align-items-center gap-2 shadow-2xs", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react36.default.createElement("span", { style: { width: "10px", height: "10px", borderRadius: "2px", background: it.color_hex || "#cbd5e1", border: "1px solid #999" } }), /* @__PURE__ */ import_react36.default.createElement("span", null, /* @__PURE__ */ import_react36.default.createElement("strong", null, it.color_name || "Item"), ":"), /* @__PURE__ */ import_react36.default.createElement("span", null, it.fabric_name ? `${it.fabric_name} ${it.width ? `(${it.width}")` : ""}` : "(No Fabric)"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-dark fw-bold" }, "[", it.quantity_meters || 0, "m / ", it.quantity_pieces || 0, "pcs]")))))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex align-items-center justify-content-between", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-notes text-secondary fs-16" }), /* @__PURE__ */ import_react36.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Terms, Special Instructions & Remarks"))), /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react36.default.createElement(
       "textarea",
       {
@@ -50034,7 +50572,7 @@
       {
         isInline: true,
         vendors: vendorList,
-        defaultTypes: [],
+        defaultTypes: processType && processType !== "All Processes" ? [processType] : ["Dyeing"],
         onCloseInline: (saved) => {
           if (saved && (saved.name || saved.vendorName)) {
             handleVendorSaved(saved);
@@ -50376,20 +50914,54 @@
       isExistingSaved && (initialChallan.is_locked || initialChallan.status === "Completed" || initialChallan.status === "Inwarded" || returns && returns.some((r) => r.linked_challan_id && (r.linked_challan_id === initialChallan.challan_number || r.linked_challan_id === initialChallan.id)))
     );
     const isReadOnly = isExistingSaved || isLocked;
-    const warehouseStockPool = [
-      { baleNo: "Roll 12304", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Off White", meters: 1065.5, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-A", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 119.3, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-B", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 111, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-C", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 78.4, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-D", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 97.8, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-E", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 113.3, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 2376-F", invoiceNo: "INV-MS-0091", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 134, arrivalDate: "2026-08-01", ageDays: 11 },
-      { baleNo: "Roll 8841-A", invoiceNo: "INV-MS-0095", fabric: "100x100 Voile (Grey)", color: "Beige", meters: 400, arrivalDate: "2026-08-08", ageDays: 4 },
-      { baleNo: "Roll 5502-A", invoiceNo: "INV-LIVA-201", fabric: "Rayon 14kg Liva", color: "Maroon Ruby", meters: 500, arrivalDate: "2026-08-03", ageDays: 9 },
-      { baleNo: "Roll 7710-A", invoiceNo: "INV-CAM-304", fabric: "Cotton Cambric 60*60", color: "Dusty Rose", meters: 650, arrivalDate: "2026-08-05", ageDays: 7 }
+    const defaultWarehouseBales = [
+      { id: "WB-101", baleNo: "Bale 1", vendorName: "Vendor A", invoiceNo: "INV-VA-001 (Jan)", date: "2026-01-15", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 500, availableMeters: 500, folding: "L98", actualDispatchedMeters: 490, subRolls: "5 Rolls (100m x 5)", ageDays: 45 },
+      { id: "WB-102", baleNo: "Bale 2", vendorName: "Vendor A", invoiceNo: "INV-VA-001 (Jan)", date: "2026-01-15", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 900, availableMeters: 900, folding: "L100", actualDispatchedMeters: 900, subRolls: "9 Rolls (100m x 9)", ageDays: 45 },
+      { id: "WB-103", baleNo: "Bale 3", vendorName: "Vendor A", invoiceNo: "INV-VA-001 (Jan)", date: "2026-01-15", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 600, availableMeters: 600, folding: "L100", actualDispatchedMeters: 600, subRolls: "6 Rolls (100m x 6)", ageDays: 45 },
+      { id: "WB-104", baleNo: "Bale 4", vendorName: "Vendor A", invoiceNo: "INV-VA-001 (Jan)", date: "2026-01-15", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 1e3, availableMeters: 1e3, folding: "L100", actualDispatchedMeters: 1e3, subRolls: "10 Rolls (100m x 10)", ageDays: 45 },
+      { id: "WB-105", baleNo: "Bale 5", vendorName: "Vendor A", invoiceNo: "INV-VA-001 (Jan)", date: "2026-01-15", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 1e3, availableMeters: 1e3, folding: "L100", actualDispatchedMeters: 1e3, subRolls: "Rolls: 100m, 100m, 100m, 50m, 90m...", ageDays: 45 },
+      { id: "WB-106", baleNo: "Bale 6 (Mega Bale)", vendorName: "Vendor A", invoiceNo: "INV-VA-002 (Feb)", date: "2026-02-10", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 5e3, availableMeters: 5e3, folding: "L100", actualDispatchedMeters: 5e3, subRolls: "50 Rolls (100m each)", ageDays: 20 },
+      { id: "WB-107", baleNo: "Bale 7", vendorName: "Vendor B", invoiceNo: "INV-VB-001 (June)", date: "2026-06-05", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 2e3, availableMeters: 2e3, folding: "L100", actualDispatchedMeters: 2e3, subRolls: "20 Rolls (100m each)", ageDays: 10 },
+      { id: "WB-108", baleNo: "Bale 8", vendorName: "Vendor B", invoiceNo: "INV-VB-001 (June)", date: "2026-06-05", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 1500, availableMeters: 1500, folding: "L100", actualDispatchedMeters: 1500, subRolls: "15 Rolls (100m each)", ageDays: 10 },
+      { id: "WB-109", baleNo: "Bale 9", vendorName: "Vendor B", invoiceNo: "INV-VB-001 (June)", date: "2026-06-05", fabric: 'Grey [48"]', fabricQuality: "Grey", width: '48"', color: "Black", meters: 1500, availableMeters: 1500, folding: "L98", actualDispatchedMeters: 1470, subRolls: "Rolls: 100m, 100m, 50m...", ageDays: 10 },
+      { id: "WB-110", baleNo: "Bale 12384", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 1865.5, availableMeters: 1865.5, folding: "L100", actualDispatchedMeters: 1865.5, subRolls: "Bale Package", ageDays: 11 },
+      { id: "WB-111", baleNo: "Roll 2376-A", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 119.3, availableMeters: 119.3, folding: "L100", actualDispatchedMeters: 119.3, subRolls: "Individual Roll", ageDays: 11 },
+      { id: "WB-112", baleNo: "Roll 2376-B", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 111, availableMeters: 111, folding: "L100", actualDispatchedMeters: 111, subRolls: "Individual Roll", ageDays: 11 },
+      { id: "WB-113", baleNo: "Roll 2376-C", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 78.4, availableMeters: 78.4, folding: "L100", actualDispatchedMeters: 78.4, subRolls: "Individual Roll", ageDays: 11 },
+      { id: "WB-114", baleNo: "Roll 2376-D", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 97.8, availableMeters: 97.8, folding: "L100", actualDispatchedMeters: 97.8, subRolls: "Individual Roll", ageDays: 11 },
+      { id: "WB-115", baleNo: "Roll 2376-E", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 113.3, availableMeters: 113.3, folding: "L100", actualDispatchedMeters: 113.3, subRolls: "Individual Roll", ageDays: 11 },
+      { id: "WB-116", baleNo: "Roll 2376-F (Cut)", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 20, availableMeters: 20, folding: "L100", actualDispatchedMeters: 20, subRolls: "Cut Piece", ageDays: 11 },
+      { id: "WB-117", baleNo: "Roll 2376-G", vendorName: "Krishna / Raju Dyeing", invoiceNo: "INV-MS-0091", date: "2026-08-01", fabric: '100x100 Voil [48"] (Grey)', fabricQuality: "100x100 Voil", width: '48"', color: "Grey", meters: 13.5, availableMeters: 13.5, folding: "L100", actualDispatchedMeters: 13.5, subRolls: "Cut Piece", ageDays: 11 }
     ];
+    const [warehouseStockPool, setWarehouseStockPool] = (0, import_react38.useState)(() => {
+      try {
+        const stored = localStorage.getItem("erp_warehouse_fabric_bales");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+      }
+      return defaultWarehouseBales;
+    });
+    const generateSystemChallanNumber = () => {
+      try {
+        const rawStored = localStorage.getItem("erp_process_challans_v1") || localStorage.getItem("erp_process_challans") || "[]";
+        const stored = JSON.parse(rawStored);
+        const existingNums = (Array.isArray(stored) ? stored : []).map(
+          (c) => String(c.challan_number || c.id || "").toUpperCase().trim()
+        );
+        for (let i = 0; i < 30; i++) {
+          const rand4 = Math.floor(1e3 + Math.random() * 9e3);
+          const candidate = `CH-${rand4}`;
+          if (!existingNums.includes(candidate) && !existingNums.includes(String(rand4))) {
+            return candidate;
+          }
+        }
+        return `CH-${Math.floor(1e3 + Math.random() * 9e3)}`;
+      } catch (e) {
+        return `CH-${Math.floor(1e3 + Math.random() * 9e3)}`;
+      }
+    };
     const [challanNumber, setChallanNumber] = (0, import_react38.useState)(
-      initialChallan?.challan_number || ""
+      initialChallan?.challan_number || generateSystemChallanNumber()
     );
     const [date, setDate] = (0, import_react38.useState)(
       initialChallan?.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
@@ -50412,13 +50984,21 @@
     const [vendorName, setVendorName] = (0, import_react38.useState)(initialChallan?.vendor_name || "");
     const [stylesInfo, setStylesInfo] = (0, import_react38.useState)(initialChallan?.styles_info || []);
     const [customerBrand, setCustomerBrand] = (0, import_react38.useState)(initialChallan?.customer_brand || "");
-    const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "");
+    const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "L100");
+    const [particulars, setParticulars] = (0, import_react38.useState)(
+      initialChallan?.particulars || '100x100 Voil [48"] gray - fab issue for dying'
+    );
     const [remarks, setRemarks] = (0, import_react38.useState)(initialChallan?.remarks || "");
-    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "");
-    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "");
+    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "Anurag");
+    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "Anurag");
     const [items, setItems] = (0, import_react38.useState)(initialChallan?.items || []);
     const [showLinkPOModal, setShowLinkPOModal] = (0, import_react38.useState)(false);
     const [showStockPickerModal, setShowStockPickerModal] = (0, import_react38.useState)(false);
+    const [modalSelectedBaleIds, setModalSelectedBaleIds] = (0, import_react38.useState)([]);
+    const [modalVendorFilter, setModalVendorFilter] = (0, import_react38.useState)("All");
+    const [modalInvoiceFilter, setModalInvoiceFilter] = (0, import_react38.useState)("All");
+    const [modalSearchTerm, setModalSearchTerm] = (0, import_react38.useState)("");
+    const [customCutInputs, setCustomCutInputs] = (0, import_react38.useState)({});
     const [showPODropdown, setShowPODropdown] = (0, import_react38.useState)(false);
     const [poSearchTerm, setPoSearchTerm] = (0, import_react38.useState)("");
     const poDropdownRef = (0, import_react38.useRef)(null);
@@ -50438,11 +51018,19 @@
       const poNum = String(po.po_number || "").trim().toLowerCase();
       return poId === target || poNum === target || target === `ppo-${poNum}`;
     };
+    const selectedPOObjects = availablePOs.filter(
+      (p) => selectedPOs.some((ref) => isPOMatched(p, ref))
+    );
+    const totalRequiredMeters = selectedPOObjects.reduce((acc, p) => {
+      const pMtrs = parseFloat(p.total_meters);
+      if (!isNaN(pMtrs) && pMtrs > 0) return acc + pMtrs;
+      const itemsSum = (p.items || []).reduce((s, it) => s + (parseFloat(it.quantity_meters) || 0), 0);
+      return acc + itemsSum;
+    }, 0);
+    const grandTotalMeters = items.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
+    const balancePendingMeters = Number(Math.max(0, totalRequiredMeters - grandTotalMeters).toFixed(2));
     (0, import_react38.useEffect)(() => {
       if (!isEmergencyDispatch && selectedPOs.length > 0) {
-        const selectedPOObjects = availablePOs.filter(
-          (p) => selectedPOs.some((ref) => isPOMatched(p, ref))
-        );
         if (selectedPOObjects.length > 0) {
           const firstPO = selectedPOObjects[0];
           if (firstPO.vendor_id) setVendorId(firstPO.vendor_id);
@@ -50459,30 +51047,32 @@
           if (firstPO.customer_brand_name) {
             setCustomerBrand(firstPO.customer_brand_name);
           }
-          if (items.length === 0) {
-            const autoItems = [];
-            selectedPOObjects.forEach((p, pIdx) => {
-              if (p.items && p.items.length > 0) {
-                p.items.forEach((it, idx) => {
-                  autoItems.push({
-                    id: Date.now() + pIdx * 10 + idx,
-                    bale_roll_no: `Roll 2376-${String.fromCharCode(65 + idx)}`,
-                    fabric_name: it.fabric_name || p.fabric_quality || "100x100 Voile (Grey)",
-                    color_name: it.color_name || "Standard",
-                    invoice_no: "INV-MS-0091",
-                    original_piece_meters: parseFloat(it.quantity_meters) || 100,
-                    dispatched_meters: parseFloat(it.quantity_meters) || 100,
-                    is_partial_cut: false,
-                    folding: foldingNotation || ""
-                  });
-                });
-              }
-            });
-            if (autoItems.length > 0) setItems(autoItems);
-          }
         }
       }
     }, [selectedPOs, isEmergencyDispatch, availablePOs]);
+    const getCurrentChallanData = () => {
+      const baleCount = items.filter((it) => String(it.bale_roll_no || "").toLowerCase().includes("bale")).length;
+      const looseCount = items.filter((it) => !String(it.bale_roll_no || "").toLowerCase().includes("bale")).length;
+      const totalPiecesText = baleCount > 0 && looseCount > 0 ? `${baleCount} Bale + ${looseCount} th` : baleCount > 0 ? `${baleCount} Bale` : `${looseCount || items.length} th`;
+      return {
+        ...initialChallan || {},
+        id: initialChallan?.id || `PCH-${String(challanNumber).replace(/\D/g, "") || "4903"}`,
+        challan_number: challanNumber,
+        date,
+        vendor_name: vendorName || "Raju dyeing",
+        vendor_id: vendorId || "VEND-0003",
+        linked_pos: selectedPOs.length > 0 ? selectedPOs : ["7611", "7612", "7613"],
+        particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
+        folding_notation: foldingNotation || "L100",
+        total_bales: baleCount || 1,
+        total_pieces: totalPiecesText || "1 Bale + 7 th",
+        grand_total_meters: grandTotalMeters || 2418.8,
+        items: items.length > 0 ? items : initialChallan?.items || [],
+        remarks: remarks || "Fab issue for dyeing",
+        receiver_signature: receiverSignature || "Anurag",
+        company_representative: companyRep || "Anurag"
+      };
+    };
     const togglePOSelection = (po) => {
       const poKey = po.po_number || po.id;
       const isAlreadySelected = selectedPOs.some((ref) => isPOMatched(po, ref));
@@ -50505,33 +51095,181 @@ Do you want to switch the shipment to "${po.vendor_name}"?`)) {
         setSelectedPOs([...selectedPOs, poKey]);
       }
     };
-    const handleSelectWarehouseRoll = (roll) => {
+    const handleAutoGenerateAndLinkPO = () => {
+      const vName = vendorName || "Job Worker";
+      const vId = vendorId || "V-01";
+      const randNum = Math.floor(1e3 + Math.random() * 9e3);
+      const newPoNum = `PPO-${randNum}`;
+      const newPO = {
+        id: newPoNum,
+        po_number: String(randNum),
+        process_type: "Dyeing",
+        vendor_id: vId,
+        vendor_name: vName,
+        date: date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        total_meters: 100,
+        fabric_quality: "Fabric (Auto Generated)",
+        status: "Issued"
+      };
+      try {
+        const rawStored = localStorage.getItem("erp_process_pos_v1") || localStorage.getItem("erp_process_pos") || "[]";
+        const stored = JSON.parse(rawStored);
+        stored.unshift(newPO);
+        localStorage.setItem("erp_process_pos_v1", JSON.stringify(stored));
+        localStorage.setItem("erp_process_pos", JSON.stringify(stored));
+      } catch (e) {
+      }
+      setVendorName(vName);
+      setVendorId(vId);
+      setSelectedPOs((prev) => [...prev, String(randNum)]);
+      setIsEmergencyDispatch(false);
+    };
+    const computeFoldedMeters = (nominalMtrs, fold) => {
+      const mtr = parseFloat(nominalMtrs) || 0;
+      const foldStr = String(fold || foldingNotation || "").toUpperCase().trim();
+      if (foldStr.includes("98")) {
+        return Number((mtr * 0.98).toFixed(2));
+      }
+      return mtr;
+    };
+    const handleSelectWarehouseRoll = (roll, customMeters = null) => {
       const existingInvoices = items.map((it) => it.invoice_no).filter(Boolean);
       const hasDifferentInvoice = existingInvoices.length > 0 && !existingInvoices.includes(roll.invoiceNo);
       if (hasDifferentInvoice) {
         const confirmMix = window.confirm(
           `\u26A0\uFE0F Single Batch Rule (Do Not Mix Invoices):
 
-You are adding a roll from invoice ${roll.invoiceNo}, but existing rolls are from ${existingInvoices[0]}.
+You are adding a roll/bale from invoice [${roll.invoiceNo}], but existing items are from [${existingInvoices[0]}].
 
-Mixing rolls from different dye lots may lead to visible shade variation.
+Mixing fabric from different dye lots may lead to visible shade variation.
 
-Do you confirm this explicit override?`
+Do you want to confirm this mixed batch dispatch?`
         );
         if (!confirmMix) return;
       }
+      const nominalOriginal = parseFloat(roll.availableMeters || roll.meters);
+      const isCustomCut = customMeters !== null && !isNaN(customMeters) && customMeters > 0 && customMeters < nominalOriginal;
+      const nominalDispatched = isCustomCut ? parseFloat(customMeters) : nominalOriginal;
+      const foldCode = roll.folding || foldingNotation || "L100";
+      const actualDispatched = computeFoldedMeters(nominalDispatched, foldCode);
       const newItem = {
         id: Date.now() + Math.random(),
         bale_roll_no: roll.baleNo,
         invoice_no: roll.invoiceNo,
-        fabric_name: roll.fabric,
-        color_name: roll.color,
-        original_piece_meters: roll.meters,
-        dispatched_meters: roll.meters,
-        is_partial_cut: false,
-        folding: foldingNotation || ""
+        vendor_name: roll.vendorName || "",
+        fabric_name: roll.fabric || 'Grey [48"]',
+        color_name: roll.color || "Black",
+        original_piece_meters: nominalOriginal,
+        dispatched_meters: actualDispatched,
+        is_partial_cut: isCustomCut,
+        folding: foldCode,
+        remaining_stock_meters: Number(Math.max(0, nominalOriginal - nominalDispatched).toFixed(2))
       };
-      setItems([...items, newItem]);
+      setItems((prev) => [...prev, newItem]);
+      setWarehouseStockPool((prev) => prev.map((wb) => {
+        if (wb.id === roll.id) {
+          const updatedAvail = Math.max(0, (wb.availableMeters || wb.meters) - nominalDispatched);
+          return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)) };
+        }
+        return wb;
+      }));
+      setShowStockPickerModal(false);
+    };
+    const handleAutoFulfillBalance = () => {
+      let remainingNeeded = balancePendingMeters;
+      if (remainingNeeded <= 0) {
+        alert("Order requirement is already 100% fulfilled!");
+        return;
+      }
+      const newItems = [...items];
+      const updatedStock = [...warehouseStockPool];
+      for (let i = 0; i < updatedStock.length; i++) {
+        const roll = updatedStock[i];
+        const avail = parseFloat(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters);
+        if (avail > 0) {
+          const foldCode = roll.folding || foldingNotation || "L100";
+          if (avail <= remainingNeeded) {
+            const actualMtrs = computeFoldedMeters(avail, foldCode);
+            newItems.push({
+              id: Date.now() + Math.random() + i,
+              bale_roll_no: roll.baleNo,
+              invoice_no: roll.invoiceNo,
+              vendor_name: roll.vendorName || "",
+              fabric_name: roll.fabric,
+              color_name: roll.color,
+              original_piece_meters: avail,
+              dispatched_meters: actualMtrs,
+              is_partial_cut: false,
+              folding: foldCode,
+              remaining_stock_meters: 0
+            });
+            remainingNeeded = Number(Math.max(0, remainingNeeded - actualMtrs).toFixed(2));
+            updatedStock[i] = { ...roll, availableMeters: 0 };
+          } else {
+            const actualCut = computeFoldedMeters(remainingNeeded, foldCode);
+            newItems.push({
+              id: Date.now() + Math.random() + i,
+              bale_roll_no: roll.baleNo,
+              invoice_no: roll.invoiceNo,
+              vendor_name: roll.vendorName || "",
+              fabric_name: roll.fabric,
+              color_name: roll.color,
+              original_piece_meters: avail,
+              dispatched_meters: actualCut,
+              is_partial_cut: true,
+              folding: foldCode,
+              remaining_stock_meters: Number((avail - remainingNeeded).toFixed(2))
+            });
+            updatedStock[i] = { ...roll, availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
+            remainingNeeded = 0;
+            break;
+          }
+        }
+        if (remainingNeeded <= 0) break;
+      }
+      setItems(newItems);
+      setWarehouseStockPool(updatedStock);
+    };
+    const handleAllocateMultiBales = () => {
+      if (modalSelectedBaleIds.length === 0) return;
+      const selectedBales = warehouseStockPool.filter((wb) => modalSelectedBaleIds.includes(wb.id));
+      const distinctInvoices = [...new Set(selectedBales.map((b) => b.invoiceNo))];
+      const existingInvoices = items.map((it) => it.invoice_no).filter(Boolean);
+      const allInvoices = [.../* @__PURE__ */ new Set([...existingInvoices, ...distinctInvoices])];
+      if (allInvoices.length > 1) {
+        const confirmMix = window.confirm(
+          `\u26A0\uFE0F Single Batch Rule (Do Not Mix Invoices):
+
+You are selecting bales from multiple invoices: [${allInvoices.join(", ")}].
+
+Confirm dispatch with mixed batch lots?`
+        );
+        if (!confirmMix) return;
+      }
+      const newAllocated = [];
+      selectedBales.forEach((roll, i) => {
+        const avail = parseFloat(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters);
+        const foldCode = roll.folding || foldingNotation || "L100";
+        const actual = computeFoldedMeters(avail, foldCode);
+        newAllocated.push({
+          id: Date.now() + Math.random() + i,
+          bale_roll_no: roll.baleNo,
+          invoice_no: roll.invoiceNo,
+          vendor_name: roll.vendorName || "",
+          fabric_name: roll.fabric,
+          color_name: roll.color,
+          original_piece_meters: avail,
+          dispatched_meters: actual,
+          is_partial_cut: false,
+          folding: foldCode,
+          remaining_stock_meters: 0
+        });
+      });
+      setItems((prev) => [...prev, ...newAllocated]);
+      setWarehouseStockPool((prev) => prev.map(
+        (wb) => modalSelectedBaleIds.includes(wb.id) ? { ...wb, availableMeters: 0 } : wb
+      ));
+      setModalSelectedBaleIds([]);
       setShowStockPickerModal(false);
     };
     const addManualStockRow = () => {
@@ -50539,26 +51277,50 @@ Do you confirm this explicit override?`
         ...items,
         {
           id: Date.now(),
-          bale_roll_no: "",
-          invoice_no: items[0]?.invoice_no || "INV-MS-0091",
-          fabric_name: items[0]?.fabric_name || "100x100 Voile (Grey)",
-          color_name: items[0]?.color_name || "Beige",
+          bale_roll_no: `Bale ${items.length + 1}`,
+          invoice_no: items[0]?.invoice_no || "INV-VA-001 (Jan)",
+          fabric_name: items[0]?.fabric_name || 'Grey [48"]',
+          color_name: items[0]?.color_name || "Black",
           original_piece_meters: "",
           dispatched_meters: "",
           is_partial_cut: false,
-          folding: foldingNotation || ""
+          folding: foldingNotation || "L100",
+          remaining_stock_meters: 0
         }
       ]);
     };
     const removeItem = (idx) => {
+      const itemToRemove = items[idx];
+      if (itemToRemove && itemToRemove.bale_roll_no) {
+        setWarehouseStockPool((prev) => prev.map((wb) => {
+          if (wb.baleNo === itemToRemove.bale_roll_no && wb.invoiceNo === itemToRemove.invoice_no) {
+            const restored = (parseFloat(wb.availableMeters) || 0) + (parseFloat(itemToRemove.dispatched_meters) || 0);
+            return { ...wb, availableMeters: Number(restored.toFixed(2)) };
+          }
+          return wb;
+        }));
+      }
       setItems(items.filter((_, i) => i !== idx));
     };
     const handleItemFieldChange = (index, field, value) => {
       const updated = [...items];
       updated[index] = { ...updated[index], [field]: value };
+      if (field === "folding") {
+        const orig = parseFloat(updated[index].original_piece_meters) || parseFloat(updated[index].dispatched_meters) || 0;
+        if (orig > 0) {
+          updated[index].dispatched_meters = computeFoldedMeters(orig, value);
+        }
+      }
+      if (field === "dispatched_meters") {
+        const orig = parseFloat(updated[index].original_piece_meters) || 0;
+        const disp = parseFloat(value) || 0;
+        if (orig > 0) {
+          updated[index].is_partial_cut = disp < orig;
+          updated[index].remaining_stock_meters = Number(Math.max(0, orig - disp).toFixed(2));
+        }
+      }
       setItems(updated);
     };
-    const grandTotalMeters = items.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
     const poLinkStatus = isEmergencyDispatch ? "Pending PO Link" : selectedPOs.length > 0 ? "Linked" : "Draft";
     const handleSubmit = (e, andRecordReturn = false) => {
       if (e && e.preventDefault) e.preventDefault();
@@ -50587,6 +51349,9 @@ Confirm dispatch with mixed batches?`
         );
         if (!confirmMix) return;
       }
+      const baleCount = items.filter((it) => String(it.bale_roll_no || "").toLowerCase().includes("bale")).length;
+      const looseCount = items.filter((it) => !String(it.bale_roll_no || "").toLowerCase().includes("bale")).length;
+      const totalPiecesText = baleCount > 0 && looseCount > 0 ? `${baleCount} Bale + ${looseCount} th` : baleCount > 0 ? `${baleCount} Bale` : `${looseCount || items.length} th`;
       const challanPayload = {
         id: initialChallan?.id || `PCH-${trimmedChallanNo}`,
         challan_number: trimmedChallanNo,
@@ -50598,9 +51363,10 @@ Confirm dispatch with mixed batches?`
         customer_brand: customerBrand,
         po_link_status: poLinkStatus,
         admin_alert_triggered: isEmergencyDispatch,
-        folding_notation: foldingNotation,
-        total_bales: 1,
-        total_pieces: items.length,
+        particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
+        folding_notation: foldingNotation || "L100",
+        total_bales: baleCount || 1,
+        total_pieces: totalPiecesText,
         grand_total_meters: Number(grandTotalMeters.toFixed(2)),
         remarks,
         receiver_signature: receiverSignature,
@@ -50641,12 +51407,12 @@ Confirm dispatch with mixed batches?`
         },
         /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-arrow-left fs-15" }),
         /* @__PURE__ */ import_react38.default.createElement("span", null, "Back to Challans")
-      ), onPrintChallan && isExistingSaved && /* @__PURE__ */ import_react38.default.createElement(
+      ), onPrintChallan && /* @__PURE__ */ import_react38.default.createElement(
         "button",
         {
           type: "button",
           className: "btn btn-outline-secondary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5",
-          onClick: () => onPrintChallan(initialChallan),
+          onClick: () => onPrintChallan(getCurrentChallanData()),
           title: "Print Job Challan Slip matching Page 15 paper format"
         },
         /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-printer fs-15" }),
@@ -50685,7 +51451,17 @@ Confirm dispatch with mixed batches?`
           if (e.target.checked) setSelectedPOs([]);
         }
       }
-    ), /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-check-label fs-12 fw-semibold text-danger", htmlFor: "emergencySwitch" }, "Emergency Dispatch (No PO)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, !isEmergencyDispatch && /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3 pb-3 border-bottom", ref: poDropdownRef }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "Link by Vendor / Party Name & Process POs (Multi-Select) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "Page 15 slip: Bundles multiple POs to same vendor in one shipment")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "position-relative" }, /* @__PURE__ */ import_react38.default.createElement(
+    ), /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-check-label fs-12 fw-semibold text-danger", htmlFor: "emergencySwitch" }, "Emergency Dispatch (No PO)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, !isEmergencyDispatch && /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3 pb-3 border-bottom", ref: poDropdownRef }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "Link by Vendor / Party Name & Process POs (Multi-Select) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "Page 15 slip: Bundles multiple POs to same vendor"), isSectionEditable("header") && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-link p-0 text-primary text-decoration-none fs-11 fw-semibold d-flex align-items-center gap-1",
+        onClick: handleAutoGenerateAndLinkPO,
+        title: "Auto-generate a new Process PO and link to this Challan"
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-12" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "+ Auto-Generate PO")
+    ))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "position-relative" }, /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
@@ -50816,7 +51592,7 @@ Confirm dispatch with mixed batches?`
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm bg-white fs-13 fw-bold text-dark",
+        className: "form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace",
         style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
         value: challanNumber,
         disabled: !isSectionEditable("header"),
@@ -50895,15 +51671,36 @@ Confirm dispatch with mixed batches?`
         },
         placeholder: "e.g. L100 / Fold 98"
       }
-    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "PO Link Status"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center", style: { height: "38px" } }, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge px-3 py-2 fs-12 fw-bold rounded-2 ${isEmergencyDispatch ? "bg-danger text-white border border-danger shadow-xs" : selectedPOs.length > 0 ? "bg-success-subtle text-success border border-success-subtle" : "bg-light text-secondary border"}` }, isEmergencyDispatch ? "\u26A0 Pending PO Link (Emergency)" : selectedPOs.length > 0 ? "\u2713 Linked to PO" : "Draft (No PO)")))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(16, 185, 129, 0.1)", color: "#10b981" } }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-packages fs-16" })), /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Warehouse Stock Allocation (Bales / Rolls Dispatch)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "FIFO older stock recommendation & Single Batch Rule (Do Not Mix Invoices)"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement(
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-8" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Particulars / Fabric Issue Description ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fw-normal" }, "(Matches physical Job Challan paper slip)")), /* @__PURE__ */ import_react38.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm bg-white fs-13 text-dark fw-medium",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: particulars,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setParticulars(e.target.value),
+        placeholder: 'e.g. 100x100 Voil [48"] gray - fab issue for dying'
+      }
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "PO Link Status"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center", style: { height: "38px" } }, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge px-3 py-2 fs-12 fw-bold rounded-2 ${isEmergencyDispatch ? "bg-danger text-white border border-danger shadow-xs" : selectedPOs.length > 0 ? "bg-success-subtle text-success border border-success-subtle" : "bg-light text-secondary border"}` }, isEmergencyDispatch ? "\u26A0 Pending PO Link (Emergency)" : selectedPOs.length > 0 ? "\u2713 Linked to PO" : "Draft (No PO)")))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(16, 185, 129, 0.1)", color: "#10b981" } }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-packages fs-16" })), /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Warehouse Stock Allocation (Bales / Rolls Dispatch)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Warehouse inward stock pool \u2022 Single Batch Rule (Do Not Mix Invoices) \u2022 Folding L100 vs L98"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-outline-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5",
+        className: "btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs",
         onClick: () => setShowStockPickerModal(true)
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse fs-14" }),
-      /* @__PURE__ */ import_react38.default.createElement("span", null, "Pick from Warehouse (FIFO)")
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Pick Bales from Warehouse (FIFO)")
+    ), totalRequiredMeters > 0 && balancePendingMeters > 0 && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-warning btn-sm px-3 rounded-2 fw-semibold d-flex align-items-center gap-1.5 shadow-xs",
+        onClick: handleAutoFulfillBalance,
+        title: "Auto-allocate sequence of bales to hit 100% of order requirement"
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Auto-Fulfill (", balancePendingMeters.toFixed(1), "m)")
     ), /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
@@ -50913,7 +51710,43 @@ Confirm dispatch with mixed batches?`
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-14" }),
       " Manual Row"
-    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-bordered align-middle mb-0", style: { borderColor: "#dee2e6", fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { style: { color: "#475569", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" } }, /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-center py-2", style: { width: "35px" } }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Bale / Roll No *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Stock Invoice Ref *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "160px" } }, "Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "120px" } }, "Color Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "160px", minWidth: "155px" }, className: "text-center" }, "Dispatch Mode"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "110px" }, className: "text-end" }, "Original (m)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-end text-dark" }, "Dispatched (m) *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "90px" }, className: "text-center" }, "Folding"), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, items.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 10, className: "text-center py-4 text-muted" }, "No stock rolls allocated yet. Click ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Pick from Warehouse (FIFO)"'), " above to select rolls.")) : items.map((it, idx) => /* @__PURE__ */ import_react38.default.createElement("tr", { key: it.id || idx }, /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center fw-bold text-muted" }, idx + 1), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
+    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom bg-light-subtle" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-2 align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "PO Required Meters"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-primary" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open Allocation"), selectedPOs.length > 0 && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10" }, selectedPOs.length, " PO(s)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Total Dispatched"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-dark" }, grandTotalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "(", items.length, " rolls/bales)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: `p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05 ? "border-success" : balancePendingMeters > 0 ? "border-warning" : "border-light"}` }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Fulfillment Status"), totalRequiredMeters > 0 ? grandTotalMeters >= totalRequiredMeters - 0.05 ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-success d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-circle-check fs-15" }), " 100% Fulfilled \u2713") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-warning d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-clock-pause fs-15" }), " Pending: ", balancePendingMeters.toFixed(2), " m") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-secondary" }, "Ready for Dispatch"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3 d-flex flex-column gap-1.5 justify-content-center" }, totalRequiredMeters > 0 && balancePendingMeters > 0 && isSectionEditable("items") ? /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-warning btn-sm py-1.5 px-3 fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-xs",
+        onClick: handleAutoFulfillBalance
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "\u26A1 Auto-Fulfill Balance")
+    ) : null, isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-primary btn-sm py-1.5 px-3 fw-semibold d-flex align-items-center justify-content-center gap-1.5 shadow-xs",
+        onClick: () => setShowStockPickerModal(true)
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Browse Warehouse Stock")
+    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-bordered align-middle mb-0", style: { borderColor: "#dee2e6", fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { style: { color: "#475569", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" } }, /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-center py-2", style: { width: "35px" } }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Bale / Roll No *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Stock Invoice Ref *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "110px" } }, "Color Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "150px" }, className: "text-center" }, "Dispatch Mode"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" }, className: "text-end" }, "Original (m)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "120px" }, className: "text-end text-dark" }, "Dispatched (m) *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "140px" }, className: "text-end" }, "Remaining in Stock (m)"), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, items.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 11, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-3" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-packages fs-32 text-secondary mb-2 d-block opacity-50" }), /* @__PURE__ */ import_react38.default.createElement("h6", { className: "fs-14 fw-semibold text-dark mb-1" }, "No Warehouse Stock Allocated Yet"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "fs-12 text-muted mb-3" }, totalRequiredMeters > 0 ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/rolls from warehouse inventory or auto-fulfill.` : "Select bales/rolls from warehouse inventory to dispatch on this Process Challan."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex justify-content-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1.5",
+        onClick: () => setShowStockPickerModal(true)
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Pick Bales from Warehouse Stock")
+    ), totalRequiredMeters > 0 && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-warning btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5",
+        onClick: handleAutoFulfillBalance
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Auto-Fulfill (FIFO)")
+    ))))) : items.map((it, idx) => /* @__PURE__ */ import_react38.default.createElement("tr", { key: it.id || idx }, /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center fw-bold text-muted" }, idx + 1), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
       "input",
       {
         type: "text",
@@ -50922,7 +51755,7 @@ Confirm dispatch with mixed batches?`
         value: it.bale_roll_no,
         disabled: !isSectionEditable("items"),
         onChange: (e) => handleItemFieldChange(idx, "bale_roll_no", e.target.value),
-        placeholder: "e.g. Roll 2376-A",
+        placeholder: "e.g. Bale 6 or Roll 2376-A",
         required: true
       }
     )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
@@ -50934,7 +51767,7 @@ Confirm dispatch with mixed batches?`
         value: it.invoice_no,
         disabled: !isSectionEditable("items"),
         onChange: (e) => handleItemFieldChange(idx, "invoice_no", e.target.value),
-        placeholder: "e.g. INV-MS-0091",
+        placeholder: "e.g. INV-VA-001 (Jan)",
         required: true
       }
     )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
@@ -50946,7 +51779,7 @@ Confirm dispatch with mixed batches?`
         value: it.fabric_name,
         disabled: !isSectionEditable("items"),
         onChange: (e) => handleItemFieldChange(idx, "fabric_name", e.target.value),
-        placeholder: "100x100 Voile"
+        placeholder: '100x100 Voil [48"] gray'
       }
     )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
       "input",
@@ -50957,9 +51790,9 @@ Confirm dispatch with mixed batches?`
         value: it.color_name,
         disabled: !isSectionEditable("items"),
         onChange: (e) => handleItemFieldChange(idx, "color_name", e.target.value),
-        placeholder: "Beige"
+        placeholder: "Black"
       }
-    )), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center", style: { minWidth: "155px" } }, /* @__PURE__ */ import_react38.default.createElement(
+    )), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center", style: { minWidth: "150px" } }, /* @__PURE__ */ import_react38.default.createElement(
       "select",
       {
         className: `form-select form-select-sm fs-11 fw-semibold ${it.is_partial_cut ? "border-warning bg-warning-subtle text-dark" : "bg-white text-dark"}`,
@@ -50971,9 +51804,9 @@ Confirm dispatch with mixed batches?`
           handleItemFieldChange(idx, "is_partial_cut", isCut);
         }
       },
-      /* @__PURE__ */ import_react38.default.createElement("option", { value: "full" }, "Scenario A: Full Roll"),
+      /* @__PURE__ */ import_react38.default.createElement("option", { value: "full" }, "Scenario A: Full Bale"),
       /* @__PURE__ */ import_react38.default.createElement("option", { value: "cut" }, "Scenario B: Cut Piece")
-    ), it.is_partial_cut && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted mt-0.5", style: { fontSize: "10px" } }, "Remaining stays in stock")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
+    ), it.is_partial_cut && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted mt-0.5", style: { fontSize: "10px" } }, "Partial cut deduction")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
       "input",
       {
         type: "number",
@@ -50984,6 +51817,17 @@ Confirm dispatch with mixed batches?`
         disabled: !isSectionEditable("items"),
         onChange: (e) => handleItemFieldChange(idx, "original_piece_meters", e.target.value),
         placeholder: "0.00"
+      }
+    )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm text-center fs-12 px-1",
+        style: { borderColor: "#cbd5e1" },
+        value: it.folding || foldingNotation || "",
+        disabled: !isSectionEditable("items"),
+        onChange: (e) => handleItemFieldChange(idx, "folding", e.target.value),
+        placeholder: "L100"
       }
     )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
       "input",
@@ -51004,27 +51848,16 @@ Confirm dispatch with mixed batches?`
         placeholder: "0.00",
         required: true
       }
-    )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm text-center fs-12 px-1",
-        style: { borderColor: "#cbd5e1" },
-        value: it.folding || foldingNotation || "",
-        disabled: !isSectionEditable("items"),
-        onChange: (e) => handleItemFieldChange(idx, "folding", e.target.value),
-        placeholder: "\u2014"
-      }
-    )), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+    )), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, it.is_partial_cut ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning-subtle font-monospace fs-11 py-1" }, it.remaining_stock_meters !== void 0 ? `${Number(it.remaining_stock_meters).toFixed(2)} m` : it.original_piece_meters ? `${(parseFloat(it.original_piece_meters) - parseFloat(it.dispatched_meters || 0)).toFixed(2)} m` : "0.00 m") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 font-monospace" }, "0.00 m (Depleted)")), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
         className: "btn btn-link text-danger p-0",
         onClick: () => removeItem(idx),
-        title: "Remove line"
+        title: "Remove line and return meters to warehouse stock"
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-trash fs-15" })
-    ))))), /* @__PURE__ */ import_react38.default.createElement("tfoot", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 7, className: "text-end text-uppercase text-secondary py-2 fs-12" }, "Grand Total Dispatched:"), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, Number(grandTotalMeters).toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: isSectionEditable("items") ? 2 : 1, className: "text-muted fs-11 py-2 text-center" }, "(", items.length, " ", items.length === 1 ? "Roll" : "Rolls", ")"))))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card border mb-2 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex align-items-center justify-content-between", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold text-dark fs-13" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-writing-sign me-1.5 text-secondary" }), " Signatures & Dispatch Remarks (Page 15)")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-6" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Company Representative Name (Authorized Signatory) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
+    ))))), /* @__PURE__ */ import_react38.default.createElement("tfoot", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 8, className: "text-end text-uppercase text-secondary py-2 fs-12" }, "Grand Total Dispatched:"), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, Number(grandTotalMeters).toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: isSectionEditable("items") ? 2 : 1, className: "text-muted fs-11 py-2 text-center" }, "(", items.length, " ", items.length === 1 ? "Roll / Bale" : "Rolls / Bales", ")"))))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card border mb-2 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex align-items-center justify-content-between", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold text-dark fs-13" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-writing-sign me-1.5 text-secondary" }), " Signatures & Dispatch Remarks (Page 15)")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-6" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Company Representative Name (Authorized Signatory) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
       "input",
       {
         type: "text",
@@ -51058,12 +51891,12 @@ Confirm dispatch with mixed batches?`
         onChange: (e) => setRemarks(e.target.value),
         placeholder: "e.g. Handed over to Raju Dyeing driver with 13 thans (CH-4903)"
       }
-    )))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, isExistingSaved ? /* @__PURE__ */ import_react38.default.createElement("span", null, "This Process Challan is finalized and dispatched to ", /* @__PURE__ */ import_react38.default.createElement("strong", null, vendorName || "Vendor"), ". Fabric is tracked as ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Out for Processing"'), ".") : /* @__PURE__ */ import_react38.default.createElement("span", null, "Stock will be deducted from warehouse inventory and tracked as ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Out for Processing"'), " against ", vendorName || "Vendor", ".")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border text-secondary px-3", onClick: onCancel }, isExistingSaved ? "Back to Challans" : "Cancel"), isExistingSaved && onPrintChallan && /* @__PURE__ */ import_react38.default.createElement(
+    )))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, isExistingSaved ? /* @__PURE__ */ import_react38.default.createElement("span", null, "This Process Challan is finalized and dispatched to ", /* @__PURE__ */ import_react38.default.createElement("strong", null, vendorName || "Vendor"), ". Fabric is tracked as ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Out for Processing"'), ".") : /* @__PURE__ */ import_react38.default.createElement("span", null, "Stock will be deducted from warehouse inventory and tracked as ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Out for Processing"'), " against ", vendorName || "Vendor", ".")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border text-secondary px-3", onClick: onCancel }, isExistingSaved ? "Back to Challans" : "Cancel"), onPrintChallan && /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
         className: "btn btn-outline-secondary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5",
-        onClick: () => onPrintChallan(initialChallan)
+        onClick: () => onPrintChallan(getCurrentChallanData())
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-printer fs-14" }),
       /* @__PURE__ */ import_react38.default.createElement("span", null, "Print Challan Slip")
@@ -51085,15 +51918,178 @@ Confirm dispatch with mixed batches?`
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-receipt-refund fs-14" }),
       /* @__PURE__ */ import_react38.default.createElement("span", null, "Record Inbound Return (GRN) \u2192")
-    )))), showStockPickerModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-lg modal-dialog-centered" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-15" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse text-primary me-2" }), "Warehouse Stock Allocation (FIFO & Single Batch Priority)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "System prioritises older stock and matching single purchase invoice batch")), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowStockPickerModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4", style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11" }, /* @__PURE__ */ import_react38.default.createElement("th", null, "Priority (FIFO)"), /* @__PURE__ */ import_react38.default.createElement("th", null, "Bale / Roll No"), /* @__PURE__ */ import_react38.default.createElement("th", null, "Purchase Invoice Ref"), /* @__PURE__ */ import_react38.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("th", null, "Color Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-end" }, "Available (m)"), /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-center" }, "Action"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, warehouseStockPool.map((roll, idx) => /* @__PURE__ */ import_react38.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10" }, "Age: ", roll.ageDays, " days (FIFO #", idx + 1, ")")), /* @__PURE__ */ import_react38.default.createElement("td", { className: "fw-bold font-monospace text-dark" }, roll.baleNo), /* @__PURE__ */ import_react38.default.createElement("td", { className: "font-monospace text-secondary" }, roll.invoiceNo), /* @__PURE__ */ import_react38.default.createElement("td", null, roll.fabric), /* @__PURE__ */ import_react38.default.createElement("td", null, roll.color), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end fw-bold text-success" }, roll.meters.toFixed(1), " m"), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+    )))), showStockPickerModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-16 mb-0" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse text-primary me-2" }), "Warehouse Stock Allocation (Bales / Rolls Inventory)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Inward purchase stock \u2022 FIFO priority \u2022 Scenario A (Full Bale) vs Scenario B (Cut Piece) \u2022 Single Batch Check")), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowStockPickerModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-2.5 px-4 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "PO Target:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-primary fs-13" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Dispatched:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-dark fs-13" }, grandTotalMeters.toFixed(2), " m")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Balance Needed:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: `fs-13 ${balancePendingMeters > 0 ? "text-warning" : "text-success"}` }, balancePendingMeters > 0 ? `${balancePendingMeters.toFixed(2)} m` : "0.00 m (Fulfilled \u2713)"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-primary btn-xs px-2.5 py-1 shadow-xs rounded",
-        onClick: () => handleSelectWarehouseRoll(roll)
+        className: "btn btn-success btn-sm px-3 shadow-xs fw-semibold d-flex align-items-center gap-1.5",
+        onClick: handleAllocateMultiBales
       },
-      "+ Allocate"
-    )))))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-footer bg-white border-top py-2.5 px-4" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border", onClick: () => setShowStockPickerModal(false) }, "Close"))))), showLinkPOModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1055 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-md modal-dialog-centered" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-15" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-link text-primary me-2" }), "Link Emergency Challan to a Process PO"), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowLinkPOModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4" }, /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-12 mb-3" }, "Select a Process PO to link to this Challan. Once linked, the red ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Pending PO Link"'), " alert will be resolved."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex flex-column gap-2" }, availablePOs.map((po) => /* @__PURE__ */ import_react38.default.createElement(
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-check fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Allocate Selected (", modalSelectedBaleIds.length, " Bales)")
+    ), totalRequiredMeters > 0 && balancePendingMeters > 0 && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-warning btn-sm px-3 shadow-xs fw-bold d-flex align-items-center gap-1.5",
+        onClick: () => {
+          handleAutoFulfillBalance();
+          setShowStockPickerModal(false);
+        }
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "\u26A1 Auto-Fulfill Balance (", balancePendingMeters.toFixed(1), "m)")
+    ))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 bg-white border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-2 align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-11 text-secondary mb-1 fw-semibold" }, "Filter by Vendor"), /* @__PURE__ */ import_react38.default.createElement(
+      "select",
+      {
+        className: "form-select form-select-sm fs-12",
+        value: modalVendorFilter,
+        onChange: (e) => setModalVendorFilter(e.target.value)
+      },
+      ["All", ...new Set(warehouseStockPool.map((w) => w.vendorName).filter(Boolean))].map((v) => /* @__PURE__ */ import_react38.default.createElement("option", { key: v, value: v }, v === "All" ? "All Inward Vendors" : v))
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-11 text-secondary mb-1 fw-semibold" }, "Filter by Purchase Invoice"), /* @__PURE__ */ import_react38.default.createElement(
+      "select",
+      {
+        className: "form-select form-select-sm fs-12 font-monospace",
+        value: modalInvoiceFilter,
+        onChange: (e) => setModalInvoiceFilter(e.target.value)
+      },
+      ["All", ...new Set(warehouseStockPool.map((w) => w.invoiceNo).filter(Boolean))].map((inv) => /* @__PURE__ */ import_react38.default.createElement("option", { key: inv, value: inv }, inv === "All" ? "All Invoices" : inv))
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-6" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-11 text-secondary mb-1 fw-semibold" }, "Search Bales / Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "input-group-text bg-light text-muted border-end-0" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-search fs-13" })), /* @__PURE__ */ import_react38.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm border-start-0 fs-12",
+        placeholder: "Search Bale 1-9, Mega Bale, Invoice, Fabric...",
+        value: modalSearchTerm,
+        onChange: (e) => setModalSearchTerm(e.target.value)
+      }
+    ), modalSearchTerm && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-secondary btn-sm",
+        onClick: () => setModalSearchTerm("")
+      },
+      "Clear"
+    ))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4", style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "12.5px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+      "input",
+      {
+        type: "checkbox",
+        className: "form-check-input",
+        checked: modalSelectedBaleIds.length > 0 && warehouseStockPool.filter((w) => (w.availableMeters !== void 0 ? w.availableMeters : w.meters) > 0).every((w) => modalSelectedBaleIds.includes(w.id)),
+        onChange: (e) => {
+          if (e.target.checked) {
+            const activeIds = warehouseStockPool.filter((w) => (w.availableMeters !== void 0 ? w.availableMeters : w.meters) > 0).map((w) => w.id);
+            setModalSelectedBaleIds(activeIds);
+          } else {
+            setModalSelectedBaleIds([]);
+          }
+        }
+      }
+    )), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" } }, "Priority (FIFO)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "Bale / Roll No & Structure"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "160px" } }, "Vendor & Invoice Ref"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Fabric & Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "120px" }, className: "text-end" }, "Available (M)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "240px" }, className: "text-center" }, "Dispatch Allocation Actions"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, warehouseStockPool.filter((roll) => {
+      const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
+      if (avail <= 0) return false;
+      if (modalVendorFilter !== "All" && roll.vendorName !== modalVendorFilter) return false;
+      if (modalInvoiceFilter !== "All" && roll.invoiceNo !== modalInvoiceFilter) return false;
+      if (modalSearchTerm.trim()) {
+        const q = modalSearchTerm.toLowerCase();
+        const match = String(roll.baleNo || "").toLowerCase().includes(q) || String(roll.invoiceNo || "").toLowerCase().includes(q) || String(roll.fabric || "").toLowerCase().includes(q) || String(roll.vendorName || "").toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    }).map((roll, idx) => {
+      const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
+      const isSelected = modalSelectedBaleIds.includes(roll.id);
+      const foldCode = roll.folding || foldingNotation || "L100";
+      const actualMetersAtFold = computeFoldedMeters(avail, foldCode);
+      const customVal = customCutInputs[roll.id] || "";
+      return /* @__PURE__ */ import_react38.default.createElement("tr", { key: roll.id || idx, className: isSelected ? "table-primary-subtle" : "" }, /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+        "input",
+        {
+          type: "checkbox",
+          className: "form-check-input",
+          checked: isSelected,
+          onChange: (e) => {
+            if (e.target.checked) {
+              setModalSelectedBaleIds((prev) => [...prev, roll.id]);
+            } else {
+              setModalSelectedBaleIds((prev) => prev.filter((id) => id !== roll.id));
+            }
+          }
+        }
+      )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge ${roll.ageDays > 60 ? "bg-danger-subtle text-danger border-danger-subtle" : "bg-primary-subtle text-primary border-primary-subtle"} border fs-10` }, "FIFO #", idx + 1, " \u2022 ", roll.ageDays, "d old")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold font-monospace text-dark fs-13" }, roll.baleNo), roll.subRolls && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11 mt-0.5" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-layers-intersect fs-11 me-1 text-secondary" }), roll.subRolls)), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-semibold text-dark fs-12" }, roll.vendorName || "Warehouse Stock"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "font-monospace text-muted fs-11" }, roll.invoiceNo)), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-dark fw-medium fs-12" }, roll.fabric), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11" }, roll.color)), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge ${foldCode.includes("98") ? "bg-info-subtle text-info-emphasis border border-info-subtle" : "bg-light text-secondary border"} fs-11 font-monospace` }, foldCode)), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-success fs-13 font-monospace" }, avail.toFixed(2), " m"), foldCode.includes("98") && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-10" }, "(= ", actualMetersAtFold.toFixed(2), "m @ 98%)")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex flex-column gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, /* @__PURE__ */ import_react38.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-primary btn-xs py-1 px-2 rounded shadow-xs fw-semibold",
+          onClick: () => handleSelectWarehouseRoll(roll),
+          title: "Allocate entire bale (Scenario A)"
+        },
+        "+ Full Bale (",
+        avail,
+        "m)"
+      ), balancePendingMeters > 0 && avail >= balancePendingMeters && /* @__PURE__ */ import_react38.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-warning btn-xs py-1 px-2 rounded shadow-xs fw-bold",
+          onClick: () => handleSelectWarehouseRoll(roll, balancePendingMeters),
+          title: `Cut exactly remaining ${balancePendingMeters}m from this bale (Scenario B)`
+        },
+        "\u2702 Cut Needed (",
+        balancePendingMeters,
+        "m)"
+      )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement(
+        "input",
+        {
+          type: "number",
+          step: "0.01",
+          className: "form-control form-control-xs py-0.5 px-1.5 fs-11 font-monospace",
+          style: { width: "85px", height: "26px" },
+          placeholder: "Cut mtrs...",
+          value: customVal,
+          onChange: (e) => {
+            const val = e.target.value;
+            setCustomCutInputs((prev) => ({ ...prev, [roll.id]: val }));
+          }
+        }
+      ), /* @__PURE__ */ import_react38.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-light border btn-xs py-0.5 px-2 text-dark fs-11 rounded",
+          style: { height: "26px" },
+          disabled: !customVal || parseFloat(customVal) <= 0 || parseFloat(customVal) > avail,
+          onClick: () => {
+            handleSelectWarehouseRoll(roll, parseFloat(customVal));
+            setCustomCutInputs((prev) => ({ ...prev, [roll.id]: "" }));
+          }
+        },
+        "Cut & Add"
+      )))));
+    }))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "Selected for Dispatch: ", /* @__PURE__ */ import_react38.default.createElement("strong", null, modalSelectedBaleIds.length, " Bales"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border", onClick: () => setShowStockPickerModal(false) }, "Close"), modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-sm px-3 shadow-xs",
+        onClick: handleAllocateMultiBales
+      },
+      "Allocate Selected Bales \u2192"
+    )))))), showLinkPOModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1055 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-md modal-dialog-centered" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-15" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-link text-primary me-2" }), "Link Emergency Challan to a Process PO"), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowLinkPOModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4" }, /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-12 mb-3" }, "Select an existing Process PO or auto-generate a new one to link to this Challan. Once linked, the red ", /* @__PURE__ */ import_react38.default.createElement("strong", null, '"Pending PO Link"'), " alert will be resolved."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3" }, /* @__PURE__ */ import_react38.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-primary btn-sm w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold",
+        onClick: () => {
+          handleAutoGenerateAndLinkPO();
+          setShowLinkPOModal(false);
+          alert(`New Process PO auto-generated and linked to Challan #${challanNumber}!`);
+        }
+      },
+      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-13" }),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, "Auto-Generate New Process PO & Link")
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex flex-column gap-2" }, availablePOs.map((po) => /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
@@ -51398,7 +52394,36 @@ Confirm dispatch with mixed batches?`
     (0, import_react40.useEffect)(() => {
       setVendorList(loadVendorsFromMaster());
     }, [availablePOs, availableChallans]);
-    const [externalChallanNo, setExternalChallanNo] = (0, import_react40.useState)(initialReturn?.vendor_external_challan_no || "");
+    const handleAutoGeneratePO = () => {
+      const vName = vendorName || (vendorList[0]?.name || "Job Worker");
+      const vId = vendorId || (vendorList[0]?.id || "V-01");
+      const randNum = Math.floor(1e3 + Math.random() * 9e3);
+      const newPoNum = `PPO-${randNum}`;
+      const newPO = {
+        id: newPoNum,
+        po_number: String(randNum),
+        process_type: "Dyeing",
+        vendor_id: vId,
+        vendor_name: vName,
+        date: receivedDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        total_meters: Number(calculatedTotalMeters || 100),
+        fabric_quality: fabricQuality || "Fabric Quality",
+        status: "Issued"
+      };
+      try {
+        const stored = JSON.parse(localStorage.getItem("erp_process_pos_v1") || localStorage.getItem("erp_process_pos") || "[]");
+        stored.unshift(newPO);
+        localStorage.setItem("erp_process_pos_v1", JSON.stringify(stored));
+        localStorage.setItem("erp_process_pos", JSON.stringify(stored));
+      } catch (e) {
+      }
+      setLinkedPoId(String(randNum));
+      setVendorName(vName);
+      setVendorId(vId);
+    };
+    const [externalChallanNo, setExternalChallanNo] = (0, import_react40.useState)(
+      initialReturn?.vendor_external_challan_no || String(Math.floor(1e3 + Math.random() * 9e3))
+    );
     const [externalChallanDate, setExternalChallanDate] = (0, import_react40.useState)(initialReturn?.vendor_challan_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
     const [vendorInvoiceNo, setVendorInvoiceNo] = (0, import_react40.useState)(initialReturn?.vendor_invoice_no || "");
     const [vendorInvoiceValue, setVendorInvoiceValue] = (0, import_react40.useState)(initialReturn?.vendor_invoice_value || "");
@@ -51630,7 +52655,17 @@ Do you want to override and save?`
         disabled: !isSectionEditable("header"),
         onChange: (e) => setReceivedDate(e.target.value)
       }
-    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Linked Process PO"), /* @__PURE__ */ import_react40.default.createElement(
+    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-1" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-0" }, "Linked Process PO"), isSectionEditable("header") && /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-link p-0 text-primary text-decoration-none fs-11 fw-semibold d-flex align-items-center gap-1",
+        onClick: handleAutoGeneratePO,
+        title: "Auto-generate a new Process PO and link it here"
+      },
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-plus fs-12" }),
+      /* @__PURE__ */ import_react40.default.createElement("span", null, "+ Auto-Generate PO")
+    )), /* @__PURE__ */ import_react40.default.createElement(
       "select",
       {
         className: "form-select form-select-sm bg-white fs-13",
@@ -52984,7 +54019,65 @@ Do you want to override and save?`
         }, 2e3);
       }, 250);
     };
-    return /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1060 }, tabIndex: "-1" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-content shadow-lg border-0" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-header bg-dark text-white d-flex justify-content-between align-items-center py-2" }, /* @__PURE__ */ import_react43.default.createElement("h6", { className: "modal-title mb-0 fw-bold" }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-2" }), isChallan ? `Challan Print \u2014 #${data.challan_number || data.id}` : `Purchase Order Print \u2014 #${data.po_number || data.id}`), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("button", { className: "btn btn-sm btn-primary me-2", onClick: handlePrint }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF"), /* @__PURE__ */ import_react43.default.createElement("button", { className: "btn btn-sm btn-outline-light", onClick: onClose }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-x" })))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-body p-4 bg-white", id: "printable-process-doc" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "border border-dark p-3 mb-3" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "row align-items-center border-bottom border-dark pb-2 mb-2" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-7" }, /* @__PURE__ */ import_react43.default.createElement("h4", { className: "fw-black text-uppercase tracking-wider mb-0", style: { letterSpacing: "1px" } }, "RAINDROP"), /* @__PURE__ */ import_react43.default.createElement("small", { className: "text-muted d-block", style: { fontSize: "11px" } }, "H1-40, RIICO Industrial Area, Mansarovar, Jaipur - 302020", /* @__PURE__ */ import_react43.default.createElement("br", null), "Ph: +91 9829059529 | GSTIN: 08BZJPD0890G1ZD")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-5 text-end" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "badge bg-dark text-white px-3 py-1 fs-6 text-uppercase" }, isChallan ? "JOB CHALLAN" : "PURCHASE ORDER (JOB WORK)"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "mt-1 fw-bold fs-5 text-danger" }, isChallan ? `CH-NO: ${data.challan_number || data.id}` : `PO NO: ${data.po_number || data.id}`), /* @__PURE__ */ import_react43.default.createElement("div", { className: "small text-muted" }, "Date: ", data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "row mb-3", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-6 border-end border-dark pe-3" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-muted small" }, "To (M/s):"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-6 text-dark" }, data.vendor_name || "Raju Dyeing (Krishna Dyeing)"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-muted small" }, "Job Issue for Dyeing / Processing")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-6 ps-3" }, isChallan ? /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Linked PO(s):"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", { className: "text-primary" }, Array.isArray(data.linked_pos) ? data.linked_pos.join(", ") : "PPO-7611, PPO-7612, PPO-7613")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Folding Notation:"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", null, data.folding_notation || "\u2014")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Total Bales / Rolls:"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", null, data.total_bales || 1, " Bale (", data.total_pieces || 7, " Pcs)"))) : /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Sales Order:"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", null, data.linked_sales_order_id || "Standalone PO (General Stock)")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Styles:"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", null, Array.isArray(data.style_names) ? data.style_names.join(", ") : data.style_name || "Graphic Boota Kurta")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted" }, "Expected Delivery:"), " ", /* @__PURE__ */ import_react43.default.createElement("strong", null, data.delivery_date || "Within 14 Days"))))), /* @__PURE__ */ import_react43.default.createElement("table", { className: "table table-bordered border-dark table-sm mb-3", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react43.default.createElement("thead", { className: "table-light border-dark text-center" }, isChallan ? /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "40px" } }, "S.No."), /* @__PURE__ */ import_react43.default.createElement("th", null, "Bale / Roll No"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Particulars / Fabric Quality"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Invoice Ref"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Folding"), /* @__PURE__ */ import_react43.default.createElement("th", { className: "text-end" }, "Meters")) : /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "40px" } }, "S.No."), /* @__PURE__ */ import_react43.default.createElement("th", null, "Particulars (Fabric & Quality)"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Style / Article"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react43.default.createElement("th", null, "Width"), /* @__PURE__ */ import_react43.default.createElement("th", { className: "text-end" }, "Mtrs"), /* @__PURE__ */ import_react43.default.createElement("th", { className: "text-end" }, "Rate/m"), /* @__PURE__ */ import_react43.default.createElement("th", { className: "text-end" }, "Amount (\u20B9)"))), /* @__PURE__ */ import_react43.default.createElement("tbody", null, isChallan ? (data.items || []).map((item, idx) => /* @__PURE__ */ import_react43.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center" }, idx + 1), /* @__PURE__ */ import_react43.default.createElement("td", { className: "fw-bold" }, item.bale_roll_no), /* @__PURE__ */ import_react43.default.createElement("td", null, item.fabric_name), /* @__PURE__ */ import_react43.default.createElement("td", null, item.color_name), /* @__PURE__ */ import_react43.default.createElement("td", null, item.invoice_no || "INV-MS-0091"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center" }, item.folding || data.folding_notation || "\u2014"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end fw-bold" }, Number(item.dispatched_meters || item.meters || 0).toFixed(2)))) : (data.items || []).map((item, idx) => /* @__PURE__ */ import_react43.default.createElement("tr", { key: idx }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center" }, idx + 1), /* @__PURE__ */ import_react43.default.createElement("td", { className: "fw-bold" }, item.fabric_name, " (", item.width, '")'), /* @__PURE__ */ import_react43.default.createElement("td", null, item.style_name, " - ", item.article_name), /* @__PURE__ */ import_react43.default.createElement("td", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "badge border me-1", style: { backgroundColor: item.color_hex || "#eee", color: "#000" } }, "\u25CF"), item.color_name), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center" }, item.width, '"'), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end fw-bold" }, Number(item.quantity_meters || 0).toFixed(2)), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end" }, "\u20B9", Number(item.dyeing_rate || 12).toFixed(2)), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end fw-bold" }, "\u20B9", Number(item.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 }))))), /* @__PURE__ */ import_react43.default.createElement("tfoot", null, /* @__PURE__ */ import_react43.default.createElement("tr", { className: "fw-bold border-top border-dark table-light" }, /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: isChallan ? 6 : 5, className: "text-end text-uppercase" }, "Grand Total:"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end fs-6 text-dark" }, isChallan ? `${Number(data.grand_total_meters || 2418.8).toFixed(2)} Mtrs` : `${Number(data.total_meters || 0).toFixed(2)} Mtrs`), !isChallan && /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end fs-6 text-primary" }, "\u20B9", Number(data.total_estimated_cost || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 }))))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "row border-top border-dark pt-2 mb-3", style: { fontSize: "11px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-8" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold text-uppercase" }, "Terms & Conditions:"), /* @__PURE__ */ import_react43.default.createElement("p", { className: "mb-0 text-muted" }, data.terms || "1. Goods delivered must be strictly as per sample and specification within stipulated date.\n2. Any variation in shade or quality must be reported immediately."), data.remarks && /* @__PURE__ */ import_react43.default.createElement("div", { className: "mt-1 text-dark" }, /* @__PURE__ */ import_react43.default.createElement("strong", null, "Remarks:"), " ", data.remarks)), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-4 text-end" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-muted small" }, "Total Pieces: ", /* @__PURE__ */ import_react43.default.createElement("strong", null, data.total_pieces || data.items?.length || 1, " Pcs")))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "row pt-4 mt-3 border-top border-dark text-center", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react43.default.createElement("div", { style: { height: "35px" } }), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Receiver's Signature"), /* @__PURE__ */ import_react43.default.createElement("small", { className: "text-muted" }, data.receiver_signature || "(Vendor Representative)")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react43.default.createElement("div", { style: { height: "35px" }, className: "fw-bold text-primary" }, data.created_by || "Saksham Garg"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Prepared By / Logged User"), /* @__PURE__ */ import_react43.default.createElement("small", { className: "text-muted" }, "Raindrop Procurement Desk")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-4" }, /* @__PURE__ */ import_react43.default.createElement("div", { style: { height: "35px" }, className: "fw-bold" }, data.company_representative || "Anurag"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "For RAINDROP (Authorised Signatory)"), /* @__PURE__ */ import_react43.default.createElement("small", { className: "text-muted" }, "Company Representative"))))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-footer bg-light py-2" }, /* @__PURE__ */ import_react43.default.createElement("button", { type: "button", className: "btn btn-secondary btn-sm", onClick: onClose }, "Close"), /* @__PURE__ */ import_react43.default.createElement("button", { type: "button", className: "btn btn-primary btn-sm", onClick: handlePrint }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF")))));
+    return /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1060 }, tabIndex: "-1" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-content shadow-lg border-0" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-header bg-dark text-white d-flex justify-content-between align-items-center py-2" }, /* @__PURE__ */ import_react43.default.createElement("h6", { className: "modal-title mb-0 fw-bold" }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-2" }), isChallan ? `Challan Print \u2014 #${data.challan_number || data.id}` : `Purchase Order Print \u2014 #${data.po_number || data.id}`), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("button", { className: "btn btn-sm btn-primary me-2", onClick: handlePrint }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF"), /* @__PURE__ */ import_react43.default.createElement("button", { className: "btn btn-sm btn-outline-light", onClick: onClose }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-x" })))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-body p-4 bg-white", id: "printable-process-doc" }, isChallan ? (
+      /* ========================================================================= */
+      /* AUTHENTIC JOB CHALLAN PAPER SLIP (Matching Page 15 & Uploaded Image)       */
+      /* ========================================================================= */
+      /* @__PURE__ */ import_react43.default.createElement("div", { className: "border border-dark p-3 bg-white", style: { fontFamily: '"Courier New", Courier, monospace, -apple-system, sans-serif' } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-between align-items-start mb-1", style: { fontSize: "11px", fontWeight: 600 } }, /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("div", null, "GSTIN : 08BZJPD0890G1ZD"), /* @__PURE__ */ import_react43.default.createElement("div", null, "PAN No. : BZJPD0890G")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "fs-6 fw-bold font-monospace text-dark border-bottom border-dark px-1" }, "2412")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center mb-2" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold text-uppercase fs-6 tracking-wide", style: { letterSpacing: "1px" } }, "JOB CHALLAN"), /* @__PURE__ */ import_react43.default.createElement("h2", { className: "fw-black text-uppercase mb-0", style: { letterSpacing: "2px", fontWeight: 900, color: "#0f172a" } }, "RAINDROP"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-muted", style: { fontSize: "11px" } }, "H1-40, RIICO Industrial Area, Mansarovar, Jaipur-302020"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-muted", style: { fontSize: "11px" } }, "+91 9829059529")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "row g-2 pt-2 pb-2 border-top border-dark align-items-end", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-7" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-baseline mb-1" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2", style: { minWidth: "35px" } }, "No."), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold fs-5 text-danger font-monospace" }, data.challan_number || "4903")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-baseline mb-1" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2", style: { minWidth: "35px" } }, "M/s"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold fs-6 text-dark border-bottom border-dark border-dotted flex-grow-1 pb-0.5" }, data.vendor_name || "Raju dyeing")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-baseline" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2", style: { minWidth: "35px" } }, "GSTIN"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "border-bottom border-dark border-dotted flex-grow-1", style: { height: "16px" } }, data.vendor_gstin || ""))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-5 text-end" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-end align-items-baseline mb-1" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2" }, "P.O ="), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold font-monospace fs-6 text-primary" }, Array.isArray(data.linked_pos) && data.linked_pos.length > 0 ? data.linked_pos.join(", ") : data.linked_pos || "7611, 7612, 7613")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-end align-items-baseline mb-1" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2" }, "Date"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold font-monospace fs-6" }, (() => {
+        const d = data.date || "2026-08-12";
+        if (d.includes("-")) {
+          const parts = d.split("-");
+          return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+        }
+        return d;
+      })())), data.folding_notation && /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-end align-items-baseline" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-muted me-2", style: { fontSize: "11px" } }, "Folding:"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "badge bg-light text-dark border border-dark fw-bold" }, data.folding_notation)))), /* @__PURE__ */ import_react43.default.createElement("table", { className: "table table-bordered border-dark table-sm mb-0 mt-2", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react43.default.createElement("thead", { className: "text-center border-dark", style: { backgroundColor: "#f8fafc" } }, /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "50px", border: "1px solid #000" } }, "S.No."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { border: "1px solid #000" } }, "PARTICULARS"), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "85px", border: "1px solid #000" } }, "Mtr."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "85px", border: "1px solid #000" } }, "Mtr."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "85px", border: "1px solid #000" } }, "Mtr."))), /* @__PURE__ */ import_react43.default.createElement("tbody", null, /* @__PURE__ */ import_react43.default.createElement("tr", { style: { minHeight: "32px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center align-top border-dark", style: { border: "1px solid #000" } }, "1"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-13 text-dark" }, data.particulars || '100x100 Voil [48"] gray - fab issue for dying'), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-secondary small mt-1" }, "B N")), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark", style: { border: "1px solid #000" } })), data.items && data.items.length > 0 ? data.items.map((item, idx) => {
+        const isBale = String(item.bale_roll_no || "").toLowerCase().includes("bale");
+        const cleanRoll = String(item.bale_roll_no || "").replace(/Roll\s*/i, "");
+        const mtrVal = Number(item.dispatched_meters || item.meters || 0).toFixed(2);
+        return /* @__PURE__ */ import_react43.default.createElement("tr", { key: idx, style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "font-monospace fw-semibold" }, isBale ? item.bale_roll_no : cleanRoll, item.is_partial_cut ? " (Cut)" : ""), item.folding && /* @__PURE__ */ import_react43.default.createElement("span", { className: "badge bg-light text-muted border px-1.5 py-0 fs-10" }, item.folding))), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, mtrVal), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }));
+      }) : (
+        /* Default Page 15 slip breakdown if no explicit items */
+        /* @__PURE__ */ import_react43.default.createElement(import_react43.default.Fragment, null, /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3 font-monospace fw-bold", style: { border: "1px solid #000" } }, "12384 -"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "1865.50"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3 font-monospace fw-bold", style: { border: "1px solid #000" } }, "2376 -"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "119.30"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3 font-monospace text-muted", style: { border: "1px solid #000" } }, '"'), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "111.00"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3 font-monospace", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "badge bg-light text-dark border px-1" }, "L-98")), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "78.40"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "97.80"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "113.30"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3 font-monospace text-muted", style: { border: "1px solid #000" } }, "(Cut piece)"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "20.00"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "24px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-3", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end font-monospace fw-bold border-dark py-0 px-2", style: { border: "1px solid #000" } }, "13.50"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } })))
+      ), /* @__PURE__ */ import_react43.default.createElement("tr", { style: { height: "20px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }))), /* @__PURE__ */ import_react43.default.createElement("tfoot", { className: "border-dark", style: { borderTop: "2px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: 2, className: "border-dark py-1 px-2", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold" }, "Remarks: "), /* @__PURE__ */ import_react43.default.createElement("span", null, data.remarks || "Fab issue for dyeing")), /* @__PURE__ */ import_react43.default.createElement("td", { className: "fw-bold text-center border-dark py-1", style: { border: "1px solid #000" } }, "Total"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-1", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-1", style: { border: "1px solid #000" } })), /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: 2, className: "border-dark py-1.5 px-2 bg-light", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold text-uppercase" }, "Total Pcs."), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold font-monospace fs-6 text-dark" }, data.total_pieces || "1 Bale + 7 th"))), /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: 3, className: "border-dark py-1.5 px-2 text-end bg-light", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold text-uppercase me-2" }, "Grand Total"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-black fs-5 font-monospace text-dark" }, Number(data.grand_total_meters || 2418.8).toFixed(2), " Mtr.")))))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-between align-items-end mt-4 pt-3", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center", style: { width: "220px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { style: { fontFamily: "Brush Script MT, cursive, Georgia, serif", fontSize: "24px", fontWeight: "bold", color: "#1e293b", minHeight: "32px" } }, data.receiver_signature || "Anurag"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Receiver's Signature")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center", style: { width: "220px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-6 mb-1" }, "For RAINDROP"), /* @__PURE__ */ import_react43.default.createElement("div", { style: { minHeight: "26px" } }), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Authorised Signatory"))))
+    ) : (
+      /* ========================================================================= */
+      /* PURCHASE ORDER (JOB WORK) PRINT FORMAT (Page 11 Slip)                      */
+      /* ========================================================================= */
+      /* @__PURE__ */ import_react43.default.createElement("div", { className: "border border-dark p-3 mb-3 bg-white", style: { fontFamily: "Arial, sans-serif" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center fw-bold fs-5 text-uppercase mb-2 text-dark", style: { letterSpacing: "1px" } }, "PURCHASE ORDER"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "row align-items-start pb-2" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-7" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-dark small fw-semibold", style: { fontSize: "11px", lineHeight: "1.4" } }, /* @__PURE__ */ import_react43.default.createElement("div", null, "GSTIN : 08BZJPD0890G1ZD"), /* @__PURE__ */ import_react43.default.createElement("div", null, "PAN No. : BZJPD0890G")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-black text-uppercase mt-1", style: { fontSize: "20px", letterSpacing: "1px", fontWeight: "900" } }, "RAINDROP"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "small text-muted", style: { fontSize: "11px", lineHeight: "1.3" } }, "H1-40, RIICO Industrial Area, Mansarovar, Jaipur-302020", /* @__PURE__ */ import_react43.default.createElement("br", null), "+91 9829059529")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "col-5" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-baseline mb-2" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2", style: { minWidth: "40px" } }, "To,"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold fs-6 text-dark border-bottom border-dark border-dotted flex-grow-1 pb-0.5" }, data.vendor_name ? `M/s ${data.vendor_name}` : "M/s Raju dyeing")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-baseline" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold me-2", style: { minWidth: "55px" } }, "CH.No ="), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-bold font-monospace fs-6 text-danger" }, data.challan_number || Array.isArray(data.linked_challans) && data.linked_challans[0] || "4903")))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center justify-content-between border border-dark px-3 py-1.5 my-2 fw-bold", style: { fontSize: "13px", backgroundColor: "#fafbfc" } }, /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-secondary me-2" }, "ORDER No."), /* @__PURE__ */ import_react43.default.createElement("span", { className: "font-monospace text-primary fs-6" }, data.po_number || data.linked_sales_order_id || "7613")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-secondary me-2" }, "CODE :"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "font-monospace text-dark fs-6" }, data.style_code || data.style_name || "RD-2611")), /* @__PURE__ */ import_react43.default.createElement("div", null, /* @__PURE__ */ import_react43.default.createElement("span", { className: "text-secondary me-2" }, "DATE :"), /* @__PURE__ */ import_react43.default.createElement("span", { className: "font-monospace text-dark fs-6" }, (() => {
+        const d = data.date || data.issue_date || "2026-08-12";
+        if (d.includes("-")) {
+          const parts = d.split("-");
+          return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+        }
+        return d;
+      })()))), /* @__PURE__ */ import_react43.default.createElement("table", { className: "table table-bordered border-dark table-sm mb-0 mt-2", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react43.default.createElement("thead", { className: "text-center border-dark", style: { backgroundColor: "#f8fafc" } }, /* @__PURE__ */ import_react43.default.createElement("tr", null, /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "45px", border: "1px solid #000" } }, "S. No."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { border: "1px solid #000" } }, "PARTICULARS"), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "65px", border: "1px solid #000" } }, "SIZE"), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "85px", border: "1px solid #000" } }, "QTY."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "110px", border: "1px solid #000" } }, "RATE Rs. P."), /* @__PURE__ */ import_react43.default.createElement("th", { style: { width: "220px", border: "1px solid #000" } }, "REMARKS / SAMPLE"))), /* @__PURE__ */ import_react43.default.createElement("tbody", null, data.items && data.items.length > 0 ? data.items.map((item, idx) => /* @__PURE__ */ import_react43.default.createElement("tr", { key: idx, style: { minHeight: "32px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center border-dark font-monospace", style: { border: "1px solid #000" } }, idx + 1), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark px-2", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-12 text-dark" }, item.fabric_name || "100x100 Voil", " (", item.width || "48", '") gray - Job issue for deying'), item.article_name && /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-secondary small" }, "Article: ", item.article_name)), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center border-dark font-monospace fw-semibold", style: { border: "1px solid #000" } }, item.width ? `${item.width}"` : '48"'), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark font-monospace fw-bold px-2", style: { border: "1px solid #000" } }, Number(item.quantity_meters || item.meters || 0).toFixed(2)), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark font-monospace fw-semibold px-2", style: { border: "1px solid #000" } }, Number(item.dyeing_rate || item.fabric_rate || 12).toFixed(2), " /- PER Mtr"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark px-2 py-1", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center justify-content-between gap-1" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react43.default.createElement(
+        "span",
+        {
+          style: {
+            display: "inline-block",
+            width: "12px",
+            height: "12px",
+            backgroundColor: item.color_hex || "#d4b996",
+            border: "1px solid #666",
+            borderRadius: "2px"
+          }
+        }
+      ), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-semibold text-dark fs-11" }, item.color_name || "Beige Color", " => ", Number(item.quantity_meters || item.meters || 0).toFixed(2))), item.sample_photo && /* @__PURE__ */ import_react43.default.createElement(
+        "img",
+        {
+          src: item.sample_photo,
+          alt: "Swatch",
+          style: { width: "28px", height: "28px", objectFit: "cover", borderRadius: "3px", border: "1px solid #cbd5e1" }
+        }
+      )), /* @__PURE__ */ import_react43.default.createElement("div", { className: "small text-muted fst-italic" }, item.style_name || data.style_name || "Graphic Boota")))) : /* @__PURE__ */ import_react43.default.createElement("tr", { style: { minHeight: "32px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center border-dark font-monospace", style: { border: "1px solid #000" } }, "1"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark px-2", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-12 text-dark" }, '100x100 Voil (48") gray - Job issue for deying')), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-center border-dark font-monospace fw-semibold", style: { border: "1px solid #000" } }, '48"'), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark font-monospace fw-bold px-2", style: { border: "1px solid #000" } }, "525.00"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark font-monospace fw-semibold px-2", style: { border: "1px solid #000" } }, "12 /- PER Mtr"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark px-2 py-1", style: { border: "1px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react43.default.createElement("span", { style: { display: "inline-block", width: "12px", height: "12px", backgroundColor: "#d4b996", border: "1px solid #666", borderRadius: "2px" } }), /* @__PURE__ */ import_react43.default.createElement("span", { className: "fw-semibold text-dark fs-11" }, "Beige Color => 525.00")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "small text-muted fst-italic" }, "Graphic Boota"))), [...Array(Math.max(1, 5 - (data.items?.length || 1)))].map((_, idx) => /* @__PURE__ */ import_react43.default.createElement("tr", { key: `blank-${idx}`, style: { height: "28px" } }, /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-2", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-2", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-2", style: { border: "1px solid #000" } }), /* @__PURE__ */ import_react43.default.createElement("td", { className: "border-dark py-0 px-2", style: { border: "1px solid #000" } })))), /* @__PURE__ */ import_react43.default.createElement("tfoot", { style: { backgroundColor: "#fafbfc" } }, /* @__PURE__ */ import_react43.default.createElement("tr", { className: "fw-bold border-top border-dark", style: { borderTop: "2px solid #000" } }, /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: 3, className: "text-end border-dark py-1 px-2", style: { border: "1px solid #000" } }, "Total"), /* @__PURE__ */ import_react43.default.createElement("td", { className: "text-end border-dark font-monospace fs-13 py-1 px-2 text-dark", style: { border: "1px solid #000" } }, Number(data.total_meters || (data.items || []).reduce((acc, it) => acc + (parseFloat(it.quantity_meters || it.meters) || 0), 0) || 525).toFixed(2)), /* @__PURE__ */ import_react43.default.createElement("td", { colSpan: 2, className: "text-end border-dark font-monospace fs-13 py-1 px-2 text-primary", style: { border: "1px solid #000" } }, "\u20B9", Number(data.total_estimated_cost || (data.items || []).reduce((acc, it) => acc + (parseFloat(it.total_amount) || 0), 0) || 6300).toLocaleString("en-IN", { minimumFractionDigits: 2 }))))), /* @__PURE__ */ import_react43.default.createElement("div", { className: "d-flex justify-content-between align-items-end mt-4 pt-2", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center", style: { width: "220px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { style: { fontFamily: "Brush Script MT, cursive, Georgia, serif", fontSize: "26px", fontWeight: "bold", color: "#1e293b", minHeight: "34px" } }, data.receiver_signature || "Anurag"), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Receiver's Signature")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-start", style: { maxWidth: "420px", fontSize: "11px", lineHeight: "1.4" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold mb-1" }, "DELIVERY DATE : ", /* @__PURE__ */ import_react43.default.createElement("span", { className: "font-monospace text-dark fs-12 ms-1" }, (() => {
+        const d = data.delivery_date || "2026-08-20";
+        if (d.includes("-")) {
+          const parts = d.split("-");
+          return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+        }
+        return d;
+      })())), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-secondary" }, /* @__PURE__ */ import_react43.default.createElement("strong", null, "TERMS :"), " 1 Goods delivered must be strictly as per sample and specification (within stipulated date)")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "text-center", style: { width: "220px" } }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "fw-bold fs-6 mb-1" }, "For RAINDROP"), /* @__PURE__ */ import_react43.default.createElement("div", { style: { minHeight: "34px" } }), /* @__PURE__ */ import_react43.default.createElement("div", { className: "border-top border-dark pt-1 fw-bold" }, "Authorised Signatory"))))
+    )), /* @__PURE__ */ import_react43.default.createElement("div", { className: "modal-footer bg-light py-2" }, /* @__PURE__ */ import_react43.default.createElement("button", { type: "button", className: "btn btn-secondary btn-sm", onClick: onClose }, "Close"), /* @__PURE__ */ import_react43.default.createElement("button", { type: "button", className: "btn btn-primary btn-sm", onClick: handlePrint }, /* @__PURE__ */ import_react43.default.createElement("i", { className: "ti ti-printer me-1" }), " Print / Save PDF")))));
   }
 
   // frontend/src/components/ProcessPO/ProcessModule.jsx

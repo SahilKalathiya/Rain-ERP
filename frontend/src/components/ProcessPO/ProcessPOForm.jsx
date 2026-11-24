@@ -57,6 +57,12 @@ export default function ProcessPOForm({
   const loadDynamicSalesOrders = () => {
     try {
       const stored = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
+      let storedPOs = [];
+      try {
+        const rawPOs = localStorage.getItem('erp_process_pos_v1') || localStorage.getItem('erp_process_pos');
+        if (rawPOs) storedPOs = JSON.parse(rawPOs);
+      } catch (e) { }
+
       if (Array.isArray(stored) && stored.length > 0) {
         return stored.map(o => {
           const styles = Array.isArray(o.styles) && o.styles.length > 0
@@ -69,26 +75,289 @@ export default function ProcessPOForm({
 
           const items = [];
           if (Array.isArray(o.fabricConsumptions)) {
+            // Group by fabric + color + width (combine even if article is different)
+            const groupsMap = new Map();
+
             o.fabricConsumptions.forEach((fc, idx) => {
-              const req = parseFloat(fc.totalFabricMeters || fc.requiredMeters || 0);
-              const ord = parseFloat(fc.orderedMeters || 0);
+              let req = parseFloat(
+                fc.totalFabricMeters ||
+                fc.requiredMeters ||
+                fc.totalGreige ||
+                fc.orderQty ||
+                fc.totalDyed ||
+                fc.meters ||
+                0
+              );
+
+              // Fallback calculation if req is 0 but pieces are present
+              if (req <= 0 && fc.pcs && parseInt(fc.pcs, 10) > 0) {
+                const isDup = /dupatta|stole|chunri|scarf/i.test((fc.articleName || fc.article || '').trim());
+                const isBot = /pant|bottom|salwar|trouser|plazo|palazzo/i.test((fc.articleName || fc.article || '').trim());
+                const defDyed = isDup ? 2.25 : (isBot ? (38 * 0.0254) : (45 * 0.0254));
+                const shrink = parseFloat(fc.shrinkPct || fc.shrinkage || 3.5);
+                req = Number((parseInt(fc.pcs, 10) * defDyed * (1 + shrink / 100)).toFixed(2));
+              }
+
               const rec = parseFloat(fc.receivedMeters || 0);
+
+              let resolvedWidth = '';
+              const artName = String(fc.article || fc.articleName || '').trim();
+              const fabName = String(fc.fabricQuality || fc.fabricName || '').trim();
+              const roleName = String(fc.role || '').trim();
+
+              // 1. Check user's designated PO Width in groupPoWidths
+              if (o.groupPoWidths && typeof o.groupPoWidths === 'object') {
+                const kExact = `${artName}___${fabName}___${roleName}`;
+                const kNoRole = `${artName}___${fabName}___`;
+                const kAnyRole = Object.keys(o.groupPoWidths).find(k =>
+                  k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) ||
+                  k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                );
+                const pow = o.groupPoWidths[kExact] || o.groupPoWidths[kNoRole] || (kAnyRole ? o.groupPoWidths[kAnyRole] : null);
+                if (pow && pow !== '—' && pow !== '-') {
+                  resolvedWidth = String(pow);
+                }
+              }
+
+              // 2. Check fc.poWidth or fc.width or fc.selectedWidth
+              if (!resolvedWidth) {
+                if (fc.poWidth && fc.poWidth !== '—' && fc.poWidth !== '-') {
+                  resolvedWidth = String(fc.poWidth);
+                } else if (fc.width && fc.width !== '—' && fc.width !== '-') {
+                  resolvedWidth = String(fc.width);
+                } else if (fc.selectedWidth && fc.selectedWidth !== '—' && fc.selectedWidth !== '-') {
+                  resolvedWidth = String(fc.selectedWidth);
+                } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths[0] && fc.selectedWidths[0] !== '—') {
+                  resolvedWidth = String(fc.selectedWidths[0]);
+                }
+              }
+
+              // 3. Check user's selected width in groupSelectedWidths
+              if (!resolvedWidth && o.groupSelectedWidths && typeof o.groupSelectedWidths === 'object') {
+                const kExact = `${artName}___${fabName}___${roleName}`;
+                const kNoRole = `${artName}___${fabName}___`;
+                const kAnyRole = Object.keys(o.groupSelectedWidths).find(k =>
+                  k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) ||
+                  k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                );
+                const gw = o.groupSelectedWidths[kExact] || o.groupSelectedWidths[kNoRole] || (kAnyRole ? o.groupSelectedWidths[kAnyRole] : null);
+                if (Array.isArray(gw) && gw[0] && gw[0] !== '—') {
+                  resolvedWidth = String(gw[0]);
+                } else if (typeof gw === 'string' && gw && gw !== '—') {
+                  resolvedWidth = gw;
+                }
+              }
+
+              if (!resolvedWidth && Array.isArray(o.articles)) {
+                const artMatch = o.articles.find(a =>
+                  String(a.name || '').toLowerCase() === artName.toLowerCase()
+                );
+                if (artMatch) {
+                  const fabMatch = (artMatch.fabrics || []).find(f =>
+                    String(f.fabricQuality || f.fabricName || '').toLowerCase() === fabName.toLowerCase()
+                  ) || artMatch.fabrics?.[0];
+                  if (fabMatch && fabMatch.width) {
+                    resolvedWidth = String(fabMatch.width);
+                  }
+                }
+              }
+
+              if (!resolvedWidth && o.widthDyedRates && typeof o.widthDyedRates === 'object') {
+                const matchingKey = Object.keys(o.widthDyedRates).find(k =>
+                  k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+                );
+                if (matchingKey) {
+                  const parts = matchingKey.split('___');
+                  if (parts.length >= 4 && parts[3]) {
+                    resolvedWidth = parts[3];
+                  }
+                }
+              }
+
+              const cleanWidthStr = resolvedWidth ? resolvedWidth.replace(/"/g, '').trim() : '44';
+              const colName = String(fc.color || fc.colorName || '').trim();
+              const itemStyle = fc.styleName || o.styleName || (styles[0] || '');
+
+              // Composite grouping key: fabric + color + width (even if article is different)
+              const groupKey = `${(fabName || '').toLowerCase().trim()}___${(colName || '').toLowerCase().trim()}___${cleanWidthStr}`;
+
+              let currentPcs = parseInt(fc.pcs || fc.quantity_pieces || fc.totalPieces || fc.orderQty || 0, 10) || 0;
+              if (currentPcs === 0 && Array.isArray(o.articles)) {
+                const artMatch = o.articles.find(a => String(a.name || '').toLowerCase() === artName.toLowerCase());
+                if (artMatch && (artMatch.totalPieces || artMatch.pieces || artMatch.quantity)) {
+                  currentPcs = parseInt(artMatch.totalPieces || artMatch.pieces || artMatch.quantity, 10) || 0;
+                }
+              }
+              const currentCons = parseFloat(fc.dyedPerPiece || fc.greigeLengthPerPiece || fc.consumption || 0);
+              const currentShrink = parseFloat(fc.shrinkPct || fc.shrinkage || 4.0);
+
+              // Rate extraction from Order / Consumption / widthDyedRates / customMarketRates
+              let itemRate = 0;
+              if (fc.dyedRate && parseFloat(fc.dyedRate) > 0) {
+                itemRate = parseFloat(fc.dyedRate);
+              } else if (fc.rate && parseFloat(fc.rate) > 0) {
+                itemRate = parseFloat(fc.rate);
+              } else if (fc.fabricRate && parseFloat(fc.fabricRate) > 0) {
+                itemRate = parseFloat(fc.fabricRate);
+              } else if (fc.marketRate && parseFloat(fc.marketRate) > 0) {
+                itemRate = parseFloat(fc.marketRate);
+              } else if (fc.price && parseFloat(fc.price) > 0) {
+                itemRate = parseFloat(fc.price);
+              } else if (fc.cost && parseFloat(fc.cost) > 0) {
+                itemRate = parseFloat(fc.cost);
+              }
+
+              if (!itemRate && o.widthDyedRates && typeof o.widthDyedRates === 'object') {
+                const kExact = `${artName}___${fabName}___${roleName}___${cleanWidthStr}`;
+                const kNoRole = `${artName}___${fabName}______${cleanWidthStr}`;
+                const kFuzzy = Object.keys(o.widthDyedRates).find(k => {
+                  const lk = k.toLowerCase();
+                  return lk.includes(artName.toLowerCase()) && lk.includes(cleanWidthStr.toLowerCase());
+                });
+                const rVal = o.widthDyedRates[kExact] ?? o.widthDyedRates[kNoRole] ?? (kFuzzy ? o.widthDyedRates[kFuzzy] : null);
+                if (rVal && parseFloat(rVal) > 0) {
+                  itemRate = parseFloat(rVal);
+                }
+              }
+
+              if (!itemRate && o.customMarketRates && typeof o.customMarketRates === 'object') {
+                const cmVal = o.customMarketRates[`${artName}___${fabName}___${cleanWidthStr}`] ||
+                              o.customMarketRates[`${fabName}_${cleanWidthStr}`] ||
+                              o.customMarketRates[fabName];
+                if (cmVal && parseFloat(cmVal) > 0) {
+                  itemRate = parseFloat(cmVal);
+                }
+              }
+
+              if (!itemRate && Array.isArray(o.articles)) {
+                const artMatch = o.articles.find(a =>
+                  String(a.name || '').toLowerCase() === artName.toLowerCase()
+                );
+                if (artMatch) {
+                  const fabMatch = (artMatch.fabrics || []).find(f =>
+                    String(f.fabricQuality || f.fabricName || '').toLowerCase() === fabName.toLowerCase()
+                  ) || artMatch.fabrics?.[0];
+                  if (fabMatch && (fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate)) {
+                    itemRate = parseFloat(fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate) || 0;
+                  }
+                }
+              }
+
+              if (!groupsMap.has(groupKey)) {
+                groupsMap.set(groupKey, {
+                  id: `${o.id}-IT${idx + 1}`,
+                  style: itemStyle,
+                  fabric: fabName || 'Fabric',
+                  fabricId: fc.fabricId || 'FAB-001',
+                  color: colName,
+                  colorHex: fc.colorHex || '#cbd5e1',
+                  articles: artName ? [artName] : [],
+                  width: cleanWidthStr,
+                  rate: itemRate,
+                  requiredMeters: req,
+                  alreadyReceivedMeters: rec,
+                  pcs: currentPcs,
+                  totalCons: currentCons,
+                  maxShrinkage: currentShrink,
+                  count: 1,
+                  subItems: [fc]
+                });
+              } else {
+                const grp = groupsMap.get(groupKey);
+                grp.requiredMeters += req;
+                grp.alreadyReceivedMeters += rec;
+                if ((!grp.rate || grp.rate === 0) && itemRate) {
+                  grp.rate = itemRate;
+                }
+                if (artName && !grp.articles.includes(artName)) {
+                  grp.articles.push(artName);
+                }
+                // Sum pieces across combined articles
+                grp.pcs += currentPcs;
+                grp.totalCons += currentCons;
+                grp.maxShrinkage = Math.max(grp.maxShrinkage, currentShrink);
+                grp.count += 1;
+                grp.subItems.push(fc);
+              }
+            });
+
+            groupsMap.forEach((entry) => {
+              const req = Number(entry.requiredMeters.toFixed(2));
+              const rec = Number(entry.alreadyReceivedMeters.toFixed(2));
+              const joinedArticles = entry.articles.join(' + ') || 'General';
+
+              // Ensure total pieces sums all articles in this combined requirement
+              let totalPcs = entry.pcs || 0;
+              if (Array.isArray(o.articles) && entry.articles.length > 0) {
+                const sumFromArticles = entry.articles.reduce((sum, aName) => {
+                  const art = o.articles.find(a => String(a.name || '').toLowerCase() === String(aName || '').toLowerCase());
+                  return sum + (parseInt(art?.totalPieces || art?.pieces || art?.quantity || 0, 10) || 0);
+                }, 0);
+                if (sumFromArticles > 0) {
+                  totalPcs = sumFromArticles;
+                }
+              }
+
+              // Calculate ordered meters from storedPOs for this combined requirement
+              let ord = 0;
+              if (Array.isArray(storedPOs) && storedPOs.length > 0) {
+                storedPOs.forEach(p => {
+                  if (p.linked_sales_order_id === o.id && p.status !== 'Cancelled') {
+                    (p.items || []).forEach(it => {
+                      const itFab = String(it.fabric_name || it.fabric || '').toLowerCase().trim();
+                      const grpFab = String(entry.fabric || '').toLowerCase().trim();
+                      const itCol = String(it.color_name || it.color || '').toLowerCase().trim();
+                      const grpCol = String(entry.color || '').toLowerCase().trim();
+                      const itWidth = String(it.width || '').replace(/"/g, '').trim();
+                      const grpWidth = String(entry.width || '').replace(/"/g, '').trim();
+                      const itArt = String(it.article_name || it.article || '').toLowerCase().trim();
+
+                      const fabMatch = !itFab || !grpFab || itFab === grpFab;
+                      const colMatch = !itCol || !grpCol || itCol === grpCol;
+                      const widthMatch = !itWidth || !grpWidth || itWidth === grpWidth;
+
+                      const artMatch = !itArt ||
+                        itArt === joinedArticles.toLowerCase() ||
+                        entry.articles.some(a => a.toLowerCase().trim() === itArt) ||
+                        joinedArticles.toLowerCase().includes(itArt);
+
+                      if (fabMatch && colMatch && widthMatch && artMatch) {
+                        ord += (parseFloat(it.quantity_meters) || 0);
+                      }
+                    });
+                  }
+                });
+              }
+
+              ord = Number(ord.toFixed(2));
+              const isOrdered = req > 0 ? (ord >= req - 0.01) : (ord > 0);
+              const isPartiallyOrdered = req > 0 && ord > 0.01 && ord < (req - 0.01);
+              const pending = req > 0 ? Math.max(0, Number((req - ord).toFixed(2))) : 0;
+
+              // Average consumption per garment piece = required meters / total garment pieces
+              let finalCons = totalPcs > 0
+                ? Number((req / totalPcs).toFixed(3))
+                : (entry.totalCons > 0 ? Number(entry.totalCons.toFixed(3)) : 2.50);
+
               items.push({
-                id: `${o.id}-IT${idx + 1}`,
-                style: fc.styleName || o.styleName || (styles[0] || ''),
-                fabric: fc.fabricQuality || fc.fabricName || 'Fabric',
-                fabricId: fc.fabricId || 'FAB-001',
-                color: fc.color || fc.colorName || '',
-                colorHex: fc.colorHex || '#cbd5e1',
-                article: fc.article || fc.articleName || '',
-                width: String(fc.width || '44').replace(/"/g, ''),
+                id: entry.id,
+                style: entry.style,
+                fabric: entry.fabric,
+                fabricId: entry.fabricId,
+                color: entry.color,
+                colorHex: entry.colorHex,
+                article: joinedArticles,
+                articlesList: entry.articles,
+                width: entry.width,
+                rate: entry.rate || 0,
                 requiredMeters: req,
                 alreadyReceivedMeters: rec,
                 orderedMeters: ord,
-                pendingMeters: Math.max(0, req - ord),
-                status: ord >= req ? 'Already Ordered' : (ord > 0 ? 'Partially Ordered' : 'Not Ordered'),
-                consumption: parseFloat(fc.consumption || 2.50),
-                shrinkage: parseFloat(fc.shrinkage || 4.0)
+                pendingMeters: pending,
+                status: isOrdered ? 'Already Ordered' : (isPartiallyOrdered ? 'Partially Ordered' : 'Not Ordered'),
+                consumption: finalCons,
+                shrinkage: entry.maxShrinkage || 4.0,
+                pcs: totalPcs || (finalCons > 0 ? Math.floor(req / finalCons) : 0)
               });
             });
           }
@@ -257,18 +526,75 @@ export default function ProcessPOForm({
     setShowInlineVendorModal(false);
   };
 
-  // Header State - Zero Pre-filled defaults when creating new (PDF Section 3.1)
+  // Helper to auto-generate PO Number based on process type (Printing, Dyeing, etc.)
+  const generateProcessPONumber = (type = 'Dyeing') => {
+    let prefix = 'PPO';
+    const lower = (type || '').toLowerCase();
+    if (lower.includes('dye')) prefix = 'DYE';
+    else if (lower.includes('print')) prefix = 'PRN';
+    else if (lower.includes('process')) prefix = 'PRC';
+    else if (lower.includes('embroid')) prefix = 'EMB';
+    else if (lower.includes('wash')) prefix = 'WSH';
+    else if (lower.includes('stitch')) prefix = 'STC';
+
+    try {
+      const rawStored = localStorage.getItem('erp_process_pos_v1') || localStorage.getItem('erp_process_pos') || '[]';
+      const stored = JSON.parse(rawStored);
+      const existingNums = (Array.isArray(stored) ? stored : []).map(p =>
+        String(p.po_number || p.id || '').toUpperCase().trim()
+      );
+      for (let i = 0; i < 30; i++) {
+        const rand4 = Math.floor(1000 + Math.random() * 9000);
+        const candidate = `${prefix}-${rand4}`;
+        if (!existingNums.includes(candidate) && !existingNums.includes(`PPO-${candidate}`) && !existingNums.includes(String(rand4))) {
+          return candidate;
+        }
+      }
+      return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+    } catch (e) {
+      return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+  };
+
+  // Process Type State
+  const [processType, setProcessType] = useState(initialPO?.process_type || '');
+
+  // Header State - Auto-generate unique PO number when creating new
   const [poNumber, setPoNumber] = useState(
-    initialPO?.po_number ? String(initialPO.po_number).replace(/^PPO-/, '') : ''
+    initialPO?.po_number
+      ? String(initialPO.po_number).replace(/^PPO-/, '')
+      : generateProcessPONumber(initialPO?.process_type || '')
   );
   const [date, setDate] = useState(
     initialPO?.date || new Date().toISOString().split('T')[0]
   );
   const [issueDate, setIssueDate] = useState(
-    initialPO?.issue_date || initialPO?.date || new Date().toISOString().split('T')[0]
+    initialPO?.issue_date || ''
   );
   const [vendorId, setVendorId] = useState(initialPO?.vendor_id || '');
   const [vendorName, setVendorName] = useState(initialPO?.vendor_name || '');
+  const [showAllVendors, setShowAllVendors] = useState(false);
+
+  const handleProcessTypeChange = (newType) => {
+    setProcessType(newType);
+    if (!initialPO || !initialPO.po_number) {
+      if (newType) {
+        setPoNumber(generateProcessPONumber(newType));
+      }
+    }
+  };
+
+  // Requirement 2: Dynamically filter vendors strictly based on the selected Process PO Type
+  const displayedVendors = React.useMemo(() => {
+    if (!processType || showAllVendors || processType === 'All Processes') {
+      return vendorList.filter((v) => v.active !== false || (v.name || v.vendorName) === vendorName);
+    }
+    const filtered = vendorList.filter((v) =>
+      (v.active !== false || (v.name || v.vendorName) === vendorName) &&
+      (vendorMatchesType(v, processType) || (v.name || v.vendorName) === vendorName)
+    );
+    return filtered;
+  }, [vendorList, processType, showAllVendors, vendorName]);
 
   // Order Linkage
   const [isOrderLinked, setIsOrderLinked] = useState(
@@ -506,9 +832,24 @@ export default function ProcessPOForm({
       if (item.color_name) {
         relevantItems = relevantItems.filter(it => it.color === item.color_name);
       }
-      const orderArticleNames = Array.from(new Set(relevantItems.map(it => it.article).filter(Boolean)));
-      if (orderArticleNames.length > 0) {
-        const matched = articleList.filter(a => orderArticleNames.includes(a.name));
+      const orderArticleNames = [];
+      relevantItems.forEach(it => {
+        if (it.article) orderArticleNames.push(it.article);
+        if (Array.isArray(it.articlesList)) {
+          it.articlesList.forEach(a => { if (a) orderArticleNames.push(a); });
+        }
+      });
+      const uniqueOrderArticles = Array.from(new Set(orderArticleNames.filter(Boolean)));
+      if (uniqueOrderArticles.length > 0) {
+        const matched = [];
+        uniqueOrderArticles.forEach(art => {
+          const m = articleList.find(a => (a.name || '').toLowerCase() === art.toLowerCase());
+          if (m) {
+            matched.push(m);
+          } else {
+            matched.push({ id: art, name: art });
+          }
+        });
         if (matched.length > 0) return matched;
       }
     }
@@ -605,17 +946,29 @@ export default function ProcessPOForm({
   // Add Item from Order Requirement (PDF Section 3.2: auto-populate from Order)
   const handleSelectOrderItem = (orderItem) => {
     if (isLocked) return;
-    const cons = parseFloat(orderItem.consumption) || 2.50;
     const reqMeters = parseFloat(orderItem.pendingMeters || orderItem.requiredMeters || 0);
+    const totalPcs = parseInt(orderItem.pcs, 10) || 0;
+    const cons = totalPcs > 0 && reqMeters > 0
+      ? Number((reqMeters / totalPcs).toFixed(3))
+      : (parseFloat(orderItem.consumption) || 2.50);
     const shrink = parseFloat(orderItem.shrinkage) || 4.0;
-    const calculatedPcs = reqMeters > 0 ? Math.floor(reqMeters / cons) : '';
+    const calculatedPcs = totalPcs > 0 ? totalPcs : (reqMeters > 0 && cons > 0 ? Math.floor(reqMeters / cons) : '');
     const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : '';
+    const itemRate = orderItem.rate ? parseFloat(orderItem.rate) : '';
+
+    // Match real fabric from fabricList so dropdown does not show "Select Fabric Quality"
+    const matchedFab = fabricList.find(f =>
+      (orderItem.fabricId && f.id === orderItem.fabricId) ||
+      (orderItem.fabric && f.name && f.name.toLowerCase().trim() === orderItem.fabric.toLowerCase().trim())
+    ) || fabricList.find(f =>
+      orderItem.fabric && f.name && (f.name.toLowerCase().includes(orderItem.fabric.toLowerCase()) || orderItem.fabric.toLowerCase().includes(f.name.toLowerCase()))
+    );
 
     const newRow = {
       id: Date.now() + Math.random(),
       style_name: orderItem.style || selectedStyles[0] || '',
-      fabric_id: orderItem.fabricId || 'FAB-001',
-      fabric_name: orderItem.fabric || '100x100 Voile (Grey)',
+      fabric_id: matchedFab ? matchedFab.id : (orderItem.fabricId || 'FAB-001'),
+      fabric_name: matchedFab ? matchedFab.name : (orderItem.fabric || '100x100 Voile (Grey)'),
       color_id: 'COL-001',
       color_name: orderItem.color || 'Beige',
       color_hex: orderItem.colorHex || '#F5F5DC',
@@ -626,16 +979,20 @@ export default function ProcessPOForm({
       consumption_per_piece: cons,
       shrinkage_percent: shrink,
       raw_fabric_meters: rawMtrs,
-      fabric_rate: '',
+      fabric_rate: itemRate !== '' ? itemRate : '',
       dyeing_rate: '',
-      total_actual_cost: 0,
-      total_amount: 0,
-      remarks: `Linked to Order requirement: ${orderItem.id}`,
+      total_actual_cost: itemRate !== '' ? itemRate : 0,
+      total_amount: (reqMeters > 0 && itemRate !== '') ? Number((reqMeters * itemRate).toFixed(2)) : 0,
+      remarks: `Linked to Order requirement: ${orderItem.id} (${orderItem.article})`,
       sample_photo: null,
       status: 'Partially Ordered'
     };
 
-    setItems([...items, newRow]);
+    if (items.length === 1 && !items[0].fabric_name && !items[0].quantity_meters) {
+      setItems([newRow]);
+    } else {
+      setItems([...items, newRow]);
+    }
   };
 
   // Standard terms insertion
@@ -681,7 +1038,8 @@ export default function ProcessPOForm({
     const payload = {
       id: initialPO?.id || fullPoId,
       po_number: cleanPoNum.replace(/^PPO-/, ''),
-      process_type: 'Job Work',
+      process_type: processType || 'Dyeing',
+      process_name: processType || 'Dyeing',
       date: date,
       issue_date: issueDate,
       vendor_id: vendorId,
@@ -735,13 +1093,12 @@ export default function ProcessPOForm({
                       <i className="ti ti-lock me-1 text-secondary"></i>Locked
                     </span>
                   ) : (
-                    <span className={`badge px-2.5 py-1 fs-11 ${
-                      initialPO?.status === 'Sent to Vendor'
-                        ? 'bg-primary-subtle text-primary border border-primary-subtle'
-                        : initialPO?.status === 'Draft'
-                          ? 'bg-light text-secondary border'
-                          : 'bg-success-subtle text-success border border-success-subtle'
-                    }`}>
+                    <span className={`badge px-2.5 py-1 fs-11 ${initialPO?.status === 'Sent to Vendor'
+                      ? 'bg-primary-subtle text-primary border border-primary-subtle'
+                      : initialPO?.status === 'Draft'
+                        ? 'bg-light text-secondary border'
+                        : 'bg-success-subtle text-success border border-success-subtle'
+                      }`}>
                       {initialPO?.status || 'Draft'}
                     </span>
                   )
@@ -777,7 +1134,7 @@ export default function ProcessPOForm({
             </div>
             <div>
               <h6 className="mb-0 fw-bold text-dark fs-14">PO Parameters &amp; Order Association</h6>
-              <p className="text-muted fs-11 mb-0">PO Number, Date, Issue Date, Job Work Vendor &amp; optional Sales Order Link (PDF Section 3.1 &amp; 3.2)</p>
+              <p className="text-muted fs-11 mb-0">PO Number, Date, Issue Date, Job Work Vendor &amp; optional Sales Order Link</p>
             </div>
           </div>
 
@@ -802,74 +1159,8 @@ export default function ProcessPOForm({
         </div>
 
         <div className="p-4">
-          {/* Top Row: 4 Primary PO Parameters from PDF Section 3.1 */}
+          {/* Row 1 (FIRST): Vendor Type Selection, Vendor & Sales Order Association */}
           <div className="row g-3 mb-3 pb-3 border-bottom" style={{ borderColor: '#f1f5f9' }}>
-            {/* Process PO Number */}
-            <div className="col-12 col-sm-6 col-lg-3">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
-                <span>Process PO Number</span>
-                <span className="text-danger">*</span>
-              </label>
-              <input
-                type="text"
-                className="form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13"
-                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
-                placeholder="e.g. 7613"
-                value={poNumber}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => setPoNumber(e.target.value)}
-              />
-            </div>
-
-            {/* PO Date */}
-            <div className="col-12 col-sm-6 col-lg-3">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
-                <span>PO Date</span>
-                <span className="text-danger">*</span>
-              </label>
-              <input
-                type="date"
-                className="form-control form-control-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
-                value={date}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-
-            {/* Issue Date (PDF Section 3.1) */}
-            <div className="col-12 col-sm-6 col-lg-3">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
-                Issue Date <small className="text-muted fw-normal">(Section 3.1)</small>
-              </label>
-              <input
-                type="date"
-                className="form-control form-control-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
-                value={issueDate}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => setIssueDate(e.target.value)}
-              />
-            </div>
-
-            {/* Target Delivery Date (PDF Section 3.1) */}
-            <div className="col-12 col-sm-6 col-lg-3">
-              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
-                Target Delivery Date
-              </label>
-              <input
-                type="date"
-                className="form-control form-control-sm bg-white fs-13"
-                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
-                value={deliveryDate}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Bottom Row: 2 cards for Job Work Vendor & Sales Order Association */}
-          <div className="row g-3">
             {/* Vendor Panel */}
             <div className="col-12 col-lg-6">
               <div
@@ -877,22 +1168,64 @@ export default function ProcessPOForm({
                 style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}
               >
                 <div>
-                  <div className="d-flex align-items-center justify-content-between mb-2">
+                  {/* Vendor Type Selection (Filter vendors based on Vendor / Process Order Type) */}
+                  <div className="mb-2.5">
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <label className="form-label fs-12 fw-semibold text-secondary mb-0 d-flex align-items-center gap-1.5">
+                        <i className="ti ti-settings-cog text-primary fs-14"></i>
+                        <span>Vendor Type</span>
+                        <span className="text-danger">*</span>
+                      </label>
+                      <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold">
+                        {displayedVendors.length} {processType ? (processType === 'All Processes' ? '' : `${processType} `) : ''}Vendor{displayedVendors.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <select
+                      className="form-select form-select-sm bg-white fs-13 fw-semibold text-dark"
+                      style={{ borderColor: '#cbd5e1', height: '36px', borderRadius: '8px' }}
+                      value={processType}
+                      disabled={!isSectionEditable('header')}
+                      onChange={(e) => handleProcessTypeChange(e.target.value)}
+                    >
+                      <option value="">-- Select Vendor Type --</option>
+                      <option value="Dyeing">Dyeing (Dyeing Mill / Processor)</option>
+                      <option value="Printing">Printing (Digital, Screen &amp; Rotary Printing)</option>
+                      <option value="Processing">Processing (Dyeing, Printing &amp; Mill Finish)</option>
+                      <option value="Embroidery">Embroidery (Computer / Machine Embroidery)</option>
+                      <option value="Washing">Washing (Enzyme, Silicon &amp; Garment Wash)</option>
+                      <option value="Stitching / Job Worker">Stitching / Job Worker (CMT, Tailoring)</option>
+                      <option value="All Processes">All Processes (Show All Vendors)</option>
+                    </select>
+                  </div>
+
+                  {/* Vendor Selection */}
+                  <div className="d-flex align-items-center justify-content-between mb-1.5">
                     <label className="form-label fs-12 fw-bold text-dark mb-0 d-flex align-items-center gap-1.5">
                       <i className="ti ti-building-store fs-15 text-primary"></i>
-                      <span>Job Work Vendor</span>
+                      <span>{processType ? (processType === 'All Processes' ? 'Job Work Vendor' : `${processType} Vendor`) : 'Vendor'}</span>
                       <span className="text-danger">*</span>
                     </label>
-                    {isSectionEditable('header') && (
+                    <div className="d-flex align-items-center gap-2">
                       <button
                         type="button"
-                        className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-12 fw-semibold d-flex align-items-center gap-1"
-                        onClick={() => setShowInlineVendorModal(true)}
+                        className="btn btn-sm btn-link p-0 text-muted text-decoration-none fs-11 d-flex align-items-center gap-1"
+                        onClick={() => setShowAllVendors(!showAllVendors)}
+                        title={showAllVendors ? (processType ? `Filter to ${processType} vendors only` : 'Filter vendors') : `Show all ${vendorList.length} vendors`}
                       >
-                        <i className="ti ti-plus fs-13"></i>
-                        <span>New Vendor</span>
+                        <i className={`ti ti-${showAllVendors ? 'filter' : 'list'} fs-12`}></i>
+                        <span>{showAllVendors ? (processType ? `Show only ${processType}` : 'Filter by Type') : `Show All (${vendorList.length})`}</span>
                       </button>
-                    )}
+                      {isSectionEditable('header') && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-12 fw-semibold d-flex align-items-center gap-1"
+                          onClick={() => setShowInlineVendorModal(true)}
+                        >
+                          <i className="ti ti-plus fs-13"></i>
+                          <span>New Vendor</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <select
@@ -907,28 +1240,49 @@ export default function ProcessPOForm({
                     }}
                   >
                     <option value="" style={{ color: '#0f172a' }}>
-                      -- Select Vendor --
+                      -- Select {processType ? (processType === 'All Processes' ? 'Vendor' : `${processType} Vendor`) : 'Vendor'} --
                     </option>
-                    {vendorName && !vendorList.some(v => (v.name || v.vendorName) === vendorName) && (
+                    {vendorName && !displayedVendors.some(v => (v.name || v.vendorName) === vendorName) && (
                       <option value={vendorName} style={{ color: '#0f172a' }}>
-                        {vendorName}
+                        {vendorName} (Currently Selected)
                       </option>
                     )}
-                    {vendorList.map((v) => {
-                      const vTypes = getVendorTypes(v);
-                      const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
-                      const cityText = v.city ? ` (${v.city})` : '';
-                      return (
-                        <option key={v.id || v.name} value={v.name || v.vendorName} style={{ color: '#0f172a' }}>
-                          {v.name || v.vendorName}{typeBadge}{cityText}
-                        </option>
-                      );
-                    })}
+                    {displayedVendors.length === 0 ? (
+                      <option value="" disabled>
+                        {processType ? `No ${processType} vendors found in Vendor Master (${vendorList.length} total vendors)` : `No vendors found in Vendor Master (${vendorList.length} total vendors)`}
+                      </option>
+                    ) : (
+                      displayedVendors.map((v) => {
+                        const vTypes = getVendorTypes(v);
+                        const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
+                        const cityText = v.city ? ` (${v.city})` : '';
+                        return (
+                          <option key={v.id || v.name} value={v.name || v.vendorName} style={{ color: '#0f172a' }}>
+                            {v.name || v.vendorName}{typeBadge}{cityText}
+                          </option>
+                        );
+                      })
+                    )}
                   </select>
                 </div>
-                <div className="mt-2 text-muted fs-11 d-flex align-items-center gap-1">
-                  <i className="ti ti-info-circle fs-13 text-secondary"></i>
-                  <span>Job work processor or dyeing mill from Vendor Master</span>
+                <div className="mt-2 text-muted fs-11 d-flex align-items-center justify-content-between">
+                  <span className="d-flex align-items-center gap-1">
+                    <i className="ti ti-info-circle fs-13 text-secondary"></i>
+                    <span>
+                      {!processType || processType === 'All Processes' || showAllVendors
+                        ? `Listing all ${vendorList.length} vendors from Vendor Master`
+                        : `Filtered to ${processType} vendors (${displayedVendors.length} of ${vendorList.length})`}
+                    </span>
+                  </span>
+                  {!showAllVendors && processType && processType !== 'All Processes' && (
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 fs-11 text-primary text-decoration-none"
+                      onClick={() => setShowAllVendors(true)}
+                    >
+                      Bypass filter
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1014,6 +1368,72 @@ export default function ProcessPOForm({
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Row 2: 4 Primary PO Parameters from PDF Section 3.1 with Auto-Generate */}
+          <div className="row g-3">
+            {/* Process PO Number */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
+                <span>Process PO Number</span>
+                <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                className="form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                placeholder="e.g. DYE-7613"
+                value={poNumber}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => setPoNumber(e.target.value)}
+              />
+            </div>
+
+            {/* PO Date */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1">
+                <span>PO Date</span>
+                <span className="text-danger">*</span>
+              </label>
+              <input
+                type="date"
+                className="form-control form-control-sm bg-white fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                value={date}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+
+            {/* Issue Date */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                className="form-control form-control-sm bg-white fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                value={issueDate}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => setIssueDate(e.target.value)}
+              />
+            </div>
+
+            {/* Target Delivery Date (PDF Section 3.1) */}
+            <div className="col-12 col-sm-6 col-lg-3">
+              <label className="form-label fs-12 fw-semibold text-secondary mb-1.5">
+                Target Delivery Date
+              </label>
+              <input
+                type="date"
+                className="form-control form-control-sm bg-white fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                value={deliveryDate}
+                disabled={!isSectionEditable('header')}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -1342,6 +1762,7 @@ export default function ProcessPOForm({
                       <th>Color</th>
                       <th>Article</th>
                       <th>Width</th>
+                      <th className="text-end">Rate (₹)</th>
                       <th className="text-end">Required (m)</th>
                       <th className="text-end">Already Received (m)</th>
                       <th className="text-end">Pending (m)</th>
@@ -1351,7 +1772,9 @@ export default function ProcessPOForm({
                   </thead>
                   <tbody>
                     {currentSelectedOrder.items.map((ordIt) => {
-                      const isFullyOrdered = ordIt.status === 'Already Ordered' || ordIt.pendingMeters <= 0;
+                      const isFullyOrdered = ordIt.requiredMeters > 0
+                        ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
+                        : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
                       return (
                         <tr key={ordIt.id} className={isFullyOrdered ? 'table-light text-muted' : ''}>
                           <td className="fw-medium">{ordIt.style}</td>
@@ -1362,8 +1785,35 @@ export default function ProcessPOForm({
                               {ordIt.color}
                             </span>
                           </td>
-                          <td>{ordIt.article}</td>
+                          <td>
+                            {ordIt.articlesList && ordIt.articlesList.length > 1 ? (
+                              <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                <span className="fw-semibold text-primary" title={ordIt.article}>
+                                  {ordIt.article}
+                                </span>
+                                <span className="badge bg-light text-dark border fs-11" title="Sum of pieces across all combined articles">
+                                  {ordIt.pcs} pcs
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="d-flex align-items-center gap-1.5">
+                                <span>{ordIt.article}</span>
+                                {ordIt.pcs > 0 && (
+                                  <span className="badge bg-light text-muted border fs-11">
+                                    {ordIt.pcs} pcs
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td>{ordIt.width}"</td>
+                          <td className="text-end fw-semibold text-dark">
+                            {ordIt.rate && parseFloat(ordIt.rate) > 0 ? (
+                              `₹${parseFloat(ordIt.rate).toFixed(2)}`
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
                           <td className="text-end fw-semibold">{ordIt.requiredMeters.toFixed(2)}</td>
                           <td className="text-end text-success">{ordIt.alreadyReceivedMeters.toFixed(2)}</td>
                           <td className="text-end fw-bold text-dark">{ordIt.pendingMeters.toFixed(2)}</td>
@@ -1372,9 +1822,13 @@ export default function ProcessPOForm({
                               <span className="badge bg-secondary-subtle text-secondary border fs-10">
                                 🔒 Already Ordered
                               </span>
-                            ) : (
+                            ) : ordIt.orderedMeters > 0 ? (
                               <span className="badge bg-warning-subtle text-warning border fs-10">
                                 Partially Ordered
+                              </span>
+                            ) : (
+                              <span className="badge bg-light text-secondary border fs-10">
+                                Not Ordered
                               </span>
                             )}
                           </td>
@@ -1584,6 +2038,9 @@ export default function ProcessPOForm({
                             }}
                           >
                             <option value="">Select Fabric Quality</option>
+                            {item.fabric_id && !filteredFabrics.some(fab => fab.id === item.fabric_id) && (
+                              <option value={item.fabric_id}>{item.fabric_name || item.fabric_id}</option>
+                            )}
                             {filteredFabrics.map(fab => (
                               <option key={fab.id} value={fab.id}>{fab.name}</option>
                             ))}
@@ -1648,6 +2105,9 @@ export default function ProcessPOForm({
                             onChange={(e) => updateItem(idx, { article_name: e.target.value })}
                           >
                             <option value="">Select Article</option>
+                            {item.article_name && !filteredArticles.some(a => (a.name || a) === item.article_name) && (
+                              <option value={item.article_name}>{item.article_name}</option>
+                            )}
                             {filteredArticles.map(a => (
                               <option key={a.id || a.name} value={a.name}>{a.name}</option>
                             ))}
@@ -1664,6 +2124,9 @@ export default function ProcessPOForm({
                             onChange={(e) => updateItem(idx, { width: e.target.value })}
                           >
                             <option value="">Width</option>
+                            {item.width && !rowWidthOptions.some(w => String(w).replace(/"/g, '') === String(item.width).replace(/"/g, '')) && (
+                              <option value={String(item.width).replace(/"/g, '')}>{String(item.width).replace(/"/g, '')}"</option>
+                            )}
                             {rowWidthOptions.map(w => {
                               const cleanW = String(w).replace(/"/g, '');
                               return <option key={cleanW} value={cleanW}>{cleanW}"</option>;
@@ -1746,14 +2209,26 @@ export default function ProcessPOForm({
                           />
                         </td>
 
-                        {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) */}
-                        <td className="text-end fw-semibold text-dark fs-13">
-                          ₹{Number(item.total_actual_cost || 0).toFixed(2)}
+                        {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) in clean box */}
+                        <td>
+                          <div
+                            className="form-control form-control-sm text-end fw-semibold text-dark bg-light d-flex align-items-center justify-content-end fs-13 w-100"
+                            style={{ borderColor: '#cbd5e1', height: '36px', minWidth: '90px' }}
+                            title="Total Actual Cost per Metre (Fabric Rate + Dyeing Rate)"
+                          >
+                            ₹{Number(item.total_actual_cost || 0).toFixed(2)}
+                          </div>
                         </td>
 
-                        {/* Total Line Amount */}
-                        <td className="text-end fw-bold text-success fs-13">
-                          ₹{Number(item.total_amount || 0).toFixed(2)}
+                        {/* Total Line Amount in clean box */}
+                        <td>
+                          <div
+                            className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-flex align-items-center justify-content-end fs-13 w-100"
+                            style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '100px' }}
+                            title="Total Line Item Amount (Metres × Total Cost/m)"
+                          >
+                            ₹{Number(item.total_amount || 0).toFixed(2)}
+                          </div>
                         </td>
 
                         {/* Swatch Photo Upload / Camera */}
@@ -1812,8 +2287,14 @@ export default function ProcessPOForm({
                     <td colSpan={2} className="text-end text-secondary fs-12 py-2">
                       Total Actual Job Cost:
                     </td>
-                    <td colSpan={2} className="text-end text-success fs-14 py-2">
-                      ₹{grandTotalCost.toFixed(2)}
+                    <td colSpan={2} className="text-end py-2">
+                      <div
+                        className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-inline-flex align-items-center justify-content-end fs-13 px-3"
+                        style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '110px' }}
+                        title="Grand Total Actual Job Cost"
+                      >
+                        ₹{grandTotalCost.toFixed(2)}
+                      </div>
                     </td>
                     <td colSpan={!isLocked && isSectionEditable('items') ? 2 : 1}></td>
                   </tr>
@@ -1935,7 +2416,7 @@ export default function ProcessPOForm({
         <VendorMasterView
           isInline={true}
           vendors={vendorList}
-          defaultTypes={[]}
+          defaultTypes={processType && processType !== 'All Processes' ? [processType] : ['Dyeing']}
           onCloseInline={(saved) => {
             if (saved && (saved.name || saved.vendorName)) {
               handleVendorSaved(saved);

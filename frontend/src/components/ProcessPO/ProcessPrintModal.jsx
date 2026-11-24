@@ -163,160 +163,531 @@ export default function ProcessPrintModal({ type = 'PO', data, onClose }) {
           </div>
 
           <div className="modal-body p-4 bg-white" id="printable-process-doc">
-            {/* Header matching Raindrop paper format */}
-            <div className="border border-dark p-3 mb-3">
-              <div className="row align-items-center border-bottom border-dark pb-2 mb-2">
-                <div className="col-7">
-                  <h4 className="fw-black text-uppercase tracking-wider mb-0" style={{ letterSpacing: '1px' }}>RAINDROP</h4>
-                  <small className="text-muted d-block" style={{ fontSize: '11px' }}>
-                    H1-40, RIICO Industrial Area, Mansarovar, Jaipur - 302020<br />
-                    Ph: +91 9829059529 | GSTIN: 08BZJPD0890G1ZD
-                  </small>
-                </div>
-                <div className="col-5 text-end">
-                  <span className="badge bg-dark text-white px-3 py-1 fs-6 text-uppercase">
-                    {isChallan ? 'JOB CHALLAN' : 'PURCHASE ORDER (JOB WORK)'}
-                  </span>
-                  <div className="mt-1 fw-bold fs-5 text-danger">
-                    {isChallan ? `CH-NO: ${data.challan_number || data.id}` : `PO NO: ${data.po_number || data.id}`}
+            {isChallan ? (
+              /* ========================================================================= */
+              /* AUTHENTIC JOB CHALLAN PAPER SLIP (Matching Page 15 & Uploaded Image)       */
+              /* ========================================================================= */
+              <div className="border border-dark p-3 bg-white" style={{ fontFamily: '"Courier New", Courier, monospace, -apple-system, sans-serif' }}>
+                {/* Top Meta Line: GSTIN, PAN, and Book No 2412 */}
+                <div className="d-flex justify-content-between align-items-start mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <div>
+                    <div>GSTIN : 08BZJPD0890G1ZD</div>
+                    <div>PAN No. : BZJPD0890G</div>
                   </div>
-                  <div className="small text-muted">Date: {data.date || new Date().toISOString().split('T')[0]}</div>
+                  <div className="fs-6 fw-bold font-monospace text-dark border-bottom border-dark px-1">
+                    2412
+                  </div>
                 </div>
-              </div>
 
-              {/* Vendor & Ref section */}
-              <div className="row mb-3" style={{ fontSize: '13px' }}>
-                <div className="col-6 border-end border-dark pe-3">
-                  <div className="text-muted small">To (M/s):</div>
-                  <div className="fw-bold fs-6 text-dark">{data.vendor_name || 'Raju Dyeing (Krishna Dyeing)'}</div>
-                  <div className="text-muted small">Job Issue for Dyeing / Processing</div>
+                {/* Center Header: JOB CHALLAN & RAINDROP */}
+                <div className="text-center mb-2">
+                  <div className="fw-bold text-uppercase fs-6 tracking-wide" style={{ letterSpacing: '1px' }}>
+                    JOB CHALLAN
+                  </div>
+                  <h2 className="fw-black text-uppercase mb-0" style={{ letterSpacing: '2px', fontWeight: 900, color: '#0f172a' }}>
+                    RAINDROP
+                  </h2>
+                  <div className="text-muted" style={{ fontSize: '11px' }}>
+                    H1-40, RIICO Industrial Area, Mansarovar, Jaipur-302020
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '11px' }}>
+                    +91 9829059529
+                  </div>
                 </div>
-                <div className="col-6 ps-3">
-                  {isChallan ? (
-                    <div>
-                      <div><span className="text-muted">Linked PO(s):</span> <strong className="text-primary">{Array.isArray(data.linked_pos) ? data.linked_pos.join(', ') : 'PPO-7611, PPO-7612, PPO-7613'}</strong></div>
-                      <div><span className="text-muted">Folding Notation:</span> <strong>{data.folding_notation || '—'}</strong></div>
-                      <div><span className="text-muted">Total Bales / Rolls:</span> <strong>{data.total_bales || 1} Bale ({data.total_pieces || 7} Pcs)</strong></div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div><span className="text-muted">Sales Order:</span> <strong>{data.linked_sales_order_id || 'Standalone PO (General Stock)'}</strong></div>
-                      <div><span className="text-muted">Styles:</span> <strong>{Array.isArray(data.style_names) ? data.style_names.join(', ') : (data.style_name || 'Graphic Boota Kurta')}</strong></div>
-                      <div><span className="text-muted">Expected Delivery:</span> <strong>{data.delivery_date || 'Within 14 Days'}</strong></div>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Line Items Table */}
-              <table className="table table-bordered border-dark table-sm mb-3" style={{ fontSize: '12px' }}>
-                <thead className="table-light border-dark text-center">
-                  {isChallan ? (
-                    <tr>
-                      <th style={{ width: '40px' }}>S.No.</th>
-                      <th>Bale / Roll No</th>
-                      <th>Particulars / Fabric Quality</th>
-                      <th>Color</th>
-                      <th>Invoice Ref</th>
-                      <th>Folding</th>
-                      <th className="text-end">Meters</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th style={{ width: '40px' }}>S.No.</th>
-                      <th>Particulars (Fabric & Quality)</th>
-                      <th>Style / Article</th>
-                      <th>Color</th>
-                      <th>Width</th>
-                      <th className="text-end">Mtrs</th>
-                      <th className="text-end">Rate/m</th>
-                      <th className="text-end">Amount (₹)</th>
-                    </tr>
-                  )}
-                </thead>
-                <tbody>
-                  {isChallan ? (
-                    (data.items || []).map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="text-center">{idx + 1}</td>
-                        <td className="fw-bold">{item.bale_roll_no}</td>
-                        <td>{item.fabric_name}</td>
-                        <td>{item.color_name}</td>
-                        <td>{item.invoice_no || 'INV-MS-0091'}</td>
-                        <td className="text-center">{item.folding || data.folding_notation || '—'}</td>
-                        <td className="text-end fw-bold">{Number(item.dispatched_meters || item.meters || 0).toFixed(2)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    (data.items || []).map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="text-center">{idx + 1}</td>
-                        <td className="fw-bold">{item.fabric_name} ({item.width}")</td>
-                        <td>{item.style_name} - {item.article_name}</td>
-                        <td>
-                          <span className="badge border me-1" style={{ backgroundColor: item.color_hex || '#eee', color: '#000' }}>●</span>
-                          {item.color_name}
-                        </td>
-                        <td className="text-center">{item.width}"</td>
-                        <td className="text-end fw-bold">{Number(item.quantity_meters || 0).toFixed(2)}</td>
-                        <td className="text-end">₹{Number(item.dyeing_rate || 12).toFixed(2)}</td>
-                        <td className="text-end fw-bold">₹{Number(item.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="fw-bold border-top border-dark table-light">
-                    <td colSpan={isChallan ? 6 : 5} className="text-end text-uppercase">Grand Total:</td>
-                    <td className="text-end fs-6 text-dark">
-                      {isChallan ? `${Number(data.grand_total_meters || 2418.80).toFixed(2)} Mtrs` : `${Number(data.total_meters || 0).toFixed(2)} Mtrs`}
-                    </td>
-                    {!isChallan && (
-                      <td className="text-end fs-6 text-primary">
-                        ₹{Number(data.total_estimated_cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
+                {/* Challan No, Party Name, PO Reference & Date */}
+                <div className="row g-2 pt-2 pb-2 border-top border-dark align-items-end" style={{ fontSize: '13px' }}>
+                  <div className="col-7">
+                    <div className="d-flex align-items-baseline mb-1">
+                      <span className="fw-bold me-2" style={{ minWidth: '35px' }}>No.</span>
+                      <span className="fw-bold fs-5 text-danger font-monospace">
+                        {data.challan_number || '4903'}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-baseline mb-1">
+                      <span className="fw-bold me-2" style={{ minWidth: '35px' }}>M/s</span>
+                      <span className="fw-bold fs-6 text-dark border-bottom border-dark border-dotted flex-grow-1 pb-0.5">
+                        {data.vendor_name || 'Raju dyeing'}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-baseline">
+                      <span className="fw-bold me-2" style={{ minWidth: '35px' }}>GSTIN</span>
+                      <span className="border-bottom border-dark border-dotted flex-grow-1" style={{ height: '16px' }}>
+                        {data.vendor_gstin || ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="col-5 text-end">
+                    <div className="d-flex justify-content-end align-items-baseline mb-1">
+                      <span className="fw-bold me-2">P.O =</span>
+                      <span className="fw-bold font-monospace fs-6 text-primary">
+                        {Array.isArray(data.linked_pos) && data.linked_pos.length > 0
+                          ? data.linked_pos.join(', ')
+                          : (data.linked_pos || '7611, 7612, 7613')}
+                      </span>
+                    </div>
+                    <div className="d-flex justify-content-end align-items-baseline mb-1">
+                      <span className="fw-bold me-2">Date</span>
+                      <span className="fw-bold font-monospace fs-6">
+                        {(() => {
+                          const d = data.date || '2026-08-12';
+                          if (d.includes('-')) {
+                            const parts = d.split('-');
+                            return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+                          }
+                          return d;
+                        })()}
+                      </span>
+                    </div>
+                    {data.folding_notation && (
+                      <div className="d-flex justify-content-end align-items-baseline">
+                        <span className="text-muted me-2" style={{ fontSize: '11px' }}>Folding:</span>
+                        <span className="badge bg-light text-dark border border-dark fw-bold">
+                          {data.folding_notation}
+                        </span>
+                      </div>
                     )}
-                  </tr>
-                </tfoot>
-              </table>
+                  </div>
+                </div>
 
-              {/* Terms and Remarks */}
-              <div className="row border-top border-dark pt-2 mb-3" style={{ fontSize: '11px' }}>
-                <div className="col-8">
-                  <div className="fw-bold text-uppercase">Terms & Conditions:</div>
-                  <p className="mb-0 text-muted">
-                    {data.terms || '1. Goods delivered must be strictly as per sample and specification within stipulated date.\n2. Any variation in shade or quality must be reported immediately.'}
-                  </p>
-                  {data.remarks && (
-                    <div className="mt-1 text-dark">
-                      <strong>Remarks:</strong> {data.remarks}
+                {/* Table: S.No. | PARTICULARS | Mtr. | Mtr. | Mtr. */}
+                <table className="table table-bordered border-dark table-sm mb-0 mt-2" style={{ fontSize: '12px' }}>
+                  <thead className="text-center border-dark" style={{ backgroundColor: '#f8fafc' }}>
+                    <tr>
+                      <th style={{ width: '50px', border: '1px solid #000' }}>S.No.</th>
+                      <th style={{ border: '1px solid #000' }}>PARTICULARS</th>
+                      <th style={{ width: '85px', border: '1px solid #000' }}>Mtr.</th>
+                      <th style={{ width: '85px', border: '1px solid #000' }}>Mtr.</th>
+                      <th style={{ width: '85px', border: '1px solid #000' }}>Mtr.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Row 1: Particulars title line */}
+                    <tr style={{ minHeight: '32px' }}>
+                      <td className="text-center align-top border-dark" style={{ border: '1px solid #000' }}>1</td>
+                      <td className="border-dark" style={{ border: '1px solid #000' }}>
+                        <div className="fw-bold fs-13 text-dark">
+                          {data.particulars || '100x100 Voil [48"] gray - fab issue for dying'}
+                        </div>
+                        <div className="text-secondary small mt-1">
+                          B N
+                        </div>
+                      </td>
+                      <td className="text-end border-dark" style={{ border: '1px solid #000' }}></td>
+                      <td className="text-end border-dark" style={{ border: '1px solid #000' }}></td>
+                      <td className="text-end border-dark" style={{ border: '1px solid #000' }}></td>
+                    </tr>
+
+                    {/* Dynamic Items / Rolls breakdown */}
+                    {data.items && data.items.length > 0 ? (
+                      data.items.map((item, idx) => {
+                        const isBale = String(item.bale_roll_no || '').toLowerCase().includes('bale');
+                        const cleanRoll = String(item.bale_roll_no || '').replace(/Roll\s*/i, '');
+                        const mtrVal = Number(item.dispatched_meters || item.meters || 0).toFixed(2);
+                        return (
+                          <tr key={idx} style={{ height: '24px' }}>
+                            <td className="text-center border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                            <td className="border-dark py-0 px-3" style={{ border: '1px solid #000' }}>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="font-monospace fw-semibold">
+                                  {isBale ? item.bale_roll_no : cleanRoll}
+                                  {item.is_partial_cut ? ' (Cut)' : ''}
+                                </span>
+                                {item.folding && (
+                                  <span className="badge bg-light text-muted border px-1.5 py-0 fs-10">
+                                    {item.folding}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                              {mtrVal}
+                            </td>
+                            <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                            <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      /* Default Page 15 slip breakdown if no explicit items */
+                      <>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3 font-monospace fw-bold" style={{ border: '1px solid #000' }}>
+                            12384 -
+                          </td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            1865.50
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3 font-monospace fw-bold" style={{ border: '1px solid #000' }}>
+                            2376 -
+                          </td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            119.30
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3 font-monospace text-muted" style={{ border: '1px solid #000' }}>
+                            "
+                          </td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            111.00
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3 font-monospace" style={{ border: '1px solid #000' }}>
+                            <span className="badge bg-light text-dark border px-1">L-98</span>
+                          </td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            78.40
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3" style={{ border: '1px solid #000' }}></td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            97.80
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3" style={{ border: '1px solid #000' }}></td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            113.30
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3 font-monospace text-muted" style={{ border: '1px solid #000' }}>
+                            (Cut piece)
+                          </td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            20.00
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                        <tr style={{ height: '24px' }}>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0 px-3" style={{ border: '1px solid #000' }}></td>
+                          <td className="text-end font-monospace fw-bold border-dark py-0 px-2" style={{ border: '1px solid #000' }}>
+                            13.50
+                          </td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                          <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        </tr>
+                      </>
+                    )}
+
+                    {/* Blank spacer rows to give authentic ledger slip appearance */}
+                    <tr style={{ height: '20px' }}>
+                      <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                      <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                      <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                      <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                      <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                    </tr>
+                  </tbody>
+
+                  {/* Table Footer: Remarks, Total Pcs, Grand Total */}
+                  <tfoot className="border-dark" style={{ borderTop: '2px solid #000' }}>
+                    <tr>
+                      <td colSpan={2} className="border-dark py-1 px-2" style={{ border: '1px solid #000' }}>
+                        <span className="fw-bold">Remarks: </span>
+                        <span>{data.remarks || 'Fab issue for dyeing'}</span>
+                      </td>
+                      <td className="fw-bold text-center border-dark py-1" style={{ border: '1px solid #000' }}>
+                        Total
+                      </td>
+                      <td className="border-dark py-1" style={{ border: '1px solid #000' }}></td>
+                      <td className="border-dark py-1" style={{ border: '1px solid #000' }}></td>
+                    </tr>
+                    <tr>
+                      <td colSpan={2} className="border-dark py-1.5 px-2 bg-light" style={{ border: '1px solid #000' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="fw-bold text-uppercase">Total Pcs.</span>
+                          <span className="fw-bold font-monospace fs-6 text-dark">
+                            {data.total_pieces || '1 Bale + 7 th'}
+                          </span>
+                        </div>
+                      </td>
+                      <td colSpan={3} className="border-dark py-1.5 px-2 text-end bg-light" style={{ border: '1px solid #000' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="fw-bold text-uppercase me-2">Grand Total</span>
+                          <span className="fw-black fs-5 font-monospace text-dark">
+                            {Number(data.grand_total_meters || 2418.80).toFixed(2)} Mtr.
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* Signatures matching Page 15 slip */}
+                <div className="d-flex justify-content-between align-items-end mt-4 pt-3" style={{ fontSize: '13px' }}>
+                  <div className="text-center" style={{ width: '220px' }}>
+                    <div style={{ fontFamily: 'Brush Script MT, cursive, Georgia, serif', fontSize: '24px', fontWeight: 'bold', color: '#1e293b', minHeight: '32px' }}>
+                      {data.receiver_signature || 'Anurag'}
                     </div>
-                  )}
-                </div>
-                <div className="col-4 text-end">
-                  <div className="text-muted small">Total Pieces: <strong>{data.total_pieces || data.items?.length || 1} Pcs</strong></div>
-                </div>
-              </div>
+                    <div className="border-top border-dark pt-1 fw-bold">
+                      Receiver's Signature
+                    </div>
+                  </div>
 
-              {/* Signature Blocks as required by Section 9 & client's slips */}
-              <div className="row pt-4 mt-3 border-top border-dark text-center" style={{ fontSize: '12px' }}>
-                <div className="col-4">
-                  <div style={{ height: '35px' }}></div>
-                  <div className="border-top border-dark pt-1 fw-bold">Receiver's Signature</div>
-                  <small className="text-muted">{data.receiver_signature || '(Vendor Representative)'}</small>
-                </div>
-                <div className="col-4">
-                  <div style={{ height: '35px' }} className="fw-bold text-primary">{data.created_by || 'Saksham Garg'}</div>
-                  <div className="border-top border-dark pt-1 fw-bold">Prepared By / Logged User</div>
-                  <small className="text-muted">Raindrop Procurement Desk</small>
-                </div>
-                <div className="col-4">
-                  <div style={{ height: '35px' }} className="fw-bold">{data.company_representative || 'Anurag'}</div>
-                  <div className="border-top border-dark pt-1 fw-bold">For RAINDROP (Authorised Signatory)</div>
-                  <small className="text-muted">Company Representative</small>
+                  <div className="text-center" style={{ width: '220px' }}>
+                    <div className="fw-bold fs-6 mb-1">
+                      For RAINDROP
+                    </div>
+                    <div style={{ minHeight: '26px' }}></div>
+                    <div className="border-top border-dark pt-1 fw-bold">
+                      Authorised Signatory
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* ========================================================================= */
+              /* PURCHASE ORDER (JOB WORK) PRINT FORMAT (Page 11 Slip)                      */
+              /* ========================================================================= */
+              <div className="border border-dark p-3 mb-3 bg-white" style={{ fontFamily: 'Arial, sans-serif' }}>
+                {/* Title */}
+                <div className="text-center fw-bold fs-5 text-uppercase mb-2 text-dark" style={{ letterSpacing: '1px' }}>
+                  PURCHASE ORDER
+                </div>
+
+                {/* Slip Header matching Page 11 */}
+                <div className="row align-items-start pb-2">
+                  <div className="col-7">
+                    <div className="text-dark small fw-semibold" style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                      <div>GSTIN : 08BZJPD0890G1ZD</div>
+                      <div>PAN No. : BZJPD0890G</div>
+                    </div>
+                    <div className="fw-black text-uppercase mt-1" style={{ fontSize: '20px', letterSpacing: '1px', fontWeight: '900' }}>
+                      RAINDROP
+                    </div>
+                    <div className="small text-muted" style={{ fontSize: '11px', lineHeight: '1.3' }}>
+                      H1-40, RIICO Industrial Area, Mansarovar, Jaipur-302020<br />
+                      +91 9829059529
+                    </div>
+                  </div>
+
+                  <div className="col-5">
+                    <div className="d-flex align-items-baseline mb-2">
+                      <span className="fw-bold me-2" style={{ minWidth: '40px' }}>To,</span>
+                      <span className="fw-bold fs-6 text-dark border-bottom border-dark border-dotted flex-grow-1 pb-0.5">
+                        {data.vendor_name ? `M/s ${data.vendor_name}` : 'M/s Raju dyeing'}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-baseline">
+                      <span className="fw-bold me-2" style={{ minWidth: '55px' }}>CH.No =</span>
+                      <span className="fw-bold font-monospace fs-6 text-danger">
+                        {data.challan_number || (Array.isArray(data.linked_challans) && data.linked_challans[0]) || '4903'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Strip: ORDER No. | CODE | DATE */}
+                <div className="d-flex align-items-center justify-content-between border border-dark px-3 py-1.5 my-2 fw-bold" style={{ fontSize: '13px', backgroundColor: '#fafbfc' }}>
+                  <div>
+                    <span className="text-secondary me-2">ORDER No.</span>
+                    <span className="font-monospace text-primary fs-6">{data.po_number || data.linked_sales_order_id || '7613'}</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary me-2">CODE :</span>
+                    <span className="font-monospace text-dark fs-6">{data.style_code || data.style_name || 'RD-2611'}</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary me-2">DATE :</span>
+                    <span className="font-monospace text-dark fs-6">
+                      {(() => {
+                        const d = data.date || data.issue_date || '2026-08-12';
+                        if (d.includes('-')) {
+                          const parts = d.split('-');
+                          return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+                        }
+                        return d;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Table matching Page 11 / Image 3 */}
+                <table className="table table-bordered border-dark table-sm mb-0 mt-2" style={{ fontSize: '12px' }}>
+                  <thead className="text-center border-dark" style={{ backgroundColor: '#f8fafc' }}>
+                    <tr>
+                      <th style={{ width: '45px', border: '1px solid #000' }}>S. No.</th>
+                      <th style={{ border: '1px solid #000' }}>PARTICULARS</th>
+                      <th style={{ width: '65px', border: '1px solid #000' }}>SIZE</th>
+                      <th style={{ width: '85px', border: '1px solid #000' }}>QTY.</th>
+                      <th style={{ width: '110px', border: '1px solid #000' }}>RATE Rs. P.</th>
+                      <th style={{ width: '220px', border: '1px solid #000' }}>REMARKS / SAMPLE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items && data.items.length > 0 ? (
+                      data.items.map((item, idx) => (
+                        <tr key={idx} style={{ minHeight: '32px' }}>
+                          <td className="text-center border-dark font-monospace" style={{ border: '1px solid #000' }}>
+                            {idx + 1}
+                          </td>
+                          <td className="border-dark px-2" style={{ border: '1px solid #000' }}>
+                            <div className="fw-bold fs-12 text-dark">
+                              {item.fabric_name || '100x100 Voil'} ({item.width || '48'}") gray - Job issue for deying
+                            </div>
+                            {item.article_name && (
+                              <div className="text-secondary small">
+                                Article: {item.article_name}
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-center border-dark font-monospace fw-semibold" style={{ border: '1px solid #000' }}>
+                            {item.width ? `${item.width}"` : '48"'}
+                          </td>
+                          <td className="text-end border-dark font-monospace fw-bold px-2" style={{ border: '1px solid #000' }}>
+                            {Number(item.quantity_meters || item.meters || 0).toFixed(2)}
+                          </td>
+                          <td className="text-end border-dark font-monospace fw-semibold px-2" style={{ border: '1px solid #000' }}>
+                            {Number(item.dyeing_rate || item.fabric_rate || 12).toFixed(2)} /- PER Mtr
+                          </td>
+                          <td className="border-dark px-2 py-1" style={{ border: '1px solid #000' }}>
+                            <div className="d-flex align-items-center justify-content-between gap-1">
+                              <div className="d-flex align-items-center gap-1.5">
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    width: '12px',
+                                    height: '12px',
+                                    backgroundColor: item.color_hex || '#d4b996',
+                                    border: '1px solid #666',
+                                    borderRadius: '2px'
+                                  }}
+                                />
+                                <span className="fw-semibold text-dark fs-11">
+                                  {item.color_name || 'Beige Color'} =&gt; {Number(item.quantity_meters || item.meters || 0).toFixed(2)}
+                                </span>
+                              </div>
+                              {item.sample_photo && (
+                                <img
+                                  src={item.sample_photo}
+                                  alt="Swatch"
+                                  style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '3px', border: '1px solid #cbd5e1' }}
+                                />
+                              )}
+                            </div>
+                            <div className="small text-muted fst-italic">
+                              {item.style_name || data.style_name || 'Graphic Boota'}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr style={{ minHeight: '32px' }}>
+                        <td className="text-center border-dark font-monospace" style={{ border: '1px solid #000' }}>1</td>
+                        <td className="border-dark px-2" style={{ border: '1px solid #000' }}>
+                          <div className="fw-bold fs-12 text-dark">
+                            100x100 Voil (48") gray - Job issue for deying
+                          </div>
+                        </td>
+                        <td className="text-center border-dark font-monospace fw-semibold" style={{ border: '1px solid #000' }}>48"</td>
+                        <td className="text-end border-dark font-monospace fw-bold px-2" style={{ border: '1px solid #000' }}>525.00</td>
+                        <td className="text-end border-dark font-monospace fw-semibold px-2" style={{ border: '1px solid #000' }}>12 /- PER Mtr</td>
+                        <td className="border-dark px-2 py-1" style={{ border: '1px solid #000' }}>
+                          <div className="d-flex align-items-center gap-1.5">
+                            <span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#d4b996', border: '1px solid #666', borderRadius: '2px' }} />
+                            <span className="fw-semibold text-dark fs-11">Beige Color =&gt; 525.00</span>
+                          </div>
+                          <div className="small text-muted fst-italic">Graphic Boota</div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Realistic blank receipt rows matching physical slip */}
+                    {[...Array(Math.max(1, 5 - (data.items?.length || 1)))].map((_, idx) => (
+                      <tr key={`blank-${idx}`} style={{ height: '28px' }}>
+                        <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        <td className="border-dark py-0 px-2" style={{ border: '1px solid #000' }}></td>
+                        <td className="border-dark py-0" style={{ border: '1px solid #000' }}></td>
+                        <td className="border-dark py-0 px-2" style={{ border: '1px solid #000' }}></td>
+                        <td className="border-dark py-0 px-2" style={{ border: '1px solid #000' }}></td>
+                        <td className="border-dark py-0 px-2" style={{ border: '1px solid #000' }}></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot style={{ backgroundColor: '#fafbfc' }}>
+                    <tr className="fw-bold border-top border-dark" style={{ borderTop: '2px solid #000' }}>
+                      <td colSpan={3} className="text-end border-dark py-1 px-2" style={{ border: '1px solid #000' }}>
+                        Total
+                      </td>
+                      <td className="text-end border-dark font-monospace fs-13 py-1 px-2 text-dark" style={{ border: '1px solid #000' }}>
+                        {Number(data.total_meters || (data.items || []).reduce((acc, it) => acc + (parseFloat(it.quantity_meters || it.meters) || 0), 0) || 525).toFixed(2)}
+                      </td>
+                      <td colSpan={2} className="text-end border-dark font-monospace fs-13 py-1 px-2 text-primary" style={{ border: '1px solid #000' }}>
+                        ₹{Number(data.total_estimated_cost || (data.items || []).reduce((acc, it) => acc + (parseFloat(it.total_amount) || 0), 0) || 6300).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* Signatures & Footer matching Page 11 Slip */}
+                <div className="d-flex justify-content-between align-items-end mt-4 pt-2" style={{ fontSize: '13px' }}>
+                  <div className="text-center" style={{ width: '220px' }}>
+                    <div style={{ fontFamily: 'Brush Script MT, cursive, Georgia, serif', fontSize: '26px', fontWeight: 'bold', color: '#1e293b', minHeight: '34px' }}>
+                      {data.receiver_signature || 'Anurag'}
+                    </div>
+                    <div className="border-top border-dark pt-1 fw-bold">
+                      Receiver's Signature
+                    </div>
+                  </div>
+
+                  <div className="text-start" style={{ maxWidth: '420px', fontSize: '11px', lineHeight: '1.4' }}>
+                    <div className="fw-bold mb-1">
+                      DELIVERY DATE : <span className="font-monospace text-dark fs-12 ms-1">
+                        {(() => {
+                          const d = data.delivery_date || '2026-08-20';
+                          if (d.includes('-')) {
+                            const parts = d.split('-');
+                            return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+                          }
+                          return d;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="text-secondary">
+                      <strong>TERMS :</strong> 1 Goods delivered must be strictly as per sample and specification (within stipulated date)
+                    </div>
+                  </div>
+
+                  <div className="text-center" style={{ width: '220px' }}>
+                    <div className="fw-bold fs-6 mb-1">
+                      For RAINDROP
+                    </div>
+                    <div style={{ minHeight: '34px' }}></div>
+                    <div className="border-top border-dark pt-1 fw-bold">
+                      Authorised Signatory
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="modal-footer bg-light py-2">

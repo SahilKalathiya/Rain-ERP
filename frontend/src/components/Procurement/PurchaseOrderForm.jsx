@@ -6,7 +6,7 @@ import AddColorModal from './AddColorModal';
 import { initialColors } from '../../data/procurementData';
 import { initialSalesOrders, getStoredData } from '../../data/salesOrderData';
 import { getMetersForPoFromGrn, getPoFulfillmentData, calculatePoFabricFulfillment } from '../../utils/procurementUtils';
-import { vendorMatchesType } from '../../utils/vendorUtils';
+import { vendorMatchesType, getVendorTypes } from '../../utils/vendorUtils';
 
 /**
  * SearchableColorInput - Custom Theme-styled Color Dropdown / Searchable Combobox
@@ -770,9 +770,7 @@ export default function PurchaseOrderForm({
       (v.active !== false || v.id === formData.vendorId) &&
       (vendorMatchesType(v, ['Fabric Supplier', 'Fabric']) || v.id === formData.vendorId)
     );
-    return filtered.length > 0
-      ? filtered
-      : vendors.filter((v) => v.active !== false || v.id === formData.vendorId);
+    return filtered;
   }, [vendors, showAllVendors, formData.vendorId]);
 
   // Requirement 15: Once a Purchase Order is sent to the vendor and its GRN process has started, the Purchase Order should no longer be editable.
@@ -1565,14 +1563,22 @@ export default function PurchaseOrderForm({
                 onChange={(e) => handleVendorChange(e.target.value)}
               >
                 <option value="">Select Fabric Supplier...</option>
-                {displayedVendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} {v.city ? `(${v.city})` : ''}
-                  </option>
-                ))}
+                {displayedVendors.length === 0 ? (
+                  <option value="" disabled>No Fabric Suppliers found in Vendor Master ({vendors.length} total vendors)</option>
+                ) : (
+                  displayedVendors.map((v) => {
+                    const vTypes = getVendorTypes(v);
+                    const typeBadge = vTypes.length > 0 ? ` [${vTypes.join(', ')}]` : '';
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.name} {v.city ? `(${v.city})` : ''}{typeBadge}
+                      </option>
+                    );
+                  })
+                )}
                 {formData.vendorId && !displayedVendors.some((v) => v.id === formData.vendorId) && (
                   <option value={formData.vendorId}>
-                    {formData.vendorName || formData.vendorId}
+                    {formData.vendorName || formData.vendorId} (Currently Selected)
                   </option>
                 )}
               </select>

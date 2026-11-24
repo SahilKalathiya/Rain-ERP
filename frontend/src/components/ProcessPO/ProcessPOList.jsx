@@ -127,9 +127,16 @@ export default function ProcessPOList({ pos = [], onNewPO, onViewPO, onPrintPO, 
                     >
                       {/* PO Number & Date Combined (Saves width, prevents horizontal scroll) */}
                       <td>
-                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace fw-bold fs-12">
-                          #{po.po_number || po.id}
-                        </span>
+                        <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                          <span className="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace fw-bold fs-12">
+                            #{po.po_number || po.id}
+                          </span>
+                          {po.process_type && po.process_type !== 'Job Work' && (
+                            <span className="badge bg-info-subtle text-info border border-info-subtle fs-10 fw-medium">
+                              {po.process_type}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-muted fs-11 mt-1 d-flex align-items-center gap-1">
                           <i className="ti ti-calendar fs-12"></i>
                           <span>{po.date}</span>

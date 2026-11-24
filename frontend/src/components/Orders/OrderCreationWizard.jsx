@@ -2065,6 +2065,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         let dyedPerPiece = '';
         const rawAvgLen = parseFloat(art.avgLength || fr.avgLength);
         const isDupatta = /dupatta|stole|chunri|scarf/i.test((art.name || '').trim());
+        const isBottom = /pant|bottom|salwar|trouser|plazo|palazzo|skirt/i.test((art.name || '').trim());
         if (!isNaN(rawAvgLen) && rawAvgLen > 0) {
           // If Dupatta, entered directly in meters (mts); else in inches, convert to meters (1 in = 0.0254 m)
           dyedPerPiece = isDupatta ? Number(rawAvgLen.toFixed(3)) : Number((rawAvgLen * 0.0254).toFixed(3));
@@ -2073,7 +2074,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
         } else if (art.consumption !== undefined && art.consumption !== null && art.consumption !== '') {
           dyedPerPiece = parseFloat(art.consumption) || '';
         } else {
-          dyedPerPiece = '';
+          // Fallback default so required fabric is realistically estimated
+          const fallbackLen = isDupatta ? 2.25 : (isBottom ? 38 : 45);
+          dyedPerPiece = isDupatta ? fallbackLen : Number((fallbackLen * 0.0254).toFixed(3));
         }
 
         // Gather all colors used across customers for this article
@@ -2120,12 +2123,15 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             key: `${art.id}_${frIdx}_${colName}`,
             articleId: art.id,
             articleName: art.name,
+            article: art.name,
             role: autoCapitalizeWords(fr.role || 'Main'),
             fabricId: fab?.id,
             fabricQuality: fab?.qualityName || fab?.quality || fab?.name || fr.fabricQuality || 'Suh Cotton',
+            fabricName: fab?.qualityName || fab?.quality || fab?.name || fr.fabricQuality || 'Suh Cotton',
             source: fr.source || 'Greige Fabric',
             width: widthVal,
             colorName: colName,
+            color: colName,
             colorHex: usedColors.size > 0 ? colorObj.hex : '#94a3b8',
             dyedPerPiece,
             shrinkPct,
@@ -2135,7 +2141,11 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
             isMainFabric,
             totalDyed,
             totalGreige,
-            orderQty
+            totalFabricMeters: totalGreige,
+            requiredMeters: totalGreige,
+            orderQty,
+            consumption: dyedPerPiece || greigeLengthPerPiece || 0,
+            shrinkage: shrinkPct
           });
         });
       });
@@ -3595,69 +3605,6 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Question 4: Same Value / Quantity Setup */}
-                              {(() => {
-                                const isAnswered = configMode.sameValue !== undefined && configMode.sameValue !== null;
-                                return (
-                                  <div
-                                    className="p-3.5 rounded-3 border transition"
-                                    style={{
-                                      backgroundColor: isAnswered ? (configMode.sameValue ? '#f8faff' : '#fffbeb') : '#ffffff',
-                                      borderColor: isAnswered ? '#c7d2fe' : '#e2e8f0'
-                                    }}
-                                  >
-                                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                      <div className="d-flex align-items-center gap-2.5">
-                                        <span
-                                          className="badge rounded-circle text-white d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                          style={{
-                                            width: '26px',
-                                            height: '26px',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold',
-                                            backgroundColor: isAnswered ? '#2e37a4' : '#94a3b8'
-                                          }}
-                                        >
-                                          4
-                                        </span>
-                                        <div>
-                                          <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
-                                            Do articles have the same value / piece quantities?
-                                          </div>
-                                          <small className="text-muted">
-                                            {configMode.sameValue === true
-                                              ? '⚡ Same Value (1:1 Auto-Sync) — quantities entered on one article automatically sync to connected articles'
-                                              : configMode.sameValue === false
-                                                ? '⚖️ Different / Separate Values — enter independent quantities for each article (e.g. 100 Kurta, 50 Pant, 75 Dupatta)'
-                                                : 'Choose whether articles share equal 1:1 piece quantities or have independent quantities'}
-                                          </small>
-                                        </div>
-                                      </div>
-                                      <div className="btn-group btn-group-sm ms-auto" role="group">
-                                        <button
-                                          type="button"
-                                          className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === true ? 'btn-primary text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                          style={{ fontSize: '12px', minWidth: '70px', backgroundColor: configMode.sameValue === true ? '#2e37a4' : '#fff' }}
-                                          onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: true })}
-                                        >
-                                          {configMode.sameValue === true && <i className="ti ti-check me-1"></i>}
-                                          Yes
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={`btn px-3.5 py-1.5 fw-semibold ${configMode.sameValue === false ? 'btn-dark text-white shadow-xs' : 'btn-outline-secondary bg-white text-dark'}`}
-                                          style={{ fontSize: '12px', minWidth: '70px', backgroundColor: configMode.sameValue === false ? '#1e293b' : '#fff' }}
-                                          onClick={() => setCustomerConfigMode(ci, { ...configMode, sameValue: false })}
-                                        >
-                                          {configMode.sameValue === false && <i className="ti ti-check me-1"></i>}
-                                          No
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
 
                             </div>
 

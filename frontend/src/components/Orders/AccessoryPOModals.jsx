@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { vendorMatchesType } from '../../utils/vendorUtils';
+import { vendorMatchesType, getVendorTypes } from '../../utils/vendorUtils';
 
 /**
  * Default accessory suppliers for PO generation if not already in vendor master
@@ -241,7 +241,7 @@ export function GenericAccessoryPOModal({
     const filtered = allVendors.filter(v =>
       vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
     );
-    return filtered.length > 0 ? filtered : allVendors;
+    return filtered;
   }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
 
   // Extract order articles
@@ -736,12 +736,19 @@ export function GenericAccessoryPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">-- Select {config.categoryName} Vendor --</option>
-                {displayedVendors.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
-                  </option>
-                ))}
+                <option value="">
+                  {displayedVendors.length === 0
+                    ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --`
+                    : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`}
+                </option>
+                {displayedVendors.map(v => {
+                  const vTypes = getVendorTypes(v);
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.city ? `(${v.city})` : ''} &mdash; [{vTypes.length > 0 ? vTypes.join(', ') : (v.type || 'Supplier')}]
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -1206,7 +1213,7 @@ export function TasselPOModal({
     const filtered = allVendors.filter(v =>
       vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
     );
-    return filtered.length > 0 ? filtered : allVendors;
+    return filtered;
   }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
 
   const orderArticles = useMemo(() => {
@@ -1577,12 +1584,19 @@ export function TasselPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">-- Select {config.categoryName} Vendor --</option>
-                {displayedVendors.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
-                  </option>
-                ))}
+                <option value="">
+                  {displayedVendors.length === 0
+                    ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --`
+                    : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`}
+                </option>
+                {displayedVendors.map(v => {
+                  const vTypes = getVendorTypes(v);
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.city ? `(${v.city})` : ''} &mdash; [{vTypes.length > 0 ? vTypes.join(', ') : (v.type || 'Supplier')}]
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -1782,7 +1796,7 @@ export function ThreadPOModal({
     const filtered = allVendors.filter(v =>
       vendorMatchesType(v, targetCategoryType) || v.id === selectedVendorId
     );
-    return filtered.length > 0 ? filtered : allVendors;
+    return filtered;
   }, [allVendors, targetCategoryType, showAllVendors, selectedVendorId]);
 
   const orderArticles = useMemo(() => {
@@ -2099,12 +2113,19 @@ export function ThreadPOModal({
                   color: '#1e293b'
                 }}
               >
-                <option value="">-- Select {config.categoryName} Vendor --</option>
-                {displayedVendors.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} {v.city ? `(${v.city})` : ''} &mdash; {v.type || 'Supplier'}
-                  </option>
-                ))}
+                <option value="">
+                  {displayedVendors.length === 0
+                    ? `-- No ${config.categoryName} vendors found in Master (${allVendors.length} total) --`
+                    : `-- Select ${config.categoryName} Vendor (${displayedVendors.length}) --`}
+                </option>
+                {displayedVendors.map(v => {
+                  const vTypes = getVendorTypes(v);
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.city ? `(${v.city})` : ''} &mdash; [{vTypes.length > 0 ? vTypes.join(', ') : (v.type || 'Supplier')}]
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

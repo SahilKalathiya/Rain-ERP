@@ -44,18 +44,18 @@ export default function VendorMasterView({
   const [isCreatingNew, setIsCreatingNew] = useState(isInline);
   const [isModalEditMode, setIsModalEditMode] = useState(isInline);
 
-  // Available Vendor Types for "Click to Add" (persisted in localStorage, empty by default)
+  // Available Vendor Types for "Click to Add" (Pre-populated with STANDARD_VENDOR_TYPES + custom types)
   const [availableTypes, setAvailableTypes] = useState(() => {
     try {
       const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return Array.from(new Set([...STANDARD_VENDOR_TYPES, ...parsed]));
         }
       }
     } catch (e) {}
-    return [];
+    return [...STANDARD_VENDOR_TYPES];
   });
 
   React.useEffect(() => {
@@ -71,9 +71,13 @@ export default function VendorMasterView({
         const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setAvailableTypes(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAvailableTypes(Array.from(new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+            return;
+          }
         }
       } catch (err) {}
+      setAvailableTypes([...STANDARD_VENDOR_TYPES]);
     };
     window.addEventListener('storage', syncTypes);
     window.addEventListener('raindrop_vendor_types_updated', syncTypes);
@@ -174,7 +178,9 @@ export default function VendorMasterView({
       const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setAvailableTypes(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAvailableTypes(Array.from(new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+        }
       }
     } catch (e) {}
     const initTypes = getInitialTypes();
@@ -211,7 +217,9 @@ export default function VendorMasterView({
       const stored = localStorage.getItem('raindrop_user_vendor_types_v2');
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setAvailableTypes(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAvailableTypes(Array.from(new Set([...STANDARD_VENDOR_TYPES, ...parsed])));
+        }
       }
     } catch (e) {}
     setSelectedVendor(vendor);
@@ -291,6 +299,11 @@ export default function VendorMasterView({
   };
 
   const handleDeleteAvailableType = (typeToDelete) => {
+    // If it's a standard system type, don't delete from available choices, just unselect from current form
+    if (STANDARD_VENDOR_TYPES.some((st) => st.toLowerCase() === typeToDelete.toLowerCase())) {
+      handleRemoveType(typeToDelete);
+      return;
+    }
     setAvailableTypes((prev) => {
       const updated = prev.filter((t) => t.toLowerCase() !== typeToDelete.toLowerCase());
       try {
@@ -304,9 +317,9 @@ export default function VendorMasterView({
   };
 
   const handleResetAvailableTypes = () => {
-    setAvailableTypes([]);
+    setAvailableTypes([...STANDARD_VENDOR_TYPES]);
     try {
-      localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify([]));
+      localStorage.setItem('raindrop_user_vendor_types_v2', JSON.stringify([...STANDARD_VENDOR_TYPES]));
       window.dispatchEvent(new Event('raindrop_vendor_types_updated'));
     } catch (e) {}
   };
@@ -916,6 +929,8 @@ export default function VendorMasterView({
                                       (t) => t.toLowerCase() === typeItem.toLowerCase()
                                     );
 
+                                    const isStandardType = STANDARD_VENDOR_TYPES.some((st) => st.toLowerCase() === typeItem.toLowerCase());
+
                                     return (
                                       <div
                                         key={typeItem}
@@ -926,14 +941,14 @@ export default function VendorMasterView({
                                           borderRadius: '16px',
                                           border: isSelected ? '1.5px solid #3b82f6' : '1px solid #cbd5e1',
                                           backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                                          color: '#0f172a',
+                                          color: isSelected ? '#1d4ed8' : '#0f172a',
                                           height: '30px',
                                           boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
                                           overflow: 'hidden'
                                         }}
                                       >
                                         <div
-                                          className="d-inline-flex align-items-center py-0 ps-2.5 pe-1"
+                                          className={`d-inline-flex align-items-center py-0 ps-2.5 ${isStandardType ? 'pe-2.5' : 'pe-1'}`}
                                           style={{ cursor: 'pointer', gap: '5px', height: '100%' }}
                                           onClick={() => toggleVendorType(typeItem)}
                                           title={isSelected ? `Click to unselect ${typeItem}` : `Click to select ${typeItem}`}
@@ -942,38 +957,40 @@ export default function VendorMasterView({
                                             className={isSelected ? "ti ti-check text-primary" : "ti ti-plus text-muted"}
                                             style={{ fontSize: '11px', fontWeight: 'bold' }}
                                           />
-                                          <span style={{ color: '#0f172a', fontWeight: isSelected ? 600 : 500 }}>{typeItem}</span>
+                                          <span style={{ color: isSelected ? '#1d4ed8' : '#0f172a', fontWeight: isSelected ? 600 : 500 }}>{typeItem}</span>
                                         </div>
-                                        <button
-                                          type="button"
-                                          className="btn p-0 border-0 bg-transparent d-inline-flex align-items-center justify-content-center"
-                                          style={{
-                                            cursor: 'pointer',
-                                            color: '#94a3b8',
-                                            width: '18px',
-                                            height: '18px',
-                                            borderRadius: '50%',
-                                            marginLeft: '4px',
-                                            marginRight: '6px',
-                                            lineHeight: 1,
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#fee2e2';
-                                            e.currentTarget.style.color = '#ef4444';
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'transparent';
-                                            e.currentTarget.style.color = '#94a3b8';
-                                          }}
-                                          title={`Delete "${typeItem}"`}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteAvailableType(typeItem);
-                                          }}
-                                        >
-                                          <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }}></i>
-                                        </button>
+                                        {!isStandardType && (
+                                          <button
+                                            type="button"
+                                            className="btn p-0 border-0 bg-transparent d-inline-flex align-items-center justify-content-center"
+                                            style={{
+                                              cursor: 'pointer',
+                                              color: '#94a3b8',
+                                              width: '18px',
+                                              height: '18px',
+                                              borderRadius: '50%',
+                                              marginLeft: '4px',
+                                              marginRight: '6px',
+                                              lineHeight: 1,
+                                              transition: 'all 0.15s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.backgroundColor = '#fee2e2';
+                                              e.currentTarget.style.color = '#ef4444';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.backgroundColor = 'transparent';
+                                              e.currentTarget.style.color = '#94a3b8';
+                                            }}
+                                            title={`Delete custom type "${typeItem}"`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteAvailableType(typeItem);
+                                            }}
+                                          >
+                                            <i className="ti ti-x" style={{ fontSize: '10px', fontWeight: 'bold' }}></i>
+                                          </button>
+                                        )}
                                       </div>
                                     );
                                   })}

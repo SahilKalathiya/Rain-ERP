@@ -109,7 +109,37 @@ export default function ProcessReturnForm({
     setVendorList(loadVendorsFromMaster());
   }, [availablePOs, availableChallans]);
 
-  const [externalChallanNo, setExternalChallanNo] = useState(initialReturn?.vendor_external_challan_no || '');
+  // Helper to auto-generate a new Process PO and link it here
+  const handleAutoGeneratePO = () => {
+    const vName = vendorName || (vendorList[0]?.name || 'Job Worker');
+    const vId = vendorId || (vendorList[0]?.id || 'V-01');
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const newPoNum = `PPO-${randNum}`;
+    const newPO = {
+      id: newPoNum,
+      po_number: String(randNum),
+      process_type: 'Dyeing',
+      vendor_id: vId,
+      vendor_name: vName,
+      date: receivedDate || new Date().toISOString().split('T')[0],
+      total_meters: Number(calculatedTotalMeters || 100),
+      fabric_quality: fabricQuality || 'Fabric Quality',
+      status: 'Issued'
+    };
+    try {
+      const stored = JSON.parse(localStorage.getItem('erp_process_pos_v1') || localStorage.getItem('erp_process_pos') || '[]');
+      stored.unshift(newPO);
+      localStorage.setItem('erp_process_pos_v1', JSON.stringify(stored));
+      localStorage.setItem('erp_process_pos', JSON.stringify(stored));
+    } catch (e) {}
+    setLinkedPoId(String(randNum));
+    setVendorName(vName);
+    setVendorId(vId);
+  };
+
+  const [externalChallanNo, setExternalChallanNo] = useState(
+    initialReturn?.vendor_external_challan_no || String(Math.floor(1000 + Math.random() * 9000))
+  );
   const [externalChallanDate, setExternalChallanDate] = useState(initialReturn?.vendor_challan_date || new Date().toISOString().split('T')[0]);
   const [vendorInvoiceNo, setVendorInvoiceNo] = useState(initialReturn?.vendor_invoice_no || '');
   const [vendorInvoiceValue, setVendorInvoiceValue] = useState(initialReturn?.vendor_invoice_value || '');
@@ -431,7 +461,20 @@ export default function ProcessReturnForm({
 
                 {/* Linked PO & Internal Challan */}
                 <div className="col-12 col-md-3">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Linked Process PO</label>
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <label className="form-label fs-12 fw-semibold text-secondary mb-0">Linked Process PO</label>
+                    {isSectionEditable('header') && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-11 fw-semibold d-flex align-items-center gap-1"
+                        onClick={handleAutoGeneratePO}
+                        title="Auto-generate a new Process PO and link it here"
+                      >
+                        <i className="ti ti-plus fs-12"></i>
+                        <span>+ Auto-Generate PO</span>
+                      </button>
+                    )}
+                  </div>
                   <select
                     className="form-select form-select-sm bg-white fs-13"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
