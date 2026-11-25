@@ -161,6 +161,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setEditingChallan(generatedChallan);
     setActiveTab('challans');
     setShowChallanForm(true);
+    lastRouteRef.current = '/process-challan';
+    if (onNavigate) onNavigate('/process-challan');
   };
 
   // 2. Process Challan Handlers
@@ -245,6 +247,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     });
     setActiveTab('returns');
     setShowReturnForm(true);
+    lastRouteRef.current = '/process-return';
+    if (onNavigate) onNavigate('/process-return');
   };
 
   // 3. Process Return Handlers

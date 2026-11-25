@@ -2076,18 +2076,18 @@
         var isCustomProperty = 0 === styleName.indexOf("--");
         null == value || "boolean" === typeof value || "" === value ? isCustomProperty ? style2.setProperty(styleName, "") : "float" === styleName ? style2.cssFloat = "" : style2[styleName] = "" : isCustomProperty ? style2.setProperty(styleName, value) : "number" !== typeof value || 0 === value || unitlessNumbers.has(styleName) ? "float" === styleName ? style2.cssFloat = value : style2[styleName] = ("" + value).trim() : style2[styleName] = value + "px";
       }
-      function setValueForStyles(node, styles, prevStyles) {
-        if (null != styles && "object" !== typeof styles)
+      function setValueForStyles(node, styles2, prevStyles) {
+        if (null != styles2 && "object" !== typeof styles2)
           throw Error(formatProdErrorMessage(62));
         node = node.style;
         if (null != prevStyles) {
           for (var styleName in prevStyles)
-            !prevStyles.hasOwnProperty(styleName) || null != styles && styles.hasOwnProperty(styleName) || (0 === styleName.indexOf("--") ? node.setProperty(styleName, "") : "float" === styleName ? node.cssFloat = "" : node[styleName] = "", viewTransitionMutationContext = true);
-          for (var styleName$16 in styles)
-            styleName = styles[styleName$16], styles.hasOwnProperty(styleName$16) && prevStyles[styleName$16] !== styleName && (setValueForStyle(node, styleName$16, styleName), viewTransitionMutationContext = true);
+            !prevStyles.hasOwnProperty(styleName) || null != styles2 && styles2.hasOwnProperty(styleName) || (0 === styleName.indexOf("--") ? node.setProperty(styleName, "") : "float" === styleName ? node.cssFloat = "" : node[styleName] = "", viewTransitionMutationContext = true);
+          for (var styleName$16 in styles2)
+            styleName = styles2[styleName$16], styles2.hasOwnProperty(styleName$16) && prevStyles[styleName$16] !== styleName && (setValueForStyle(node, styleName$16, styleName), viewTransitionMutationContext = true);
         } else
-          for (var styleName$17 in styles)
-            styles.hasOwnProperty(styleName$17) && setValueForStyle(node, styleName$17, styles[styleName$17]);
+          for (var styleName$17 in styles2)
+            styles2.hasOwnProperty(styleName$17) && setValueForStyle(node, styleName$17, styles2[styleName$17]);
       }
       function isCustomElement(tagName) {
         if (-1 === tagName.indexOf("-")) return false;
@@ -13352,9 +13352,9 @@
         previousDispatcher.S(href, precedence, options2);
         var ownerDocument = globalDocument;
         if (ownerDocument && href) {
-          var styles = getResourcesFromRoot(ownerDocument).hoistableStyles, key = getStyleKey(href);
+          var styles2 = getResourcesFromRoot(ownerDocument).hoistableStyles, key = getStyleKey(href);
           precedence = precedence || "default";
-          var resource = styles.get(key);
+          var resource = styles2.get(key);
           if (!resource) {
             var state = { loading: 0, preload: null };
             if (resource = ownerDocument.querySelector(
@@ -13389,7 +13389,7 @@
               count: 1,
               state
             };
-            styles.set(key, resource);
+            styles2.set(key, resource);
           }
         }
       }
@@ -28761,7 +28761,7 @@
                 style: { width: "26px", height: "26px", fontSize: "12px", fontWeight: "bold", backgroundColor: configMode.sameColor !== void 0 && configMode.sameColor !== null ? "#2e37a4" : "#94a3b8" }
               },
               "2"
-            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Do articles have the same colors or contrast?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameColor === true ? "\u{1F3A8} Same Colors \u2014 color palette selected below applies across all articles" : configMode.sameColor === false ? "\u{1F3AD} Contrast / Different Colors \u2014 select independent or contrast colors for each article (e.g. Yellow Kurta + Maroon Pant)" : "Choose whether articles share colors or have separate / contrast palettes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
+            ), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fw-bold text-dark", style: { fontSize: "14.5px" } }, "Do articles have the same colors?"), /* @__PURE__ */ import_react10.default.createElement("small", { className: "text-muted" }, configMode.sameColor === true ? "\u{1F3A8} Same Colors \u2014 color palette selected below applies across all articles" : configMode.sameColor === false ? "\u{1F3AD} Contrast / Different Colors \u2014 select independent or contrast colors for each article (e.g. Yellow Kurta + Maroon Pant)" : "Choose whether articles share colors or have separate / contrast palettes"))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "btn-group btn-group-sm ms-auto", role: "group" }, /* @__PURE__ */ import_react10.default.createElement(
               "button",
               {
                 type: "button",
@@ -48958,6 +48958,244 @@
     const [isReadOnly, setIsReadOnly] = (0, import_react36.useState)(readOnlyDefault || isLocked);
     const [editingSection, setEditingSection] = (0, import_react36.useState)(readOnlyDefault || initialPO || isLocked ? null : "all");
     const [startDirection, setStartDirection] = (0, import_react36.useState)("style");
+    const buildOrderItems = (o, storedPOs, shouldCombine) => {
+      const items2 = [];
+      if (!Array.isArray(o.fabricConsumptions)) return items2;
+      const groupsMap = /* @__PURE__ */ new Map();
+      o.fabricConsumptions.forEach((fc, idx) => {
+        let req = parseFloat(
+          fc.totalFabricMeters || fc.requiredMeters || fc.totalGreige || fc.orderQty || fc.totalDyed || fc.meters || 0
+        );
+        if (req <= 0 && fc.pcs && parseInt(fc.pcs, 10) > 0) {
+          const isDup = /dupatta|stole|chunri|scarf/i.test((fc.articleName || fc.article || "").trim());
+          const isBot = /pant|bottom|salwar|trouser|plazo|palazzo/i.test((fc.articleName || fc.article || "").trim());
+          const defDyed = isDup ? 2.25 : isBot ? 38 * 0.0254 : 45 * 0.0254;
+          const shrink = parseFloat(fc.shrinkPct || fc.shrinkage || 3.5);
+          req = Number((parseInt(fc.pcs, 10) * defDyed * (1 + shrink / 100)).toFixed(2));
+        }
+        const rec = parseFloat(fc.receivedMeters || 0);
+        let resolvedWidth = "";
+        const artName = String(fc.article || fc.articleName || "").trim();
+        const fabName = String(fc.fabricQuality || fc.fabricName || "").trim();
+        const roleName = String(fc.role || "").trim();
+        if (o.groupPoWidths && typeof o.groupPoWidths === "object") {
+          const kExact = `${artName}___${fabName}___${roleName}`;
+          const kNoRole = `${artName}___${fabName}___`;
+          const kAnyRole = Object.keys(o.groupPoWidths).find(
+            (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+          );
+          const pow = o.groupPoWidths[kExact] || o.groupPoWidths[kNoRole] || (kAnyRole ? o.groupPoWidths[kAnyRole] : null);
+          if (pow && pow !== "\u2014" && pow !== "-") {
+            resolvedWidth = String(pow);
+          }
+        }
+        if (!resolvedWidth) {
+          if (fc.poWidth && fc.poWidth !== "\u2014" && fc.poWidth !== "-") {
+            resolvedWidth = String(fc.poWidth);
+          } else if (fc.width && fc.width !== "\u2014" && fc.width !== "-") {
+            resolvedWidth = String(fc.width);
+          } else if (fc.selectedWidth && fc.selectedWidth !== "\u2014" && fc.selectedWidth !== "-") {
+            resolvedWidth = String(fc.selectedWidth);
+          } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths[0] && fc.selectedWidths[0] !== "\u2014") {
+            resolvedWidth = String(fc.selectedWidths[0]);
+          }
+        }
+        if (!resolvedWidth && o.groupSelectedWidths && typeof o.groupSelectedWidths === "object") {
+          const kExact = `${artName}___${fabName}___${roleName}`;
+          const kNoRole = `${artName}___${fabName}___`;
+          const kAnyRole = Object.keys(o.groupSelectedWidths).find(
+            (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+          );
+          const gw = o.groupSelectedWidths[kExact] || o.groupSelectedWidths[kNoRole] || (kAnyRole ? o.groupSelectedWidths[kAnyRole] : null);
+          if (Array.isArray(gw) && gw[0] && gw[0] !== "\u2014") {
+            resolvedWidth = String(gw[0]);
+          } else if (typeof gw === "string" && gw && gw !== "\u2014") {
+            resolvedWidth = gw;
+          }
+        }
+        if (!resolvedWidth && Array.isArray(o.articles)) {
+          const artMatch = o.articles.find(
+            (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
+          );
+          if (artMatch) {
+            const fabMatch = (artMatch.fabrics || []).find(
+              (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
+            ) || artMatch.fabrics?.[0];
+            if (fabMatch && fabMatch.width) {
+              resolvedWidth = String(fabMatch.width);
+            }
+          }
+        }
+        if (!resolvedWidth && o.widthDyedRates && typeof o.widthDyedRates === "object") {
+          const matchingKey = Object.keys(o.widthDyedRates).find(
+            (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
+          );
+          if (matchingKey) {
+            const parts = matchingKey.split("___");
+            if (parts.length >= 4 && parts[3]) {
+              resolvedWidth = parts[3];
+            }
+          }
+        }
+        const cleanWidthStr = resolvedWidth ? resolvedWidth.replace(/"/g, "").trim() : "44";
+        const colName = String(fc.color || fc.colorName || "").trim();
+        const itemStyle = fc.styleName || o.styleName || (styles[0] || "");
+        const groupKey = shouldCombine ? `${(fabName || "").toLowerCase().trim()}___${(colName || "").toLowerCase().trim()}___${cleanWidthStr}` : `${(artName || "").toLowerCase().trim()}___${(fabName || "").toLowerCase().trim()}___${(colName || "").toLowerCase().trim()}___${cleanWidthStr}___${idx}`;
+        let currentPcs = parseInt(fc.pcs || fc.quantity_pieces || fc.totalPieces || fc.orderQty || 0, 10) || 0;
+        if (currentPcs === 0 && Array.isArray(o.articles)) {
+          const artMatch = o.articles.find((a) => String(a.name || "").toLowerCase() === artName.toLowerCase());
+          if (artMatch && (artMatch.totalPieces || artMatch.pieces || artMatch.quantity)) {
+            currentPcs = parseInt(artMatch.totalPieces || artMatch.pieces || artMatch.quantity, 10) || 0;
+          }
+        }
+        const currentCons = parseFloat(fc.dyedPerPiece || fc.greigeLengthPerPiece || fc.consumption || 0);
+        const currentShrink = parseFloat(fc.shrinkPct || fc.shrinkage || 4);
+        let itemRate = 0;
+        if (fc.dyedRate && parseFloat(fc.dyedRate) > 0) {
+          itemRate = parseFloat(fc.dyedRate);
+        } else if (fc.rate && parseFloat(fc.rate) > 0) {
+          itemRate = parseFloat(fc.rate);
+        } else if (fc.fabricRate && parseFloat(fc.fabricRate) > 0) {
+          itemRate = parseFloat(fc.fabricRate);
+        } else if (fc.marketRate && parseFloat(fc.marketRate) > 0) {
+          itemRate = parseFloat(fc.marketRate);
+        } else if (fc.price && parseFloat(fc.price) > 0) {
+          itemRate = parseFloat(fc.price);
+        } else if (fc.cost && parseFloat(fc.cost) > 0) {
+          itemRate = parseFloat(fc.cost);
+        }
+        if (!itemRate && o.widthDyedRates && typeof o.widthDyedRates === "object") {
+          const kExact = `${artName}___${fabName}___${roleName}___${cleanWidthStr}`;
+          const kNoRole = `${artName}___${fabName}______${cleanWidthStr}`;
+          const kFuzzy = Object.keys(o.widthDyedRates).find((k) => {
+            const lk = k.toLowerCase();
+            return lk.includes(artName.toLowerCase()) && lk.includes(cleanWidthStr.toLowerCase());
+          });
+          const rVal = o.widthDyedRates[kExact] ?? o.widthDyedRates[kNoRole] ?? (kFuzzy ? o.widthDyedRates[kFuzzy] : null);
+          if (rVal && parseFloat(rVal) > 0) {
+            itemRate = parseFloat(rVal);
+          }
+        }
+        if (!itemRate && o.customMarketRates && typeof o.customMarketRates === "object") {
+          const cmVal = o.customMarketRates[`${artName}___${fabName}___${cleanWidthStr}`] || o.customMarketRates[`${fabName}_${cleanWidthStr}`] || o.customMarketRates[fabName];
+          if (cmVal && parseFloat(cmVal) > 0) {
+            itemRate = parseFloat(cmVal);
+          }
+        }
+        if (!itemRate && Array.isArray(o.articles)) {
+          const artMatch = o.articles.find(
+            (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
+          );
+          if (artMatch) {
+            const fabMatch = (artMatch.fabrics || []).find(
+              (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
+            ) || artMatch.fabrics?.[0];
+            if (fabMatch && (fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate)) {
+              itemRate = parseFloat(fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate) || 0;
+            }
+          }
+        }
+        if (!groupsMap.has(groupKey)) {
+          groupsMap.set(groupKey, {
+            id: `${o.id}-IT${idx + 1}`,
+            style: itemStyle,
+            fabric: fabName || "Fabric",
+            fabricId: fc.fabricId || "FAB-001",
+            color: colName,
+            colorHex: fc.colorHex || "#cbd5e1",
+            articles: artName ? [artName] : [],
+            width: cleanWidthStr,
+            rate: itemRate,
+            requiredMeters: req,
+            alreadyReceivedMeters: rec,
+            pcs: currentPcs,
+            totalCons: currentCons,
+            maxShrinkage: currentShrink,
+            count: 1,
+            subItems: [fc]
+          });
+        } else {
+          const grp = groupsMap.get(groupKey);
+          grp.requiredMeters += req;
+          grp.alreadyReceivedMeters += rec;
+          if ((!grp.rate || grp.rate === 0) && itemRate) {
+            grp.rate = itemRate;
+          }
+          if (artName && !grp.articles.includes(artName)) {
+            grp.articles.push(artName);
+          }
+          grp.pcs += currentPcs;
+          grp.totalCons += currentCons;
+          grp.maxShrinkage = Math.max(grp.maxShrinkage, currentShrink);
+          grp.count += 1;
+          grp.subItems.push(fc);
+        }
+      });
+      groupsMap.forEach((entry) => {
+        const req = Number(entry.requiredMeters.toFixed(2));
+        const rec = Number(entry.alreadyReceivedMeters.toFixed(2));
+        const joinedArticles = entry.articles.join(" + ") || "General";
+        let totalPcs = entry.pcs || 0;
+        if (totalPcs === 0 && Array.isArray(o.articles) && entry.articles.length > 0) {
+          const sumFromArticles = entry.articles.reduce((sum, aName) => {
+            const art = o.articles.find((a) => String(a.name || "").toLowerCase() === String(aName || "").toLowerCase());
+            return sum + (parseInt(art?.totalPieces || art?.pieces || art?.quantity || 0, 10) || 0);
+          }, 0);
+          if (sumFromArticles > 0) {
+            totalPcs = sumFromArticles;
+          }
+        }
+        let ord = 0;
+        if (Array.isArray(storedPOs) && storedPOs.length > 0) {
+          storedPOs.forEach((p) => {
+            if (p.linked_sales_order_id === o.id && p.status !== "Cancelled") {
+              (p.items || []).forEach((it) => {
+                const itFab = String(it.fabric_name || it.fabric || "").toLowerCase().trim();
+                const grpFab = String(entry.fabric || "").toLowerCase().trim();
+                const itCol = String(it.color_name || it.color || "").toLowerCase().trim();
+                const grpCol = String(entry.color || "").toLowerCase().trim();
+                const itWidth = String(it.width || "").replace(/"/g, "").trim();
+                const grpWidth = String(entry.width || "").replace(/"/g, "").trim();
+                const itArt = String(it.article_name || it.article || "").toLowerCase().trim();
+                const fabMatch = !itFab || !grpFab || itFab === grpFab;
+                const colMatch = !itCol || !grpCol || itCol === grpCol;
+                const widthMatch = !itWidth || !grpWidth || itWidth === grpWidth;
+                const artMatch = !itArt || itArt === joinedArticles.toLowerCase() || entry.articles.some((a) => a.toLowerCase().trim() === itArt) || joinedArticles.toLowerCase().includes(itArt);
+                if (fabMatch && colMatch && widthMatch && artMatch) {
+                  ord += parseFloat(it.quantity_meters) || 0;
+                }
+              });
+            }
+          });
+        }
+        ord = Number(ord.toFixed(2));
+        const isOrdered = req > 0 ? ord >= req - 0.01 : ord > 0;
+        const isPartiallyOrdered = req > 0 && ord > 0.01 && ord < req - 0.01;
+        const pending = req > 0 ? Math.max(0, Number((req - ord).toFixed(2))) : 0;
+        let finalCons = totalPcs > 0 ? Number((req / totalPcs).toFixed(3)) : entry.totalCons > 0 ? Number(entry.totalCons.toFixed(3)) : 2.5;
+        items2.push({
+          id: entry.id,
+          style: entry.style,
+          fabric: entry.fabric,
+          fabricId: entry.fabricId,
+          color: entry.color,
+          colorHex: entry.colorHex,
+          article: joinedArticles,
+          articlesList: entry.articles,
+          width: entry.width,
+          rate: entry.rate || 0,
+          requiredMeters: req,
+          alreadyReceivedMeters: rec,
+          orderedMeters: ord,
+          pendingMeters: pending,
+          status: isOrdered ? "Already Ordered" : isPartiallyOrdered ? "Partially Ordered" : "Not Ordered",
+          consumption: finalCons,
+          shrinkage: entry.maxShrinkage || 4,
+          pcs: totalPcs || (finalCons > 0 ? Math.floor(req / finalCons) : 0)
+        });
+      });
+      return items2;
+    };
     const loadDynamicSalesOrders = () => {
       try {
         const stored = JSON.parse(localStorage.getItem("erp_sales_orders_v1") || "[]");
@@ -48969,253 +49207,18 @@
         }
         if (Array.isArray(stored) && stored.length > 0) {
           return stored.map((o) => {
-            const styles = Array.isArray(o.styles) && o.styles.length > 0 ? o.styles : o.styleName ? [o.styleName] : [];
+            const styles2 = Array.isArray(o.styles) && o.styles.length > 0 ? o.styles : o.styleName ? [o.styleName] : [];
             const custName = Array.isArray(o.customerOrders) && o.customerOrders.length > 0 ? o.customerOrders.map((c) => c.customerName).filter(Boolean).join(", ") : o.customerName || o.customer || o.buyerName || "";
-            const items2 = [];
-            if (Array.isArray(o.fabricConsumptions)) {
-              const groupsMap = /* @__PURE__ */ new Map();
-              o.fabricConsumptions.forEach((fc, idx) => {
-                let req = parseFloat(
-                  fc.totalFabricMeters || fc.requiredMeters || fc.totalGreige || fc.orderQty || fc.totalDyed || fc.meters || 0
-                );
-                if (req <= 0 && fc.pcs && parseInt(fc.pcs, 10) > 0) {
-                  const isDup = /dupatta|stole|chunri|scarf/i.test((fc.articleName || fc.article || "").trim());
-                  const isBot = /pant|bottom|salwar|trouser|plazo|palazzo/i.test((fc.articleName || fc.article || "").trim());
-                  const defDyed = isDup ? 2.25 : isBot ? 38 * 0.0254 : 45 * 0.0254;
-                  const shrink = parseFloat(fc.shrinkPct || fc.shrinkage || 3.5);
-                  req = Number((parseInt(fc.pcs, 10) * defDyed * (1 + shrink / 100)).toFixed(2));
-                }
-                const rec = parseFloat(fc.receivedMeters || 0);
-                let resolvedWidth = "";
-                const artName = String(fc.article || fc.articleName || "").trim();
-                const fabName = String(fc.fabricQuality || fc.fabricName || "").trim();
-                const roleName = String(fc.role || "").trim();
-                if (o.groupPoWidths && typeof o.groupPoWidths === "object") {
-                  const kExact = `${artName}___${fabName}___${roleName}`;
-                  const kNoRole = `${artName}___${fabName}___`;
-                  const kAnyRole = Object.keys(o.groupPoWidths).find(
-                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
-                  );
-                  const pow = o.groupPoWidths[kExact] || o.groupPoWidths[kNoRole] || (kAnyRole ? o.groupPoWidths[kAnyRole] : null);
-                  if (pow && pow !== "\u2014" && pow !== "-") {
-                    resolvedWidth = String(pow);
-                  }
-                }
-                if (!resolvedWidth) {
-                  if (fc.poWidth && fc.poWidth !== "\u2014" && fc.poWidth !== "-") {
-                    resolvedWidth = String(fc.poWidth);
-                  } else if (fc.width && fc.width !== "\u2014" && fc.width !== "-") {
-                    resolvedWidth = String(fc.width);
-                  } else if (fc.selectedWidth && fc.selectedWidth !== "\u2014" && fc.selectedWidth !== "-") {
-                    resolvedWidth = String(fc.selectedWidth);
-                  } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths[0] && fc.selectedWidths[0] !== "\u2014") {
-                    resolvedWidth = String(fc.selectedWidths[0]);
-                  }
-                }
-                if (!resolvedWidth && o.groupSelectedWidths && typeof o.groupSelectedWidths === "object") {
-                  const kExact = `${artName}___${fabName}___${roleName}`;
-                  const kNoRole = `${artName}___${fabName}___`;
-                  const kAnyRole = Object.keys(o.groupSelectedWidths).find(
-                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___${fabName.toLowerCase()}`) || k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
-                  );
-                  const gw = o.groupSelectedWidths[kExact] || o.groupSelectedWidths[kNoRole] || (kAnyRole ? o.groupSelectedWidths[kAnyRole] : null);
-                  if (Array.isArray(gw) && gw[0] && gw[0] !== "\u2014") {
-                    resolvedWidth = String(gw[0]);
-                  } else if (typeof gw === "string" && gw && gw !== "\u2014") {
-                    resolvedWidth = gw;
-                  }
-                }
-                if (!resolvedWidth && Array.isArray(o.articles)) {
-                  const artMatch = o.articles.find(
-                    (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
-                  );
-                  if (artMatch) {
-                    const fabMatch = (artMatch.fabrics || []).find(
-                      (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
-                    ) || artMatch.fabrics?.[0];
-                    if (fabMatch && fabMatch.width) {
-                      resolvedWidth = String(fabMatch.width);
-                    }
-                  }
-                }
-                if (!resolvedWidth && o.widthDyedRates && typeof o.widthDyedRates === "object") {
-                  const matchingKey = Object.keys(o.widthDyedRates).find(
-                    (k) => k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
-                  );
-                  if (matchingKey) {
-                    const parts = matchingKey.split("___");
-                    if (parts.length >= 4 && parts[3]) {
-                      resolvedWidth = parts[3];
-                    }
-                  }
-                }
-                const cleanWidthStr = resolvedWidth ? resolvedWidth.replace(/"/g, "").trim() : "44";
-                const colName = String(fc.color || fc.colorName || "").trim();
-                const itemStyle = fc.styleName || o.styleName || (styles[0] || "");
-                const groupKey = `${(fabName || "").toLowerCase().trim()}___${(colName || "").toLowerCase().trim()}___${cleanWidthStr}`;
-                let currentPcs = parseInt(fc.pcs || fc.quantity_pieces || fc.totalPieces || fc.orderQty || 0, 10) || 0;
-                if (currentPcs === 0 && Array.isArray(o.articles)) {
-                  const artMatch = o.articles.find((a) => String(a.name || "").toLowerCase() === artName.toLowerCase());
-                  if (artMatch && (artMatch.totalPieces || artMatch.pieces || artMatch.quantity)) {
-                    currentPcs = parseInt(artMatch.totalPieces || artMatch.pieces || artMatch.quantity, 10) || 0;
-                  }
-                }
-                const currentCons = parseFloat(fc.dyedPerPiece || fc.greigeLengthPerPiece || fc.consumption || 0);
-                const currentShrink = parseFloat(fc.shrinkPct || fc.shrinkage || 4);
-                let itemRate = 0;
-                if (fc.dyedRate && parseFloat(fc.dyedRate) > 0) {
-                  itemRate = parseFloat(fc.dyedRate);
-                } else if (fc.rate && parseFloat(fc.rate) > 0) {
-                  itemRate = parseFloat(fc.rate);
-                } else if (fc.fabricRate && parseFloat(fc.fabricRate) > 0) {
-                  itemRate = parseFloat(fc.fabricRate);
-                } else if (fc.marketRate && parseFloat(fc.marketRate) > 0) {
-                  itemRate = parseFloat(fc.marketRate);
-                } else if (fc.price && parseFloat(fc.price) > 0) {
-                  itemRate = parseFloat(fc.price);
-                } else if (fc.cost && parseFloat(fc.cost) > 0) {
-                  itemRate = parseFloat(fc.cost);
-                }
-                if (!itemRate && o.widthDyedRates && typeof o.widthDyedRates === "object") {
-                  const kExact = `${artName}___${fabName}___${roleName}___${cleanWidthStr}`;
-                  const kNoRole = `${artName}___${fabName}______${cleanWidthStr}`;
-                  const kFuzzy = Object.keys(o.widthDyedRates).find((k) => {
-                    const lk = k.toLowerCase();
-                    return lk.includes(artName.toLowerCase()) && lk.includes(cleanWidthStr.toLowerCase());
-                  });
-                  const rVal = o.widthDyedRates[kExact] ?? o.widthDyedRates[kNoRole] ?? (kFuzzy ? o.widthDyedRates[kFuzzy] : null);
-                  if (rVal && parseFloat(rVal) > 0) {
-                    itemRate = parseFloat(rVal);
-                  }
-                }
-                if (!itemRate && o.customMarketRates && typeof o.customMarketRates === "object") {
-                  const cmVal = o.customMarketRates[`${artName}___${fabName}___${cleanWidthStr}`] || o.customMarketRates[`${fabName}_${cleanWidthStr}`] || o.customMarketRates[fabName];
-                  if (cmVal && parseFloat(cmVal) > 0) {
-                    itemRate = parseFloat(cmVal);
-                  }
-                }
-                if (!itemRate && Array.isArray(o.articles)) {
-                  const artMatch = o.articles.find(
-                    (a) => String(a.name || "").toLowerCase() === artName.toLowerCase()
-                  );
-                  if (artMatch) {
-                    const fabMatch = (artMatch.fabrics || []).find(
-                      (f) => String(f.fabricQuality || f.fabricName || "").toLowerCase() === fabName.toLowerCase()
-                    ) || artMatch.fabrics?.[0];
-                    if (fabMatch && (fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate)) {
-                      itemRate = parseFloat(fabMatch.rate || fabMatch.price || fabMatch.cost || fabMatch.defaultRate) || 0;
-                    }
-                  }
-                }
-                if (!groupsMap.has(groupKey)) {
-                  groupsMap.set(groupKey, {
-                    id: `${o.id}-IT${idx + 1}`,
-                    style: itemStyle,
-                    fabric: fabName || "Fabric",
-                    fabricId: fc.fabricId || "FAB-001",
-                    color: colName,
-                    colorHex: fc.colorHex || "#cbd5e1",
-                    articles: artName ? [artName] : [],
-                    width: cleanWidthStr,
-                    rate: itemRate,
-                    requiredMeters: req,
-                    alreadyReceivedMeters: rec,
-                    pcs: currentPcs,
-                    totalCons: currentCons,
-                    maxShrinkage: currentShrink,
-                    count: 1,
-                    subItems: [fc]
-                  });
-                } else {
-                  const grp = groupsMap.get(groupKey);
-                  grp.requiredMeters += req;
-                  grp.alreadyReceivedMeters += rec;
-                  if ((!grp.rate || grp.rate === 0) && itemRate) {
-                    grp.rate = itemRate;
-                  }
-                  if (artName && !grp.articles.includes(artName)) {
-                    grp.articles.push(artName);
-                  }
-                  grp.pcs += currentPcs;
-                  grp.totalCons += currentCons;
-                  grp.maxShrinkage = Math.max(grp.maxShrinkage, currentShrink);
-                  grp.count += 1;
-                  grp.subItems.push(fc);
-                }
-              });
-              groupsMap.forEach((entry) => {
-                const req = Number(entry.requiredMeters.toFixed(2));
-                const rec = Number(entry.alreadyReceivedMeters.toFixed(2));
-                const joinedArticles = entry.articles.join(" + ") || "General";
-                let totalPcs = entry.pcs || 0;
-                if (Array.isArray(o.articles) && entry.articles.length > 0) {
-                  const sumFromArticles = entry.articles.reduce((sum, aName) => {
-                    const art = o.articles.find((a) => String(a.name || "").toLowerCase() === String(aName || "").toLowerCase());
-                    return sum + (parseInt(art?.totalPieces || art?.pieces || art?.quantity || 0, 10) || 0);
-                  }, 0);
-                  if (sumFromArticles > 0) {
-                    totalPcs = sumFromArticles;
-                  }
-                }
-                let ord = 0;
-                if (Array.isArray(storedPOs) && storedPOs.length > 0) {
-                  storedPOs.forEach((p) => {
-                    if (p.linked_sales_order_id === o.id && p.status !== "Cancelled") {
-                      (p.items || []).forEach((it) => {
-                        const itFab = String(it.fabric_name || it.fabric || "").toLowerCase().trim();
-                        const grpFab = String(entry.fabric || "").toLowerCase().trim();
-                        const itCol = String(it.color_name || it.color || "").toLowerCase().trim();
-                        const grpCol = String(entry.color || "").toLowerCase().trim();
-                        const itWidth = String(it.width || "").replace(/"/g, "").trim();
-                        const grpWidth = String(entry.width || "").replace(/"/g, "").trim();
-                        const itArt = String(it.article_name || it.article || "").toLowerCase().trim();
-                        const fabMatch = !itFab || !grpFab || itFab === grpFab;
-                        const colMatch = !itCol || !grpCol || itCol === grpCol;
-                        const widthMatch = !itWidth || !grpWidth || itWidth === grpWidth;
-                        const artMatch = !itArt || itArt === joinedArticles.toLowerCase() || entry.articles.some((a) => a.toLowerCase().trim() === itArt) || joinedArticles.toLowerCase().includes(itArt);
-                        if (fabMatch && colMatch && widthMatch && artMatch) {
-                          ord += parseFloat(it.quantity_meters) || 0;
-                        }
-                      });
-                    }
-                  });
-                }
-                ord = Number(ord.toFixed(2));
-                const isOrdered = req > 0 ? ord >= req - 0.01 : ord > 0;
-                const isPartiallyOrdered = req > 0 && ord > 0.01 && ord < req - 0.01;
-                const pending = req > 0 ? Math.max(0, Number((req - ord).toFixed(2))) : 0;
-                let finalCons = totalPcs > 0 ? Number((req / totalPcs).toFixed(3)) : entry.totalCons > 0 ? Number(entry.totalCons.toFixed(3)) : 2.5;
-                items2.push({
-                  id: entry.id,
-                  style: entry.style,
-                  fabric: entry.fabric,
-                  fabricId: entry.fabricId,
-                  color: entry.color,
-                  colorHex: entry.colorHex,
-                  article: joinedArticles,
-                  articlesList: entry.articles,
-                  width: entry.width,
-                  rate: entry.rate || 0,
-                  requiredMeters: req,
-                  alreadyReceivedMeters: rec,
-                  orderedMeters: ord,
-                  pendingMeters: pending,
-                  status: isOrdered ? "Already Ordered" : isPartiallyOrdered ? "Partially Ordered" : "Not Ordered",
-                  consumption: finalCons,
-                  shrinkage: entry.maxShrinkage || 4,
-                  pcs: totalPcs || (finalCons > 0 ? Math.floor(req / finalCons) : 0)
-                });
-              });
-            }
             return {
               id: o.id,
               customer: custName,
               brand: o.brandName || o.brand || "",
-              styleName: o.styleName || (styles[0] || ""),
+              styleName: o.styleName || (styles2[0] || ""),
               deliveryDate: o.expectedDelivery || o.deliveryDate || "",
               status: o.status || "",
-              styles,
-              items: items2
+              styles: styles2,
+              items: buildOrderItems(o, storedPOs, true),
+              separateItems: buildOrderItems(o, storedPOs, false)
             };
           });
         }
@@ -49223,7 +49226,10 @@
       }
       return [];
     };
-    const [availableSalesOrders, setAvailableSalesOrders] = (0, import_react36.useState)(loadDynamicSalesOrders);
+    const [combineStyleMap, setCombineStyleMap] = (0, import_react36.useState)({});
+    const isStyleCombined = (sIdx) => combineStyleMap[sIdx] !== false;
+    const setStyleCombined = (sIdx, val) => setCombineStyleMap((prev) => ({ ...prev, [sIdx]: val }));
+    const [availableSalesOrders, setAvailableSalesOrders] = (0, import_react36.useState)(() => loadDynamicSalesOrders());
     (0, import_react36.useEffect)(() => {
       const handleOrdersSync = () => setAvailableSalesOrders(loadDynamicSalesOrders());
       window.addEventListener("storage", handleOrdersSync);
@@ -49483,31 +49489,35 @@
       ...articleList.map((a) => a.name),
       ...addedCustomStyles
     ])).filter(Boolean);
-    const getRequirementsForStyle = (styleName, sIdx) => {
+    const getRequirementsForStyle = (styleName, sIdx, shouldCombine = true) => {
       if (!styleName || !styleName.trim()) return [];
       const cleanStyle = styleName.trim().toLowerCase();
       const matchingOrder = availableSalesOrders.find(
         (o) => o.styles && o.styles.some((s) => s.toLowerCase().trim() === cleanStyle) || o.styleName && o.styleName.toLowerCase().trim() === cleanStyle || cleanStyle.includes(o.id.toLowerCase()) || o.items && o.items.some((it) => String(it.style || "").toLowerCase().trim() === cleanStyle)
       );
-      if (matchingOrder && Array.isArray(matchingOrder.items) && matchingOrder.items.length > 0) {
-        const exactStyleItems = matchingOrder.items.filter(
-          (it) => String(it.style || "").toLowerCase().trim() === cleanStyle
-        );
-        if (exactStyleItems.length > 0) return exactStyleItems;
-        return matchingOrder.items;
+      if (matchingOrder) {
+        const mItems = shouldCombine ? matchingOrder.items : matchingOrder.separateItems || matchingOrder.items;
+        if (Array.isArray(mItems) && mItems.length > 0) {
+          const exactStyleItems = mItems.filter(
+            (it) => String(it.style || "").toLowerCase().trim() === cleanStyle
+          );
+          if (exactStyleItems.length > 0) return exactStyleItems;
+          return mItems;
+        }
       }
-      if (currentSelectedOrder && Array.isArray(currentSelectedOrder.items)) {
-        const byArticleOrStyle = currentSelectedOrder.items.filter((it) => {
+      const curItems = currentSelectedOrder ? shouldCombine ? currentSelectedOrder.items : currentSelectedOrder.separateItems || currentSelectedOrder.items : null;
+      if (curItems && Array.isArray(curItems)) {
+        const byArticleOrStyle = curItems.filter((it) => {
           const itStyle = String(it.style || "").toLowerCase().trim();
           const itArt = String(it.article || "").toLowerCase().trim();
           return itStyle === cleanStyle || itArt === cleanStyle || itArt.includes(cleanStyle) || cleanStyle.includes(itArt) || sIdx === 0 && (/top|kurta|shirt/i.test(cleanStyle) && /kurta|top|shirt/i.test(itArt)) || sIdx === 1 && (/bottom|pant|pyjama|salwar|penat/i.test(cleanStyle) && /pant|pyjama|salwar|penat|bottom/i.test(itArt));
         });
         if (byArticleOrStyle.length > 0) return byArticleOrStyle;
         if (styleCountOption === "2+" || styleCountOption === "more") {
-          const bottomItems = currentSelectedOrder.items.filter(
+          const bottomItems = curItems.filter(
             (it) => /pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ""))
           );
-          const topItems = currentSelectedOrder.items.filter(
+          const topItems = curItems.filter(
             (it) => !/pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ""))
           );
           if (bottomItems.length > 0 && topItems.length > 0) {
@@ -49580,6 +49590,20 @@
       setSelectedStyles(updated);
       if (styleCountOption === "1") {
         setItems((prev) => prev.map((it) => ({ ...it, style_name: value })));
+      }
+      if (value && value.trim() && !linkedOrderId) {
+        const cleanVal = value.trim().toLowerCase();
+        const matchingOrder = availableSalesOrders.find(
+          (o) => o.styles && o.styles.some((s) => s.toLowerCase().trim() === cleanVal) || o.styleName && o.styleName.toLowerCase().trim() === cleanVal || cleanVal.includes(o.id.toLowerCase()) || o.items && o.items.some(
+            (it) => String(it.style || "").toLowerCase().trim() === cleanVal || String(it.article || "").toLowerCase().trim() === cleanVal
+          )
+        );
+        if (matchingOrder) {
+          setIsOrderLinked(true);
+          setLinkedOrderId(matchingOrder.id);
+          if (matchingOrder.customer) setCustomerBrand(matchingOrder.customer);
+          if (matchingOrder.deliveryDate) setDeliveryDate(matchingOrder.deliveryDate);
+        }
       }
     };
     const handleAddStyleSlot = () => {
@@ -49821,7 +49845,7 @@
       const calculatedPcs = totalPcs > 0 ? totalPcs : reqMeters > 0 && cons > 0 ? Math.floor(reqMeters / cons) : "";
       const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : "";
       const customRate = orderItemRates[orderItem.id];
-      const itemRate = customRate !== void 0 && customRate !== "" ? parseFloat(customRate) || 0 : orderItem.rate ? parseFloat(orderItem.rate) : "";
+      const itemRate = customRate !== void 0 && customRate !== "" ? parseFloat(customRate) || 0 : "";
       const matchedFab = fabricList.find(
         (f) => orderItem.fabricId && f.id === orderItem.fabricId || orderItem.fabric && f.name && f.name.toLowerCase().trim() === orderItem.fabric.toLowerCase().trim()
       ) || fabricList.find(
@@ -49918,12 +49942,12 @@
       "button",
       {
         type: "button",
-        className: "btn btn-light btn-sm border d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-2",
+        className: "btn btn-light rounded-circle border shadow-sm d-flex align-items-center justify-content-center p-0",
         onClick: handleExit,
-        style: { borderColor: "#cbd5e1" }
+        title: "Back to Process PO List",
+        style: { width: "38px", height: "38px", borderColor: "#e2e8f0", backgroundColor: "#ffffff", color: "#334155", flexShrink: 0 }
       },
-      /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-arrow-left fs-14" }),
-      /* @__PURE__ */ import_react36.default.createElement("span", { className: "fw-semibold" }, "Back to PO List")
+      /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-arrow-left fs-18" })
     ), /* @__PURE__ */ import_react36.default.createElement("div", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("h5", { className: "mb-0 fw-bold text-dark fs-16" }, initialPO ? `Process PO #${poNumber}` : "New Process PO"), initialPO && (isLocked ? /* @__PURE__ */ import_react36.default.createElement(
       "span",
       {
@@ -50328,9 +50352,9 @@
           ))
         );
       })))
-    ), isOrderLinked && currentSelectedOrder && (styleCountOption === "2+" || selectedStyles.length > 1 ? selectedStyles.map((styleVal, sIdx) => {
+    ), isOrderLinked && currentSelectedOrder && /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, styleCountOption === "2+" || selectedStyles.length > 1 ? selectedStyles.map((styleVal, sIdx) => {
       const positionLabel = sIdx === 0 ? "Top Style" : sIdx === 1 ? "Bottom Style" : `Style Component #${sIdx + 1}`;
-      const styleItems = getRequirementsForStyle(styleVal, sIdx);
+      const styleItems = getRequirementsForStyle(styleVal, sIdx, isStyleCombined(sIdx));
       const isStyleSet = Boolean(styleVal && styleVal.trim());
       if (!isStyleSet) {
         return /* @__PURE__ */ import_react36.default.createElement("div", { key: `pending-style-${sIdx}`, className: "mt-4 p-3 border rounded-3 bg-white shadow-xs", style: { borderColor: "#cbd5e1", borderStyle: "dashed" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-secondary text-white px-2.5 py-1 fs-11 font-monospace rounded-pill" }, "#", sIdx + 1), /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-13 fw-bold text-dark" }, positionLabel, " (Pending Selection)")), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-light text-muted border fs-11" }, "Display Priority ", sIdx + 1)), /* @__PURE__ */ import_react36.default.createElement("div", { className: "p-3 bg-light-subtle rounded-2 text-center" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-hand-click fs-22 text-primary mb-1 d-block opacity-75" }), /* @__PURE__ */ import_react36.default.createElement("span", { className: "fw-semibold text-dark fs-13 d-block" }, "Choose or Type Style #", sIdx + 1, " (", positionLabel, ") in the slot above"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-muted fs-12 mb-2 d-block" }, "Its fabric qualities, colors, articles and required meters will automatically open in this box (PDF Section 3.2)."), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-center gap-1.5 flex-wrap mt-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-muted fs-11 me-1" }, "Quick Select:"), masterStyleOptions.slice(0, 6).map((st) => /* @__PURE__ */ import_react36.default.createElement(
@@ -50356,7 +50380,23 @@
         }
         return true;
       });
-      return /* @__PURE__ */ import_react36.default.createElement("div", { key: `style-box-${sIdx}-${styleVal}`, className: "mt-4 p-3 border rounded-3 bg-light shadow-xs", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-primary text-white px-2.5 py-1 fs-11 font-monospace rounded-pill" }, "#", sIdx + 1), /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-13 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for #", sIdx + 1, " ", positionLabel, ": ", /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-primary ms-1" }, styleVal)), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-11" }, "\u2713 ", selectedCount, " Selected & Added")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement(
+      return /* @__PURE__ */ import_react36.default.createElement("div", { key: `style-box-${sIdx}-${styleVal}`, className: "mt-4 p-3 border rounded-3 bg-light shadow-xs", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-primary text-white px-2.5 py-1 fs-11 font-monospace rounded-pill" }, "#", sIdx + 1), /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-13 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for #", sIdx + 1, " ", positionLabel, ": ", /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-primary ms-1" }, styleVal)), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-11" }, "\u2713 ", selectedCount, " Selected & Added")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "btn-group btn-group-xs p-0.5 bg-white border rounded-2", style: { borderColor: "#cbd5e1" }, title: "Combine articles with same Fabric, Color & Width for this style" }, /* @__PURE__ */ import_react36.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: `btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${isStyleCombined(sIdx) ? "btn-primary text-white fw-semibold" : "btn-light text-secondary border-0"}`,
+          onClick: () => setStyleCombined(sIdx, true)
+        },
+        "Combine Same"
+      ), /* @__PURE__ */ import_react36.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: `btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${!isStyleCombined(sIdx) ? "btn-primary text-white fw-semibold" : "btn-light text-secondary border-0"}`,
+          onClick: () => setStyleCombined(sIdx, false)
+        },
+        "Keep Separate"
+      )), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement(
         "button",
         {
           type: "button",
@@ -50384,7 +50424,7 @@
             inputMode: "decimal",
             className: "form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white",
             style: { fontSize: "12px", borderColor: "#cbd5e1", height: "28px" },
-            value: orderItemRates[ordIt.id] !== void 0 ? orderItemRates[ordIt.id] : ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : "",
+            value: orderItemRates[ordIt.id] !== void 0 ? orderItemRates[ordIt.id] : "",
             placeholder: "0.00",
             disabled: isLocked || isFullyOrdered || isAlreadySelected,
             onChange: (e) => {
@@ -50412,10 +50452,27 @@
     }) : (
       /* Single Style Display */
       /* @__PURE__ */ import_react36.default.createElement("div", { className: "mt-4 p-3 border rounded-3 bg-light", style: { borderColor: "#e2e8f0" } }, (() => {
-        const selectedCount = (currentSelectedOrder.items || []).filter(
+        const singleItems = isStyleCombined(0) ? currentSelectedOrder.items || [] : currentSelectedOrder.separateItems || currentSelectedOrder.items || [];
+        const selectedCount = singleItems.filter(
           (ordIt) => selectedRequirementIds.includes(ordIt.id) || items.some((it) => it.order_item_id === ordIt.id)
         ).length;
-        return /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for ", currentSelectedOrder.id, " (", currentSelectedOrder.customer, ")"), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-11" }, "\u2713 ", selectedCount, " Selected & Added")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement(
+        return /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react36.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react36.default.createElement("i", { className: "ti ti-clipboard-list text-primary" }), "Fabric Requirements for ", currentSelectedOrder.id, " (", currentSelectedOrder.customer, ")"), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-11" }, "\u2713 ", selectedCount, " Selected & Added")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "btn-group btn-group-xs p-0.5 bg-white border rounded-2", style: { borderColor: "#cbd5e1" }, title: "Combine articles with same Fabric, Color & Width" }, /* @__PURE__ */ import_react36.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: `btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${isStyleCombined(0) ? "btn-primary text-white fw-semibold" : "btn-light text-secondary border-0"}`,
+            onClick: () => setStyleCombined(0, true)
+          },
+          "Combine Same"
+        ), /* @__PURE__ */ import_react36.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: `btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${!isStyleCombined(0) ? "btn-primary text-white fw-semibold" : "btn-light text-secondary border-0"}`,
+            onClick: () => setStyleCombined(0, false)
+          },
+          "Keep Separate"
+        )), selectedCount > 0 && /* @__PURE__ */ import_react36.default.createElement(
           "button",
           {
             type: "button",
@@ -50426,7 +50483,8 @@
           /* @__PURE__ */ import_react36.default.createElement("span", null, hideSelectedRequirements ? `Show Hidden (${selectedCount})` : "Hide Selected")
         ), /* @__PURE__ */ import_react36.default.createElement("span", { className: "badge bg-white text-secondary border fs-11" }, "Required vs Received Balance")));
       })(), /* @__PURE__ */ import_react36.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react36.default.createElement("table", { className: "table table-sm table-bordered bg-white align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react36.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react36.default.createElement("tr", null, /* @__PURE__ */ import_react36.default.createElement("th", null, "Style"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Fabric Quality"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Color"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Article"), /* @__PURE__ */ import_react36.default.createElement("th", null, "Width"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end", style: { width: "115px" } }, "Rate (\u20B9)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Required (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Already Received (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-end" }, "Pending (m)"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center" }, "Status"), /* @__PURE__ */ import_react36.default.createElement("th", { className: "text-center", style: { width: "90px" } }, "Action"))), /* @__PURE__ */ import_react36.default.createElement("tbody", null, (() => {
-        const visibleItems = currentSelectedOrder.items.filter((ordIt) => {
+        const baseItems = isStyleCombined(0) ? currentSelectedOrder.items || [] : currentSelectedOrder.separateItems || currentSelectedOrder.items || [];
+        const visibleItems = baseItems.filter((ordIt) => {
           const isSelected = selectedRequirementIds.includes(ordIt.id) || items.some((it) => it.order_item_id === ordIt.id);
           if (hideSelectedRequirements && isSelected) {
             return false;
@@ -50457,7 +50515,7 @@
               inputMode: "decimal",
               className: "form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white",
               style: { fontSize: "12px", borderColor: "#cbd5e1", height: "28px" },
-              value: orderItemRates[ordIt.id] !== void 0 ? orderItemRates[ordIt.id] : ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : "",
+              value: orderItemRates[ordIt.id] !== void 0 ? orderItemRates[ordIt.id] : "",
               placeholder: "0.00",
               disabled: isLocked || isFullyOrdered || isAlreadySelected,
               onChange: (e) => {
@@ -50696,29 +50754,19 @@
             disabled: !isSectionEditable("items"),
             onChange: (e) => updateItem(idx, { fabric_rate: e.target.value })
           }
-        )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement("div", { className: "input-group input-group-sm" }, /* @__PURE__ */ import_react36.default.createElement(
+        )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
           "input",
           {
             type: "number",
             step: "any",
             placeholder: "0.00",
-            className: "form-control form-control-sm text-end bg-white fs-13",
+            className: "form-control form-control-sm text-end bg-white fs-13 w-100",
             style: { borderColor: "#cbd5e1", height: "36px" },
             value: item.dyeing_rate,
             disabled: !isSectionEditable("items"),
             onChange: (e) => updateItem(idx, { dyeing_rate: e.target.value })
           }
-        ), isSectionEditable("items") && /* @__PURE__ */ import_react36.default.createElement(
-          "button",
-          {
-            type: "button",
-            className: "btn btn-outline-primary btn-sm px-1.5",
-            style: { height: "36px", fontSize: "10px", borderColor: "#cbd5e1" },
-            title: `Auto-recommend rate (\u20B9${getRecommendedDyeingRate(item)}/m for ${item.width || "44"}" ${processType || "Dyeing"})`,
-            onClick: () => updateItem(idx, { dyeing_rate: getRecommendedDyeingRate(item) })
-          },
-          "Auto"
-        ))), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
+        )), /* @__PURE__ */ import_react36.default.createElement("td", null, /* @__PURE__ */ import_react36.default.createElement(
           "div",
           {
             className: "form-control form-control-sm text-end fw-semibold text-dark bg-light d-flex align-items-center justify-content-end fs-13 w-100",
@@ -51394,51 +51442,93 @@
       try {
         const savedStockRaw = localStorage.getItem("erp_warehouse_fabric_bales");
         const savedStock = savedStockRaw ? JSON.parse(savedStockRaw) : null;
-        const rawPOs = localStorage.getItem("raindrop_pos_v1");
-        const pos = rawPOs ? JSON.parse(rawPOs) : [];
+        const rawStockPool = localStorage.getItem("raindrop_stock_pool_v1");
+        const stockPool = rawStockPool ? JSON.parse(rawStockPool) : [];
         const rawGRNs = localStorage.getItem("raindrop_grns_v1");
         const grns = rawGRNs ? JSON.parse(rawGRNs) : [];
+        const rawPOs = localStorage.getItem("raindrop_pos_v1");
+        const pos = rawPOs ? JSON.parse(rawPOs) : [];
+        const rawOpenBales = localStorage.getItem("erp_process_open_bales_v1");
+        const openBales = rawOpenBales ? JSON.parse(rawOpenBales) : [];
         const dynamicBales = [];
-        (Array.isArray(grns) ? grns : []).forEach((grn, gIdx) => {
-          if (!grn) return;
-          const invoiceNo = grn.invoiceNo || grn.billNo || `INV-GRN-${grn.id || gIdx + 1}`;
-          const vendorName2 = grn.vendorName || grn.supplierName || "Procurement Vendor";
-          const inwardDate = grn.inwardDate || grn.date || "2026-02-01";
-          const poRef = grn.poId || grn.linkedPOs && grn.linkedPOs[0] || "";
-          if (Array.isArray(grn.bales) && grn.bales.length > 0) {
-            grn.bales.forEach((bale, bIdx) => {
-              const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
-              const fab = bale.fabricItemLabel || grn.fabricName || "Grey Fabric";
-              const width = bale.width || grn.width || '48"';
-              const color = bale.color || grn.color || "Grey";
-              const totalMtrs = Number(bale.totalLength) || (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === "object" ? p.length : p) || 0), 0) : 0) || 500;
-              let pieces = [];
-              if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
-                pieces = bale.pieces.map((p, pIdx) => {
-                  const pMtrs = Number(typeof p === "object" ? p.length || p.meters : p) || 100;
-                  const pNo = typeof p === "object" && p.pieceNo ? p.pieceNo : `Than ${bIdx + 1}-${pIdx + 1}`;
-                  return {
-                    id: `grn-${grn.id || gIdx}-b${bIdx}-p${pIdx}`,
-                    pieceNo: String(pNo).replace(/^Roll\s*/i, "Than "),
-                    meters: pMtrs,
-                    isDispatched: false
-                  };
+        const seenBaleKeys = /* @__PURE__ */ new Set();
+        const buildPiecesFromBale = (bale, bIdx, idPrefix, totalMtrs) => {
+          if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
+            return bale.pieces.map((p, pIdx) => {
+              const pMtrs = Number(typeof p === "object" ? p.length || p.meters : p) || 100;
+              const pNo = typeof p === "object" && p.pieceNo ? p.pieceNo : `Than ${bIdx + 1}-${pIdx + 1}`;
+              return {
+                id: `${idPrefix}-b${bIdx}-p${pIdx}`,
+                pieceNo: String(pNo).replace(/^Roll\s*/i, "Than "),
+                meters: pMtrs,
+                isDispatched: false
+              };
+            });
+          }
+          const pieceSize = 100;
+          const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
+          const rem = Number((totalMtrs - count * pieceSize).toFixed(2));
+          const res = [];
+          for (let i = 1; i <= count; i++) {
+            res.push({ id: `${idPrefix}-b${bIdx}-p${i}`, pieceNo: `Than ${bIdx + 1}-${i}`, meters: pieceSize, isDispatched: false });
+          }
+          if (rem > 0) {
+            res.push({ id: `${idPrefix}-b${bIdx}-p${count + 1}`, pieceNo: `Than ${bIdx + 1}-${count + 1}`, meters: rem, isDispatched: false });
+          }
+          return res;
+        };
+        if (Array.isArray(stockPool) && stockPool.length > 0) {
+          stockPool.forEach((sp, spIdx) => {
+            if (!sp) return;
+            const spQty = Number(sp.qty) || 0;
+            if (spQty <= 0) return;
+            const matchedGrn = (Array.isArray(grns) ? grns : []).find((g) => g && g.id === sp.grnId);
+            const invoiceNo = matchedGrn?.invoiceNo || matchedGrn?.billNo || sp.invoiceNo || (sp.grnId ? `INV-${sp.grnId}` : `INV-SP-${spIdx + 1}`);
+            const vendorName2 = matchedGrn?.vendorName || matchedGrn?.supplierName || sp.vendorName || "Stock Pool";
+            const inwardDate = matchedGrn?.inwardDate || matchedGrn?.date || "2026-02-01";
+            const poRef = sp.poId || matchedGrn?.poId || "";
+            if (matchedGrn && Array.isArray(matchedGrn.bales) && matchedGrn.bales.length > 0) {
+              matchedGrn.bales.forEach((bale, bIdx) => {
+                const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
+                const uniqKey = `${matchedGrn.id}_${bNo}_${invoiceNo}`;
+                if (seenBaleKeys.has(uniqKey)) return;
+                seenBaleKeys.add(uniqKey);
+                const fab = bale.fabricItemLabel || sp.fabricName || matchedGrn.fabricName || "Grey Fabric";
+                const width = bale.width || sp.width || matchedGrn.width || '48"';
+                const color = bale.color || sp.colorName || matchedGrn.color || "Grey";
+                const totalMtrs = Number(bale.totalLength) || (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === "object" ? p.length || p.meters : p) || 0), 0) : 0) || spQty;
+                const pieces = buildPiecesFromBale(bale, bIdx, `sp-${sp.id || spIdx}`, totalMtrs);
+                dynamicBales.push({
+                  id: `WB-SP-${sp.id || spIdx}-${bIdx}`,
+                  stockPoolId: sp.id,
+                  poId: poRef,
+                  baleNo: bNo,
+                  vendorName: vendorName2,
+                  invoiceNo,
+                  date: inwardDate,
+                  fabric: `${fab} [${width}]`,
+                  fabricQuality: fab,
+                  width,
+                  color,
+                  meters: totalMtrs,
+                  availableMeters: totalMtrs,
+                  folding: matchedGrn.folding || "L100",
+                  actualDispatchedMeters: totalMtrs,
+                  subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
+                  ageDays: Math.max(1, Math.floor((/* @__PURE__ */ new Date() - new Date(inwardDate)) / (1e3 * 60 * 60 * 24))) || 15,
+                  pieces
                 });
-              } else {
-                const pieceSize = 100;
-                const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
-                const rem = Number((totalMtrs - count * pieceSize).toFixed(2));
-                for (let i = 1; i <= count; i++) {
-                  pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${i}`, pieceNo: `Than ${bIdx + 1}-${i}`, meters: pieceSize, isDispatched: false });
-                }
-                if (rem > 0) {
-                  pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${count + 1}`, pieceNo: `Than ${bIdx + 1}-${count + 1}`, meters: rem, isDispatched: false });
-                }
-              }
+              });
+            } else {
+              const fab = sp.fabricName || "Grey Fabric";
+              const width = sp.width || '48"';
+              const color = sp.colorName || "Grey";
+              const pieces = buildPiecesFromBale({}, spIdx, `sp-${sp.id || spIdx}`, spQty);
               dynamicBales.push({
-                id: `WB-GRN-${grn.id || gIdx}-${bIdx}`,
+                id: `WB-SP-${sp.id || spIdx}`,
+                stockPoolId: sp.id,
                 poId: poRef,
-                baleNo: bNo,
+                baleNo: sp.lotNo || `Lot ${sp.id || spIdx + 1}`,
                 vendorName: vendorName2,
                 invoiceNo,
                 date: inwardDate,
@@ -51446,17 +51536,82 @@
                 fabricQuality: fab,
                 width,
                 color,
-                meters: totalMtrs,
-                availableMeters: totalMtrs,
-                folding: grn.folding || "L100",
-                actualDispatchedMeters: totalMtrs,
-                subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
-                ageDays: Math.max(1, Math.floor((/* @__PURE__ */ new Date() - new Date(inwardDate)) / (1e3 * 60 * 60 * 24))) || 15,
+                meters: spQty,
+                availableMeters: spQty,
+                folding: "L100",
+                actualDispatchedMeters: spQty,
+                subRolls: `${pieces.length} Thans (Stock Pool)`,
+                ageDays: 10,
                 pieces
               });
-            });
-          }
+            }
+          });
+        }
+        (Array.isArray(openBales) ? openBales : []).forEach((ob, obIdx) => {
+          if (!ob) return;
+          const obMtrs = Number(ob.remaining_meters !== void 0 ? ob.remaining_meters : ob.returned_meters) || 0;
+          if (obMtrs <= 0 || ob.status && ob.status !== "Available") return;
+          const fab = ob.fabric_name || "100x100 Voile (Grey)";
+          const width = ob.width ? `${String(ob.width).replace(/[^\d.]/g, "")}"` : '48"';
+          dynamicBales.push({
+            id: `WB-OB-${ob.id || obIdx}`,
+            openBaleId: ob.id,
+            poId: ob.linked_po_id || "",
+            baleNo: `Open Bale (${ob.id})`,
+            vendorName: ob.vendor_name || "Grey Return Stock",
+            invoiceNo: ob.original_vendor_invoice_ref || "INV-OPEN-BALE",
+            date: ob.created_at || "2026-08-12",
+            fabric: `${fab} [${width}]`,
+            fabricQuality: fab,
+            width,
+            color: "Raw / Greige",
+            meters: obMtrs,
+            availableMeters: obMtrs,
+            folding: "L100",
+            actualDispatchedMeters: obMtrs,
+            subRolls: "Open Bale (Grey Return)",
+            ageDays: 5,
+            pieces: [{ id: `ob-${ob.id || obIdx}-p1`, pieceNo: `Open Than ${ob.id}`, meters: obMtrs, isDispatched: false }]
+          });
         });
+        if (dynamicBales.length === 0) {
+          (Array.isArray(grns) ? grns : []).forEach((grn, gIdx) => {
+            if (!grn) return;
+            const invoiceNo = grn.invoiceNo || grn.billNo || `INV-GRN-${grn.id || gIdx + 1}`;
+            const vendorName2 = grn.vendorName || grn.supplierName || "Procurement Vendor";
+            const inwardDate = grn.inwardDate || grn.date || "2026-02-01";
+            const poRef = grn.poId || grn.linkedPOs && grn.linkedPOs[0] || "";
+            if (Array.isArray(grn.bales) && grn.bales.length > 0) {
+              grn.bales.forEach((bale, bIdx) => {
+                const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
+                const fab = bale.fabricItemLabel || grn.fabricName || "Grey Fabric";
+                const width = bale.width || grn.width || '48"';
+                const color = bale.color || grn.color || "Grey";
+                const totalMtrs = Number(bale.totalLength) || (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === "object" ? p.length : p) || 0), 0) : 0) || 500;
+                const pieces = buildPiecesFromBale(bale, bIdx, `grn-${grn.id || gIdx}`, totalMtrs);
+                dynamicBales.push({
+                  id: `WB-GRN-${grn.id || gIdx}-${bIdx}`,
+                  poId: poRef,
+                  baleNo: bNo,
+                  vendorName: vendorName2,
+                  invoiceNo,
+                  date: inwardDate,
+                  fabric: `${fab} [${width}]`,
+                  fabricQuality: fab,
+                  width,
+                  color,
+                  meters: totalMtrs,
+                  availableMeters: totalMtrs,
+                  folding: grn.folding || "L100",
+                  actualDispatchedMeters: totalMtrs,
+                  subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
+                  ageDays: Math.max(1, Math.floor((/* @__PURE__ */ new Date() - new Date(inwardDate)) / (1e3 * 60 * 60 * 24))) || 15,
+                  pieces
+                });
+              });
+            }
+          });
+        }
         (Array.isArray(pos) ? pos : []).forEach((po, pIdx) => {
           if (!po) return;
           const poId = po.id || `PO-${pIdx + 1}`;
@@ -51649,12 +51804,7 @@
             pieces: [{ id: "WB-REAL-05-p1", pieceNo: "Than 2376-B", meters: 111, isDispatched: false }]
           }
         ];
-        let finalBales = [];
-        if (dynamicBales.length > 0) {
-          finalBales = [...dynamicBales, ...realisticBaseline];
-        } else {
-          finalBales = realisticBaseline;
-        }
+        let finalBales = dynamicBales.length > 0 ? dynamicBales : realisticBaseline;
         if (Array.isArray(savedStock) && savedStock.length > 0) {
           finalBales = finalBales.map((fb) => {
             const match = savedStock.find((sb) => sb.id === fb.id || sb.baleNo === fb.baleNo && sb.invoiceNo === fb.invoiceNo);
@@ -51731,11 +51881,9 @@
       if (typeof s === "string" && s.trim()) return [s.trim()];
       return [];
     });
-    const [customerBrand, setCustomerBrand] = (0, import_react38.useState)(initialChallan?.customer_brand || "");
-    const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "L100");
-    const [particulars, setParticulars] = (0, import_react38.useState)(
-      initialChallan?.particulars || '100x100 Voil [48"] gray - fab issue for dying'
-    );
+    const [customerBrand, setCustomerBrand2] = (0, import_react38.useState)(initialChallan?.customer_brand || "");
+    const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "");
+    const [particulars, setParticulars] = (0, import_react38.useState)(initialChallan?.particulars || "");
     const [remarks, setRemarks] = (0, import_react38.useState)(initialChallan?.remarks || "");
     const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "Anurag");
     const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "Anurag");
@@ -51770,6 +51918,13 @@
             });
           });
         }
+      }
+    }, [showStockPickerModal]);
+    const [selectedStockGroupKey, setSelectedStockGroupKey] = (0, import_react38.useState)(null);
+    (0, import_react38.useEffect)(() => {
+      if (!showStockPickerModal) {
+        setSelectedStockGroupKey(null);
+        setExpandedBaleId(null);
       }
     }, [showStockPickerModal]);
     const [showPODropdown, setShowPODropdown] = (0, import_react38.useState)(false);
@@ -51818,7 +51973,7 @@
           });
           setStylesInfo(allStyles);
           if (firstPO.customer_brand_name) {
-            setCustomerBrand(firstPO.customer_brand_name);
+            setCustomerBrand2(firstPO.customer_brand_name);
           }
         }
       }
@@ -51835,8 +51990,8 @@
         vendor_name: vendorName || "Raju dyeing",
         vendor_id: vendorId || "VEND-0003",
         linked_pos: selectedPOs.length > 0 ? selectedPOs : ["7611", "7612", "7613"],
-        particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
-        folding_notation: foldingNotation || "L100",
+        particulars: particulars || "",
+        folding_notation: foldingNotation || "",
         total_bales: baleCount || 1,
         total_pieces: totalPiecesText || "1 Bale + 7 th",
         grand_total_meters: grandTotalMeters || 2418.8,
@@ -51925,9 +52080,38 @@ Do you want to confirm this mixed batch dispatch?`
       const nominalDispatched = isCustomCut ? parseFloat(customMeters) : nominalOriginal;
       const foldCode = roll.folding || foldingNotation || "L100";
       const actualDispatched = computeFoldedMeters(nominalDispatched, foldCode);
+      const basePieces = ensureBalePieces(roll);
+      const cutBreakdown = [];
+      let updatedPiecesForPool = basePieces;
+      if (!isCustomCut) {
+        updatedPiecesForPool = basePieces.map((p) => ({ ...p, isDispatched: true }));
+      } else {
+        let remainingToCut = nominalDispatched;
+        updatedPiecesForPool = basePieces.map((p) => {
+          if (p.isDispatched || remainingToCut <= 0) return p;
+          const pMtrs = parseFloat(p.meters) || 0;
+          if (pMtrs <= 0) return p;
+          if (pMtrs <= remainingToCut) {
+            remainingToCut = Number((remainingToCut - pMtrs).toFixed(2));
+            cutBreakdown.push(`${p.pieceNo} (${pMtrs}m)`);
+            return { ...p, isDispatched: true };
+          }
+          const cutFromThis = Number(remainingToCut.toFixed(2));
+          const leftOnPiece = Number((pMtrs - cutFromThis).toFixed(2));
+          remainingToCut = 0;
+          cutBreakdown.push(`${p.pieceNo} - Cut ${cutFromThis}m`);
+          return {
+            ...p,
+            originalMeters: p.originalMeters || pMtrs,
+            meters: leftOnPiece,
+            isDispatched: false
+          };
+        });
+      }
       const newItem = {
         id: Date.now() + Math.random(),
-        bale_roll_no: roll.baleNo,
+        bale_roll_no: isCustomCut && cutBreakdown.length > 0 ? `${roll.baleNo} (${cutBreakdown.join(", ")})` : roll.baleNo,
+        parent_bale_id: roll.id,
         invoice_no: roll.invoiceNo,
         vendor_name: roll.vendorName || "",
         fabric_name: roll.fabric || 'Grey [48"]',
@@ -51935,16 +52119,15 @@ Do you want to confirm this mixed batch dispatch?`
         original_piece_meters: nominalOriginal,
         dispatched_meters: actualDispatched,
         is_partial_cut: isCustomCut,
+        dispatch_mode: isCustomCut ? "Bale Cut (Scenario B)" : "Full Bale (Scenario A)",
         folding: foldCode,
         remaining_stock_meters: Number(Math.max(0, nominalOriginal - nominalDispatched).toFixed(2))
       };
       setItems((prev) => [...prev, newItem]);
       setWarehouseStockPool((prev) => prev.map((wb) => {
         if (wb.id === roll.id) {
-          const updatedAvail = Math.max(0, (wb.availableMeters || wb.meters) - nominalDispatched);
-          const currentPieces = ensureBalePieces(wb);
-          const updatedPieces = !isCustomCut ? currentPieces.map((p) => ({ ...p, isDispatched: true })) : currentPieces;
-          return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)), pieces: updatedPieces };
+          const updatedAvail = Math.max(0, (wb.availableMeters !== void 0 ? wb.availableMeters : wb.meters) - nominalDispatched);
+          return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)), pieces: updatedPiecesForPool };
         }
         return wb;
       }));
@@ -51971,7 +52154,7 @@ Do you want to confirm this mixed batch dispatch?`
         };
       });
     };
-    const handleAllocateSinglePiece = (roll, piece) => {
+    const handleAllocateSinglePiece = (roll, piece, customCutMeters = null) => {
       if (piece.isDispatched) return;
       const existingInvoices = items.map((it) => it.invoice_no).filter(Boolean);
       const hasDifferentInvoice = existingInvoices.length > 0 && !existingInvoices.includes(roll.invoiceNo);
@@ -51987,10 +52170,14 @@ Confirm dispatch with mixed batch lots?`
       }
       const foldCode = roll.folding || foldingNotation || "L100";
       const nominalMtrs = parseFloat(piece.meters) || 100;
-      const actualDispatched = computeFoldedMeters(nominalMtrs, foldCode);
+      const cutMtrs = customCutMeters !== null ? Math.min(nominalMtrs, Math.max(0, parseFloat(customCutMeters) || 0)) : nominalMtrs;
+      if (cutMtrs <= 0) return;
+      const isCutFromPiece = customCutMeters !== null && cutMtrs < nominalMtrs;
+      const remainingPieceMtrs = isCutFromPiece ? Number((nominalMtrs - cutMtrs).toFixed(2)) : 0;
+      const actualDispatched = computeFoldedMeters(cutMtrs, foldCode);
       const newItem = {
         id: Date.now() + Math.random(),
-        bale_roll_no: `${roll.baleNo} (${piece.pieceNo})`,
+        bale_roll_no: isCutFromPiece ? `${roll.baleNo} (${piece.pieceNo} - Cut ${cutMtrs}m)` : `${roll.baleNo} (${piece.pieceNo})`,
         parent_bale_id: roll.id,
         piece_id: piece.id,
         invoice_no: roll.invoiceNo,
@@ -52000,17 +52187,28 @@ Confirm dispatch with mixed batch lots?`
         original_piece_meters: nominalMtrs,
         dispatched_meters: actualDispatched,
         is_partial_cut: true,
-        dispatch_mode: "Piece Allocation",
+        dispatch_mode: isCutFromPiece ? "Piece Cut (Scenario B)" : "Piece Allocation",
         folding: foldCode,
-        remaining_stock_meters: 0
+        remaining_stock_meters: remainingPieceMtrs
       };
       setItems((prev) => [...prev, newItem]);
       setWarehouseStockPool((prev) => prev.map((wb) => {
         if (wb.id === roll.id) {
           const currentPieces = ensureBalePieces(wb);
-          const updatedPieces = currentPieces.map((p) => p.id === piece.id ? { ...p, isDispatched: true } : p);
+          const updatedPieces = currentPieces.map((p) => {
+            if (p.id !== piece.id) return p;
+            if (isCutFromPiece) {
+              return {
+                ...p,
+                originalMeters: p.originalMeters || nominalMtrs,
+                meters: remainingPieceMtrs,
+                isDispatched: false
+              };
+            }
+            return { ...p, isDispatched: true };
+          });
           const currentAvail = wb.availableMeters !== void 0 ? wb.availableMeters : wb.meters;
-          const updatedAvail = Math.max(0, currentAvail - nominalMtrs);
+          const updatedAvail = Math.max(0, currentAvail - cutMtrs);
           return {
             ...wb,
             availableMeters: Number(updatedAvail.toFixed(2)),
@@ -52290,8 +52488,8 @@ Confirm dispatch with mixed batches?`
         customer_brand: customerBrand,
         po_link_status: poLinkStatus,
         admin_alert_triggered: isEmergencyDispatch,
-        particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
-        folding_notation: foldingNotation || "L100",
+        particulars: particulars || "",
+        folding_notation: foldingNotation || "",
         total_bales: baleCount || 1,
         total_pieces: totalPiecesText,
         grand_total_meters: Number(grandTotalMeters.toFixed(2)),
@@ -52304,6 +52502,32 @@ Confirm dispatch with mixed batches?`
         created_at: initialChallan?.created_at || (/* @__PURE__ */ new Date()).toISOString(),
         items
       };
+      try {
+        const rawSp = localStorage.getItem("raindrop_stock_pool_v1");
+        if (rawSp) {
+          const spList = JSON.parse(rawSp);
+          if (Array.isArray(spList) && spList.length > 0) {
+            const updatedSp = spList.map((sp) => {
+              if (!sp || (Number(sp.qty) || 0) <= 0) return sp;
+              let deduct = 0;
+              items.forEach((it) => {
+                const parentBale = warehouseStockPool.find((wb) => wb.id === it.parent_bale_id || wb.baleNo === it.bale_roll_no);
+                const matchesById = parentBale?.stockPoolId && parentBale.stockPoolId === sp.id;
+                const matchesByFab = !parentBale?.stockPoolId && String(it.fabric_name || "").toLowerCase().includes(String(sp.fabricName || "").toLowerCase()) && String(it.color_name || "").toLowerCase() === String(sp.colorName || "").toLowerCase();
+                if (matchesById || matchesByFab) {
+                  deduct += parseFloat(it.dispatched_meters) || 0;
+                }
+              });
+              if (deduct > 0) {
+                return { ...sp, qty: Math.max(0, Number((Number(sp.qty) - deduct).toFixed(2))) };
+              }
+              return sp;
+            });
+            localStorage.setItem("raindrop_stock_pool_v1", JSON.stringify(updatedSp));
+          }
+        }
+      } catch (e2) {
+      }
       onSave(challanPayload, andRecordReturn);
     };
     const isSectionEditable = (sectionKey) => {
@@ -52316,7 +52540,17 @@ Confirm dispatch with mixed batches?`
         className: "card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3",
         style: { borderColor: "#e2e8f0" }
       },
-      /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react38.default.createElement(
+      /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-3" }, onCancel && /* @__PURE__ */ import_react38.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-light rounded-circle border shadow-sm d-flex align-items-center justify-content-center p-0",
+          onClick: onCancel,
+          title: "Back to Challans List",
+          style: { width: "38px", height: "38px", borderColor: "#e2e8f0", backgroundColor: "#ffffff", color: "#334155", flexShrink: 0 }
+        },
+        /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-arrow-left fs-18" })
+      ), /* @__PURE__ */ import_react38.default.createElement(
         "div",
         {
           className: "rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs",
@@ -52637,38 +52871,11 @@ Confirm dispatch with mixed batches?`
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-14" }),
       " Manual Row"
-    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom bg-light-subtle" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-2 align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "PO Required Meters"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-primary" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open Allocation"), selectedPOs.length > 0 && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10" }, selectedPOs.length, " PO(s)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Total Dispatched"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-dark" }, grandTotalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "(", items.length, " rolls/bales)"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "(", items.length, " bales/thans)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: `p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05 ? "border-success" : balancePendingMeters > 0 ? "border-warning" : "border-light"}` }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Fulfillment Status"), totalRequiredMeters > 0 ? grandTotalMeters >= totalRequiredMeters - 0.05 ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-success d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-circle-check fs-15" }), " 100% Fulfilled \u2713") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-warning d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-clock-pause fs-15" }), " Pending: ", balancePendingMeters.toFixed(2), " m") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-secondary" }, "Ready for Dispatch"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3 d-flex flex-column gap-1.5 justify-content-center" }, totalRequiredMeters > 0 && balancePendingMeters > 0 && isSectionEditable("items") ? /* @__PURE__ */ import_react38.default.createElement(
+    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 px-4 border-bottom bg-light-subtle" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-2 align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "PO Required Meters"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-primary" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open Allocation"), selectedPOs.length > 0 && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10" }, selectedPOs.length, " PO(s)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-2.5 rounded border bg-white shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Total Dispatched"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-baseline gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-16 fw-bold text-dark" }, grandTotalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11" }, "(", items.length, " bales/thans)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: `p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05 ? "border-success" : balancePendingMeters > 0 ? "border-warning" : "border-light"}` }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-11 fw-medium text-uppercase d-block" }, "Fulfillment Status"), totalRequiredMeters > 0 ? grandTotalMeters >= totalRequiredMeters - 0.05 ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-success d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-circle-check fs-15" }), " 100% Fulfilled \u2713") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-warning d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-clock-pause fs-15" }), " Pending: ", balancePendingMeters.toFixed(2), " m") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-13 fw-bold text-secondary" }, "Ready for Dispatch"))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-bordered align-middle mb-0", style: { borderColor: "#dee2e6", fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { style: { color: "#475569", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" } }, /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-center py-2", style: { width: "35px" } }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Bale / Piece (Than) No *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Stock Invoice Ref *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "110px" } }, "Color Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "150px" }, className: "text-center" }, "Dispatch Mode"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" }, className: "text-end" }, "Original (m)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "120px" }, className: "text-end text-dark" }, "Dispatched (m) *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "140px" }, className: "text-end" }, "Remaining in Stock (m)"), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, items.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 11, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-3" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-packages fs-32 text-secondary mb-2 d-block opacity-50" }), /* @__PURE__ */ import_react38.default.createElement("h6", { className: "fs-14 fw-semibold text-dark mb-1" }, "No Warehouse Stock Allocated Yet"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "fs-12 text-muted mb-3" }, totalRequiredMeters > 0 ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/pieces from warehouse inventory or auto-fulfill.` : "Select bales/pieces from warehouse inventory to dispatch on this Process Challan."), totalRequiredMeters > 0 && /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex justify-content-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-outline-warning btn-sm py-1.5 px-3 fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-xs",
-        onClick: handleAutoFulfillBalance
-      },
-      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
-      /* @__PURE__ */ import_react38.default.createElement("span", null, "\u26A1 Auto-Fulfill Balance")
-    ) : null, isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-outline-primary btn-sm py-1.5 px-3 fw-semibold d-flex align-items-center justify-content-center gap-1.5 shadow-xs",
-        onClick: () => setShowStockPickerModal(true)
-      },
-      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse fs-14" }),
-      /* @__PURE__ */ import_react38.default.createElement("span", null, "Browse Warehouse Stock")
-    )))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-0" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-bordered align-middle mb-0", style: { borderColor: "#dee2e6", fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("tr", { style: { color: "#475569", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" } }, /* @__PURE__ */ import_react38.default.createElement("th", { className: "text-center py-2", style: { width: "35px" } }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Bale / Piece (Than) No *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "140px" } }, "Stock Invoice Ref *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Fabric Quality"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "110px" } }, "Color Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "150px" }, className: "text-center" }, "Dispatch Mode"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" }, className: "text-end" }, "Original (m)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "120px" }, className: "text-end text-dark" }, "Dispatched (m) *"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "140px" }, className: "text-end" }, "Remaining in Stock (m)"), isSectionEditable("items") && /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, items.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 11, className: "text-center py-5 text-muted" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-3" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-packages fs-32 text-secondary mb-2 d-block opacity-50" }), /* @__PURE__ */ import_react38.default.createElement("h6", { className: "fs-14 fw-semibold text-dark mb-1" }, "No Warehouse Stock Allocated Yet"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "fs-12 text-muted mb-3" }, totalRequiredMeters > 0 ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/pieces from warehouse inventory or auto-fulfill.` : "Select bales/pieces from warehouse inventory to dispatch on this Process Challan."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex justify-content-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1.5",
-        onClick: () => setShowStockPickerModal(true)
-      },
-      /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse fs-14" }),
-      /* @__PURE__ */ import_react38.default.createElement("span", null, "Pick Bales from Warehouse Stock")
-    ), totalRequiredMeters > 0 && /* @__PURE__ */ import_react38.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-warning btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5",
+        className: "btn btn-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5",
         onClick: handleAutoFulfillBalance
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-bolt fs-14" }),
@@ -52845,7 +53052,7 @@ Confirm dispatch with mixed batches?`
       },
       /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-receipt-refund fs-14" }),
       /* @__PURE__ */ import_react38.default.createElement("span", null, "Record Inbound Return (GRN) \u2192")
-    )))), showStockPickerModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-16 mb-0" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse text-primary me-2" }), "Warehouse Stock Allocation (Bales / Rolls Inventory) Warehouse Stock Allocation (Bales & Thans Inventory)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Inward purchase stock \u2022 FIFO priority \u2022 Scenario A (Full Bale) vs Scenario B (Cut Piece) \u2022 Single Batch Check Inward procurement stock \u2022 Real Purchase Orders & GRNs \u2022 Pick Full Bales, Individual Thans, or Cut Meters")), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowStockPickerModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-2.5 px-4 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "PO Target:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-primary fs-13" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Dispatched:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-dark fs-13" }, grandTotalMeters.toFixed(2), " m")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Balance Needed:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: `fs-13 ${balancePendingMeters > 0 ? "text-warning" : "text-success"}` }, balancePendingMeters > 0 ? `${balancePendingMeters.toFixed(2)} m` : "0.00 m (Fulfilled \u2713)"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
+    )))), showStockPickerModal && /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal fade show d-block", style: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-content shadow-lg border-0", style: { borderRadius: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between" }, /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement("h6", { className: "modal-title fw-bold text-dark fs-16 mb-0" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-building-warehouse text-primary me-2" }), "Warehouse Stock Allocation (Stock Pool \u2192 Bales \u2192 Pieces)"), /* @__PURE__ */ import_react38.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Select Fabric, Width & Colour first \u2192 then pick Bales or Individual Thans / Cut Meters (FIFO & Single Batch)")), /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn-close", onClick: () => setShowStockPickerModal(false) })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "py-2.5 px-4 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "PO Target:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-primary fs-13" }, totalRequiredMeters > 0 ? `${totalRequiredMeters.toFixed(2)} m` : "Open")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Dispatched:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-dark fs-13" }, grandTotalMeters.toFixed(2), " m")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "16px" } }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Balance Needed:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: `fs-13 ${balancePendingMeters > 0 ? "text-warning" : "text-success"}` }, balancePendingMeters > 0 ? `${balancePendingMeters.toFixed(2)} m` : "0.00 m (Fulfilled \u2713)"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
@@ -52899,185 +53106,286 @@ Confirm dispatch with mixed batches?`
         onClick: () => setModalSearchTerm("")
       },
       "Clear"
-    ))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4", style: { background: "#f8fafc" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "12.5px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
-      "input",
-      {
-        type: "checkbox",
-        className: "form-check-input",
-        checked: modalSelectedBaleIds.length > 0 && warehouseStockPool.filter((w) => (w.availableMeters !== void 0 ? w.availableMeters : w.meters) > 0).every((w) => modalSelectedBaleIds.includes(w.id)),
-        onChange: (e) => {
-          if (e.target.checked) {
-            const activeIds = warehouseStockPool.filter((w) => (w.availableMeters !== void 0 ? w.availableMeters : w.meters) > 0).map((w) => w.id);
-            setModalSelectedBaleIds(activeIds);
-          } else {
-            setModalSelectedBaleIds([]);
-          }
+    ))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4", style: { background: "#f8fafc" } }, (() => {
+      const filteredBales = warehouseStockPool.filter((roll) => {
+        const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
+        if (avail <= 0) return false;
+        if (modalVendorFilter !== "All" && roll.vendorName !== modalVendorFilter) return false;
+        if (modalInvoiceFilter !== "All" && roll.invoiceNo !== modalInvoiceFilter) return false;
+        if (modalSearchTerm.trim()) {
+          const q = modalSearchTerm.toLowerCase();
+          const match = String(roll.baleNo || "").toLowerCase().includes(q) || String(roll.invoiceNo || "").toLowerCase().includes(q) || String(roll.fabric || "").toLowerCase().includes(q) || String(roll.fabricQuality || "").toLowerCase().includes(q) || String(roll.color || "").toLowerCase().includes(q) || String(roll.vendorName || "").toLowerCase().includes(q) || String(roll.poId || "").toLowerCase().includes(q);
+          if (!match) return false;
         }
+        return true;
+      });
+      const groupsMap = /* @__PURE__ */ new Map();
+      filteredBales.forEach((roll) => {
+        const avail = Number(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters) || 0;
+        const fabName = String(roll.fabricQuality || roll.fabric || "Fabric").replace(/\s*\[[^\]]+\]/g, "").trim();
+        const widthStr = String(roll.width || '48"').replace(/"/g, "").trim() + '"';
+        const colorStr = String(roll.color || "Grey").trim();
+        const gKey = `${fabName.toLowerCase()}___${widthStr.toLowerCase()}___${colorStr.toLowerCase()}`;
+        if (!groupsMap.has(gKey)) {
+          groupsMap.set(gKey, {
+            key: gKey,
+            fabricQuality: fabName,
+            width: widthStr,
+            color: colorStr,
+            totalMeters: 0,
+            bales: []
+          });
+        }
+        const grp = groupsMap.get(gKey);
+        grp.totalMeters += avail;
+        grp.bales.push(roll);
+      });
+      const stockGroups = Array.from(groupsMap.values());
+      const activeGroup = selectedStockGroupKey ? groupsMap.get(selectedStockGroupKey) : null;
+      if (!activeGroup) {
+        return /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "200px" } }, "Fabric"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" } }, "Width"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Colour"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "160px" }, className: "text-end" }, "Available Quantity"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Bales / Lots"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "50px" } }))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, stockGroups.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 6, className: "text-center py-5 text-muted" }, "No available stock found matching your filters.")) : stockGroups.map((grp) => /* @__PURE__ */ import_react38.default.createElement(
+          "tr",
+          {
+            key: grp.key,
+            style: { cursor: "pointer" },
+            onClick: () => {
+              setSelectedStockGroupKey(grp.key);
+              setExpandedBaleId(null);
+            }
+          },
+          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-dark" }, grp.fabricQuality)),
+          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "font-monospace text-dark" }, grp.width)),
+          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
+            "span",
+            {
+              className: "d-inline-block rounded-circle border",
+              style: {
+                width: "12px",
+                height: "12px",
+                backgroundColor: grp.color.toLowerCase().includes("black") ? "#0f172a" : grp.color.toLowerCase().includes("white") ? "#ffffff" : grp.color.toLowerCase().includes("blue") ? "#1d4ed8" : grp.color.toLowerCase().includes("natural") ? "#f5f0e1" : "#94a3b8"
+              }
+            }
+          ), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-medium text-dark" }, grp.color))),
+          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace text-dark fs-14" }, grp.totalMeters.toFixed(1), "m")),
+          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-dark border rounded-pill px-2.5 py-1 fs-11 fw-semibold" }, grp.bales.length, " bale(s)")),
+          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center text-muted" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-chevron-right fs-16" }))
+        )))));
       }
-    )), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "Bale No & Structure"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "PO & Invoice Ref"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Fabric Quality & Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-end" }, "Available (M)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "320px" }, className: "text-center" }, "Dispatch Allocation Actions"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, warehouseStockPool.filter((roll) => {
-      const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
-      if (avail <= 0) return false;
-      if (modalVendorFilter !== "All" && roll.vendorName !== modalVendorFilter) return false;
-      if (modalInvoiceFilter !== "All" && roll.invoiceNo !== modalInvoiceFilter) return false;
-      if (modalSearchTerm.trim()) {
-        const q = modalSearchTerm.toLowerCase();
-        const match = String(roll.baleNo || "").toLowerCase().includes(q) || String(roll.invoiceNo || "").toLowerCase().includes(q) || String(roll.fabric || "").toLowerCase().includes(q) || String(roll.vendorName || "").toLowerCase().includes(q) || String(roll.poId || "").toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      return true;
-    }).map((roll, idx) => {
-      const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
-      const isSelected = modalSelectedBaleIds.includes(roll.id);
-      const foldCode = roll.folding || foldingNotation || "L100";
-      const actualMetersAtFold = computeFoldedMeters(avail, foldCode);
-      const customVal = customCutInputs[roll.id] || "";
-      const pieces = ensureBalePieces(roll);
-      const availPieces = pieces.filter((p) => !p.isDispatched);
-      const dispatchedPieces = pieces.filter((p) => p.isDispatched);
-      const selectedPieceIds = modalSelectedPieceIds[roll.id] || [];
-      const selectedPieceCount = selectedPieceIds.length;
-      const selectedMeters = pieces.filter((p) => selectedPieceIds.includes(p.id)).reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
-      const isExpanded = expandedBaleId === roll.id;
-      return /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, { key: roll.id || idx }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: isSelected ? "table-primary-subtle" : "" }, /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+      return /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3 p-2.5 px-3 bg-white border rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-2xs", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react38.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-light btn-sm border d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-2 fw-semibold",
+          onClick: () => {
+            setSelectedStockGroupKey(null);
+            setExpandedBaleId(null);
+          }
+        },
+        /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-arrow-left fs-14" }),
+        /* @__PURE__ */ import_react38.default.createElement("span", null, "Back to Fabrics")
+      ), /* @__PURE__ */ import_react38.default.createElement("div", { className: "vr", style: { height: "20px" } }), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold text-dark fs-13" }, activeGroup.fabricQuality), /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-dark border font-monospace fs-11" }, activeGroup.width), /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11" }, activeGroup.color)), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Available in Group:"), /* @__PURE__ */ import_react38.default.createElement("strong", { className: "text-success font-monospace fs-14" }, activeGroup.totalMeters.toFixed(2), " m"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-secondary border fs-11" }, activeGroup.bales.length, " bale(s)"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "12.5px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
         "input",
         {
           type: "checkbox",
           className: "form-check-input",
-          checked: isSelected,
+          checked: activeGroup.bales.length > 0 && activeGroup.bales.every((w) => modalSelectedBaleIds.includes(w.id)),
           onChange: (e) => {
+            const groupIds = activeGroup.bales.map((w) => w.id);
             if (e.target.checked) {
-              setModalSelectedBaleIds((prev) => [...prev, roll.id]);
+              setModalSelectedBaleIds((prev) => Array.from(/* @__PURE__ */ new Set([...prev, ...groupIds])));
             } else {
-              setModalSelectedBaleIds((prev) => prev.filter((id) => id !== roll.id));
+              setModalSelectedBaleIds((prev) => prev.filter((id) => !groupIds.includes(id)));
             }
           }
         }
-      )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-package text-primary fs-14" }), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace text-dark fs-13" }, roll.baleNo)), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11 mt-0.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-secondary border font-monospace fs-10" }, "FIFO #", idx + 1), /* @__PURE__ */ import_react38.default.createElement("span", null, roll.subRolls ? String(roll.subRolls).replace(/rolls?/gi, "Thans") : `${pieces.length} Thans`))), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, roll.poId && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold font-monospace" }, roll.poId), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-semibold text-dark fs-12" }, roll.vendorName || "Procurement Stock")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "font-monospace text-muted fs-11 mt-0.5" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-receipt fs-11 me-1 text-secondary" }), roll.invoiceNo)), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-dark fw-bold fs-12" }, roll.fabricQuality || roll.fabric), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11 d-flex align-items-center gap-1 mt-0.5" }, /* @__PURE__ */ import_react38.default.createElement(
-        "span",
-        {
-          className: "d-inline-block rounded-circle",
-          style: {
-            width: "8px",
-            height: "8px",
-            backgroundColor: String(roll.color || "").toLowerCase() === "black" ? "#0f172a" : "#94a3b8"
-          }
-        }
-      ), /* @__PURE__ */ import_react38.default.createElement("span", null, roll.color || "Grey"), roll.width && /* @__PURE__ */ import_react38.default.createElement("span", { className: "ms-1 font-monospace" }, "[", roll.width, "]"))), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge ${foldCode.includes("98") ? "bg-info-subtle text-info-emphasis border border-info-subtle" : "bg-light text-secondary border"} fs-11 font-monospace px-2 py-1` }, foldCode)), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-success fs-14 font-monospace" }, avail.toFixed(2), " m"), foldCode.includes("98") && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-10" }, "(= ", actualMetersAtFold.toFixed(2), "m @ 98%)")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center justify-content-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-primary btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1",
-          onClick: () => handleSelectWarehouseRoll(roll),
-          title: "Allocate the entire bale (Scenario A)"
-        },
-        /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-12" }),
-        /* @__PURE__ */ import_react38.default.createElement("span", null, "Full Bale (", avail, "m)")
-      ), pieces.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: `btn btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1 ${isExpanded ? "btn-dark" : "btn-outline-primary"}`,
-          onClick: () => setExpandedBaleId(isExpanded ? null : roll.id),
-          title: "View and pick individual thans/pieces from this bale"
-        },
-        /* @__PURE__ */ import_react38.default.createElement("i", { className: `ti ${isExpanded ? "ti-chevron-up" : "ti-list-details"} fs-12` }),
-        /* @__PURE__ */ import_react38.default.createElement("span", null, isExpanded ? "Hide Thans" : `Pick Thans (${availPieces.length})`)
-      ), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement(
-        "input",
-        {
-          type: "number",
-          step: "0.01",
-          className: "form-control form-control-sm py-0.5 px-1.5 fs-11 font-monospace text-end",
-          style: { width: "75px", height: "29px" },
-          placeholder: "Meters",
-          value: customVal,
-          onChange: (e) => {
-            const val = e.target.value;
-            setCustomCutInputs((prev) => ({ ...prev, [roll.id]: val }));
-          }
-        }
-      ), /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-outline-secondary btn-sm py-1 px-2 text-dark fs-11 rounded fw-medium",
-          style: { height: "29px" },
-          disabled: !customVal || parseFloat(customVal) <= 0 || parseFloat(customVal) > avail,
-          onClick: () => {
-            handleSelectWarehouseRoll(roll, parseFloat(customVal));
-            setCustomCutInputs((prev) => ({ ...prev, [roll.id]: "" }));
-          },
-          title: "Cut exact meters from this bale"
-        },
-        "\u2702 Cut"
-      ))))), isExpanded && /* @__PURE__ */ import_react38.default.createElement("tr", { className: "bg-light-subtle" }, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 7, className: "p-3 border-top-0 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 bg-white rounded-3 border shadow-sm", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom flex-wrap gap-2" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge px-2.5 py-1.5 fs-12 fw-bold rounded", style: { backgroundColor: "#eef2ff", color: "#4338ca", border: "1px solid #c7d2fe" } }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-layers-intersect me-1" }), " ", roll.baleNo, " Individual Thans (Pieces)"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Total ", /* @__PURE__ */ import_react38.default.createElement("strong", null, pieces.length, " Thans"), " \u2022 ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-success fw-bold" }, availPieces.length, " In Stock"), " \u2022 ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-secondary" }, dispatchedPieces.length, " Dispatched"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, availPieces.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-xs btn-outline-secondary py-1 px-2.5 rounded fs-11 fw-medium",
-          onClick: () => handleSelectAllPieces(roll)
-        },
-        selectedPieceCount === availPieces.length ? "Deselect All" : "Select All Available"
-      ), selectedPieceCount > 0 && /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-xs btn-success py-1 px-3 fw-bold rounded shadow-xs fs-11 d-flex align-items-center gap-1",
-          onClick: () => handleAllocateSelectedPieces(roll)
-        },
-        /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-check fs-12" }),
-        /* @__PURE__ */ import_react38.default.createElement("span", null, "Allocate ", selectedPieceCount, " Selected Thans (", selectedMeters.toFixed(2), "m) \u2192")
-      ), /* @__PURE__ */ import_react38.default.createElement(
-        "button",
-        {
-          type: "button",
-          className: "btn btn-xs btn-light border py-1 px-2 rounded text-secondary",
-          onClick: () => setExpandedBaleId(null),
-          title: "Close"
-        },
-        /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-x fs-12" })
-      ))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive rounded border", style: { maxHeight: "280px", overflowY: "auto" } }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light sticky-top" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Than (Piece) No"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "130px" } }, "Length (Meters)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "110px" }, className: "text-center" }, "Status"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-end" }, "Action"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, pieces.map((piece, pIdx) => {
-        const isPieceSelected = selectedPieceIds.includes(piece.id);
-        const isPieceDispatched = piece.isDispatched;
-        const actualPieceMtrs = computeFoldedMeters(piece.meters, foldCode);
-        return /* @__PURE__ */ import_react38.default.createElement(
-          "tr",
+      )), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "Bale No & Structure"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "PO & Invoice Ref"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Fabric Quality & Shade"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "85px" }, className: "text-center" }, "Folding"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-end" }, "Available (M)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "320px" }, className: "text-center" }, "Dispatch Allocation Actions"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, activeGroup.bales.map((roll, idx) => {
+        const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
+        const isSelected = modalSelectedBaleIds.includes(roll.id);
+        const foldCode = roll.folding || foldingNotation || "L100";
+        const actualMetersAtFold = computeFoldedMeters(avail, foldCode);
+        const customVal = customCutInputs[roll.id] || "";
+        const pieces = ensureBalePieces(roll);
+        const availPieces = pieces.filter((p) => !p.isDispatched);
+        const dispatchedPieces = pieces.filter((p) => p.isDispatched);
+        const selectedPieceIds = modalSelectedPieceIds[roll.id] || [];
+        const selectedPieceCount = selectedPieceIds.length;
+        const selectedMeters = pieces.filter((p) => selectedPieceIds.includes(p.id)).reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
+        const isExpanded = expandedBaleId === roll.id;
+        return /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, { key: roll.id || idx }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: isSelected ? "table-primary-subtle" : "" }, /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement(
+          "input",
           {
-            key: piece.id || pIdx,
-            className: isPieceDispatched ? "table-light opacity-60 text-muted" : isPieceSelected ? "table-primary-subtle" : "",
-            style: { cursor: isPieceDispatched ? "not-allowed" : "pointer" },
-            onClick: () => {
-              if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
-            }
-          },
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react38.default.createElement(
-            "input",
-            {
-              type: "checkbox",
-              className: "form-check-input",
-              checked: isPieceSelected,
-              disabled: isPieceDispatched,
-              onChange: () => {
-                if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
+            type: "checkbox",
+            className: "form-check-input",
+            checked: isSelected,
+            onChange: (e) => {
+              if (e.target.checked) {
+                setModalSelectedBaleIds((prev) => [...prev, roll.id]);
+              } else {
+                setModalSelectedBaleIds((prev) => prev.filter((id) => id !== roll.id));
               }
             }
-          )),
-          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: `fw-bold font-monospace fs-12 ${isPieceDispatched ? "text-decoration-line-through text-muted" : "text-dark"}` }, piece.pieceNo)),
-          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace fs-12 text-primary" }, piece.meters, " m"), foldCode.includes("98") && /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-10 ms-1" }, "(= ", actualPieceMtrs.toFixed(2), "m)")),
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, isPieceDispatched ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-10" }, "Dispatched") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-10" }, "In Stock")),
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end", onClick: (e) => e.stopPropagation() }, !isPieceDispatched && /* @__PURE__ */ import_react38.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: "btn btn-outline-primary btn-xs py-0.5 px-2 rounded fs-11 fw-semibold",
-              onClick: () => handleAllocateSinglePiece(roll, piece),
-              title: `Allocate ${piece.pieceNo} only`
+          }
+        )), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-package text-primary fs-14" }), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace text-dark fs-13" }, roll.baleNo)), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11 mt-0.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-secondary border font-monospace fs-10" }, "FIFO #", idx + 1), /* @__PURE__ */ import_react38.default.createElement("span", null, roll.subRolls ? String(roll.subRolls).replace(/rolls?/gi, "Thans") : `${pieces.length} Thans`))), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, roll.poId && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold font-monospace" }, roll.poId), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-semibold text-dark fs-12" }, roll.vendorName || "Procurement Stock")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "font-monospace text-muted fs-11 mt-0.5" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-receipt fs-11 me-1 text-secondary" }), roll.invoiceNo)), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-dark fw-bold fs-12" }, roll.fabricQuality || roll.fabric), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-11 d-flex align-items-center gap-1 mt-0.5" }, /* @__PURE__ */ import_react38.default.createElement(
+          "span",
+          {
+            className: "d-inline-block rounded-circle",
+            style: {
+              width: "8px",
+              height: "8px",
+              backgroundColor: String(roll.color || "").toLowerCase() === "black" ? "#0f172a" : "#94a3b8"
+            }
+          }
+        ), /* @__PURE__ */ import_react38.default.createElement("span", null, roll.color || "Grey"), roll.width && /* @__PURE__ */ import_react38.default.createElement("span", { className: "ms-1 font-monospace" }, "[", roll.width, "]"))), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: `badge ${foldCode.includes("98") ? "bg-info-subtle text-info-emphasis border border-info-subtle" : "bg-light text-secondary border"} fs-11 font-monospace px-2 py-1` }, foldCode)), /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-success fs-14 font-monospace" }, avail.toFixed(2), " m"), foldCode.includes("98") && /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-10" }, "(= ", actualMetersAtFold.toFixed(2), "m @ 98%)")), /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center justify-content-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-primary btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1",
+            onClick: () => handleSelectWarehouseRoll(roll),
+            title: "Allocate the entire bale (Scenario A)"
+          },
+          /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-plus fs-12" }),
+          /* @__PURE__ */ import_react38.default.createElement("span", null, "Full Bale (", avail, "m)")
+        ), pieces.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: `btn btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1 ${isExpanded ? "btn-dark" : "btn-outline-primary"}`,
+            onClick: () => setExpandedBaleId(isExpanded ? null : roll.id),
+            title: "View and pick individual thans/pieces from this bale"
+          },
+          /* @__PURE__ */ import_react38.default.createElement("i", { className: `ti ${isExpanded ? "ti-chevron-up" : "ti-list-details"} fs-12` }),
+          /* @__PURE__ */ import_react38.default.createElement("span", null, isExpanded ? "Hide Thans" : `Pick Thans (${availPieces.length})`)
+        ), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react38.default.createElement(
+          "input",
+          {
+            type: "number",
+            step: "0.01",
+            className: "form-control form-control-sm py-0.5 px-1.5 fs-11 font-monospace text-end",
+            style: { width: "75px", height: "29px" },
+            placeholder: "Meters",
+            value: customVal,
+            onChange: (e) => {
+              const val = e.target.value;
+              setCustomCutInputs((prev) => ({ ...prev, [roll.id]: val }));
+            }
+          }
+        ), /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-outline-secondary btn-sm py-1 px-2 text-dark fs-11 rounded fw-medium",
+            style: { height: "29px" },
+            disabled: !customVal || parseFloat(customVal) <= 0 || parseFloat(customVal) > avail,
+            onClick: () => {
+              handleSelectWarehouseRoll(roll, parseFloat(customVal));
+              setCustomCutInputs((prev) => ({ ...prev, [roll.id]: "" }));
             },
-            "+ Allocate Than"
-          ))
-        );
-      }))))))));
-    }))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "Selected for Dispatch: ", /* @__PURE__ */ import_react38.default.createElement("strong", null, modalSelectedBaleIds.length, " Bales"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border", onClick: () => setShowStockPickerModal(false) }, "Close"), modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
+            title: "Cut exact meters from this bale"
+          },
+          "\u2702 Cut"
+        ))))), isExpanded && /* @__PURE__ */ import_react38.default.createElement("tr", { className: "bg-light-subtle" }, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 7, className: "p-3 border-top-0 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-3 bg-white rounded-3 border shadow-sm", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom flex-wrap gap-2" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge px-2.5 py-1.5 fs-12 fw-bold rounded", style: { backgroundColor: "#eef2ff", color: "#4338ca", border: "1px solid #c7d2fe" } }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-layers-intersect me-1" }), " ", roll.baleNo, " Individual Thans (Pieces)"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-12" }, "Total ", /* @__PURE__ */ import_react38.default.createElement("strong", null, pieces.length, " Thans"), " \u2022 ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-success fw-bold" }, availPieces.length, " In Stock"), " \u2022 ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-secondary" }, dispatchedPieces.length, " Dispatched"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, availPieces.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-xs btn-outline-secondary py-1 px-2.5 rounded fs-11 fw-medium",
+            onClick: () => handleSelectAllPieces(roll)
+          },
+          selectedPieceCount === availPieces.length ? "Deselect All" : "Select All Available"
+        ), selectedPieceCount > 0 && /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-xs btn-success py-1 px-3 fw-bold rounded shadow-xs fs-11 d-flex align-items-center gap-1",
+            onClick: () => handleAllocateSelectedPieces(roll)
+          },
+          /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-check fs-12" }),
+          /* @__PURE__ */ import_react38.default.createElement("span", null, "Allocate ", selectedPieceCount, " Selected Thans (", selectedMeters.toFixed(2), "m) \u2192")
+        ), /* @__PURE__ */ import_react38.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-xs btn-light border py-1 px-2 rounded text-secondary",
+            onClick: () => setExpandedBaleId(null),
+            title: "Close"
+          },
+          /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-x fs-12" })
+        ))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive rounded border", style: { maxHeight: "280px", overflowY: "auto" } }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light sticky-top" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" }, className: "text-center" }, "#"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Than (Piece) No"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "130px" } }, "Length (Meters)"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "110px" }, className: "text-center" }, "Status"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "280px" }, className: "text-end" }, "Action"))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, pieces.map((piece, pIdx) => {
+          const isPieceSelected = selectedPieceIds.includes(piece.id);
+          const isPieceDispatched = piece.isDispatched;
+          const actualPieceMtrs = computeFoldedMeters(piece.meters, foldCode);
+          const pieceCutKey = `${roll.id}__${piece.id}`;
+          const pieceCutVal = customCutInputs[pieceCutKey] || "";
+          return /* @__PURE__ */ import_react38.default.createElement(
+            "tr",
+            {
+              key: piece.id || pIdx,
+              className: isPieceDispatched ? "table-light opacity-60 text-muted" : isPieceSelected ? "table-primary-subtle" : "",
+              style: { cursor: isPieceDispatched ? "not-allowed" : "pointer" },
+              onClick: () => {
+                if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
+              }
+            },
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react38.default.createElement(
+              "input",
+              {
+                type: "checkbox",
+                className: "form-check-input",
+                checked: isPieceSelected,
+                disabled: isPieceDispatched,
+                onChange: () => {
+                  if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
+                }
+              }
+            )),
+            /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: `fw-bold font-monospace fs-12 ${isPieceDispatched ? "text-decoration-line-through text-muted" : "text-dark"}` }, piece.pieceNo)),
+            /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace fs-12 text-primary" }, piece.meters, " m"), piece.originalMeters && piece.meters < piece.originalMeters && /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-10 ms-1.5" }, "Cut from ", piece.originalMeters, "m"), foldCode.includes("98") && /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-muted fs-10 ms-1" }, "(= ", actualPieceMtrs.toFixed(2), "m)")),
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, isPieceDispatched ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-10" }, "Dispatched") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-10" }, "In Stock")),
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end", onClick: (e) => e.stopPropagation() }, !isPieceDispatched && /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-inline-flex align-items-center justify-content-end gap-1.5 flex-nowrap" }, /* @__PURE__ */ import_react38.default.createElement(
+              "input",
+              {
+                type: "number",
+                step: "0.01",
+                min: "0",
+                max: piece.meters,
+                className: "form-control form-control-sm py-0 px-2 fs-11 font-monospace text-end bg-white",
+                style: { width: "76px", height: "28px", borderColor: "#cbd5e1", borderRadius: "6px" },
+                placeholder: "Cut m",
+                value: pieceCutVal,
+                onChange: (e) => {
+                  const val = e.target.value;
+                  setCustomCutInputs((prev) => ({ ...prev, [pieceCutKey]: val }));
+                }
+              }
+            ), /* @__PURE__ */ import_react38.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-primary btn-sm px-2.5 rounded-2 fs-11 fw-semibold text-nowrap d-inline-flex align-items-center gap-1",
+                style: { height: "28px" },
+                disabled: !pieceCutVal || parseFloat(pieceCutVal) <= 0 || parseFloat(pieceCutVal) > parseFloat(piece.meters),
+                onClick: () => {
+                  handleAllocateSinglePiece(roll, piece, parseFloat(pieceCutVal));
+                  setCustomCutInputs((prev) => ({ ...prev, [pieceCutKey]: "" }));
+                },
+                title: `Cut exact meters from ${piece.pieceNo} (remaining stays in stock)`
+              },
+              /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-scissors fs-12" }),
+              /* @__PURE__ */ import_react38.default.createElement("span", null, "Cut")
+            ), /* @__PURE__ */ import_react38.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-outline-primary btn-sm px-2.5 rounded-2 fs-11 fw-semibold text-nowrap d-inline-flex align-items-center gap-1",
+                style: { height: "28px" },
+                onClick: () => handleAllocateSinglePiece(roll, piece),
+                title: `Allocate full ${piece.pieceNo}`
+              },
+              /* @__PURE__ */ import_react38.default.createElement("span", null, "+ Full Than")
+            )))
+          );
+        }))))))));
+      })))));
+    })()), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "Selected for Dispatch: ", /* @__PURE__ */ import_react38.default.createElement("strong", null, modalSelectedBaleIds.length, " Bales"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react38.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border", onClick: () => setShowStockPickerModal(false) }, "Close"), modalSelectedBaleIds.length > 0 && /* @__PURE__ */ import_react38.default.createElement(
       "button",
       {
         type: "button",
@@ -53350,6 +53658,12 @@ Confirm dispatch with mixed batches?`
     const [isReadOnly, setIsReadOnly] = (0, import_react40.useState)(isLocked ? true : Boolean(readOnlyDefault));
     const [editingSection, setEditingSection] = (0, import_react40.useState)(isLocked ? null : "all");
     const [linkedPoId, setLinkedPoId] = (0, import_react40.useState)(initialReturn?.linked_po_id || "");
+    const [selectedPoIds, setSelectedPoIds] = (0, import_react40.useState)(() => {
+      if (Array.isArray(initialReturn?.linked_po_ids) && initialReturn.linked_po_ids.length > 0) {
+        return initialReturn.linked_po_ids;
+      }
+      return initialReturn?.linked_po_id ? [initialReturn.linked_po_id] : [];
+    });
     const [linkedChallanId, setLinkedChallanId] = (0, import_react40.useState)(initialReturn?.linked_challan_id || "");
     const [vendorId, setVendorId] = (0, import_react40.useState)(initialReturn?.vendor_id || "");
     const [vendorName, setVendorName] = (0, import_react40.useState)(initialReturn?.vendor_name || "");
@@ -53480,35 +53794,81 @@ Confirm dispatch with mixed batches?`
       if (initialReturn?.pieces && initialReturn.pieces.length > 0) {
         return initialReturn.pieces.map((p) => ({
           ...p,
+          po_ref: p.po_ref || initialReturn?.linked_po_id || "",
+          challan_ref: p.challan_ref || initialReturn?.linked_challan_id || "",
           folding: isExistingSavedReturn ? p.folding || "" : initialReturn.folding_standard || ""
         }));
       }
       return [];
     });
-    const calculatedTotalMeters = pieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
+    const [pieceViewMode, setPieceViewMode] = (0, import_react40.useState)("columns");
+    const filledPieces = pieces.filter((p) => (parseFloat(p.meters) || 0) > 0);
+    const calculatedTotalMeters = filledPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
+    const greyReturnedNum = parseFloat(greyFabricReturned) || 0;
+    const totalReturnedWithGrey = calculatedTotalMeters + greyReturnedNum;
     const statedMeters = parseFloat(vendorDeclaredMeters) || 0;
+    const statedPieces = parseInt(vendorDeclaredPieces, 10) || 0;
     const isMeterMismatch = statedMeters > 0 && Math.abs(calculatedTotalMeters - statedMeters) > 0.05;
+    const isPieceCountMismatch = statedPieces > 0 && filledPieces.length !== statedPieces;
     const meterDifference = statedMeters > 0 ? (calculatedTotalMeters - statedMeters).toFixed(2) : 0;
+    const selectedPoTotalMeters = import_react40.default.useMemo(() => {
+      const activePoIds = selectedPoIds.length > 0 ? selectedPoIds : linkedPoId ? [linkedPoId] : [];
+      if (activePoIds.length === 0) return 0;
+      return (availablePOs || []).filter((p) => activePoIds.includes(String(p.po_number)) || activePoIds.includes(String(p.id))).reduce((sum, p) => sum + (parseFloat(p.total_meters) || 0), 0);
+    }, [availablePOs, selectedPoIds, linkedPoId]);
+    const isPoMeterMismatch = selectedPoTotalMeters > 0 && Math.abs(totalReturnedWithGrey - selectedPoTotalMeters) > 0.05;
+    const poMeterDifference = selectedPoTotalMeters > 0 ? (totalReturnedWithGrey - selectedPoTotalMeters).toFixed(2) : 0;
     const handlePieceMeterChange = (index, value) => {
       const updated = [...pieces];
       updated[index].meters = value;
       setPieces(updated);
     };
-    const addPieceRow = () => {
-      setPieces((prev) => [
-        ...prev,
-        {
-          id: Date.now() + Math.random(),
-          piece_no: prev.length + 1,
-          meters: "",
-          color_name: prev[prev.length - 1]?.color_name || (colorMasterList[0]?.name || ""),
-          folding: foldingStandard || ""
+    const addPieceRow = (overrides = {}, count = 1) => {
+      setPieces((prev) => {
+        const last = prev[prev.length - 1];
+        const basePo = overrides.po_ref !== void 0 ? overrides.po_ref : last?.po_ref || linkedPoId || "";
+        const baseCh = overrides.challan_ref !== void 0 ? overrides.challan_ref : last?.challan_ref || linkedChallanId || "";
+        const baseCol = overrides.color_name !== void 0 ? overrides.color_name : last?.color_name || (colorMasterList[0]?.name || "");
+        const baseFold = overrides.folding !== void 0 ? overrides.folding : foldingStandard || "";
+        const newRows = [];
+        for (let i = 0; i < count; i++) {
+          newRows.push({
+            id: Date.now() + Math.random() + i,
+            piece_no: prev.length + i + 1,
+            meters: "",
+            po_ref: basePo,
+            challan_ref: baseCh,
+            color_name: baseCol,
+            folding: baseFold
+          });
         }
-      ]);
+        return [...prev, ...newRows];
+      });
     };
     const removePieceRow = (idx) => {
       setPieces((prev) => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 })));
     };
+    const pendingPoItems = import_react40.default.useMemo(() => {
+      const activePoIds = selectedPoIds.length > 0 ? selectedPoIds : linkedPoId ? [linkedPoId] : [];
+      const matchedPOs = (availablePOs || []).filter(
+        (p) => activePoIds.includes(String(p.po_number)) || activePoIds.includes(String(p.id))
+      );
+      const list = [];
+      matchedPOs.forEach((po) => {
+        const poRef = po.po_number || po.id;
+        (po.items || []).forEach((it, idx) => {
+          list.push({
+            key: `${poRef}-${idx}`,
+            po_ref: poRef,
+            fabric_name: it.fabric_name || po.fabric_quality || "",
+            color_name: it.color_name || "",
+            width: it.width || "",
+            ordered_meters: parseFloat(it.quantity_meters) || 0
+          });
+        });
+      });
+      return list;
+    }, [availablePOs, selectedPoIds, linkedPoId]);
     const handleSubmit = (e, andRunQC = false) => {
       if (e && e.preventDefault) e.preventDefault();
       if (!vendorName && !vendorId) {
@@ -53519,16 +53879,47 @@ Confirm dispatch with mixed batches?`
         alert("Please enter the Vendor's External Challan Number (e.g. #2196).");
         return;
       }
-      if (isMeterMismatch) {
-        const confirmSave = window.confirm(
-          `\u26A0\uFE0F Validation Warning (Section 5.2 & 12.3):
-
-Piece-wise sum (${calculatedTotalMeters.toFixed(2)}m) does NOT match vendor declared total (${statedMeters.toFixed(2)}m).
-Difference: ${meterDifference}m.
-
-Do you want to override and save?`
+      try {
+        const existingReturns = JSON.parse(localStorage.getItem("erp_process_returns_v1") || localStorage.getItem("erp_process_returns") || "[]");
+        const currentId = initialReturn?.id || `PRN-${externalChallanNo}`;
+        const dup = (Array.isArray(existingReturns) ? existingReturns : []).find(
+          (r) => r.id !== currentId && String(r.vendor_name || "").trim().toLowerCase() === String(vendorName || "").trim().toLowerCase() && String(r.vendor_external_challan_no || "").trim().toLowerCase() === String(externalChallanNo || "").trim().toLowerCase()
         );
-        if (!confirmSave) return;
+        if (dup) {
+          alert(`Duplicate Vendor Challan (Section 12.3):
+
+Challan #${externalChallanNo} is already recorded for ${vendorName}.`);
+          return;
+        }
+      } catch (err) {
+      }
+      if (filledPieces.length === 0) {
+        alert("Please enter at least one piece / than length (metres) before saving the GRN.");
+        return;
+      }
+      if (isMeterMismatch || isPieceCountMismatch) {
+        alert(
+          `Cannot Complete GRN \u2014 Vendor Summary Mismatch:
+
+Recorded: ${filledPieces.length} thans / ${calculatedTotalMeters.toFixed(2)}m
+Vendor Stated: ${statedPieces || filledPieces.length} thans / ${statedMeters.toFixed(2)}m
+Difference: ${meterDifference}m
+
+Please match the recorded pieces and metres with the vendor's stated summary.`
+        );
+        return;
+      }
+      if (isPoMeterMismatch) {
+        alert(
+          `Cannot Complete GRN \u2014 PO Meters Mismatch:
+
+Selected PO(s) Target: ${selectedPoTotalMeters.toFixed(2)}m
+Total Returned (Dyed + Grey): ${totalReturnedWithGrey.toFixed(2)}m
+Difference: ${poMeterDifference}m
+
+Returned metres must match the selected PO metres to complete this GRN.`
+        );
+        return;
       }
       const returnPayload = {
         id: initialReturn?.id || `PRN-${externalChallanNo}`,
@@ -53540,18 +53931,19 @@ Do you want to override and save?`
         vendor_invoice_date: externalChallanDate,
         vendor_invoice_value: parseFloat(vendorInvoiceValue) || 0,
         internal_series: "Job Work",
-        linked_po_id: linkedPoId,
+        linked_po_id: linkedPoId || selectedPoIds[0] || "",
+        linked_po_ids: selectedPoIds.length > 0 ? selectedPoIds : linkedPoId ? [linkedPoId] : [],
         linked_challan_id: linkedChallanId,
         received_date: receivedDate,
         fabric_quality: fabricQuality,
         width,
         weight: parseFloat(weight) || 0,
         folding_standard: foldingStandard,
-        total_pieces: pieces.length,
+        total_pieces: filledPieces.length,
         total_meters: Number(calculatedTotalMeters.toFixed(2)),
-        vendor_declared_pieces: parseInt(vendorDeclaredPieces, 10) || pieces.length,
+        vendor_declared_pieces: parseInt(vendorDeclaredPieces, 10) || filledPieces.length,
         vendor_declared_meters: statedMeters || calculatedTotalMeters,
-        grey_fabric_returned_meters: parseFloat(greyFabricReturned) || 0,
+        grey_fabric_returned_meters: greyReturnedNum,
         target_invoice_for_grey: targetInvoiceForGrey,
         transport_details: {
           lr_number: lrNumber,
@@ -53562,8 +53954,9 @@ Do you want to override and save?`
         status: initialReturn?.status || "Received",
         created_by: initialReturn?.created_by || "Saksham Garg",
         created_at: initialReturn?.created_at || (/* @__PURE__ */ new Date()).toISOString(),
-        pieces: pieces.map((p) => ({
+        pieces: filledPieces.map((p, idx) => ({
           ...p,
+          piece_no: idx + 1,
           folding: p.folding || foldingStandard || "",
           meters: parseFloat(p.meters) || 0,
           qc_status: p.qc_status || "Pending"
@@ -53572,11 +53965,21 @@ Do you want to override and save?`
       onSave(returnPayload, andRunQC);
     };
     const isSectionEditable = (sectionKey) => {
-      if (isLocked) return false;
-      if (!isReadOnly) return true;
-      return editingSection === sectionKey || editingSection === "all";
+      if (editingSection === sectionKey || editingSection === "all") return true;
+      if (isLocked || isReadOnly) return false;
+      return true;
     };
-    return /* @__PURE__ */ import_react40.default.createElement("div", { className: "card shadow-sm border mb-4", style: { borderRadius: "12px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react40.default.createElement(
+    return /* @__PURE__ */ import_react40.default.createElement("div", { className: "card shadow-sm border mb-4", style: { borderRadius: "12px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-3" }, onCancel && /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-light rounded-circle border shadow-sm d-flex align-items-center justify-content-center p-0",
+        onClick: onCancel,
+        title: "Back to Record Inward (GRN) List",
+        style: { width: "38px", height: "38px", borderColor: "#e2e8f0", backgroundColor: "#ffffff", color: "#334155", flexShrink: 0 }
+      },
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-arrow-left fs-18" })
+    ), /* @__PURE__ */ import_react40.default.createElement(
       "div",
       {
         className: "rounded-3 d-flex align-items-center justify-content-center shadow-xs",
@@ -53619,14 +54022,13 @@ Do you want to override and save?`
         disabled: !isSectionEditable("header"),
         onChange: (e) => {
           const chosen = e.target.value;
-          setVendorName(chosen);
           const v = vendorList.find((vend) => vend.name === chosen || vend.id === chosen);
-          if (v) {
-            setVendorId(v.id || v.name);
-            setVendorName(v.name);
-          } else {
-            setVendorId(chosen);
-          }
+          const nextName = v ? v.name : chosen;
+          setVendorName(nextName);
+          setVendorId(v ? v.id || v.name : chosen);
+          setLinkedPoId("");
+          setSelectedPoIds([]);
+          setLinkedChallanId("");
         },
         required: true
       },
@@ -53684,6 +54086,9 @@ Do you want to override and save?`
         onChange: (e) => {
           const val = e.target.value;
           setLinkedPoId(val);
+          if (val && !selectedPoIds.includes(val)) {
+            setSelectedPoIds((prev) => [...prev, val]);
+          }
           if (val) {
             const poObj = availablePOs.find((p) => String(p.po_number) === String(val) || String(p.id) === String(val));
             if (poObj) {
@@ -53699,7 +54104,7 @@ Do you want to override and save?`
         }
       },
       /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "-- Select Linked PO by Vendor Name --"),
-      availablePOs.map((po) => /* @__PURE__ */ import_react40.default.createElement("option", { key: po.id || po.po_number, value: po.po_number || po.id }, po.vendor_name || "Vendor", " \u2014 PO #", po.po_number || po.id, " (", po.total_meters, "m)"))
+      availablePOs.filter((po) => !vendorName || String(po.vendor_name || "").trim().toLowerCase() === String(vendorName).trim().toLowerCase()).map((po) => /* @__PURE__ */ import_react40.default.createElement("option", { key: po.id || po.po_number, value: po.po_number || po.id }, po.vendor_name || "Vendor", " \u2014 PO #", po.po_number || po.id, " (", po.total_meters, "m)"))
     )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Linked Internal Challan"), /* @__PURE__ */ import_react40.default.createElement(
       "select",
       {
@@ -53713,14 +54118,14 @@ Do you want to override and save?`
           if (val) {
             const chObj = availableChallans.find((c) => String(c.challan_number) === String(val) || String(c.id) === String(val));
             if (chObj) {
-              if (chObj.vendor_name) {
+              if (!vendorName && chObj.vendor_name) {
                 setVendorName(chObj.vendor_name);
                 setVendorId(chObj.vendor_id || chObj.vendor_name);
               }
-              if (chObj.items?.[0]?.fabric_name) {
+              if (!fabricQuality && chObj.items?.[0]?.fabric_name) {
                 setFabricQuality(chObj.items[0].fabric_name);
               }
-              if (chObj.folding_notation) {
+              if (!foldingStandard && chObj.folding_notation) {
                 setFoldingStandard(chObj.folding_notation);
                 setPieces((prev) => prev.map((p) => ({
                   ...p,
@@ -53732,7 +54137,7 @@ Do you want to override and save?`
         }
       },
       /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "-- Select Linked Challan by Vendor Name --"),
-      availableChallans.map((ch) => /* @__PURE__ */ import_react40.default.createElement("option", { key: ch.id || ch.challan_number, value: ch.challan_number || ch.id }, ch.vendor_name || "Vendor", " \u2014 CH #", ch.challan_number || ch.id))
+      availableChallans.filter((ch) => !vendorName || String(ch.vendor_name || "").trim().toLowerCase() === String(vendorName).trim().toLowerCase()).map((ch) => /* @__PURE__ */ import_react40.default.createElement("option", { key: ch.id || ch.challan_number, value: ch.challan_number || ch.id }, ch.vendor_name || "Vendor", " \u2014 CH #", ch.challan_number || ch.id))
     )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Fabric Quality"), /* @__PURE__ */ import_react40.default.createElement(
       "input",
       {
@@ -53761,33 +54166,67 @@ Do you want to override and save?`
         },
         placeholder: "Enter folding (e.g. L100, Fold 98)"
       }
-    ))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(59, 130, 246, 0.1)", color: "#2563eb" } }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-ruler-measure fs-16" })), /* @__PURE__ */ import_react40.default.createElement("div", null, /* @__PURE__ */ import_react40.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Piece-Wise Meterage Breakdown & Summary Validation"), /* @__PURE__ */ import_react40.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Validates vendor stated summary against piece-wise total"))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement(
+    ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "mt-3 pt-3 border-top", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react40.default.createElement(
+      "div",
+      {
+        className: "d-flex align-items-center justify-content-between py-1 px-2 rounded-2",
+        style: { cursor: "pointer", background: "#f8fafc" },
+        onClick: () => setShowTransport(!showTransport)
+      },
+      /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-truck-delivery text-secondary fs-15" }), /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-semibold text-dark fs-12" }, "Transport & LR Details (Collapsible)"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "badge bg-white text-muted border fs-10" }, "Hidden by default for local job work")),
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: `ti ti-chevron-${showTransport ? "up" : "down"} text-secondary` })
+    ), showTransport && /* @__PURE__ */ import_react40.default.createElement("div", { className: "row g-3 mt-1" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "LR Number"), /* @__PURE__ */ import_react40.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: lrNumber,
+        disabled: !isSectionEditable("header") && !isSectionEditable("transport"),
+        onChange: (e) => setLrNumber(e.target.value),
+        placeholder: "e.g. LR-9981"
+      }
+    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "LR Date"), /* @__PURE__ */ import_react40.default.createElement(
+      "input",
+      {
+        type: "date",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: lrDate,
+        disabled: !isSectionEditable("header") && !isSectionEditable("transport"),
+        onChange: (e) => setLrDate(e.target.value)
+      }
+    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Transporter Name"), /* @__PURE__ */ import_react40.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: transporterName,
+        disabled: !isSectionEditable("header") && !isSectionEditable("transport"),
+        onChange: (e) => setTransporterName(e.target.value),
+        placeholder: "e.g. Local Auto Tempo"
+      }
+    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Vehicle No."), /* @__PURE__ */ import_react40.default.createElement(
+      "input",
+      {
+        type: "text",
+        className: "form-control form-control-sm bg-white fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: vehicleNo,
+        disabled: !isSectionEditable("header") && !isSectionEditable("transport"),
+        onChange: (e) => setVehicleNo(e.target.value),
+        placeholder: "e.g. GJ-05-BX-4120"
+      }
+    )))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(59, 130, 246, 0.1)", color: "#2563eb" } }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-ruler-measure fs-16" })), /* @__PURE__ */ import_react40.default.createElement("div", null, /* @__PURE__ */ import_react40.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Piece-Wise Meterage Breakdown & Summary Validation"), /* @__PURE__ */ import_react40.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Validates vendor stated summary against piece-wise total"))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement(
       "button",
       {
         type: "button",
         className: "btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs",
-        onClick: addPieceRow
+        onClick: () => addPieceRow({ po_ref: linkedPoId || "", color_name: "" }, 20)
       },
       /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-plus fs-14" }),
-      /* @__PURE__ */ import_react40.default.createElement("span", null, "Add Piece / Than")
-    ), isReadOnly && editingSection !== "pieces" && /* @__PURE__ */ import_react40.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold",
-        onClick: () => setEditingSection("pieces")
-      },
-      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-edit me-1" }),
-      " Edit Pieces"
-    ), isReadOnly && editingSection === "pieces" && /* @__PURE__ */ import_react40.default.createElement(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold",
-        onClick: () => setEditingSection(null)
-      },
-      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check me-1" }),
-      " Done"
+      /* @__PURE__ */ import_react40.default.createElement("span", null, "Add 20-Row Column")
     ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-3 rounded-3 mb-3 border d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#f8faff", borderColor: "#c7d2fe" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react40.default.createElement("div", null, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-11 fw-bold text-secondary text-uppercase mb-1" }, "Vendor Stated Thans / Pieces"), /* @__PURE__ */ import_react40.default.createElement(
       "input",
       {
@@ -53811,59 +54250,174 @@ Do you want to override and save?`
         onChange: (e) => setVendorDeclaredMeters(e.target.value),
         placeholder: "e.g. 1477.60"
       }
-    ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, statedMeters > 0 && (isMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Mismatch Flagged:"), " Stated ", statedMeters.toFixed(2), "m vs Grid ", calculatedTotalMeters.toFixed(2), "m (Diff: ", meterDifference > 0 ? `+${meterDifference}` : meterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Match:"), " Stated Summary matches Piece-wise Grid exactly!"))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "table-responsive bg-white border rounded" }, /* @__PURE__ */ import_react40.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react40.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "text-secondary fs-11 text-uppercase" }, /* @__PURE__ */ import_react40.default.createElement("th", { className: "text-center", style: { width: "40px" } }, "Than #"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { minWidth: "150px" } }, "Color Shade"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "140px" } }, "Folding"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "160px" }, className: "text-end text-dark" }, "Length (Metres) *"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "QC Status"), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "45px" }, className: "text-center" }, "Act"))), /* @__PURE__ */ import_react40.default.createElement("tbody", null, pieces.length === 0 ? /* @__PURE__ */ import_react40.default.createElement("tr", null, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 6 : 5, className: "text-center py-4 text-muted" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-receipt-off fs-24 d-block mb-1 text-secondary opacity-50" }), "No piece / than entries recorded yet. Click ", /* @__PURE__ */ import_react40.default.createElement("strong", null, '"+ Add Piece / Than"'), " above to enter received rolls.")) : pieces.map((p, idx) => /* @__PURE__ */ import_react40.default.createElement("tr", { key: p.id || idx }, /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center fw-bold text-muted font-monospace" }, idx + 1), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
-      "select",
-      {
-        className: "form-select form-select-sm bg-white fs-12",
-        style: { borderColor: "#cbd5e1" },
-        value: p.color_name,
-        disabled: !isSectionEditable("pieces"),
-        onChange: (e) => {
-          const updated = [...pieces];
-          updated[idx].color_name = e.target.value;
-          setPieces(updated);
-        }
-      },
-      /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "Select Color..."),
-      colorMasterList.map((c) => /* @__PURE__ */ import_react40.default.createElement("option", { key: c.id || c.name, value: c.name }, c.name))
-    )), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm fs-12 text-center",
-        style: { borderColor: "#cbd5e1" },
-        value: p.folding || "",
-        disabled: !isSectionEditable("pieces"),
-        onChange: (e) => {
-          const updated = [...pieces];
-          updated[idx].folding = e.target.value;
-          setPieces(updated);
-        },
-        placeholder: "\u2014"
-      }
-    )), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "number",
-        step: "0.01",
-        className: "form-control form-control-sm text-end fw-bold text-dark fs-12",
-        style: { borderColor: "#cbd5e1" },
-        value: p.meters,
-        disabled: !isSectionEditable("pieces"),
-        onChange: (e) => handlePieceMeterChange(idx, e.target.value),
-        placeholder: "0.00",
-        required: true
-      }
-    )), /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: `badge fs-10 ${p.qc_status === "Accepted" ? "bg-success-subtle text-success border border-success-subtle" : p.qc_status === "Rejected - Reprocess" ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-light text-secondary border"}` }, p.qc_status || "Pending QC")), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react40.default.createElement(
+    ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, (isReadOnly || isLocked) && editingSection !== "pieces" && /* @__PURE__ */ import_react40.default.createElement(
       "button",
       {
         type: "button",
-        className: "btn btn-link text-danger p-0",
-        onClick: () => removePieceRow(idx),
-        title: "Delete than"
+        className: "btn btn-light btn-sm border text-dark px-2.5 py-1.5 rounded fs-12 fw-semibold",
+        onClick: () => setEditingSection("pieces")
       },
-      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-trash fs-15" })
-    ))))), /* @__PURE__ */ import_react40.default.createElement("tfoot", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: 3, className: "text-end text-uppercase text-secondary py-2 fs-12" }, "Total Recorded Pieces & Metres:"), /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-end text-dark fs-13 py-2" }, Number(calculatedTotalMeters).toFixed(2), " m"), /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 2 : 1, className: "text-muted fs-11 py-2 text-center" }, "(", pieces.length, " Thans)"))))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(234, 179, 8, 0.15)", color: "#ca8a04" } }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-archive fs-16" })), /* @__PURE__ */ import_react40.default.createElement("div", null, /* @__PURE__ */ import_react40.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Grey Fabric Return & Open Bale Resolution"), /* @__PURE__ */ import_react40.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Unutilised raw fabric returns as an Open Bale linked to original vendor purchase invoice"))), isReadOnly && editingSection !== "grey" && /* @__PURE__ */ import_react40.default.createElement(
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-edit me-1" }),
+      " Edit Pieces"
+    ), (isReadOnly || isLocked) && editingSection === "pieces" && /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-success btn-sm px-2.5 py-1.5 rounded fs-12 fw-semibold",
+        onClick: () => setEditingSection(null)
+      },
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check me-1" }),
+      " Done"
+    ), (statedMeters > 0 || statedPieces > 0) && (isMeterMismatch || isPieceCountMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Summary Mismatch:"), " ", isPieceCountMismatch ? `Stated ${statedPieces} thans vs ${filledPieces.length} filled` : "", isPieceCountMismatch && isMeterMismatch ? " \u2022 " : "", isMeterMismatch ? `Stated ${statedMeters.toFixed(2)}m vs Grid ${calculatedTotalMeters.toFixed(2)}m (Diff: ${meterDifference > 0 ? `+${meterDifference}` : meterDifference}m)` : "")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Summary Match:"), " ", filledPieces.length, " Thans \u2022 ", calculatedTotalMeters.toFixed(2), "m"))), selectedPoTotalMeters > 0 && (isPoMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-triangle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Mismatch:"), " PO ", selectedPoTotalMeters.toFixed(2), "m vs Returned ", totalReturnedWithGrey.toFixed(2), "m (Diff: ", poMeterDifference > 0 ? `+${poMeterDifference}` : poMeterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Matched:"), " ", totalReturnedWithGrey.toFixed(2), "m / ", selectedPoTotalMeters.toFixed(2), "m"))))), isSectionEditable("pieces") && pendingPoItems.length > 0 && /* @__PURE__ */ import_react40.default.createElement("div", { className: "mb-3 p-3 rounded-3 border bg-white", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-list-check text-primary fs-15" }), /* @__PURE__ */ import_react40.default.createElement("span", null, "Pending Items from Selected PO(s) \u2014 Quick Add to Slip")), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, selectedPoIds.map((pid) => /* @__PURE__ */ import_react40.default.createElement("span", { key: pid, className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11 font-monospace d-inline-flex align-items-center gap-1" }, "PO #", pid, selectedPoIds.length > 1 && /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn-close",
+        style: { fontSize: "8px" },
+        onClick: () => setSelectedPoIds((prev) => prev.filter((id) => id !== pid))
+      }
+    ))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex flex-wrap gap-2" }, pendingPoItems.map((pit) => /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        key: pit.key,
+        type: "button",
+        className: "btn btn-outline-primary btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5",
+        onClick: () => addPieceRow({
+          po_ref: pit.po_ref,
+          challan_ref: linkedChallanId || "",
+          color_name: pit.color_name,
+          folding: foldingStandard || ""
+        }, 20),
+        title: "Add a 20-row Than column for this PO & Color"
+      },
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-plus fs-12" }),
+      /* @__PURE__ */ import_react40.default.createElement("span", { className: "font-monospace" }, "PO #", pit.po_ref),
+      /* @__PURE__ */ import_react40.default.createElement("span", null, "\u2022 ", pit.color_name || "Color"),
+      /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted" }, "(", pit.ordered_meters.toFixed(0), "m)")
+    )))), (() => {
+      const colMap = /* @__PURE__ */ new Map();
+      pieces.forEach((p, idx) => {
+        const poKey = String(p.po_ref || linkedPoId || "General").trim();
+        const colKey = String(p.color_name || "Standard").trim();
+        const groupKey = `${poKey}___${colKey}`;
+        if (!colMap.has(groupKey)) {
+          colMap.set(groupKey, {
+            groupKey,
+            po_ref: p.po_ref || linkedPoId || "",
+            challan_ref: p.challan_ref || linkedChallanId || "",
+            color_name: p.color_name || "",
+            entries: []
+          });
+        }
+        colMap.get(groupKey).entries.push({ piece: p, idx });
+      });
+      const colGroups = Array.from(colMap.values());
+      if (colGroups.length === 0) {
+        return /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-4 text-center text-muted bg-white border rounded-3" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-receipt-off fs-24 d-block mb-1 text-secondary opacity-50" }), /* @__PURE__ */ import_react40.default.createElement("p", { className: "mb-2 fs-13" }, "No piece / than entries recorded yet."), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-primary btn-sm px-3",
+            onClick: () => addPieceRow({ po_ref: linkedPoId || "", color_name: colorMasterList[0]?.name || "" }, 20)
+          },
+          /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-plus me-1" }),
+          " Start First 20-Row Column"
+        ));
+      }
+      return /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement("div", { className: "row g-3" }, colGroups.map((grp, gIdx) => {
+        const filledInGroup = grp.entries.filter((e) => (parseFloat(e.piece.meters) || 0) > 0).length;
+        const subTotalMeters = grp.entries.reduce((s, e) => s + (parseFloat(e.piece.meters) || 0), 0);
+        const chunks = [];
+        for (let c = 0; c < grp.entries.length; c += 20) {
+          chunks.push(grp.entries.slice(c, c + 20));
+        }
+        return /* @__PURE__ */ import_react40.default.createElement("div", { key: grp.groupKey + gIdx, className: chunks.length > 1 ? "col-12" : "col-12 col-lg-6" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "border rounded-3 bg-white shadow-2xs overflow-hidden", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-2.5 px-3 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "badge bg-primary text-white font-monospace fs-11" }, grp.challan_ref ? `C.No: ${grp.challan_ref}` : "Lot"), /* @__PURE__ */ import_react40.default.createElement(
+          "input",
+          {
+            type: "text",
+            className: "form-control form-control-sm font-monospace fw-bold bg-white px-2 py-0",
+            style: { width: "95px", height: "32px", fontSize: "12px" },
+            value: grp.po_ref,
+            disabled: !isSectionEditable("pieces"),
+            placeholder: "O.No / PO #",
+            onChange: (e) => {
+              const newPo = e.target.value;
+              setPieces((prev) => prev.map(
+                (p, pIdx) => grp.entries.some((en) => en.idx === pIdx) ? { ...p, po_ref: newPo } : p
+              ));
+            }
+          }
+        ), /* @__PURE__ */ import_react40.default.createElement(
+          "select",
+          {
+            className: "form-select form-select-sm fw-semibold bg-white px-2 py-0",
+            style: { minWidth: "140px", width: "auto", height: "32px", fontSize: "12px", lineHeight: "30px" },
+            value: grp.color_name,
+            disabled: !isSectionEditable("pieces"),
+            onChange: (e) => {
+              const newCol = e.target.value;
+              setPieces((prev) => prev.map(
+                (p, pIdx) => grp.entries.some((en) => en.idx === pIdx) ? { ...p, color_name: newCol } : p
+              ));
+            }
+          },
+          /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "Select Color..."),
+          colorMasterList.map((c) => /* @__PURE__ */ import_react40.default.createElement("option", { key: c.id || c.name, value: c.name }, c.name))
+        )), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold",
+            onClick: () => addPieceRow({ po_ref: grp.po_ref, challan_ref: grp.challan_ref, color_name: grp.color_name }, 20)
+          },
+          "+20 Rows"
+        )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "row g-0" }, chunks.map((chunk, chunkIdx) => {
+          const chunkMeters = chunk.reduce((s, e) => s + (parseFloat(e.piece.meters) || 0), 0);
+          const chunkFilled = chunk.filter((e) => (parseFloat(e.piece.meters) || 0) > 0).length;
+          const colClass = chunks.length >= 3 ? "col-12 col-md-6 col-xl-4 border-end" : chunks.length === 2 ? "col-12 col-md-6 border-end" : "col-12";
+          return /* @__PURE__ */ import_react40.default.createElement("div", { key: chunkIdx, className: colClass }, /* @__PURE__ */ import_react40.default.createElement("table", { className: "table table-sm table-hover align-middle mb-0", style: { fontSize: "12px" } }, /* @__PURE__ */ import_react40.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "text-secondary fs-10 text-uppercase" }, /* @__PURE__ */ import_react40.default.createElement("th", { className: "text-center", style: { width: "32px" } }, "#"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "96px" } }, "Length (m)"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "68px" } }, "Fold"), /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "66px" }, className: "text-center" }, "QC"), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("th", { style: { width: "28px" } }))), /* @__PURE__ */ import_react40.default.createElement("tbody", null, chunk.map(({ piece: p, idx }, rowInChunk) => {
+            const displayNo = chunkIdx * 20 + rowInChunk + 1;
+            return /* @__PURE__ */ import_react40.default.createElement("tr", { key: p.id || idx }, /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center fw-bold text-muted font-monospace" }, displayNo), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
+              "input",
+              {
+                type: "number",
+                step: "0.01",
+                className: "form-control form-control-sm text-end fw-bold text-dark fs-12 px-1.5",
+                style: { borderColor: "#cbd5e1", height: "26px", width: "90px" },
+                value: p.meters,
+                disabled: !isSectionEditable("pieces"),
+                onChange: (e) => handlePieceMeterChange(idx, e.target.value),
+                placeholder: "\u2014"
+              }
+            )), /* @__PURE__ */ import_react40.default.createElement("td", null, /* @__PURE__ */ import_react40.default.createElement(
+              "input",
+              {
+                type: "text",
+                className: "form-control form-control-sm fs-11 text-center px-1",
+                style: { borderColor: "#cbd5e1", height: "26px", width: "62px" },
+                value: p.folding || "",
+                disabled: !isSectionEditable("pieces"),
+                onChange: (e) => {
+                  const updated = [...pieces];
+                  updated[idx].folding = e.target.value;
+                  setPieces(updated);
+                },
+                placeholder: "L100"
+              }
+            )), /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: `badge fs-10 ${p.qc_status === "Accepted" ? "bg-success-subtle text-success" : "bg-light text-secondary border"}` }, p.qc_status || "Pending")), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react40.default.createElement(
+              "button",
+              {
+                type: "button",
+                className: "btn btn-link text-danger p-0",
+                onClick: () => removePieceRow(idx),
+                title: "Delete row"
+              },
+              /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-trash fs-13" })
+            )));
+          })), /* @__PURE__ */ import_react40.default.createElement("tfoot", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: 2, className: "text-end text-secondary fs-11 py-1.5" }, "Col ", chunkIdx + 1, " (", chunkFilled, " Thans):"), /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 3 : 2, className: "text-end text-primary fs-12 py-1.5 pe-2 font-monospace" }, chunkMeters.toFixed(2), " m")))));
+        })), chunks.length > 1 && /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-2 px-3 bg-light border-top d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-secondary fs-11" }, "Lot Sub-Total (", filledInGroup, " Thans):"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-primary fs-13 font-monospace" }, subTotalMeters.toFixed(2), " m"))));
+      })), /* @__PURE__ */ import_react40.default.createElement("div", { className: "mt-3 p-2.5 px-3 rounded-3 bg-light border d-flex flex-wrap align-items-center justify-content-between gap-2", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase" }, "Grand Total Recorded (", colGroups.length, " Lot Column", colGroups.length > 1 ? "s" : "", "):"), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-3" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "badge bg-white text-dark border px-2.5 py-1 fs-12 font-monospace" }, filledPieces.length, " Thans"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-dark fs-15 font-monospace" }, Number(calculatedTotalMeters).toFixed(2), " m"))));
+    })())), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-4 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3", style: { background: "#fafbfc" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "rounded-circle d-flex align-items-center justify-content-center", style: { width: "32px", height: "32px", background: "rgba(234, 179, 8, 0.15)", color: "#ca8a04" } }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-archive fs-16" })), /* @__PURE__ */ import_react40.default.createElement("div", null, /* @__PURE__ */ import_react40.default.createElement("h6", { className: "mb-0 fw-bold text-dark fs-14" }, "Grey Fabric Return & Open Bale Resolution"), /* @__PURE__ */ import_react40.default.createElement("p", { className: "text-muted fs-11 mb-0" }, "Unutilised raw fabric returns as an Open Bale linked to original vendor purchase invoice"))), isReadOnly && editingSection !== "grey" && /* @__PURE__ */ import_react40.default.createElement(
       "button",
       {
         type: "button",
@@ -53911,59 +54465,7 @@ Do you want to override and save?`
         onChange: (e) => setTargetInvoiceForGrey(e.target.value)
       },
       availablePurchaseInvoices.map((inv) => /* @__PURE__ */ import_react40.default.createElement("option", { key: inv.invoiceNo, value: `${inv.invoiceNo} (${inv.supplier})` }, inv.invoiceNo, " \u2014 ", inv.supplier, " (Remaining Stock: ", inv.remainingStock.toFixed(1), "m)"))
-    ) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "form-control form-control-sm bg-light text-dark fs-13 d-flex align-items-center gap-2", style: { height: "38px", borderRadius: "6px" } }, parseFloat(greyFabricReturned) > 0 ? /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-sparkles text-warning" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Auto-Assigned:"), " ", targetInvoiceForGrey || "INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)")) : /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted" }, "Not applicable (0 Metres returned)")))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card border mb-2 shadow-sm", style: { borderRadius: "10px", borderColor: "#e2e8f0", background: "#ffffff" } }, /* @__PURE__ */ import_react40.default.createElement(
-      "div",
-      {
-        className: "p-3 px-4 border-bottom d-flex align-items-center justify-content-between",
-        style: { background: "#fafbfc", cursor: "pointer" },
-        onClick: () => setShowTransport(!showTransport)
-      },
-      /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-truck-delivery text-secondary fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-dark fs-13" }, "Transport & LR Details (Collapsible)"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "badge bg-light text-muted border fs-10" }, "Hidden by default for local job work")),
-      /* @__PURE__ */ import_react40.default.createElement("i", { className: `ti ti-chevron-${showTransport ? "up" : "down"} text-secondary` })
-    ), showTransport && /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "LR Number"), /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
-        value: lrNumber,
-        disabled: !isSectionEditable("transport"),
-        onChange: (e) => setLrNumber(e.target.value),
-        placeholder: "e.g. LR-9981"
-      }
-    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "LR Date"), /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "date",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
-        value: lrDate,
-        disabled: !isSectionEditable("transport"),
-        onChange: (e) => setLrDate(e.target.value)
-      }
-    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Transporter Name"), /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
-        value: transporterName,
-        disabled: !isSectionEditable("transport"),
-        onChange: (e) => setTransporterName(e.target.value),
-        placeholder: "e.g. Local Auto Tempo"
-      }
-    )), /* @__PURE__ */ import_react40.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react40.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Vehicle No."), /* @__PURE__ */ import_react40.default.createElement(
-      "input",
-      {
-        type: "text",
-        className: "form-control form-control-sm bg-white fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
-        value: vehicleNo,
-        disabled: !isSectionEditable("transport"),
-        onChange: (e) => setVehicleNo(e.target.value),
-        placeholder: "e.g. GJ-05-BX-4120"
-      }
-    )))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "text-muted fs-12" }, "Inward goods will be logged into incoming queue for Quality Control & Lot Splitting"), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react40.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border text-secondary px-3", onClick: onCancel }, "Cancel"), !isReadOnly && /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement(
+    ) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "form-control form-control-sm bg-light text-dark fs-13 d-flex align-items-center gap-2", style: { height: "38px", borderRadius: "6px" } }, parseFloat(greyFabricReturned) > 0 ? /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-sparkles text-warning" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Auto-Assigned:"), " ", targetInvoiceForGrey || "INV-MS-0091 (M.S. Textiles - Largest Remaining Stock Balance)")) : /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted" }, "Not applicable (0 Metres returned)"))))))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "card-footer bg-white border-top py-3 px-4 d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "text-muted fs-12" }, "Inward goods will be logged into incoming queue for Quality Control & Lot Splitting"), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex gap-2" }, /* @__PURE__ */ import_react40.default.createElement("button", { type: "button", className: "btn btn-light btn-sm border text-secondary px-3", onClick: onCancel }, "Cancel"), (!isReadOnly || editingSection !== null) && /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement(
       "button",
       {
         type: "button",
@@ -55204,6 +55706,8 @@ Do you want to override and save?`
       setEditingChallan(generatedChallan);
       setActiveTab("challans");
       setShowChallanForm(true);
+      lastRouteRef.current = "/process-challan";
+      if (onNavigate) onNavigate("/process-challan");
     };
     const handleSaveChallan = (challanData, andRecordReturn = false) => {
       const toSave = {
@@ -55271,6 +55775,8 @@ Do you want to override and save?`
       });
       setActiveTab("returns");
       setShowReturnForm(true);
+      lastRouteRef.current = "/process-return";
+      if (onNavigate) onNavigate("/process-return");
     };
     const handleSaveReturn = (returnData, andInspectQC = false) => {
       let updated;

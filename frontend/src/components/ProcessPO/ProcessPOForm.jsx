@@ -54,29 +54,11 @@ export default function ProcessPOForm({
   const [startDirection, setStartDirection] = useState('style');
 
   // Dynamic Sales Orders (Loaded strictly from system's real Sales Orders)
-  const loadDynamicSalesOrders = () => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
-      let storedPOs = [];
-      try {
-        const rawPOs = localStorage.getItem('erp_process_pos_v1') || localStorage.getItem('erp_process_pos');
-        if (rawPOs) storedPOs = JSON.parse(rawPOs);
-      } catch (e) { }
-
-      if (Array.isArray(stored) && stored.length > 0) {
-        return stored.map(o => {
-          const styles = Array.isArray(o.styles) && o.styles.length > 0
-            ? o.styles
-            : (o.styleName ? [o.styleName] : []);
-
-          const custName = (Array.isArray(o.customerOrders) && o.customerOrders.length > 0)
-            ? o.customerOrders.map(c => c.customerName).filter(Boolean).join(', ')
-            : (o.customerName || o.customer || o.buyerName || '');
-
-          const items = [];
-          if (Array.isArray(o.fabricConsumptions)) {
-            // Group by fabric + color + width (combine even if article is different)
-            const groupsMap = new Map();
+  const buildOrderItems = (o, storedPOs, shouldCombine) => {
+    const items = [];
+    if (!Array.isArray(o.fabricConsumptions)) return items;
+    // Group by fabric + color + width (when shouldCombine is true), or keep articles separate
+    const groupsMap = new Map();
 
             o.fabricConsumptions.forEach((fc, idx) => {
               let req = parseFloat(
@@ -178,8 +160,10 @@ export default function ProcessPOForm({
               const colName = String(fc.color || fc.colorName || '').trim();
               const itemStyle = fc.styleName || o.styleName || (styles[0] || '');
 
-              // Composite grouping key: fabric + color + width (even if article is different)
-              const groupKey = `${(fabName || '').toLowerCase().trim()}___${(colName || '').toLowerCase().trim()}___${cleanWidthStr}`;
+              // Composite grouping key: combine by fabric + color + width, or keep articles separate
+              const groupKey = shouldCombine
+                ? `${(fabName || '').toLowerCase().trim()}___${(colName || '').toLowerCase().trim()}___${cleanWidthStr}`
+                : `${(artName || '').toLowerCase().trim()}___${(fabName || '').toLowerCase().trim()}___${(colName || '').toLowerCase().trim()}___${cleanWidthStr}___${idx}`;
 
               let currentPcs = parseInt(fc.pcs || fc.quantity_pieces || fc.totalPieces || fc.orderQty || 0, 10) || 0;
               if (currentPcs === 0 && Array.isArray(o.articles)) {
@@ -286,9 +270,10 @@ export default function ProcessPOForm({
               const rec = Number(entry.alreadyReceivedMeters.toFixed(2));
               const joinedArticles = entry.articles.join(' + ') || 'General';
 
-              // Ensure total pieces sums all articles in this combined requirement
+              // Use the exact color-wise piece sum (entry.pcs) from fabricConsumptions;
+              // only fall back to article-level totals if entry.pcs is 0
               let totalPcs = entry.pcs || 0;
-              if (Array.isArray(o.articles) && entry.articles.length > 0) {
+              if (totalPcs === 0 && Array.isArray(o.articles) && entry.articles.length > 0) {
                 const sumFromArticles = entry.articles.reduce((sum, aName) => {
                   const art = o.articles.find(a => String(a.name || '').toLowerCase() === String(aName || '').toLowerCase());
                   return sum + (parseInt(art?.totalPieces || art?.pieces || art?.quantity || 0, 10) || 0);
@@ -359,8 +344,29 @@ export default function ProcessPOForm({
                 shrinkage: entry.maxShrinkage || 4.0,
                 pcs: totalPcs || (finalCons > 0 ? Math.floor(req / finalCons) : 0)
               });
-            });
-          }
+    });
+    return items;
+  };
+
+  const loadDynamicSalesOrders = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
+      let storedPOs = [];
+      try {
+        const rawPOs = localStorage.getItem('erp_process_pos_v1') || localStorage.getItem('erp_process_pos');
+        if (rawPOs) storedPOs = JSON.parse(rawPOs);
+      } catch (e) { }
+
+      if (Array.isArray(stored) && stored.length > 0) {
+        return stored.map(o => {
+          const styles = Array.isArray(o.styles) && o.styles.length > 0
+            ? o.styles
+            : (o.styleName ? [o.styleName] : []);
+
+          const custName = (Array.isArray(o.customerOrders) && o.customerOrders.length > 0)
+            ? o.customerOrders.map(c => c.customerName).filter(Boolean).join(', ')
+            : (o.customerName || o.customer || o.buyerName || '');
+
           return {
             id: o.id,
             customer: custName,
@@ -369,7 +375,8 @@ export default function ProcessPOForm({
             deliveryDate: o.expectedDelivery || o.deliveryDate || '',
             status: o.status || '',
             styles: styles,
-            items: items
+            items: buildOrderItems(o, storedPOs, true),
+            separateItems: buildOrderItems(o, storedPOs, false)
           };
         });
       }
@@ -377,7 +384,11 @@ export default function ProcessPOForm({
     return [];
   };
 
-  const [availableSalesOrders, setAvailableSalesOrders] = useState(loadDynamicSalesOrders);
+  // Per-style toggle: true = combine same Fabric/Color/Width, false = keep articles separate
+  const [combineStyleMap, setCombineStyleMap] = useState({});
+  const isStyleCombined = (sIdx) => combineStyleMap[sIdx] !== false;
+  const setStyleCombined = (sIdx, val) => setCombineStyleMap(prev => ({ ...prev, [sIdx]: val }));
+  const [availableSalesOrders, setAvailableSalesOrders] = useState(() => loadDynamicSalesOrders());
 
   useEffect(() => {
     const handleOrdersSync = () => setAvailableSalesOrders(loadDynamicSalesOrders());
@@ -691,7 +702,7 @@ export default function ProcessPOForm({
   ])).filter(Boolean);
 
   // Helper to resolve requirement items for each style in turn (PDF Section 3.2: Multi-Style display)
-  const getRequirementsForStyle = (styleName, sIdx) => {
+  const getRequirementsForStyle = (styleName, sIdx, shouldCombine = true) => {
     if (!styleName || !styleName.trim()) return [];
     const cleanStyle = styleName.trim().toLowerCase();
 
@@ -703,18 +714,24 @@ export default function ProcessPOForm({
       (o.items && o.items.some(it => String(it.style || '').toLowerCase().trim() === cleanStyle))
     );
 
-    if (matchingOrder && Array.isArray(matchingOrder.items) && matchingOrder.items.length > 0) {
-      const exactStyleItems = matchingOrder.items.filter(it =>
-        String(it.style || '').toLowerCase().trim() === cleanStyle
-      );
-      if (exactStyleItems.length > 0) return exactStyleItems;
-      return matchingOrder.items;
+    if (matchingOrder) {
+      const mItems = shouldCombine ? matchingOrder.items : (matchingOrder.separateItems || matchingOrder.items);
+      if (Array.isArray(mItems) && mItems.length > 0) {
+        const exactStyleItems = mItems.filter(it =>
+          String(it.style || '').toLowerCase().trim() === cleanStyle
+        );
+        if (exactStyleItems.length > 0) return exactStyleItems;
+        return mItems;
+      }
     }
 
     // 2. Check currentSelectedOrder items
-    if (currentSelectedOrder && Array.isArray(currentSelectedOrder.items)) {
+    const curItems = currentSelectedOrder
+      ? (shouldCombine ? currentSelectedOrder.items : (currentSelectedOrder.separateItems || currentSelectedOrder.items))
+      : null;
+    if (curItems && Array.isArray(curItems)) {
       // Check if any item matches the style name or article name
-      const byArticleOrStyle = currentSelectedOrder.items.filter(it => {
+      const byArticleOrStyle = curItems.filter(it => {
         const itStyle = String(it.style || '').toLowerCase().trim();
         const itArt = String(it.article || '').toLowerCase().trim();
         return itStyle === cleanStyle ||
@@ -729,10 +746,10 @@ export default function ProcessPOForm({
 
       // If multi-style PO and current order has top and bottom articles, partition them
       if (styleCountOption === '2+' || styleCountOption === 'more') {
-        const bottomItems = currentSelectedOrder.items.filter(it =>
+        const bottomItems = curItems.filter(it =>
           /pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ''))
         );
-        const topItems = currentSelectedOrder.items.filter(it =>
+        const topItems = curItems.filter(it =>
           !/pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ''))
         );
 
@@ -813,6 +830,25 @@ export default function ProcessPOForm({
     setSelectedStyles(updated);
     if (styleCountOption === '1') {
       setItems(prev => prev.map(it => ({ ...it, style_name: value })));
+    }
+    // PDF Section 3.2: Starting from Style auto-fetches & links matching Sales Order data
+    if (value && value.trim() && !linkedOrderId) {
+      const cleanVal = value.trim().toLowerCase();
+      const matchingOrder = availableSalesOrders.find(o =>
+        (o.styles && o.styles.some(s => s.toLowerCase().trim() === cleanVal)) ||
+        (o.styleName && o.styleName.toLowerCase().trim() === cleanVal) ||
+        cleanVal.includes(o.id.toLowerCase()) ||
+        (o.items && o.items.some(it =>
+          String(it.style || '').toLowerCase().trim() === cleanVal ||
+          String(it.article || '').toLowerCase().trim() === cleanVal
+        ))
+      );
+      if (matchingOrder) {
+        setIsOrderLinked(true);
+        setLinkedOrderId(matchingOrder.id);
+        if (matchingOrder.customer) setCustomerBrand(matchingOrder.customer);
+        if (matchingOrder.deliveryDate) setDeliveryDate(matchingOrder.deliveryDate);
+      }
     }
   };
 
@@ -1097,11 +1133,11 @@ export default function ProcessPOForm({
     const calculatedPcs = totalPcs > 0 ? totalPcs : (reqMeters > 0 && cons > 0 ? Math.floor(reqMeters / cons) : '');
     const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : '';
 
-    // Check if custom rate was entered in rate box
+    // Check if custom rate was entered in rate box (do not auto-fill order rate)
     const customRate = orderItemRates[orderItem.id];
     const itemRate = (customRate !== undefined && customRate !== '')
       ? (parseFloat(customRate) || 0)
-      : (orderItem.rate ? parseFloat(orderItem.rate) : '');
+      : '';
 
     // Match real fabric from fabricList so dropdown does not show "Select Fabric Quality"
     const matchedFab = fabricList.find(f =>
@@ -1223,12 +1259,12 @@ export default function ProcessPOForm({
           <div className="d-flex align-items-center gap-3">
             <button
               type="button"
-              className="btn btn-light btn-sm border d-flex align-items-center gap-1.5 px-3 py-1.5 rounded-2"
+              className="btn btn-light rounded-circle border shadow-sm d-flex align-items-center justify-content-center p-0"
               onClick={handleExit}
-              style={{ borderColor: '#cbd5e1' }}
+              title="Back to Process PO List"
+              style={{ width: '38px', height: '38px', borderColor: '#e2e8f0', backgroundColor: '#ffffff', color: '#334155', flexShrink: 0 }}
             >
-              <i className="ti ti-arrow-left fs-14"></i>
-              <span className="fw-semibold">Back to PO List</span>
+              <i className="ti ti-arrow-left fs-18"></i>
             </button>
             <div>
               <div className="d-flex align-items-center gap-2">
@@ -1893,7 +1929,8 @@ export default function ProcessPOForm({
 
           {/* Linked Sales Order Item Selection Matrix (PDF Section 3.2: Multi-Style display in turn) */}
           {isOrderLinked && currentSelectedOrder && (
-            (styleCountOption === '2+' || selectedStyles.length > 1) ? (
+            <>
+              {(styleCountOption === '2+' || selectedStyles.length > 1) ? (
                     selectedStyles.map((styleVal, sIdx) => {
                       const positionLabel = sIdx === 0
                         ? 'Top Style'
@@ -1901,7 +1938,7 @@ export default function ProcessPOForm({
                           ? 'Bottom Style'
                           : `Style Component #${sIdx + 1}`;
 
-                      const styleItems = getRequirementsForStyle(styleVal, sIdx);
+                      const styleItems = getRequirementsForStyle(styleVal, sIdx, isStyleCombined(sIdx));
                       const isStyleSet = Boolean(styleVal && styleVal.trim());
 
                       if (!isStyleSet) {
@@ -1977,7 +2014,23 @@ export default function ProcessPOForm({
                                       )}
                                     </div>
 
-                                    <div className="d-flex align-items-center gap-2">
+                                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                                      <div className="btn-group btn-group-xs p-0.5 bg-white border rounded-2" style={{ borderColor: '#cbd5e1' }} title="Combine articles with same Fabric, Color & Width for this style">
+                                        <button
+                                          type="button"
+                                          className={`btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${isStyleCombined(sIdx) ? 'btn-primary text-white fw-semibold' : 'btn-light text-secondary border-0'}`}
+                                          onClick={() => setStyleCombined(sIdx, true)}
+                                        >
+                                          Combine Same
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${!isStyleCombined(sIdx) ? 'btn-primary text-white fw-semibold' : 'btn-light text-secondary border-0'}`}
+                                          onClick={() => setStyleCombined(sIdx, false)}
+                                        >
+                                          Keep Separate
+                                        </button>
+                                      </div>
                                       {selectedCount > 0 && (
                                         <button
                                           type="button"
@@ -2081,7 +2134,7 @@ export default function ProcessPOForm({
                                                         inputMode="decimal"
                                                         className="form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white"
                                                         style={{ fontSize: '12px', borderColor: '#cbd5e1', height: '28px' }}
-                                                        value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : (ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : '')}
+                                                        value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : ''}
                                                         placeholder="0.00"
                                                         disabled={isLocked || isFullyOrdered || isAlreadySelected}
                                                         onChange={(e) => {
@@ -2155,7 +2208,10 @@ export default function ProcessPOForm({
               /* Single Style Display */
               <div className="mt-4 p-3 border rounded-3 bg-light" style={{ borderColor: '#e2e8f0' }}>
                 {(() => {
-                  const selectedCount = (currentSelectedOrder.items || []).filter(ordIt =>
+                  const singleItems = isStyleCombined(0)
+                    ? (currentSelectedOrder.items || [])
+                    : (currentSelectedOrder.separateItems || currentSelectedOrder.items || []);
+                  const selectedCount = singleItems.filter(ordIt =>
                     selectedRequirementIds.includes(ordIt.id) || items.some(it => it.order_item_id === ordIt.id)
                   ).length;
                   return (
@@ -2171,7 +2227,23 @@ export default function ProcessPOForm({
                           </span>
                         )}
                       </div>
-                      <div className="d-flex align-items-center gap-2">
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <div className="btn-group btn-group-xs p-0.5 bg-white border rounded-2" style={{ borderColor: '#cbd5e1' }} title="Combine articles with same Fabric, Color & Width">
+                          <button
+                            type="button"
+                            className={`btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${isStyleCombined(0) ? 'btn-primary text-white fw-semibold' : 'btn-light text-secondary border-0'}`}
+                            onClick={() => setStyleCombined(0, true)}
+                          >
+                            Combine Same
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn-xs px-2 py-0.5 fs-11 rounded-1 ${!isStyleCombined(0) ? 'btn-primary text-white fw-semibold' : 'btn-light text-secondary border-0'}`}
+                            onClick={() => setStyleCombined(0, false)}
+                          >
+                            Keep Separate
+                          </button>
+                        </div>
                         {selectedCount > 0 && (
                           <button
                             type="button"
@@ -2209,7 +2281,10 @@ export default function ProcessPOForm({
                     </thead>
                     <tbody>
                       {(() => {
-                        const visibleItems = currentSelectedOrder.items.filter(ordIt => {
+                        const baseItems = isStyleCombined(0)
+                          ? (currentSelectedOrder.items || [])
+                          : (currentSelectedOrder.separateItems || currentSelectedOrder.items || []);
+                        const visibleItems = baseItems.filter(ordIt => {
                           const isSelected = selectedRequirementIds.includes(ordIt.id) ||
                             items.some(it => it.order_item_id === ordIt.id);
                           if (hideSelectedRequirements && isSelected) {
@@ -2290,7 +2365,7 @@ export default function ProcessPOForm({
                                     inputMode="decimal"
                                     className="form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white"
                                     style={{ fontSize: '12px', borderColor: '#cbd5e1', height: '28px' }}
-                                    value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : (ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : '')}
+                                    value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : ''}
                                     placeholder="0.00"
                                     disabled={isLocked || isFullyOrdered || isAlreadySelected}
                                     onChange={(e) => {
@@ -2359,6 +2434,8 @@ export default function ProcessPOForm({
                 </div>
               </div>
             )
+            }
+            </>
           )}
         </div>
       </div>
@@ -2699,31 +2776,18 @@ export default function ProcessPOForm({
                                                     />
                                                   </td>
 
-                        {/* Dyeing Rate (with Auto-Recommendation button per PDF Section 3.2) */}
+                        {/* Dyeing Rate */}
                         <td>
-                          <div className="input-group input-group-sm">
-                            <input
-                              type="number"
-                              step="any"
-                              placeholder="0.00"
-                              className="form-control form-control-sm text-end bg-white fs-13"
-                              style={{ borderColor: '#cbd5e1', height: '36px' }}
-                              value={item.dyeing_rate}
-                              disabled={!isSectionEditable('items')}
-                              onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
-                            />
-                            {isSectionEditable('items') && (
-                              <button
-                                type="button"
-                                className="btn btn-outline-primary btn-sm px-1.5"
-                                style={{ height: '36px', fontSize: '10px', borderColor: '#cbd5e1' }}
-                                title={`Auto-recommend rate (₹${getRecommendedDyeingRate(item)}/m for ${item.width || '44'}" ${processType || 'Dyeing'})`}
-                                onClick={() => updateItem(idx, { dyeing_rate: getRecommendedDyeingRate(item) })}
-                              >
-                                Auto
-                              </button>
-                            )}
-                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            className="form-control form-control-sm text-end bg-white fs-13 w-100"
+                            style={{ borderColor: '#cbd5e1', height: '36px' }}
+                            value={item.dyeing_rate}
+                            disabled={!isSectionEditable('items')}
+                            onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
+                          />
                         </td>
 
                                                   {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) in clean box */}

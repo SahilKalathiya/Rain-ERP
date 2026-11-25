@@ -3522,7 +3522,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
                                     </span>
                                     <div>
                                       <div className="fw-bold text-dark" style={{ fontSize: '14.5px' }}>
-                                        Do articles have the same colors or contrast?
+                                        Do articles have the same colors?
                                       </div>
                                       <small className="text-muted">
                                         {configMode.sameColor === true

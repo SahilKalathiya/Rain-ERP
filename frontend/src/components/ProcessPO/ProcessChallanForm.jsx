@@ -147,69 +147,117 @@ export default function ProcessChallanForm({
     { id: 'WB-116', baleNo: 'Than 2376-F (Cut Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 20.00, availableMeters: 20.00, folding: 'L100', actualDispatchedMeters: 20.00, subRolls: 'Cut Than / Piece', ageDays: 11 },
     { id: 'WB-117', baleNo: 'Than 2376-G (Cut Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 13.50, availableMeters: 13.50, folding: 'L100', actualDispatchedMeters: 13.50, subRolls: 'Cut Than / Piece', ageDays: 11 }
   ];
-  // Dynamic Warehouse Stock Loader:
-  // Loads authentic warehouse stock directly from Real Procurement Purchase Orders (raindrop_pos_v1)
-  // and Goods Inward GRNs (raindrop_grns_v1) created by the user in the ERP.
+  // Dynamic Warehouse Stock Loader (PDF Section 1, 4.2, 4.4 & 5.3):
+  // Loads warehouse stock from Stock Pool (raindrop_stock_pool_v1) + GRNs (raindrop_grns_v1) + Open Bales (erp_process_open_bales_v1).
   const loadWarehouseStockFromProcurement = () => {
     try {
       const savedStockRaw = localStorage.getItem('erp_warehouse_fabric_bales');
       const savedStock = savedStockRaw ? JSON.parse(savedStockRaw) : null;
 
-      // 1. Read real Purchase Orders created by the user in the Procurement module
-      const rawPOs = localStorage.getItem('raindrop_pos_v1');
-      const pos = rawPOs ? JSON.parse(rawPOs) : [];
+      // 1. Read Stock Pool (QC-passed / approved inventory)
+      const rawStockPool = localStorage.getItem('raindrop_stock_pool_v1');
+      const stockPool = rawStockPool ? JSON.parse(rawStockPool) : [];
 
       // 2. Read real GRNs created in Goods Inward
       const rawGRNs = localStorage.getItem('raindrop_grns_v1');
       const grns = rawGRNs ? JSON.parse(rawGRNs) : [];
 
+      // 3. Read real Purchase Orders created in Procurement
+      const rawPOs = localStorage.getItem('raindrop_pos_v1');
+      const pos = rawPOs ? JSON.parse(rawPOs) : [];
+
+      // 4. Read Open Bales from unutilised grey fabric returns (PDF Section 5.3)
+      const rawOpenBales = localStorage.getItem('erp_process_open_bales_v1');
+      const openBales = rawOpenBales ? JSON.parse(rawOpenBales) : [];
+
       const dynamicBales = [];
+      const seenBaleKeys = new Set();
 
-      // A. Process real GRNs with inwarded physical bales first
-      (Array.isArray(grns) ? grns : []).forEach((grn, gIdx) => {
-        if (!grn) return;
-        const invoiceNo = grn.invoiceNo || grn.billNo || `INV-GRN-${grn.id || gIdx + 1}`;
-        const vendorName = grn.vendorName || grn.supplierName || 'Procurement Vendor';
-        const inwardDate = grn.inwardDate || grn.date || '2026-02-01';
-        const poRef = grn.poId || (grn.linkedPOs && grn.linkedPOs[0]) || '';
+      const buildPiecesFromBale = (bale, bIdx, idPrefix, totalMtrs) => {
+        if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
+          return bale.pieces.map((p, pIdx) => {
+            const pMtrs = Number(typeof p === 'object' ? (p.length || p.meters) : p) || 100;
+            const pNo = (typeof p === 'object' && p.pieceNo) ? p.pieceNo : `Than ${bIdx + 1}-${pIdx + 1}`;
+            return {
+              id: `${idPrefix}-b${bIdx}-p${pIdx}`,
+              pieceNo: String(pNo).replace(/^Roll\s*/i, 'Than '),
+              meters: pMtrs,
+              isDispatched: false
+            };
+          });
+        }
+        const pieceSize = 100;
+        const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
+        const rem = Number((totalMtrs - count * pieceSize).toFixed(2));
+        const res = [];
+        for (let i = 1; i <= count; i++) {
+          res.push({ id: `${idPrefix}-b${bIdx}-p${i}`, pieceNo: `Than ${bIdx + 1}-${i}`, meters: pieceSize, isDispatched: false });
+        }
+        if (rem > 0) {
+          res.push({ id: `${idPrefix}-b${bIdx}-p${count + 1}`, pieceNo: `Than ${bIdx + 1}-${count + 1}`, meters: rem, isDispatched: false });
+        }
+        return res;
+      };
 
-        if (Array.isArray(grn.bales) && grn.bales.length > 0) {
-          grn.bales.forEach((bale, bIdx) => {
-            const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
-            const fab = bale.fabricItemLabel || grn.fabricName || 'Grey Fabric';
-            const width = bale.width || grn.width || '48"';
-            const color = bale.color || grn.color || 'Grey';
-            const totalMtrs = Number(bale.totalLength) ||
-              (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0) : 0) || 500;
+      // A. Primary Source (PDF): Stock Pool (raindrop_stock_pool_v1) joined with GRN physical bales
+      if (Array.isArray(stockPool) && stockPool.length > 0) {
+        stockPool.forEach((sp, spIdx) => {
+          if (!sp) return;
+          const spQty = Number(sp.qty) || 0;
+          if (spQty <= 0) return;
 
-            let pieces = [];
-            if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
-              pieces = bale.pieces.map((p, pIdx) => {
-                const pMtrs = Number(typeof p === 'object' ? (p.length || p.meters) : p) || 100;
-                const pNo = (typeof p === 'object' && p.pieceNo) ? p.pieceNo : `Than ${bIdx + 1}-${pIdx + 1}`;
-                return {
-                  id: `grn-${grn.id || gIdx}-b${bIdx}-p${pIdx}`,
-                  pieceNo: String(pNo).replace(/^Roll\s*/i, 'Than '),
-                  meters: pMtrs,
-                  isDispatched: false
-                };
+          const matchedGrn = (Array.isArray(grns) ? grns : []).find(g => g && g.id === sp.grnId);
+          const invoiceNo = matchedGrn?.invoiceNo || matchedGrn?.billNo || sp.invoiceNo || (sp.grnId ? `INV-${sp.grnId}` : `INV-SP-${spIdx + 1}`);
+          const vendorName = matchedGrn?.vendorName || matchedGrn?.supplierName || sp.vendorName || 'Stock Pool';
+          const inwardDate = matchedGrn?.inwardDate || matchedGrn?.date || '2026-02-01';
+          const poRef = sp.poId || matchedGrn?.poId || '';
+
+          if (matchedGrn && Array.isArray(matchedGrn.bales) && matchedGrn.bales.length > 0) {
+            matchedGrn.bales.forEach((bale, bIdx) => {
+              const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
+              const uniqKey = `${matchedGrn.id}_${bNo}_${invoiceNo}`;
+              if (seenBaleKeys.has(uniqKey)) return;
+              seenBaleKeys.add(uniqKey);
+
+              const fab = bale.fabricItemLabel || sp.fabricName || matchedGrn.fabricName || 'Grey Fabric';
+              const width = bale.width || sp.width || matchedGrn.width || '48"';
+              const color = bale.color || sp.colorName || matchedGrn.color || 'Grey';
+              const totalMtrs = Number(bale.totalLength) ||
+                (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === 'object' ? (p.length || p.meters) : p) || 0), 0) : 0) ||
+                spQty;
+              const pieces = buildPiecesFromBale(bale, bIdx, `sp-${sp.id || spIdx}`, totalMtrs);
+
+              dynamicBales.push({
+                id: `WB-SP-${sp.id || spIdx}-${bIdx}`,
+                stockPoolId: sp.id,
+                poId: poRef,
+                baleNo: bNo,
+                vendorName,
+                invoiceNo,
+                date: inwardDate,
+                fabric: `${fab} [${width}]`,
+                fabricQuality: fab,
+                width,
+                color,
+                meters: totalMtrs,
+                availableMeters: totalMtrs,
+                folding: matchedGrn.folding || 'L100',
+                actualDispatchedMeters: totalMtrs,
+                subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
+                ageDays: Math.max(1, Math.floor((new Date() - new Date(inwardDate)) / (1000 * 60 * 60 * 24))) || 15,
+                pieces
               });
-            } else {
-              const pieceSize = 100;
-              const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
-              const rem = Number((totalMtrs - count * pieceSize).toFixed(2));
-              for (let i = 1; i <= count; i++) {
-                pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${i}`, pieceNo: `Than ${bIdx + 1}-${i}`, meters: pieceSize, isDispatched: false });
-              }
-              if (rem > 0) {
-                pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${count + 1}`, pieceNo: `Than ${bIdx + 1}-${count + 1}`, meters: rem, isDispatched: false });
-              }
-            }
-
+            });
+          } else {
+            const fab = sp.fabricName || 'Grey Fabric';
+            const width = sp.width || '48"';
+            const color = sp.colorName || 'Grey';
+            const pieces = buildPiecesFromBale({}, spIdx, `sp-${sp.id || spIdx}`, spQty);
             dynamicBales.push({
-              id: `WB-GRN-${grn.id || gIdx}-${bIdx}`,
+              id: `WB-SP-${sp.id || spIdx}`,
+              stockPoolId: sp.id,
               poId: poRef,
-              baleNo: bNo,
+              baleNo: sp.lotNo || `Lot ${sp.id || spIdx + 1}`,
               vendorName,
               invoiceNo,
               date: inwardDate,
@@ -217,17 +265,89 @@ export default function ProcessChallanForm({
               fabricQuality: fab,
               width,
               color,
-              meters: totalMtrs,
-              availableMeters: totalMtrs,
-              folding: grn.folding || 'L100',
-              actualDispatchedMeters: totalMtrs,
-              subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
-              ageDays: Math.max(1, Math.floor((new Date() - new Date(inwardDate)) / (1000 * 60 * 60 * 24))) || 15,
+              meters: spQty,
+              availableMeters: spQty,
+              folding: 'L100',
+              actualDispatchedMeters: spQty,
+              subRolls: `${pieces.length} Thans (Stock Pool)`,
+              ageDays: 10,
               pieces
             });
-          });
-        }
+          }
+        });
+      }
+
+      // B. Also integrate Open Bales from unutilised grey fabric returns (PDF Section 5.3)
+      (Array.isArray(openBales) ? openBales : []).forEach((ob, obIdx) => {
+        if (!ob) return;
+        const obMtrs = Number(ob.remaining_meters !== undefined ? ob.remaining_meters : ob.returned_meters) || 0;
+        if (obMtrs <= 0 || (ob.status && ob.status !== 'Available')) return;
+        const fab = ob.fabric_name || '100x100 Voile (Grey)';
+        const width = ob.width ? `${String(ob.width).replace(/[^\d.]/g, '')}"` : '48"';
+        dynamicBales.push({
+          id: `WB-OB-${ob.id || obIdx}`,
+          openBaleId: ob.id,
+          poId: ob.linked_po_id || '',
+          baleNo: `Open Bale (${ob.id})`,
+          vendorName: ob.vendor_name || 'Grey Return Stock',
+          invoiceNo: ob.original_vendor_invoice_ref || 'INV-OPEN-BALE',
+          date: ob.created_at || '2026-08-12',
+          fabric: `${fab} [${width}]`,
+          fabricQuality: fab,
+          width,
+          color: 'Raw / Greige',
+          meters: obMtrs,
+          availableMeters: obMtrs,
+          folding: 'L100',
+          actualDispatchedMeters: obMtrs,
+          subRolls: 'Open Bale (Grey Return)',
+          ageDays: 5,
+          pieces: [{ id: `ob-${ob.id || obIdx}-p1`, pieceNo: `Open Than ${ob.id}`, meters: obMtrs, isDispatched: false }]
+        });
       });
+
+      // C. Fallback: Process real GRNs directly if Stock Pool is empty
+      if (dynamicBales.length === 0) {
+        (Array.isArray(grns) ? grns : []).forEach((grn, gIdx) => {
+          if (!grn) return;
+          const invoiceNo = grn.invoiceNo || grn.billNo || `INV-GRN-${grn.id || gIdx + 1}`;
+          const vendorName = grn.vendorName || grn.supplierName || 'Procurement Vendor';
+          const inwardDate = grn.inwardDate || grn.date || '2026-02-01';
+          const poRef = grn.poId || (grn.linkedPOs && grn.linkedPOs[0]) || '';
+
+          if (Array.isArray(grn.bales) && grn.bales.length > 0) {
+            grn.bales.forEach((bale, bIdx) => {
+              const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
+              const fab = bale.fabricItemLabel || grn.fabricName || 'Grey Fabric';
+              const width = bale.width || grn.width || '48"';
+              const color = bale.color || grn.color || 'Grey';
+              const totalMtrs = Number(bale.totalLength) ||
+                (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0) : 0) || 500;
+              const pieces = buildPiecesFromBale(bale, bIdx, `grn-${grn.id || gIdx}`, totalMtrs);
+
+              dynamicBales.push({
+                id: `WB-GRN-${grn.id || gIdx}-${bIdx}`,
+                poId: poRef,
+                baleNo: bNo,
+                vendorName,
+                invoiceNo,
+                date: inwardDate,
+                fabric: `${fab} [${width}]`,
+                fabricQuality: fab,
+                width,
+                color,
+                meters: totalMtrs,
+                availableMeters: totalMtrs,
+                folding: grn.folding || 'L100',
+                actualDispatchedMeters: totalMtrs,
+                subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
+                ageDays: Math.max(1, Math.floor((new Date() - new Date(inwardDate)) / (1000 * 60 * 60 * 24))) || 15,
+                pieces
+              });
+            });
+          }
+        });
+      }
 
       // B. Process real Purchase Orders from raindrop_pos_v1
       (Array.isArray(pos) ? pos : []).forEach((po, pIdx) => {
@@ -431,13 +551,8 @@ export default function ProcessChallanForm({
         }
       ];
 
-      // Merge: User created POs / GRNs appear first on top!
-      let finalBales = [];
-      if (dynamicBales.length > 0) {
-        finalBales = [...dynamicBales, ...realisticBaseline];
-      } else {
-        finalBales = realisticBaseline;
-      }
+      // Use real Stock Pool / GRN / Open Bale data when available; only fall back to baseline if empty
+      let finalBales = dynamicBales.length > 0 ? dynamicBales : realisticBaseline;
 
       // Reconcile with any existing session allocations in localStorage
       if (Array.isArray(savedStock) && savedStock.length > 0) {
@@ -536,12 +651,10 @@ export default function ProcessChallanForm({
   const [customerBrand, setCustomerBrand] = useState(initialChallan?.customer_brand || '');
 
   // Folding Notation (e.g. "L100" or "L98")
-  const [foldingNotation, setFoldingNotation] = useState(initialChallan?.folding_notation || 'L100');
+  const [foldingNotation, setFoldingNotation] = useState(initialChallan?.folding_notation || '');
 
   // Particulars / Fabric Issue Description (Page 15 physical slip)
-  const [particulars, setParticulars] = useState(
-    initialChallan?.particulars || '100x100 Voil [48"] gray - fab issue for dying'
-  );
+  const [particulars, setParticulars] = useState(initialChallan?.particulars || '');
 
   // Remarks
   const [remarks, setRemarks] = useState(initialChallan?.remarks || '');
@@ -588,6 +701,15 @@ export default function ProcessChallanForm({
           });
         });
       }
+    }
+  }, [showStockPickerModal]);
+
+  // Step 1 -> Step 2 drill-down in Warehouse Stock Picker: selected Fabric+Width+Color group
+  const [selectedStockGroupKey, setSelectedStockGroupKey] = useState(null);
+  useEffect(() => {
+    if (!showStockPickerModal) {
+      setSelectedStockGroupKey(null);
+      setExpandedBaleId(null);
     }
   }, [showStockPickerModal]);
 
@@ -676,8 +798,8 @@ export default function ProcessChallanForm({
       vendor_name: vendorName || 'Raju dyeing',
       vendor_id: vendorId || 'VEND-0003',
       linked_pos: selectedPOs.length > 0 ? selectedPOs : ['7611', '7612', '7613'],
-      particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
-      folding_notation: foldingNotation || 'L100',
+      particulars: particulars || '',
+      folding_notation: foldingNotation || '',
       total_bales: baleCount || 1,
       total_pieces: totalPiecesText || '1 Bale + 7 th',
       grand_total_meters: grandTotalMeters || 2418.80,
@@ -772,9 +894,43 @@ export default function ProcessChallanForm({
     const foldCode = roll.folding || foldingNotation || 'L100';
     const actualDispatched = computeFoldedMeters(nominalDispatched, foldCode);
 
+    // Compute exact piece-level deductions for both full bale and bale-level cut
+    const basePieces = ensureBalePieces(roll);
+    const cutBreakdown = [];
+    let updatedPiecesForPool = basePieces;
+
+    if (!isCustomCut) {
+      updatedPiecesForPool = basePieces.map(p => ({ ...p, isDispatched: true }));
+    } else {
+      let remainingToCut = nominalDispatched;
+      updatedPiecesForPool = basePieces.map(p => {
+        if (p.isDispatched || remainingToCut <= 0) return p;
+        const pMtrs = parseFloat(p.meters) || 0;
+        if (pMtrs <= 0) return p;
+        if (pMtrs <= remainingToCut) {
+          remainingToCut = Number((remainingToCut - pMtrs).toFixed(2));
+          cutBreakdown.push(`${p.pieceNo} (${pMtrs}m)`);
+          return { ...p, isDispatched: true };
+        }
+        const cutFromThis = Number(remainingToCut.toFixed(2));
+        const leftOnPiece = Number((pMtrs - cutFromThis).toFixed(2));
+        remainingToCut = 0;
+        cutBreakdown.push(`${p.pieceNo} - Cut ${cutFromThis}m`);
+        return {
+          ...p,
+          originalMeters: p.originalMeters || pMtrs,
+          meters: leftOnPiece,
+          isDispatched: false
+        };
+      });
+    }
+
     const newItem = {
       id: Date.now() + Math.random(),
-      bale_roll_no: roll.baleNo,
+      bale_roll_no: isCustomCut && cutBreakdown.length > 0
+        ? `${roll.baleNo} (${cutBreakdown.join(', ')})`
+        : roll.baleNo,
+      parent_bale_id: roll.id,
       invoice_no: roll.invoiceNo,
       vendor_name: roll.vendorName || '',
       fabric_name: roll.fabric || 'Grey [48"]',
@@ -782,6 +938,7 @@ export default function ProcessChallanForm({
       original_piece_meters: nominalOriginal,
       dispatched_meters: actualDispatched,
       is_partial_cut: isCustomCut,
+      dispatch_mode: isCustomCut ? 'Bale Cut (Scenario B)' : 'Full Bale (Scenario A)',
       folding: foldCode,
       remaining_stock_meters: Number(Math.max(0, nominalOriginal - nominalDispatched).toFixed(2))
     };
@@ -791,10 +948,8 @@ export default function ProcessChallanForm({
     // Update warehouse stock available balance & piece statuses
     setWarehouseStockPool(prev => prev.map(wb => {
       if (wb.id === roll.id) {
-        const updatedAvail = Math.max(0, (wb.availableMeters || wb.meters) - nominalDispatched);
-        const currentPieces = ensureBalePieces(wb);
-        const updatedPieces = !isCustomCut ? currentPieces.map(p => ({ ...p, isDispatched: true })) : currentPieces;
-        return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)), pieces: updatedPieces };
+        const updatedAvail = Math.max(0, (wb.availableMeters !== undefined ? wb.availableMeters : wb.meters) - nominalDispatched);
+        return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)), pieces: updatedPiecesForPool };
       }
       return wb;
     }));
@@ -827,8 +982,8 @@ export default function ProcessChallanForm({
     });
   };
 
-  // Allocate a single piece/roll directly from inside the bale breakdown
-  const handleAllocateSinglePiece = (roll, piece) => {
+  // Allocate a single piece/roll (full or partial cut) directly from inside the bale breakdown
+  const handleAllocateSinglePiece = (roll, piece, customCutMeters = null) => {
     if (piece.isDispatched) return;
 
     // Check Single Batch Rule
@@ -843,11 +998,20 @@ export default function ProcessChallanForm({
 
     const foldCode = roll.folding || foldingNotation || 'L100';
     const nominalMtrs = parseFloat(piece.meters) || 100;
-    const actualDispatched = computeFoldedMeters(nominalMtrs, foldCode);
+    const cutMtrs = customCutMeters !== null
+      ? Math.min(nominalMtrs, Math.max(0, parseFloat(customCutMeters) || 0))
+      : nominalMtrs;
+    if (cutMtrs <= 0) return;
+
+    const isCutFromPiece = customCutMeters !== null && cutMtrs < nominalMtrs;
+    const remainingPieceMtrs = isCutFromPiece ? Number((nominalMtrs - cutMtrs).toFixed(2)) : 0;
+    const actualDispatched = computeFoldedMeters(cutMtrs, foldCode);
 
     const newItem = {
       id: Date.now() + Math.random(),
-      bale_roll_no: `${roll.baleNo} (${piece.pieceNo})`,
+      bale_roll_no: isCutFromPiece
+        ? `${roll.baleNo} (${piece.pieceNo} - Cut ${cutMtrs}m)`
+        : `${roll.baleNo} (${piece.pieceNo})`,
       parent_bale_id: roll.id,
       piece_id: piece.id,
       invoice_no: roll.invoiceNo,
@@ -857,20 +1021,31 @@ export default function ProcessChallanForm({
       original_piece_meters: nominalMtrs,
       dispatched_meters: actualDispatched,
       is_partial_cut: true,
-      dispatch_mode: 'Piece Allocation',
+      dispatch_mode: isCutFromPiece ? 'Piece Cut (Scenario B)' : 'Piece Allocation',
       folding: foldCode,
-      remaining_stock_meters: 0
+      remaining_stock_meters: remainingPieceMtrs
     };
 
     setItems(prev => [...prev, newItem]);
 
-    // Update warehouse stock pool
+    // Update warehouse stock pool (Scenario B: cut piece immediately reduces piece meters & leaves remainder in stock)
     setWarehouseStockPool(prev => prev.map(wb => {
       if (wb.id === roll.id) {
         const currentPieces = ensureBalePieces(wb);
-        const updatedPieces = currentPieces.map(p => p.id === piece.id ? { ...p, isDispatched: true } : p);
+        const updatedPieces = currentPieces.map(p => {
+          if (p.id !== piece.id) return p;
+          if (isCutFromPiece) {
+            return {
+              ...p,
+              originalMeters: p.originalMeters || nominalMtrs,
+              meters: remainingPieceMtrs,
+              isDispatched: false
+            };
+          }
+          return { ...p, isDispatched: true };
+        });
         const currentAvail = wb.availableMeters !== undefined ? wb.availableMeters : wb.meters;
-        const updatedAvail = Math.max(0, currentAvail - nominalMtrs);
+        const updatedAvail = Math.max(0, currentAvail - cutMtrs);
         return {
           ...wb,
           availableMeters: Number(updatedAvail.toFixed(2)),
@@ -1198,8 +1373,8 @@ export default function ProcessChallanForm({
       customer_brand: customerBrand,
       po_link_status: poLinkStatus,
       admin_alert_triggered: isEmergencyDispatch,
-      particulars: particulars || '100x100 Voil [48"] gray - fab issue for dying',
-      folding_notation: foldingNotation || 'L100',
+      particulars: particulars || '',
+      folding_notation: foldingNotation || '',
       total_bales: baleCount || 1,
       total_pieces: totalPiecesText,
       grand_total_meters: Number(grandTotalMeters.toFixed(2)),
@@ -1212,6 +1387,35 @@ export default function ProcessChallanForm({
       created_at: initialChallan?.created_at || new Date().toISOString(),
       items
     };
+
+    // PDF Section 4.2: Deduct dispatched quantity from Stock Pool (raindrop_stock_pool_v1)
+    try {
+      const rawSp = localStorage.getItem('raindrop_stock_pool_v1');
+      if (rawSp) {
+        const spList = JSON.parse(rawSp);
+        if (Array.isArray(spList) && spList.length > 0) {
+          const updatedSp = spList.map(sp => {
+            if (!sp || (Number(sp.qty) || 0) <= 0) return sp;
+            let deduct = 0;
+            items.forEach(it => {
+              const parentBale = warehouseStockPool.find(wb => wb.id === it.parent_bale_id || wb.baleNo === it.bale_roll_no);
+              const matchesById = parentBale?.stockPoolId && parentBale.stockPoolId === sp.id;
+              const matchesByFab = !parentBale?.stockPoolId &&
+                String(it.fabric_name || '').toLowerCase().includes(String(sp.fabricName || '').toLowerCase()) &&
+                String(it.color_name || '').toLowerCase() === String(sp.colorName || '').toLowerCase();
+              if (matchesById || matchesByFab) {
+                deduct += parseFloat(it.dispatched_meters) || 0;
+              }
+            });
+            if (deduct > 0) {
+              return { ...sp, qty: Math.max(0, Number((Number(sp.qty) - deduct).toFixed(2))) };
+            }
+            return sp;
+          });
+          localStorage.setItem('raindrop_stock_pool_v1', JSON.stringify(updatedSp));
+        }
+      }
+    } catch (e) { }
 
     onSave(challanPayload, andRecordReturn);
   };
@@ -1230,6 +1434,17 @@ export default function ProcessChallanForm({
         style={{ borderColor: '#e2e8f0' }}
       >
         <div className="d-flex align-items-center gap-3">
+          {onCancel && (
+            <button
+              type="button"
+              className="btn btn-light rounded-circle border shadow-sm d-flex align-items-center justify-content-center p-0"
+              onClick={onCancel}
+              title="Back to Challans List"
+              style={{ width: '38px', height: '38px', borderColor: '#e2e8f0', backgroundColor: '#ffffff', color: '#334155', flexShrink: 0 }}
+            >
+              <i className="ti ti-arrow-left fs-18"></i>
+            </button>
+          )}
           <div
             className="rounded-3 d-flex align-items-center justify-content-center text-white shadow-xs"
             style={{ width: '42px', height: '42px', background: '#4f46e5' }}
@@ -1798,7 +2013,7 @@ export default function ProcessChallanForm({
             {/* Real-Time Requirement vs Dispatched Tracker Bar */}
             <div className="p-3 px-4 border-bottom bg-light-subtle">
               <div className="row g-2 align-items-center">
-                <div className="col-12 col-md-3">
+                <div className="col-12 col-md-4">
                   <div className="p-2.5 rounded border bg-white shadow-xs">
                     <span className="text-muted fs-11 fw-medium text-uppercase d-block">PO Required Meters</span>
                     <div className="d-flex align-items-baseline gap-1.5">
@@ -1814,20 +2029,19 @@ export default function ProcessChallanForm({
                   </div>
                 </div>
 
-                <div className="col-12 col-md-3">
+                <div className="col-12 col-md-4">
                   <div className="p-2.5 rounded border bg-white shadow-xs">
                     <span className="text-muted fs-11 fw-medium text-uppercase d-block">Total Dispatched</span>
                     <div className="d-flex align-items-baseline gap-1.5">
                       <span className="fs-16 fw-bold text-dark">
                         {grandTotalMeters.toFixed(2)} m
                       </span>
-                      <span className="text-muted fs-11">({items.length} rolls/bales)</span>
                       <span className="text-muted fs-11">({items.length} bales/thans)</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="col-12 col-md-3">
+                <div className="col-12 col-md-4">
                   <div className={`p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05
                     ? 'border-success'
                     : balancePendingMeters > 0
@@ -1849,29 +2063,6 @@ export default function ProcessChallanForm({
                       <span className="fs-13 fw-bold text-secondary">Ready for Dispatch</span>
                     )}
                   </div>
-                </div>
-
-                <div className="col-12 col-md-3 d-flex flex-column gap-1.5 justify-content-center">
-                  {totalRequiredMeters > 0 && balancePendingMeters > 0 && isSectionEditable('items') ? (
-                    <button
-                      type="button"
-                      className="btn btn-outline-warning btn-sm py-1.5 px-3 fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-xs"
-                      onClick={handleAutoFulfillBalance}
-                    >
-                      <i className="ti ti-bolt fs-14"></i>
-                      <span>⚡ Auto-Fulfill Balance</span>
-                    </button>
-                  ) : null}
-                  {isSectionEditable('items') && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm py-1.5 px-3 fw-semibold d-flex align-items-center justify-content-center gap-1.5 shadow-xs"
-                      onClick={() => setShowStockPickerModal(true)}
-                    >
-                      <i className="ti ti-building-warehouse fs-14"></i>
-                      <span>Browse Warehouse Stock</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -1906,26 +2097,18 @@ export default function ProcessChallanForm({
                                 ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/pieces from warehouse inventory or auto-fulfill.`
                                 : 'Select bales/pieces from warehouse inventory to dispatch on this Process Challan.'}
                             </p>
-                            <div className="d-flex justify-content-center gap-2">
-                              <button
-                                type="button"
-                                className="btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1.5"
-                                onClick={() => setShowStockPickerModal(true)}
-                              >
-                                <i className="ti ti-building-warehouse fs-14"></i>
-                                <span>Pick Bales from Warehouse Stock</span>
-                              </button>
-                              {totalRequiredMeters > 0 && (
+                            {totalRequiredMeters > 0 && (
+                              <div className="d-flex justify-content-center gap-2">
                                 <button
                                   type="button"
-                                  className="btn btn-warning btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
+                                  className="btn btn-primary btn-sm px-3 shadow-xs d-flex align-items-center gap-1.5"
                                   onClick={handleAutoFulfillBalance}
                                 >
                                   <i className="ti ti-bolt fs-14"></i>
                                   <span>Auto-Fulfill (FIFO)</span>
                                 </button>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2236,12 +2419,10 @@ export default function ProcessChallanForm({
                 <div>
                   <h6 className="modal-title fw-bold text-dark fs-16 mb-0">
                     <i className="ti ti-building-warehouse text-primary me-2"></i>
-                    Warehouse Stock Allocation (Bales / Rolls Inventory)
-                    Warehouse Stock Allocation (Bales &amp; Thans Inventory)
+                    Warehouse Stock Allocation (Stock Pool → Bales → Pieces)
                   </h6>
                   <p className="text-muted fs-11 mb-0">
-                    Inward purchase stock • FIFO priority • Scenario A (Full Bale) vs Scenario B (Cut Piece) • Single Batch Check
-                    Inward procurement stock • Real Purchase Orders &amp; GRNs • Pick Full Bales, Individual Thans, or Cut Meters
+                    Select Fabric, Width &amp; Colour first → then pick Bales or Individual Thans / Cut Meters (FIFO &amp; Single Batch)
                   </p>
                 </div>
                 <button type="button" className="btn-close" onClick={() => setShowStockPickerModal(false)}></button>
@@ -2355,58 +2536,186 @@ export default function ProcessChallanForm({
               </div>
 
               <div className="modal-body p-4" style={{ background: '#f8fafc' }}>
-                <div className="table-responsive bg-white border rounded shadow-xs">
-                  <table className="table table-hover align-middle mb-0" style={{ fontSize: '12.5px' }}>
-                    <thead className="table-light">
-                      <tr className="text-secondary fs-11 fw-bold text-uppercase">
-                        <th style={{ width: '40px' }} className="text-center">
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={
-                              modalSelectedBaleIds.length > 0 &&
-                              warehouseStockPool.filter(w => (w.availableMeters !== undefined ? w.availableMeters : w.meters) > 0)
-                                .every(w => modalSelectedBaleIds.includes(w.id))
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                const activeIds = warehouseStockPool
-                                  .filter(w => (w.availableMeters !== undefined ? w.availableMeters : w.meters) > 0)
-                                  .map(w => w.id);
-                                setModalSelectedBaleIds(activeIds);
-                              } else {
-                                setModalSelectedBaleIds([]);
-                              }
+                {(() => {
+                  const filteredBales = warehouseStockPool.filter(roll => {
+                    const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
+                    if (avail <= 0) return false;
+                    if (modalVendorFilter !== 'All' && roll.vendorName !== modalVendorFilter) return false;
+                    if (modalInvoiceFilter !== 'All' && roll.invoiceNo !== modalInvoiceFilter) return false;
+                    if (modalSearchTerm.trim()) {
+                      const q = modalSearchTerm.toLowerCase();
+                      const match = String(roll.baleNo || '').toLowerCase().includes(q) ||
+                        String(roll.invoiceNo || '').toLowerCase().includes(q) ||
+                        String(roll.fabric || '').toLowerCase().includes(q) ||
+                        String(roll.fabricQuality || '').toLowerCase().includes(q) ||
+                        String(roll.color || '').toLowerCase().includes(q) ||
+                        String(roll.vendorName || '').toLowerCase().includes(q) ||
+                        String(roll.poId || '').toLowerCase().includes(q);
+                      if (!match) return false;
+                    }
+                    return true;
+                  });
+
+                  const groupsMap = new Map();
+                  filteredBales.forEach(roll => {
+                    const avail = Number(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters) || 0;
+                    const fabName = String(roll.fabricQuality || roll.fabric || 'Fabric').replace(/\s*\[[^\]]+\]/g, '').trim();
+                    const widthStr = String(roll.width || '48"').replace(/"/g, '').trim() + '"';
+                    const colorStr = String(roll.color || 'Grey').trim();
+                    const gKey = `${fabName.toLowerCase()}___${widthStr.toLowerCase()}___${colorStr.toLowerCase()}`;
+                    if (!groupsMap.has(gKey)) {
+                      groupsMap.set(gKey, {
+                        key: gKey,
+                        fabricQuality: fabName,
+                        width: widthStr,
+                        color: colorStr,
+                        totalMeters: 0,
+                        bales: []
+                      });
+                    }
+                    const grp = groupsMap.get(gKey);
+                    grp.totalMeters += avail;
+                    grp.bales.push(roll);
+                  });
+
+                  const stockGroups = Array.from(groupsMap.values());
+                  const activeGroup = selectedStockGroupKey ? groupsMap.get(selectedStockGroupKey) : null;
+
+                  if (!activeGroup) {
+                    return (
+                      <div className="table-responsive bg-white border rounded shadow-xs">
+                        <table className="table table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
+                          <thead className="table-light">
+                            <tr className="text-secondary fs-11 fw-bold text-uppercase">
+                              <th style={{ minWidth: '200px' }}>Fabric</th>
+                              <th style={{ width: '100px' }}>Width</th>
+                              <th style={{ minWidth: '150px' }}>Colour</th>
+                              <th style={{ width: '160px' }} className="text-end">Available Quantity</th>
+                              <th style={{ width: '130px' }} className="text-center">Bales / Lots</th>
+                              <th style={{ width: '50px' }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stockGroups.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="text-center py-5 text-muted">
+                                  No available stock found matching your filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              stockGroups.map(grp => (
+                                <tr
+                                  key={grp.key}
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={() => {
+                                    setSelectedStockGroupKey(grp.key);
+                                    setExpandedBaleId(null);
+                                  }}
+                                >
+                                  <td>
+                                    <div className="fw-bold text-dark">{grp.fabricQuality}</div>
+                                  </td>
+                                  <td>
+                                    <span className="font-monospace text-dark">{grp.width}</span>
+                                  </td>
+                                  <td>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <span
+                                        className="d-inline-block rounded-circle border"
+                                        style={{
+                                          width: '12px',
+                                          height: '12px',
+                                          backgroundColor:
+                                            grp.color.toLowerCase().includes('black') ? '#0f172a' :
+                                            grp.color.toLowerCase().includes('white') ? '#ffffff' :
+                                            grp.color.toLowerCase().includes('blue') ? '#1d4ed8' :
+                                            grp.color.toLowerCase().includes('natural') ? '#f5f0e1' : '#94a3b8'
+                                        }}
+                                      ></span>
+                                      <span className="fw-medium text-dark">{grp.color}</span>
+                                    </div>
+                                  </td>
+                                  <td className="text-end">
+                                    <span className="fw-bold font-monospace text-dark fs-14">
+                                      {grp.totalMeters.toFixed(1)}m
+                                    </span>
+                                  </td>
+                                  <td className="text-center">
+                                    <span className="badge bg-light text-dark border rounded-pill px-2.5 py-1 fs-11 fw-semibold">
+                                      {grp.bales.length} bale(s)
+                                    </span>
+                                  </td>
+                                  <td className="text-center text-muted">
+                                    <i className="ti ti-chevron-right fs-16"></i>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="mb-3 p-2.5 px-3 bg-white border rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-2xs" style={{ borderColor: '#cbd5e1' }}>
+                        <div className="d-flex align-items-center gap-2.5">
+                          <button
+                            type="button"
+                            className="btn btn-light btn-sm border d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-2 fw-semibold"
+                            onClick={() => {
+                              setSelectedStockGroupKey(null);
+                              setExpandedBaleId(null);
                             }}
-                          />
-                        </th>
-                        <th style={{ minWidth: '180px' }}>Bale No &amp; Structure</th>
-                        <th style={{ minWidth: '180px' }}>PO &amp; Invoice Ref</th>
-                        <th style={{ minWidth: '150px' }}>Fabric Quality &amp; Shade</th>
-                        <th style={{ width: '85px' }} className="text-center">Folding</th>
-                        <th style={{ width: '130px' }} className="text-end">Available (M)</th>
-                        <th style={{ minWidth: '320px' }} className="text-center">Dispatch Allocation Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {warehouseStockPool
-                        .filter(roll => {
-                          const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
-                          if (avail <= 0) return false;
-                          if (modalVendorFilter !== 'All' && roll.vendorName !== modalVendorFilter) return false;
-                          if (modalInvoiceFilter !== 'All' && roll.invoiceNo !== modalInvoiceFilter) return false;
-                          if (modalSearchTerm.trim()) {
-                            const q = modalSearchTerm.toLowerCase();
-                            const match = String(roll.baleNo || '').toLowerCase().includes(q) ||
-                              String(roll.invoiceNo || '').toLowerCase().includes(q) ||
-                              String(roll.fabric || '').toLowerCase().includes(q) ||
-                              String(roll.vendorName || '').toLowerCase().includes(q) ||
-                              String(roll.poId || '').toLowerCase().includes(q);
-                            if (!match) return false;
-                          }
-                          return true;
-                        })
-                        .map((roll, idx) => {
+                          >
+                            <i className="ti ti-arrow-left fs-14"></i>
+                            <span>Back to Fabrics</span>
+                          </button>
+                          <div className="vr" style={{ height: '20px' }}></div>
+                          <span className="fw-bold text-dark fs-13">{activeGroup.fabricQuality}</span>
+                          <span className="badge bg-light text-dark border font-monospace fs-11">{activeGroup.width}</span>
+                          <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">{activeGroup.color}</span>
+                        </div>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="text-muted fs-12">Available in Group:</span>
+                          <strong className="text-success font-monospace fs-14">{activeGroup.totalMeters.toFixed(2)} m</strong>
+                          <span className="badge bg-light text-secondary border fs-11">{activeGroup.bales.length} bale(s)</span>
+                        </div>
+                      </div>
+
+                      <div className="table-responsive bg-white border rounded shadow-xs">
+                        <table className="table table-hover align-middle mb-0" style={{ fontSize: '12.5px' }}>
+                          <thead className="table-light">
+                            <tr className="text-secondary fs-11 fw-bold text-uppercase">
+                              <th style={{ width: '40px' }} className="text-center">
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={
+                                    activeGroup.bales.length > 0 &&
+                                    activeGroup.bales.every(w => modalSelectedBaleIds.includes(w.id))
+                                  }
+                                  onChange={(e) => {
+                                    const groupIds = activeGroup.bales.map(w => w.id);
+                                    if (e.target.checked) {
+                                      setModalSelectedBaleIds(prev => Array.from(new Set([...prev, ...groupIds])));
+                                    } else {
+                                      setModalSelectedBaleIds(prev => prev.filter(id => !groupIds.includes(id)));
+                                    }
+                                  }}
+                                />
+                              </th>
+                              <th style={{ minWidth: '180px' }}>Bale No &amp; Structure</th>
+                              <th style={{ minWidth: '180px' }}>PO &amp; Invoice Ref</th>
+                              <th style={{ minWidth: '150px' }}>Fabric Quality &amp; Shade</th>
+                              <th style={{ width: '85px' }} className="text-center">Folding</th>
+                              <th style={{ width: '130px' }} className="text-end">Available (M)</th>
+                              <th style={{ minWidth: '320px' }} className="text-center">Dispatch Allocation Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeGroup.bales.map((roll, idx) => {
                           const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
                           const isSelected = modalSelectedBaleIds.includes(roll.id);
                           const foldCode = roll.folding || foldingNotation || 'L100';
@@ -2619,7 +2928,7 @@ export default function ProcessChallanForm({
                                               <th style={{ minWidth: '150px' }}>Than (Piece) No</th>
                                               <th style={{ minWidth: '130px' }}>Length (Meters)</th>
                                               <th style={{ width: '110px' }} className="text-center">Status</th>
-                                              <th style={{ width: '130px' }} className="text-end">Action</th>
+                                              <th style={{ minWidth: '280px' }} className="text-end">Action</th>
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -2627,6 +2936,8 @@ export default function ProcessChallanForm({
                                               const isPieceSelected = selectedPieceIds.includes(piece.id);
                                               const isPieceDispatched = piece.isDispatched;
                                               const actualPieceMtrs = computeFoldedMeters(piece.meters, foldCode);
+                                              const pieceCutKey = `${roll.id}__${piece.id}`;
+                                              const pieceCutVal = customCutInputs[pieceCutKey] || '';
 
                                               return (
                                                 <tr
@@ -2655,6 +2966,11 @@ export default function ProcessChallanForm({
                                                   </td>
                                                   <td>
                                                     <span className="fw-bold font-monospace fs-12 text-primary">{piece.meters} m</span>
+                                                    {piece.originalMeters && piece.meters < piece.originalMeters && (
+                                                      <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 ms-1.5">
+                                                        Cut from {piece.originalMeters}m
+                                                      </span>
+                                                    )}
                                                     {foldCode.includes('98') && (
                                                       <span className="text-muted fs-10 ms-1">(= {actualPieceMtrs.toFixed(2)}m)</span>
                                                     )}
@@ -2668,14 +2984,45 @@ export default function ProcessChallanForm({
                                                   </td>
                                                   <td className="text-end" onClick={(e) => e.stopPropagation()}>
                                                     {!isPieceDispatched && (
-                                                      <button
-                                                        type="button"
-                                                        className="btn btn-outline-primary btn-xs py-0.5 px-2 rounded fs-11 fw-semibold"
-                                                        onClick={() => handleAllocateSinglePiece(roll, piece)}
-                                                        title={`Allocate ${piece.pieceNo} only`}
-                                                      >
-                                                        + Allocate Than
-                                                      </button>
+                                                      <div className="d-inline-flex align-items-center justify-content-end gap-1.5 flex-nowrap">
+                                                        <input
+                                                          type="number"
+                                                          step="0.01"
+                                                          min="0"
+                                                          max={piece.meters}
+                                                          className="form-control form-control-sm py-0 px-2 fs-11 font-monospace text-end bg-white"
+                                                          style={{ width: '76px', height: '28px', borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                                          placeholder="Cut m"
+                                                          value={pieceCutVal}
+                                                          onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setCustomCutInputs(prev => ({ ...prev, [pieceCutKey]: val }));
+                                                          }}
+                                                        />
+                                                        <button
+                                                          type="button"
+                                                          className="btn btn-primary btn-sm px-2.5 rounded-2 fs-11 fw-semibold text-nowrap d-inline-flex align-items-center gap-1"
+                                                          style={{ height: '28px' }}
+                                                          disabled={!pieceCutVal || parseFloat(pieceCutVal) <= 0 || parseFloat(pieceCutVal) > parseFloat(piece.meters)}
+                                                          onClick={() => {
+                                                            handleAllocateSinglePiece(roll, piece, parseFloat(pieceCutVal));
+                                                            setCustomCutInputs(prev => ({ ...prev, [pieceCutKey]: '' }));
+                                                          }}
+                                                          title={`Cut exact meters from ${piece.pieceNo} (remaining stays in stock)`}
+                                                        >
+                                                          <i className="ti ti-scissors fs-12"></i>
+                                                          <span>Cut</span>
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="btn btn-outline-primary btn-sm px-2.5 rounded-2 fs-11 fw-semibold text-nowrap d-inline-flex align-items-center gap-1"
+                                                          style={{ height: '28px' }}
+                                                          onClick={() => handleAllocateSinglePiece(roll, piece)}
+                                                          title={`Allocate full ${piece.pieceNo}`}
+                                                        >
+                                                          <span>+ Full Than</span>
+                                                        </button>
+                                                      </div>
                                                     )}
                                                   </td>
                                                 </tr>
@@ -2691,9 +3038,12 @@ export default function ProcessChallanForm({
                             </React.Fragment>
                           );
                         })}
-                    </tbody>
-                  </table>
-                </div>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center">
