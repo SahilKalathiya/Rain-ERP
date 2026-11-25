@@ -80,6 +80,37 @@ export const getStoredAccessoriesMaster = () => {
   return data;
 };
 
+export const getStoredAccessoryCategories = () => {
+  const data = getStoredData('erp_accessory_categories_v1', []);
+  return Array.isArray(data) ? data : [];
+};
+
+export const saveCustomAccessoryCategory = (categoryObj) => {
+  const existing = getStoredAccessoryCategories();
+  const cleanName = (categoryObj?.name || '').trim();
+  if (!cleanName) return existing;
+  const alreadyExists = existing.some(
+    (c) => (typeof c === 'string' ? c : c?.name || '').trim().toLowerCase() === cleanName.toLowerCase()
+  );
+  const updated = alreadyExists
+    ? existing
+    : [
+        ...existing,
+        {
+          name: cleanName,
+          icon: categoryObj?.icon || 'ti ti-tag',
+          defaultUnit: categoryObj?.defaultUnit || 'PIECE',
+          createdAt: new Date().toISOString()
+        }
+      ];
+  setStoredData('erp_accessory_categories_v1', updated);
+  try {
+    window.dispatchEvent(new CustomEvent('erp_accessory_categories_updated', { detail: updated }));
+    window.dispatchEvent(new Event('storage'));
+  } catch (e) {}
+  return updated;
+};
+
 const LEGACY_MOCK_NAMES = [
   'charcoal', 'green', 'navy blue', 'sea green', 'royal blue', 'ivory',
   'lavender', 'pastel red', 'white', 'watermelon', 'jamun', 'rama green',

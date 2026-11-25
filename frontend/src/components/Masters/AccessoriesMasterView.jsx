@@ -4,6 +4,7 @@ import {
   getStoredData,
   setStoredData,
   getStoredAccessoriesMaster,
+  getStoredAccessoryCategories,
   initialThreadSizes,
   getStoredThreadSizes,
   setStoredThreadSizes,
@@ -359,8 +360,9 @@ export function TasselTypeMultiSelect({ value, onChange, disabled = false }) {
   );
 }
 
-export default function AccessoriesMasterView({ isInline = false, onSaveInline, onCloseInline }) {
+export default function AccessoriesMasterView({ isInline = false, onSaveInline, onCloseInline, initialCategory = '' }) {
   const [accessories, setAccessories] = useState(() => getStoredAccessoriesMaster());
+  const [customCategories, setCustomCategories] = useState(() => getStoredAccessoryCategories());
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditing, setIsEditing] = useState(isInline);
@@ -546,16 +548,39 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   useEffect(() => {
     const handleUpdate = () => {
       setAccessories(getStoredAccessoriesMaster());
+      setCustomCategories(getStoredAccessoryCategories());
       setThreadSizes(getStoredThreadSizes());
       setThreadColors(getStoredThreadBrandColors());
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('erp_accessories_master_updated', handleUpdate);
+    window.addEventListener('erp_accessory_categories_updated', handleUpdate);
     return () => {
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('erp_accessories_master_updated', handleUpdate);
+      window.removeEventListener('erp_accessory_categories_updated', handleUpdate);
     };
   }, []);
+
+  const customCategoryNames = useMemo(() => {
+    const baseLower = new Set([
+      ...ACCESSORY_CATEGORIES.map((c) => c.toLowerCase()),
+      ...BASE_CATEGORIES.map((c) => c.toLowerCase())
+    ]);
+    return (customCategories || [])
+      .map((c) => (typeof c === 'string' ? c : c?.name || '').trim())
+      .filter((name) => name && !baseLower.has(name.toLowerCase()));
+  }, [customCategories]);
+
+  const dynamicAccessoryCategories = useMemo(
+    () => [...ACCESSORY_CATEGORIES, ...customCategoryNames],
+    [customCategoryNames]
+  );
+
+  const dynamicTabs = useMemo(
+    () => ['All', ...BASE_CATEGORIES, ...customCategoryNames, 'Thread Sizes', 'Thread Brand & Colors'],
+    [customCategoryNames]
+  );
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -614,7 +639,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
     processRemarks: ''
   });
 
-  const [formData, setFormData] = useState(() => getEmptyAccessoryForm('Buttons'));
+  const [formData, setFormData] = useState(() => getEmptyAccessoryForm(initialCategory || 'Buttons'));
   const [laceSizeInput, setLaceSizeInput] = useState('');
 
   // Requirement 25: Duplicate names should not be allowed across Accessories
@@ -776,7 +801,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   };
 
   const handleAddNew = () => {
-    const targetCat = ALL_TABS.includes(selectedCategory) && selectedCategory !== 'Thread Sizes' && selectedCategory !== 'Thread Brand & Colors' && selectedCategory !== 'All'
+    const targetCat = dynamicTabs.includes(selectedCategory) && selectedCategory !== 'Thread Sizes' && selectedCategory !== 'Thread Brand & Colors' && selectedCategory !== 'All'
       ? (selectedCategory === 'Tassels' ? 'Tassel' : (selectedCategory === 'Buttons' ? 'Button' : selectedCategory))
       : 'Button';
 
@@ -1095,7 +1120,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
   }, [accessories, selectedCategory, searchQuery]);
 
   return (
-    <div className="p-4" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+    <div className={isInline ? '' : 'p-4'} style={isInline ? undefined : { backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+      {!isInline && (
+        <>
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -1168,7 +1195,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
               value={selectedCategory}
               onChange={(e) => handleCategoryChange(e.target.value)}
             >
-              {ALL_TABS.map((cat) => (
+              {dynamicTabs.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -1232,7 +1259,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
 
       {/* Category Tabs */}
       <div className="d-flex gap-2 mb-4 overflow-auto pb-2">
-        {ALL_TABS.map((cat) => {
+        {dynamicTabs.map((cat) => {
           const isThreadTab = cat === 'Thread Sizes' || cat === 'Thread Brand & Colors';
           const count = cat === 'All'
             ? accessories.length
@@ -1252,6 +1279,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
           );
         })}
       </div>
+        </>
+      )}
 
       {/* ========================================================================= */}
       {/* ========================================================================= */}
@@ -1266,7 +1295,13 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
             overflowY: 'auto'
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setIsEditing(false);
+            if (e.target === e.currentTarget) {
+              if (isInline && onCloseInline) {
+                onCloseInline();
+              } else {
+                setIsEditing(false);
+              }
+            }
           }}
         >
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '620px', width: '100%' }}>
@@ -1304,8 +1339,12 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     type="button"
                     className="btn-close shadow-none"
                     onClick={() => {
-                      setIsEditing(false);
-                      setIsModalEditMode(false);
+                      if (isInline && onCloseInline) {
+                        onCloseInline();
+                      } else {
+                        setIsEditing(false);
+                        setIsModalEditMode(false);
+                      }
                     }}
                     aria-label="Close"
                   ></button>
@@ -1361,9 +1400,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                           }}
                           style={{ height: '42px', borderRadius: '8px' }}
                         >
-                          {ACCESSORY_CATEGORIES.map((c) => (
+                          {dynamicAccessoryCategories.map((c) => (
                             <option key={c} value={c}>
-                              {c}2
+                              {c}
                             </option>
                           ))}
                         </select>
@@ -2817,7 +2856,9 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                       type="button"
                       className="btn btn-theme-close rounded-3 px-4 fw-medium"
                       onClick={() => {
-                        if (isCreatingNew) {
+                        if (isInline && onCloseInline) {
+                          onCloseInline();
+                        } else if (isCreatingNew) {
                           setIsEditing(false);
                           setIsModalEditMode(false);
                         } else {
@@ -2843,6 +2884,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
         </div>
       )}
 
+      {!isInline && (
+        <>
       {/* ========================================================================= */}
       {/* THREAD SIZES MASTER (PACKAGING & UNITS)                                   */}
       {/* ========================================================================= */}
@@ -4502,6 +4545,8 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {/* ARTICLE MASTER POPUP MODAL (IDENTICAL TO ARTICLE MASTER MODAL) */}

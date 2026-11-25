@@ -1,11 +1,19 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { getStoredData, setStoredData, initialAccessoryMasters, getStoredAccessoriesMaster } from '../../data/salesOrderData';
+import {
+  getStoredData,
+  setStoredData,
+  initialAccessoryMasters,
+  getStoredAccessoriesMaster,
+  getStoredAccessoryCategories,
+  saveCustomAccessoryCategory
+} from '../../data/salesOrderData';
 import { initialVendors, initialPurchaseOrders, initialFabrics as procurementFabrics } from '../../data/procurementData';
 import {
   GenericAccessoryPOModal,
   TasselPOModal,
   ThreadPOModal
 } from './AccessoryPOModals';
+import AccessoriesMasterView from '../Masters/AccessoriesMasterView';
 
 const autoCapitalizeWords = (str) => {
   if (!str) return '';
@@ -100,16 +108,25 @@ export default function OrderDetailView({
 
   // Master Accessories Dynamic State (Sourced from Accessories Master)
   const [masterAccessories, setMasterAccessories] = useState(() => getStoredAccessoriesMaster());
+  const [customAccessoryCategories, setCustomAccessoryCategories] = useState(() => getStoredAccessoryCategories());
+  const [showNewAccessoryModal, setShowNewAccessoryModal] = useState(false);
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryUnit, setNewCategoryUnit] = useState('PIECE');
+  const [newCategoryError, setNewCategoryError] = useState('');
 
   useEffect(() => {
     const handleUpdate = () => {
       setMasterAccessories(getStoredAccessoriesMaster());
+      setCustomAccessoryCategories(getStoredAccessoryCategories());
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('erp_accessories_master_updated', handleUpdate);
+    window.addEventListener('erp_accessory_categories_updated', handleUpdate);
     return () => {
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('erp_accessories_master_updated', handleUpdate);
+      window.removeEventListener('erp_accessory_categories_updated', handleUpdate);
     };
   }, []);
 
@@ -484,6 +501,12 @@ export default function OrderDetailView({
     ];
 
     const allCatNames = [...defaultOrder];
+    (customAccessoryCategories || []).forEach(c => {
+      const cname = (typeof c === 'string' ? c : c?.name || '').trim();
+      if (cname && !allCatNames.some(existing => matchesCategory(cname, existing))) {
+        allCatNames.push(cname);
+      }
+    });
     masterAccessories.forEach(m => {
       if (m.category && !allCatNames.some(existing => matchesCategory(m.category, existing))) {
         allCatNames.push(m.category);
@@ -491,14 +514,18 @@ export default function OrderDetailView({
     });
 
     return allCatNames.map(catName => {
+      const customMetaObj = (customAccessoryCategories || []).find(c => {
+        const cname = (typeof c === 'string' ? c : c?.name || '').trim();
+        return cname && matchesCategory(cname, catName);
+      });
       const meta = CATEGORY_METADATA[catName] || Object.entries(CATEGORY_METADATA).find(([k]) => matchesCategory(k, catName))?.[1] || {
         name: catName,
-        icon: 'ti ti-tag',
+        icon: (typeof customMetaObj === 'object' && customMetaObj?.icon) || 'ti ti-tag',
         iconColor: '#2e37a4',
         bgColor: '#eef2ff',
         poBtnText: `${catName} PO`,
         poBtnColor: '#2e37a4',
-        defaultUnit: 'PCS'
+        defaultUnit: (typeof customMetaObj === 'object' && customMetaObj?.defaultUnit) || 'PIECE'
       };
 
       const inCat = masterAccessories.filter(m => matchesCategory(m.category, catName));
@@ -594,7 +621,7 @@ export default function OrderDetailView({
         varieties
       };
     });
-  }, [masterAccessories]);
+  }, [masterAccessories, customAccessoryCategories]);
 
   const [addedAccessories, setAddedAccessories] = useState(() => {
     if (Array.isArray(order?.accessories) && order.accessories.length > 0) {
@@ -5433,6 +5460,44 @@ export default function OrderDetailView({
               </button>
             );
           })}
+
+          {/* + New Category Quick Link (Linked with Accessories Master) */}
+          <button
+            type="button"
+            className="btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs"
+            style={{
+              width: '100%',
+              height: '76px',
+              backgroundColor: '#f8fafc',
+              borderColor: '#2e37a4',
+              borderWidth: '1.5px',
+              borderStyle: 'dashed',
+              color: '#2e37a4',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              setNewCategoryName('');
+              setNewCategoryUnit('PIECE');
+              setNewCategoryError('');
+              setShowNewCategoryModal(true);
+            }}
+            title="Add new category directly to Accessories Master"
+          >
+            <div
+              className="rounded-circle d-flex align-items-center justify-content-center mb-1"
+              style={{
+                width: '28px',
+                height: '28px',
+                backgroundColor: '#eef2ff',
+                color: '#2e37a4'
+              }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: '15px' }}></i>
+            </div>
+            <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              + New
+            </span>
+          </button>
         </div>
 
         {/* 2. Active Category Action Bar & Quick Varieties */}
@@ -6119,6 +6184,128 @@ export default function OrderDetailView({
           onSavePO={handleSaveAccessoryPO}
         />
       ) : null}
+
+      {/* Add New Category Modal (Linked directly to Accessories Master) */}
+      {showNewCategoryModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.55)', zIndex: 1060 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewCategoryModal(false);
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px', width: '100%' }}>
+            <div className="modal-content shadow-lg border-0 rounded-4 bg-white overflow-hidden">
+              <div className="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center bg-white">
+                <h5 className="modal-title fw-bold text-dark mb-0 fs-16">
+                  Add New Accessory Category
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close shadow-none"
+                  onClick={() => setShowNewCategoryModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const clean = autoCapitalizeWords(newCategoryName.trim());
+                  if (!clean) {
+                    setNewCategoryError('Please enter a category name.');
+                    return;
+                  }
+                  const duplicate = ACCESSORY_CATEGORIES.some(
+                    (c) => matchesCategory(c.id, clean) || matchesCategory(c.name, clean)
+                  );
+                  if (duplicate) {
+                    setNewCategoryError(`Category "${clean}" already exists.`);
+                    return;
+                  }
+                  const updatedCats = saveCustomAccessoryCategory({
+                    name: clean,
+                    defaultUnit: newCategoryUnit
+                  });
+                  setCustomAccessoryCategories(updatedCats);
+                  setActiveCategory(clean);
+                  setShowNewCategoryModal(false);
+                }}
+              >
+                <div className="modal-body p-4">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold text-dark small mb-1.5">
+                      Category Name <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={`form-control ${newCategoryError ? 'is-invalid' : ''}`}
+                      placeholder="e.g. Piping, Patch, Mirror, Stone"
+                      value={newCategoryName}
+                      autoFocus
+                      onChange={(e) => {
+                        setNewCategoryName(e.target.value);
+                        if (newCategoryError) setNewCategoryError('');
+                      }}
+                      style={{ height: '42px', borderRadius: '8px' }}
+                    />
+                    {newCategoryError && (
+                      <div className="invalid-feedback d-block small mt-1">{newCategoryError}</div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="form-label fw-semibold text-dark small mb-1.5">
+                      Default Unit
+                    </label>
+                    <select
+                      className="form-select"
+                      value={newCategoryUnit}
+                      onChange={(e) => setNewCategoryUnit(e.target.value)}
+                      style={{ height: '42px', borderRadius: '8px' }}
+                    >
+                      <option value="PIECE">Piece</option>
+                      <option value="PCS">Pcs</option>
+                      <option value="METER">Meter</option>
+                      <option value="GRAM">Gram</option>
+                      <option value="PACK">Pack</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="modal-footer border-top py-3 px-4 d-flex justify-content-end gap-2 bg-light">
+                  <button
+                    type="button"
+                    className="btn btn-light border rounded-3 px-3 fw-medium"
+                    onClick={() => setShowNewCategoryModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary rounded-3 px-4 fw-semibold"
+                  >
+                    <i className="ti ti-plus me-1"></i> Add Category
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Accessories Master Modal */}
+      {showNewAccessoryModal && (
+        <AccessoriesMasterView
+          isInline={true}
+          initialCategory={activeCategory || undefined}
+          onSaveInline={(newAcc) => {
+            setMasterAccessories(getStoredAccessoriesMaster());
+            if (newAcc?.category) {
+              setActiveCategory(newAcc.category);
+            }
+            setShowNewAccessoryModal(false);
+          }}
+          onCloseInline={() => setShowNewAccessoryModal(false)}
+        />
+      )}
     </div>
   );
 }

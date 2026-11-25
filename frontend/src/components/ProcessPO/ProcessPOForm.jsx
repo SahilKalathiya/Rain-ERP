@@ -384,9 +384,9 @@ export default function ProcessPOForm({
     return [];
   };
 
-  // Per-style toggle: true = combine same Fabric/Color/Width, false = keep articles separate
+  // Per-style toggle: true = combine same Fabric/Color/Width, false/unset = keep articles separate (default)
   const [combineStyleMap, setCombineStyleMap] = useState({});
-  const isStyleCombined = (sIdx) => combineStyleMap[sIdx] !== false;
+  const isStyleCombined = (sIdx) => combineStyleMap[sIdx] === true;
   const setStyleCombined = (sIdx, val) => setCombineStyleMap(prev => ({ ...prev, [sIdx]: val }));
   const [availableSalesOrders, setAvailableSalesOrders] = useState(() => loadDynamicSalesOrders());
 
@@ -702,7 +702,7 @@ export default function ProcessPOForm({
   ])).filter(Boolean);
 
   // Helper to resolve requirement items for each style in turn (PDF Section 3.2: Multi-Style display)
-  const getRequirementsForStyle = (styleName, sIdx, shouldCombine = true) => {
+  const getRequirementsForStyle = (styleName, sIdx, shouldCombine = false) => {
     if (!styleName || !styleName.trim()) return [];
     const cleanStyle = styleName.trim().toLowerCase();
 
@@ -848,6 +848,7 @@ export default function ProcessPOForm({
         setLinkedOrderId(matchingOrder.id);
         if (matchingOrder.customer) setCustomerBrand(matchingOrder.customer);
         if (matchingOrder.deliveryDate) setDeliveryDate(matchingOrder.deliveryDate);
+        checkOrderWidthAlert(matchingOrder.id, matchingOrder);
       }
     }
   };
@@ -875,6 +876,57 @@ export default function ProcessPOForm({
     setSelectedStyles(updated);
   };
 
+  const [multipleWidthsAlert, setMultipleWidthsAlert] = useState('');
+
+  // Check if Sales Order has multiple widths selected; alert only when >1 distinct width exists
+  const checkOrderWidthAlert = (orderId, ordObj = null) => {
+    if (!orderId) {
+      setMultipleWidthsAlert('');
+      return;
+    }
+    const ord = ordObj || availableSalesOrders.find(o => o.id === orderId);
+    const widthSet = new Set();
+
+    try {
+      const rawOrders = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
+      const rawOrd = (Array.isArray(rawOrders) ? rawOrders : []).find(o => o.id === orderId);
+      if (rawOrd) {
+        if (rawOrd.groupPoWidths && typeof rawOrd.groupPoWidths === 'object') {
+          Object.values(rawOrd.groupPoWidths).forEach(w => {
+            const clean = String(w || '').replace(/["\s—-]/g, '');
+            if (clean) widthSet.add(`${clean}"`);
+          });
+        }
+        if (rawOrd.groupSelectedWidths && typeof rawOrd.groupSelectedWidths === 'object') {
+          Object.entries(rawOrd.groupSelectedWidths).forEach(([k, arr]) => {
+            if (Array.isArray(arr) && arr.length > 1 && !(rawOrd.groupPoWidths && rawOrd.groupPoWidths[k])) {
+              arr.forEach(w => {
+                const clean = String(w || '').replace(/["\s—-]/g, '');
+                if (clean) widthSet.add(`${clean}"`);
+              });
+            }
+          });
+        }
+      }
+    } catch (e) { }
+
+    if (ord && Array.isArray(ord.items)) {
+      ord.items.forEach(it => {
+        const clean = String(it.width || '').replace(/["\s—-]/g, '');
+        if (clean) widthSet.add(`${clean}"`);
+      });
+    }
+
+    const distinctWidths = Array.from(widthSet);
+    if (distinctWidths.length > 1) {
+      const msg = `Multiple widths (${distinctWidths.join(', ')}) are selected in Order #${orderId}. Please first fix a single width in the Order ("Select for PO") before creating a Process PO.`;
+      setMultipleWidthsAlert(msg);
+      window.alert(`⚠️ ${msg}`);
+    } else {
+      setMultipleWidthsAlert('');
+    }
+  };
+
   // Order selection handler
   const handleSelectOrder = (orderId) => {
     if (isLocked) return;
@@ -890,6 +942,7 @@ export default function ProcessPOForm({
         setStyleCountOption(ord.styles.length > 1 ? '2+' : '1');
       }
     }
+    checkOrderWidthAlert(orderId, ord);
   };
 
   // Section editable helper
@@ -1930,6 +1983,12 @@ export default function ProcessPOForm({
           {/* Linked Sales Order Item Selection Matrix (PDF Section 3.2: Multi-Style display in turn) */}
           {isOrderLinked && currentSelectedOrder && (
             <>
+              {multipleWidthsAlert && (
+                <div className="alert alert-danger d-flex align-items-center gap-2 mt-3 mb-0 py-2.5 px-3 fs-12 fw-semibold" role="alert">
+                  <i className="ti ti-alert-triangle fs-16"></i>
+                  <span>{multipleWidthsAlert}</span>
+                </div>
+              )}
               {(styleCountOption === '2+' || selectedStyles.length > 1) ? (
                     selectedStyles.map((styleVal, sIdx) => {
                       const positionLabel = sIdx === 0
