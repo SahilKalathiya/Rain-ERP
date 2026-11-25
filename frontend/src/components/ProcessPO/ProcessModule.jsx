@@ -23,7 +23,7 @@ import ProcessPrintModal from './ProcessPrintModal';
  */
 export default function ProcessModule({ initialTab = 'pos', currentRoute = '/process-po', onNavigate }) {
   const [activeTab, setActiveTab] = useState(initialTab); // 'pos' | 'challans' | 'returns' | 'qc' | 'tracking'
-  
+
   // Stored Data State
   const [pos, setPos] = useState(getStoredProcessPOs);
   const [challans, setChallans] = useState(getStoredProcessChallans);
@@ -221,15 +221,15 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     const defaultPieces = challan.items && challan.items.length > 0
       ? challan.items.map((it, idx) => ({
-          id: idx + 1,
-          piece_no: idx + 1,
-          meters: it.dispatched_meters || it.original_piece_meters || 100,
-          color_name: it.color_name || 'Standard',
-          folding: it.folding || ''
-        }))
+        id: idx + 1,
+        piece_no: idx + 1,
+        meters: it.dispatched_meters || it.original_piece_meters || 100,
+        color_name: it.color_name || 'Standard',
+        folding: it.folding || ''
+      }))
       : [
-          { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: '' }
-        ];
+        { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: '' }
+      ];
 
     setEditingReturn({
       vendor_id: challan.vendor_id || '',

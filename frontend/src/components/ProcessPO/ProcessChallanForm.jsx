@@ -42,38 +42,435 @@ export default function ProcessChallanForm({
   // Once saved and sent for challan, it is permanent/dispatched and cannot be edited
   const isReadOnly = isExistingSaved || isLocked;
 
-  // Available Warehouse Bales & Rolls for Stock Picking (FIFO & Invoice Batch)
+  // Helper to ensure each bale has structured individual thans / pieces (PDF Section 4.1 & 4.2)
+  const ensureBalePieces = (bale) => {
+    if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
+      return bale.pieces.map(p => ({
+        ...p,
+        pieceNo: String(p.pieceNo || '').replace(/^Roll\s*/i, 'Than ')
+      }));
+    }
+    if (bale.baleNo === 'Bale 5') {
+      return [
+        { id: `${bale.id}-p1`, pieceNo: 'Piece 5-1', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p2`, pieceNo: 'Piece 5-2', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p3`, pieceNo: 'Piece 5-3', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p4`, pieceNo: 'Piece 5-4', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p5`, pieceNo: 'Piece 5-5', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p6`, pieceNo: 'Piece 5-6', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p7`, pieceNo: 'Piece 5-7', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p8`, pieceNo: 'Piece 5-8', meters: 100, isDispatched: false },
+        { id: `${bale.id}-p9`, pieceNo: 'Piece 5-9', meters: 50, isDispatched: false },
+        { id: `${bale.id}-p10`, pieceNo: 'Piece 5-10', meters: 90, isDispatched: false },
+        { id: `${bale.id}-p11`, pieceNo: 'Piece 5-11', meters: 60, isDispatched: false }
+      ];
+    }
+    const totalMtrs = parseFloat(bale.availableMeters !== undefined ? bale.availableMeters : bale.meters) || 500;
+    const cleanBaleName = String(bale.baleNo || '1').replace(/\D/g, '') || '1';
+    const pieceSize = 100;
+    const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
+    const remainder = Number((totalMtrs - (count * pieceSize)).toFixed(2));
+    const result = [];
+    for (let i = 1; i <= count; i++) {
+      result.push({
+        id: `${bale.id}-p${i}`,
+        pieceNo: `Than ${cleanBaleName}-${i}`,
+        meters: pieceSize,
+        isDispatched: false
+      });
+    }
+    if (remainder > 0) {
+      result.push({
+        id: `${bale.id}-p${count + 1}`,
+        pieceNo: `Than ${cleanBaleName}-${count + 1}`,
+        meters: remainder,
+        isDispatched: false
+      });
+    }
+    return result;
+  };
+
+  // Available Warehouse Bales & Pieces for Stock Picking (FIFO & Invoice Batch)
   // Reflects authentic procurement inward stock as per client specifications:
   // - Vendor A: Jan (INV-VA-001: 4,000 mt) & Feb (INV-VA-002: 5,000 mt)
   // - Vendor B: June (INV-VB-001: 5,000 mt)
-  // - Bales 1-9 with full / cut piece options, sub-rolls (100, 50, 90m), and folding (L100 / L98)
+  // - Bales 1-9 with full / cut piece options, sub-pieces/thans (100, 50, 90m), and folding (L100 / L98)
   const defaultWarehouseBales = [
-    { id: 'WB-101', baleNo: 'Bale 1', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 500, availableMeters: 500, folding: 'L98', actualDispatchedMeters: 490, subRolls: '5 Rolls (100m x 5)', ageDays: 45 },
-    { id: 'WB-102', baleNo: 'Bale 2', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 900, availableMeters: 900, folding: 'L100', actualDispatchedMeters: 900, subRolls: '9 Rolls (100m x 9)', ageDays: 45 },
-    { id: 'WB-103', baleNo: 'Bale 3', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 600, availableMeters: 600, folding: 'L100', actualDispatchedMeters: 600, subRolls: '6 Rolls (100m x 6)', ageDays: 45 },
-    { id: 'WB-104', baleNo: 'Bale 4', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1000, availableMeters: 1000, folding: 'L100', actualDispatchedMeters: 1000, subRolls: '10 Rolls (100m x 10)', ageDays: 45 },
-    { id: 'WB-105', baleNo: 'Bale 5', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1000, availableMeters: 1000, folding: 'L100', actualDispatchedMeters: 1000, subRolls: 'Rolls: 100m, 100m, 100m, 50m, 90m...', ageDays: 45 },
-    { id: 'WB-106', baleNo: 'Bale 6 (Mega Bale)', vendorName: 'Vendor A', invoiceNo: 'INV-VA-002 (Feb)', date: '2026-02-10', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 5000, availableMeters: 5000, folding: 'L100', actualDispatchedMeters: 5000, subRolls: '50 Rolls (100m each)', ageDays: 20 },
-    { id: 'WB-107', baleNo: 'Bale 7', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 2000, availableMeters: 2000, folding: 'L100', actualDispatchedMeters: 2000, subRolls: '20 Rolls (100m each)', ageDays: 10 },
-    { id: 'WB-108', baleNo: 'Bale 8', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1500, availableMeters: 1500, folding: 'L100', actualDispatchedMeters: 1500, subRolls: '15 Rolls (100m each)', ageDays: 10 },
-    { id: 'WB-109', baleNo: 'Bale 9', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1500, availableMeters: 1500, folding: 'L98', actualDispatchedMeters: 1470, subRolls: 'Rolls: 100m, 100m, 50m...', ageDays: 10 },
+    {
+      id: 'WB-101', baleNo: 'Bale 1', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 500, availableMeters: 500, folding: 'L98', actualDispatchedMeters: 490, subRolls: '5 Pieces (100m x 5)', ageDays: 45,
+      pieces: [
+        { id: 'WB-101-p1', pieceNo: 'Piece 1-1', meters: 100, isDispatched: false },
+        { id: 'WB-101-p2', pieceNo: 'Piece 1-2', meters: 100, isDispatched: false },
+        { id: 'WB-101-p3', pieceNo: 'Piece 1-3', meters: 100, isDispatched: false },
+        { id: 'WB-101-p4', pieceNo: 'Piece 1-4', meters: 100, isDispatched: false },
+        { id: 'WB-101-p5', pieceNo: 'Piece 1-5', meters: 100, isDispatched: false }
+      ]
+    },
+    {
+      id: 'WB-102', baleNo: 'Bale 2', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 900, availableMeters: 900, folding: 'L100', actualDispatchedMeters: 900, subRolls: '9 Pieces (100m x 9)', ageDays: 45,
+      pieces: [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => ({ id: `WB-102-p${i}`, pieceNo: `Piece 2-${i}`, meters: 100, isDispatched: false }))
+    },
+    {
+      id: 'WB-103', baleNo: 'Bale 3', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 600, availableMeters: 600, folding: 'L100', actualDispatchedMeters: 600, subRolls: '6 Pieces (100m x 6)', ageDays: 45,
+      pieces: [1, 2, 3, 4, 5, 6].map(i => ({ id: `WB-103-p${i}`, pieceNo: `Piece 3-${i}`, meters: 100, isDispatched: false }))
+    },
+    {
+      id: 'WB-104', baleNo: 'Bale 4', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1000, availableMeters: 1000, folding: 'L100', actualDispatchedMeters: 1000, subRolls: '10 Pieces (100m x 10)', ageDays: 45,
+      pieces: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => ({ id: `WB-104-p${i}`, pieceNo: `Piece 4-${i}`, meters: 100, isDispatched: false }))
+    },
+    {
+      id: 'WB-105', baleNo: 'Bale 5', vendorName: 'Vendor A', invoiceNo: 'INV-VA-001 (Jan)', date: '2026-01-15', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1000, availableMeters: 1000, folding: 'L100', actualDispatchedMeters: 1000, subRolls: 'Pieces: 100m, 100m, 100m, 50m, 90m...', ageDays: 45,
+      pieces: [
+        { id: 'WB-105-p1', pieceNo: 'Piece 5-1', meters: 100, isDispatched: false },
+        { id: 'WB-105-p2', pieceNo: 'Piece 5-2', meters: 100, isDispatched: false },
+        { id: 'WB-105-p3', pieceNo: 'Piece 5-3', meters: 100, isDispatched: false },
+        { id: 'WB-105-p4', pieceNo: 'Piece 5-4', meters: 100, isDispatched: false },
+        { id: 'WB-105-p5', pieceNo: 'Piece 5-5', meters: 100, isDispatched: false },
+        { id: 'WB-105-p6', pieceNo: 'Piece 5-6', meters: 100, isDispatched: false },
+        { id: 'WB-105-p7', pieceNo: 'Piece 5-7', meters: 100, isDispatched: false },
+        { id: 'WB-105-p8', pieceNo: 'Piece 5-8', meters: 100, isDispatched: false },
+        { id: 'WB-105-p9', pieceNo: 'Piece 5-9', meters: 50, isDispatched: false },
+        { id: 'WB-105-p10', pieceNo: 'Piece 5-10', meters: 90, isDispatched: false },
+        { id: 'WB-105-p11', pieceNo: 'Piece 5-11', meters: 60, isDispatched: false }
+      ]
+    },
+    { id: 'WB-106', baleNo: 'Bale 6 (Mega Bale)', vendorName: 'Vendor A', invoiceNo: 'INV-VA-002 (Feb)', date: '2026-02-10', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 5000, availableMeters: 5000, folding: 'L100', actualDispatchedMeters: 5000, subRolls: '50 Pieces (100m each)', ageDays: 20 },
+    { id: 'WB-107', baleNo: 'Bale 7', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 2000, availableMeters: 2000, folding: 'L100', actualDispatchedMeters: 2000, subRolls: '20 Pieces (100m each)', ageDays: 10 },
+    { id: 'WB-108', baleNo: 'Bale 8', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1500, availableMeters: 1500, folding: 'L100', actualDispatchedMeters: 1500, subRolls: '15 Pieces (100m each)', ageDays: 10 },
+    { id: 'WB-109', baleNo: 'Bale 9', vendorName: 'Vendor B', invoiceNo: 'INV-VB-001 (June)', date: '2026-06-05', fabric: 'Grey [48"]', fabricQuality: 'Grey', width: '48"', color: 'Black', meters: 1500, availableMeters: 1500, folding: 'L98', actualDispatchedMeters: 1470, subRolls: 'Pieces: 100m, 100m, 50m...', ageDays: 10 },
     { id: 'WB-110', baleNo: 'Bale 12384', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 1865.50, availableMeters: 1865.50, folding: 'L100', actualDispatchedMeters: 1865.50, subRolls: 'Bale Package', ageDays: 11 },
-    { id: 'WB-111', baleNo: 'Roll 2376-A', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 119.30, availableMeters: 119.30, folding: 'L100', actualDispatchedMeters: 119.30, subRolls: 'Individual Roll', ageDays: 11 },
-    { id: 'WB-112', baleNo: 'Roll 2376-B', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 111.00, availableMeters: 111.00, folding: 'L100', actualDispatchedMeters: 111.00, subRolls: 'Individual Roll', ageDays: 11 },
-    { id: 'WB-113', baleNo: 'Roll 2376-C', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 78.40, availableMeters: 78.40, folding: 'L100', actualDispatchedMeters: 78.40, subRolls: 'Individual Roll', ageDays: 11 },
-    { id: 'WB-114', baleNo: 'Roll 2376-D', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 97.80, availableMeters: 97.80, folding: 'L100', actualDispatchedMeters: 97.80, subRolls: 'Individual Roll', ageDays: 11 },
-    { id: 'WB-115', baleNo: 'Roll 2376-E', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 113.30, availableMeters: 113.30, folding: 'L100', actualDispatchedMeters: 113.30, subRolls: 'Individual Roll', ageDays: 11 },
-    { id: 'WB-116', baleNo: 'Roll 2376-F (Cut)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 20.00, availableMeters: 20.00, folding: 'L100', actualDispatchedMeters: 20.00, subRolls: 'Cut Piece', ageDays: 11 },
-    { id: 'WB-117', baleNo: 'Roll 2376-G', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 13.50, availableMeters: 13.50, folding: 'L100', actualDispatchedMeters: 13.50, subRolls: 'Cut Piece', ageDays: 11 }
+    { id: 'WB-111', baleNo: 'Than 2376-A (Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 119.30, availableMeters: 119.30, folding: 'L100', actualDispatchedMeters: 119.30, subRolls: 'Individual Than / Piece', ageDays: 11 },
+    { id: 'WB-112', baleNo: 'Than 2376-B (Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 111.00, availableMeters: 111.00, folding: 'L100', actualDispatchedMeters: 111.00, subRolls: 'Individual Than / Piece', ageDays: 11 },
+    { id: 'WB-113', baleNo: 'Than 2376-C (Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 78.40, availableMeters: 78.40, folding: 'L100', actualDispatchedMeters: 78.40, subRolls: 'Individual Than / Piece', ageDays: 11 },
+    { id: 'WB-114', baleNo: 'Than 2376-D (Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 97.80, availableMeters: 97.80, folding: 'L100', actualDispatchedMeters: 97.80, subRolls: 'Individual Than / Piece', ageDays: 11 },
+    { id: 'WB-115', baleNo: 'Than 2376-E (Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 113.30, availableMeters: 113.30, folding: 'L100', actualDispatchedMeters: 113.30, subRolls: 'Individual Than / Piece', ageDays: 11 },
+    { id: 'WB-116', baleNo: 'Than 2376-F (Cut Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 20.00, availableMeters: 20.00, folding: 'L100', actualDispatchedMeters: 20.00, subRolls: 'Cut Than / Piece', ageDays: 11 },
+    { id: 'WB-117', baleNo: 'Than 2376-G (Cut Piece)', vendorName: 'Krishna / Raju Dyeing', invoiceNo: 'INV-MS-0091', date: '2026-08-01', fabric: '100x100 Voil [48"] (Grey)', fabricQuality: '100x100 Voil', width: '48"', color: 'Grey', meters: 13.50, availableMeters: 13.50, folding: 'L100', actualDispatchedMeters: 13.50, subRolls: 'Cut Than / Piece', ageDays: 11 }
   ];
+  // Dynamic Warehouse Stock Loader:
+  // Loads authentic warehouse stock directly from Real Procurement Purchase Orders (raindrop_pos_v1)
+  // and Goods Inward GRNs (raindrop_grns_v1) created by the user in the ERP.
+  const loadWarehouseStockFromProcurement = () => {
+    try {
+      const savedStockRaw = localStorage.getItem('erp_warehouse_fabric_bales');
+      const savedStock = savedStockRaw ? JSON.parse(savedStockRaw) : null;
+
+      // 1. Read real Purchase Orders created by the user in the Procurement module
+      const rawPOs = localStorage.getItem('raindrop_pos_v1');
+      const pos = rawPOs ? JSON.parse(rawPOs) : [];
+
+      // 2. Read real GRNs created in Goods Inward
+      const rawGRNs = localStorage.getItem('raindrop_grns_v1');
+      const grns = rawGRNs ? JSON.parse(rawGRNs) : [];
+
+      const dynamicBales = [];
+
+      // A. Process real GRNs with inwarded physical bales first
+      (Array.isArray(grns) ? grns : []).forEach((grn, gIdx) => {
+        if (!grn) return;
+        const invoiceNo = grn.invoiceNo || grn.billNo || `INV-GRN-${grn.id || gIdx + 1}`;
+        const vendorName = grn.vendorName || grn.supplierName || 'Procurement Vendor';
+        const inwardDate = grn.inwardDate || grn.date || '2026-02-01';
+        const poRef = grn.poId || (grn.linkedPOs && grn.linkedPOs[0]) || '';
+
+        if (Array.isArray(grn.bales) && grn.bales.length > 0) {
+          grn.bales.forEach((bale, bIdx) => {
+            const bNo = bale.baleNo ? `Bale ${bale.baleNo}` : `Bale ${bIdx + 1}`;
+            const fab = bale.fabricItemLabel || grn.fabricName || 'Grey Fabric';
+            const width = bale.width || grn.width || '48"';
+            const color = bale.color || grn.color || 'Grey';
+            const totalMtrs = Number(bale.totalLength) ||
+              (Array.isArray(bale.pieces) ? bale.pieces.reduce((s, p) => s + (Number(typeof p === 'object' ? p.length : p) || 0), 0) : 0) || 500;
+
+            let pieces = [];
+            if (Array.isArray(bale.pieces) && bale.pieces.length > 0) {
+              pieces = bale.pieces.map((p, pIdx) => {
+                const pMtrs = Number(typeof p === 'object' ? (p.length || p.meters) : p) || 100;
+                const pNo = (typeof p === 'object' && p.pieceNo) ? p.pieceNo : `Than ${bIdx + 1}-${pIdx + 1}`;
+                return {
+                  id: `grn-${grn.id || gIdx}-b${bIdx}-p${pIdx}`,
+                  pieceNo: String(pNo).replace(/^Roll\s*/i, 'Than '),
+                  meters: pMtrs,
+                  isDispatched: false
+                };
+              });
+            } else {
+              const pieceSize = 100;
+              const count = Math.max(1, Math.floor(totalMtrs / pieceSize));
+              const rem = Number((totalMtrs - count * pieceSize).toFixed(2));
+              for (let i = 1; i <= count; i++) {
+                pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${i}`, pieceNo: `Than ${bIdx + 1}-${i}`, meters: pieceSize, isDispatched: false });
+              }
+              if (rem > 0) {
+                pieces.push({ id: `grn-${grn.id || gIdx}-b${bIdx}-p${count + 1}`, pieceNo: `Than ${bIdx + 1}-${count + 1}`, meters: rem, isDispatched: false });
+              }
+            }
+
+            dynamicBales.push({
+              id: `WB-GRN-${grn.id || gIdx}-${bIdx}`,
+              poId: poRef,
+              baleNo: bNo,
+              vendorName,
+              invoiceNo,
+              date: inwardDate,
+              fabric: `${fab} [${width}]`,
+              fabricQuality: fab,
+              width,
+              color,
+              meters: totalMtrs,
+              availableMeters: totalMtrs,
+              folding: grn.folding || 'L100',
+              actualDispatchedMeters: totalMtrs,
+              subRolls: `${pieces.length} Thans (Avg ${(totalMtrs / pieces.length).toFixed(0)}m)`,
+              ageDays: Math.max(1, Math.floor((new Date() - new Date(inwardDate)) / (1000 * 60 * 60 * 24))) || 15,
+              pieces
+            });
+          });
+        }
+      });
+
+      // B. Process real Purchase Orders from raindrop_pos_v1
+      (Array.isArray(pos) ? pos : []).forEach((po, pIdx) => {
+        if (!po) return;
+        const poId = po.id || `PO-${pIdx + 1}`;
+        const vendorName = po.vendorName || po.vendor || 'Procurement Vendor';
+        const poDate = po.orderDate || po.date || po.createdDate || '2026-02-15';
+        const invoiceNo = po.invoiceNo || po.supplierInvoiceNo || `INV-${String(poId).replace(/\D/g, '') || (pIdx + 101)}`;
+        const items = Array.isArray(po.items) && po.items.length > 0 ? po.items : [{
+          fabricName: po.fabricName || 'Grey Fabric',
+          colorName: po.colorName || 'Grey',
+          width: po.width || '48"',
+          quantity: po.totalQuantity || po.quantity || 5000,
+          fold: po.fold || 100
+        }];
+
+        items.forEach((item, itIdx) => {
+          const totalQty = Number(item.quantity) || 500;
+          const fab = item.fabricName || 'Grey Fabric';
+          const width = item.width || '48"';
+          const color = item.colorName || 'Grey';
+          const foldCode = item.fold ? `L${item.fold}` : 'L100';
+
+          // Split order quantity into authentic bales (e.g. 5000m + 1000m for a 6000m order)
+          let baleSizes = [];
+          if (totalQty === 6000) {
+            baleSizes = [5000, 1000];
+          } else if (totalQty > 5000) {
+            baleSizes = [5000, totalQty - 5000];
+          } else if (totalQty > 2000) {
+            let left = totalQty;
+            while (left > 1500) {
+              baleSizes.push(1000);
+              left -= 1000;
+            }
+            if (left > 0) baleSizes.push(left);
+          } else if (totalQty > 1000) {
+            baleSizes = [1000, totalQty - 1000];
+          } else {
+            baleSizes = [totalQty];
+          }
+
+          baleSizes.forEach((bSize, bIdx) => {
+            const cleanBaleNum = bIdx + 1;
+            const pieceSize = 100;
+            const pieceCount = Math.max(1, Math.floor(bSize / pieceSize));
+            const rem = Number((bSize - pieceCount * pieceSize).toFixed(2));
+            const pieces = [];
+
+            for (let pi = 1; pi <= pieceCount; pi++) {
+              pieces.push({
+                id: `WB-${poId}-${itIdx}-${bIdx}-p${pi}`,
+                pieceNo: `Than ${cleanBaleNum}-${pi}`,
+                meters: pieceSize,
+                isDispatched: false
+              });
+            }
+            if (rem > 0) {
+              pieces.push({
+                id: `WB-${poId}-${itIdx}-${bIdx}-p${pieceCount + 1}`,
+                pieceNo: `Than ${cleanBaleNum}-${pieceCount + 1}`,
+                meters: rem,
+                isDispatched: false
+              });
+            }
+
+            dynamicBales.push({
+              id: `WB-${poId}-${itIdx}-${bIdx}`,
+              poId: poId,
+              baleNo: `Bale ${cleanBaleNum} (${bSize >= 1000 ? `${(bSize / 1000).toFixed(0)}k m` : `${bSize}m`})`,
+              vendorName,
+              invoiceNo,
+              date: poDate,
+              fabric: `${fab} [${width}]`,
+              fabricQuality: fab,
+              width,
+              color,
+              meters: bSize,
+              availableMeters: bSize,
+              folding: foldCode,
+              actualDispatchedMeters: bSize,
+              subRolls: `${pieces.length} Thans (${pieceSize}m each)`,
+              ageDays: Math.max(1, Math.floor((new Date() - new Date(poDate)) / (1000 * 60 * 60 * 24))) || 10,
+              pieces
+            });
+          });
+        });
+      });
+
+      // C. Authentic baseline stock matching client documents (M.S. Textiles & Keshav Freight)
+      const realisticBaseline = [
+        {
+          id: 'WB-REAL-01',
+          poId: 'PO-7611',
+          baleNo: 'Bale 12384',
+          vendorName: 'M.S. Textiles / Raju Dyeing',
+          invoiceNo: 'INV-MS-0091',
+          date: '2026-08-01',
+          fabric: '100x100 Voil [48"]',
+          fabricQuality: '100x100 Voil',
+          width: '48"',
+          color: 'Grey',
+          meters: 1865.50,
+          availableMeters: 1865.50,
+          folding: 'L100',
+          actualDispatchedMeters: 1865.50,
+          subRolls: '18 Thans (100m avg)',
+          ageDays: 14,
+          pieces: Array.from({ length: 18 }, (_, i) => ({
+            id: `WB-REAL-01-p${i + 1}`,
+            pieceNo: `Than 12384-${i + 1}`,
+            meters: i === 17 ? 65.50 : 100,
+            isDispatched: false
+          }))
+        },
+        {
+          id: 'WB-REAL-02',
+          poId: 'PO-7612',
+          baleNo: 'Bale 1 (5,000m Main Lot)',
+          vendorName: 'Shree Ram Cotton Mills',
+          invoiceNo: 'INV-SR-5012',
+          date: '2026-08-05',
+          fabric: 'Grey Voil [48"]',
+          fabricQuality: 'Grey Voil',
+          width: '48"',
+          color: 'Black',
+          meters: 5000,
+          availableMeters: 5000,
+          folding: 'L100',
+          actualDispatchedMeters: 5000,
+          subRolls: '50 Thans (100m each)',
+          ageDays: 10,
+          pieces: Array.from({ length: 50 }, (_, i) => ({
+            id: `WB-REAL-02-p${i + 1}`,
+            pieceNo: `Than 1-${i + 1}`,
+            meters: 100,
+            isDispatched: false
+          }))
+        },
+        {
+          id: 'WB-REAL-03',
+          poId: 'PO-7612',
+          baleNo: 'Bale 2 (1,000m Buffer Lot)',
+          vendorName: 'Shree Ram Cotton Mills',
+          invoiceNo: 'INV-SR-5012',
+          date: '2026-08-05',
+          fabric: 'Grey Voil [48"]',
+          fabricQuality: 'Grey Voil',
+          width: '48"',
+          color: 'Black',
+          meters: 1000,
+          availableMeters: 1000,
+          folding: 'L100',
+          actualDispatchedMeters: 1000,
+          subRolls: '10 Thans (100m each)',
+          ageDays: 10,
+          pieces: Array.from({ length: 10 }, (_, i) => ({
+            id: `WB-REAL-03-p${i + 1}`,
+            pieceNo: `Than 2-${i + 1}`,
+            meters: 100,
+            isDispatched: false
+          }))
+        },
+        {
+          id: 'WB-REAL-04',
+          poId: 'PO-7613',
+          baleNo: 'Than 2376-A (Piece)',
+          vendorName: 'M.S. Textiles',
+          invoiceNo: 'INV-MS-0091',
+          date: '2026-08-01',
+          fabric: '100x100 Voil [48"]',
+          fabricQuality: '100x100 Voil',
+          width: '48"',
+          color: 'Grey',
+          meters: 119.30,
+          availableMeters: 119.30,
+          folding: 'L100',
+          actualDispatchedMeters: 119.30,
+          subRolls: 'Individual Than',
+          ageDays: 14,
+          pieces: [{ id: 'WB-REAL-04-p1', pieceNo: 'Than 2376-A', meters: 119.30, isDispatched: false }]
+        },
+        {
+          id: 'WB-REAL-05',
+          poId: 'PO-7613',
+          baleNo: 'Than 2376-B (Piece)',
+          vendorName: 'M.S. Textiles',
+          invoiceNo: 'INV-MS-0091',
+          date: '2026-08-01',
+          fabric: '100x100 Voil [48"]',
+          fabricQuality: '100x100 Voil',
+          width: '48"',
+          color: 'Grey',
+          meters: 111.00,
+          availableMeters: 111.00,
+          folding: 'L100',
+          actualDispatchedMeters: 111.00,
+          subRolls: 'Individual Than',
+          ageDays: 14,
+          pieces: [{ id: 'WB-REAL-05-p1', pieceNo: 'Than 2376-B', meters: 111.00, isDispatched: false }]
+        }
+      ];
+
+      // Merge: User created POs / GRNs appear first on top!
+      let finalBales = [];
+      if (dynamicBales.length > 0) {
+        finalBales = [...dynamicBales, ...realisticBaseline];
+      } else {
+        finalBales = realisticBaseline;
+      }
+
+      // Reconcile with any existing session allocations in localStorage
+      if (Array.isArray(savedStock) && savedStock.length > 0) {
+        finalBales = finalBales.map(fb => {
+          const match = savedStock.find(sb => sb.id === fb.id || (sb.baleNo === fb.baleNo && sb.invoiceNo === fb.invoiceNo));
+          if (match) {
+            return {
+              ...fb,
+              availableMeters: match.availableMeters !== undefined ? match.availableMeters : fb.availableMeters,
+              pieces: match.pieces || fb.pieces
+            };
+          }
+          return fb;
+        });
+      }
+
+      return finalBales;
+    } catch (err) {
+      console.warn('Error loading procurement warehouse stock:', err);
+      return [];
+    }
+  };
 
   const [warehouseStockPool, setWarehouseStockPool] = useState(() => {
-    try {
-      const stored = localStorage.getItem('erp_warehouse_fabric_bales');
-      if (stored) return JSON.parse(stored);
-    } catch (e) {}
-    return defaultWarehouseBales;
+    return loadWarehouseStockFromProcurement();
   });
+
+  // Sync warehouse stock changes to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('erp_warehouse_fabric_bales', JSON.stringify(warehouseStockPool));
+    } catch (e) { }
+  }, [warehouseStockPool]);
 
   // Helper to generate a unique system-generated Challan Number (e.g. CH-6557)
   const generateSystemChallanNumber = () => {
@@ -114,8 +511,9 @@ export default function ProcessChallanForm({
   // Multi-PO selection (e.g. PO #7611, #7612, #7613) - deduplicate
   const [selectedPOs, setSelectedPOs] = useState(() => {
     const raw = initialChallan?.linked_pos || [];
+    const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
     const unique = [];
-    raw.forEach(ref => {
+    arr.forEach(ref => {
       const clean = String(ref).replace(/^PPO-/, '');
       if (!unique.some(u => String(u).replace(/^PPO-/, '') === clean)) {
         unique.push(clean);
@@ -129,7 +527,12 @@ export default function ProcessChallanForm({
   const [vendorName, setVendorName] = useState(initialChallan?.vendor_name || '');
 
   // Styles & Customer Brand
-  const [stylesInfo, setStylesInfo] = useState(initialChallan?.styles_info || []);
+  const [stylesInfo, setStylesInfo] = useState(() => {
+    const s = initialChallan?.styles_info;
+    if (Array.isArray(s)) return s;
+    if (typeof s === 'string' && s.trim()) return [s.trim()];
+    return [];
+  });
   const [customerBrand, setCustomerBrand] = useState(initialChallan?.customer_brand || '');
 
   // Folding Notation (e.g. "L100" or "L98")
@@ -148,7 +551,10 @@ export default function ProcessChallanForm({
   const [receiverSignature, setReceiverSignature] = useState(initialChallan?.receiver_signature || 'Anurag');
 
   // Stock Bales / Rolls allocated for dispatch
-  const [items, setItems] = useState(initialChallan?.items || []);
+  const [items, setItems] = useState(() => {
+    const it = initialChallan?.items;
+    return Array.isArray(it) ? it : [];
+  });
 
   // Modal states for Link PO & Warehouse Stock Allocation
   const [showLinkPOModal, setShowLinkPOModal] = useState(false);
@@ -160,6 +566,30 @@ export default function ProcessChallanForm({
   const [modalInvoiceFilter, setModalInvoiceFilter] = useState('All');
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [customCutInputs, setCustomCutInputs] = useState({});
+  const [expandedBaleId, setExpandedBaleId] = useState(null);
+  const [modalSelectedPieceIds, setModalSelectedPieceIds] = useState({});
+
+  // When opening the Stock Picker modal, re-sync with latest procurement POs / GRNs
+  useEffect(() => {
+    if (showStockPickerModal) {
+      const fresh = loadWarehouseStockFromProcurement();
+      if (fresh && fresh.length > 0) {
+        setWarehouseStockPool(prev => {
+          return fresh.map(fb => {
+            const existing = prev.find(p => p.id === fb.id || (p.baleNo === fb.baleNo && p.invoiceNo === fb.invoiceNo));
+            if (existing) {
+              return {
+                ...fb,
+                availableMeters: existing.availableMeters !== undefined ? existing.availableMeters : fb.availableMeters,
+                pieces: existing.pieces || fb.pieces
+              };
+            }
+            return fb;
+          });
+        });
+      }
+    }
+  }, [showStockPickerModal]);
 
   // Multi-PO Bundling Dropdown states
   const [showPODropdown, setShowPODropdown] = useState(false);
@@ -358,16 +788,170 @@ export default function ProcessChallanForm({
 
     setItems(prev => [...prev, newItem]);
 
-    // Update warehouse stock available balance
+    // Update warehouse stock available balance & piece statuses
     setWarehouseStockPool(prev => prev.map(wb => {
       if (wb.id === roll.id) {
         const updatedAvail = Math.max(0, (wb.availableMeters || wb.meters) - nominalDispatched);
-        return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)) };
+        const currentPieces = ensureBalePieces(wb);
+        const updatedPieces = !isCustomCut ? currentPieces.map(p => ({ ...p, isDispatched: true })) : currentPieces;
+        return { ...wb, availableMeters: Number(updatedAvail.toFixed(2)), pieces: updatedPieces };
       }
       return wb;
     }));
 
     setShowStockPickerModal(false);
+  };
+
+  // Toggle selection of an individual piece/roll inside a bale
+  const handleTogglePieceSelect = (baleId, pieceId) => {
+    setModalSelectedPieceIds(prev => {
+      const current = prev[baleId] || [];
+      const exists = current.includes(pieceId);
+      return {
+        ...prev,
+        [baleId]: exists ? current.filter(id => id !== pieceId) : [...current, pieceId]
+      };
+    });
+  };
+
+  // Select or Deselect all available pieces inside a bale
+  const handleSelectAllPieces = (roll) => {
+    const pieces = ensureBalePieces(roll).filter(p => !p.isDispatched);
+    setModalSelectedPieceIds(prev => {
+      const current = prev[roll.id] || [];
+      const allSelected = pieces.length > 0 && pieces.every(p => current.includes(p.id));
+      return {
+        ...prev,
+        [roll.id]: allSelected ? [] : pieces.map(p => p.id)
+      };
+    });
+  };
+
+  // Allocate a single piece/roll directly from inside the bale breakdown
+  const handleAllocateSinglePiece = (roll, piece) => {
+    if (piece.isDispatched) return;
+
+    // Check Single Batch Rule
+    const existingInvoices = items.map(it => it.invoice_no).filter(Boolean);
+    const hasDifferentInvoice = existingInvoices.length > 0 && !existingInvoices.includes(roll.invoiceNo);
+    if (hasDifferentInvoice) {
+      const confirmMix = window.confirm(
+        `⚠️ Single Batch Rule (Do Not Mix Invoices):\n\nYou are adding piece [${piece.pieceNo}] from invoice [${roll.invoiceNo}], but existing items are from [${existingInvoices[0]}].\n\nConfirm dispatch with mixed batch lots?`
+      );
+      if (!confirmMix) return;
+    }
+
+    const foldCode = roll.folding || foldingNotation || 'L100';
+    const nominalMtrs = parseFloat(piece.meters) || 100;
+    const actualDispatched = computeFoldedMeters(nominalMtrs, foldCode);
+
+    const newItem = {
+      id: Date.now() + Math.random(),
+      bale_roll_no: `${roll.baleNo} (${piece.pieceNo})`,
+      parent_bale_id: roll.id,
+      piece_id: piece.id,
+      invoice_no: roll.invoiceNo,
+      vendor_name: roll.vendorName || '',
+      fabric_name: roll.fabric || 'Grey [48"]',
+      color_name: roll.color || 'Black',
+      original_piece_meters: nominalMtrs,
+      dispatched_meters: actualDispatched,
+      is_partial_cut: true,
+      dispatch_mode: 'Piece Allocation',
+      folding: foldCode,
+      remaining_stock_meters: 0
+    };
+
+    setItems(prev => [...prev, newItem]);
+
+    // Update warehouse stock pool
+    setWarehouseStockPool(prev => prev.map(wb => {
+      if (wb.id === roll.id) {
+        const currentPieces = ensureBalePieces(wb);
+        const updatedPieces = currentPieces.map(p => p.id === piece.id ? { ...p, isDispatched: true } : p);
+        const currentAvail = wb.availableMeters !== undefined ? wb.availableMeters : wb.meters;
+        const updatedAvail = Math.max(0, currentAvail - nominalMtrs);
+        return {
+          ...wb,
+          availableMeters: Number(updatedAvail.toFixed(2)),
+          pieces: updatedPieces
+        };
+      }
+      return wb;
+    }));
+
+    setModalSelectedPieceIds(prev => ({
+      ...prev,
+      [roll.id]: (prev[roll.id] || []).filter(id => id !== piece.id)
+    }));
+  };
+
+  // Allocate multiple selected pieces from the bale drawer
+  const handleAllocateSelectedPieces = (roll) => {
+    const selectedIds = modalSelectedPieceIds[roll.id] || [];
+    if (selectedIds.length === 0) return;
+
+    const pieces = ensureBalePieces(roll).filter(p => selectedIds.includes(p.id) && !p.isDispatched);
+    if (pieces.length === 0) return;
+
+    // Check Single Batch Rule
+    const existingInvoices = items.map(it => it.invoice_no).filter(Boolean);
+    const hasDifferentInvoice = existingInvoices.length > 0 && !existingInvoices.includes(roll.invoiceNo);
+    if (hasDifferentInvoice) {
+      const confirmMix = window.confirm(
+        `⚠️ Single Batch Rule (Do Not Mix Invoices):\n\nYou are adding ${pieces.length} pieces from invoice [${roll.invoiceNo}], but existing items are from [${existingInvoices[0]}].\n\nConfirm dispatch with mixed batch lots?`
+      );
+      if (!confirmMix) return;
+    }
+
+    const foldCode = roll.folding || foldingNotation || 'L100';
+    let totalNominalAllocated = 0;
+    const newItems = [];
+
+    pieces.forEach((piece, idx) => {
+      const nominalMtrs = parseFloat(piece.meters) || 100;
+      totalNominalAllocated += nominalMtrs;
+      const actualDispatched = computeFoldedMeters(nominalMtrs, foldCode);
+      newItems.push({
+        id: Date.now() + Math.random() + idx,
+        bale_roll_no: `${roll.baleNo} (${piece.pieceNo})`,
+        parent_bale_id: roll.id,
+        piece_id: piece.id,
+        invoice_no: roll.invoiceNo,
+        vendor_name: roll.vendorName || '',
+        fabric_name: roll.fabric || 'Grey [48"]',
+        color_name: roll.color || 'Black',
+        original_piece_meters: nominalMtrs,
+        dispatched_meters: actualDispatched,
+        is_partial_cut: true,
+        dispatch_mode: 'Piece Allocation',
+        folding: foldCode,
+        remaining_stock_meters: 0
+      });
+    });
+
+    setItems(prev => [...prev, ...newItems]);
+
+    // Update warehouse stock pool
+    setWarehouseStockPool(prev => prev.map(wb => {
+      if (wb.id === roll.id) {
+        const currentPieces = ensureBalePieces(wb);
+        const updatedPieces = currentPieces.map(p => selectedIds.includes(p.id) ? { ...p, isDispatched: true } : p);
+        const currentAvail = wb.availableMeters !== undefined ? wb.availableMeters : wb.meters;
+        const updatedAvail = Math.max(0, currentAvail - totalNominalAllocated);
+        return {
+          ...wb,
+          availableMeters: Number(updatedAvail.toFixed(2)),
+          pieces: updatedPieces
+        };
+      }
+      return wb;
+    }));
+
+    setModalSelectedPieceIds(prev => ({
+      ...prev,
+      [roll.id]: []
+    }));
   };
 
   // Auto-Fulfill Pending Balance (FIFO sequence: takes full bales or cuts from next bale to reach 100%)
@@ -499,12 +1083,31 @@ export default function ProcessChallanForm({
 
   const removeItem = (idx) => {
     const itemToRemove = items[idx];
-    if (itemToRemove && itemToRemove.bale_roll_no) {
-      // Return meters back to warehouse stock pool
+    if (itemToRemove) {
+      // Return meters & pieces back to warehouse stock pool
       setWarehouseStockPool(prev => prev.map(wb => {
-        if (wb.baleNo === itemToRemove.bale_roll_no && wb.invoiceNo === itemToRemove.invoice_no) {
+        const isPieceOfBale = itemToRemove.parent_bale_id === wb.id ||
+          (itemToRemove.bale_roll_no && wb.baleNo && itemToRemove.bale_roll_no.startsWith(wb.baleNo));
+
+        if (isPieceOfBale) {
+          const currentPieces = ensureBalePieces(wb);
+          const updatedPieces = currentPieces.map(p => {
+            if (p.id === itemToRemove.piece_id || (itemToRemove.bale_roll_no && itemToRemove.bale_roll_no.includes(p.pieceNo))) {
+              return { ...p, isDispatched: false };
+            }
+            return p;
+          });
+          const restoredMtrs = parseFloat(itemToRemove.original_piece_meters) || parseFloat(itemToRemove.dispatched_meters) || 0;
+          const currentAvail = parseFloat(wb.availableMeters !== undefined ? wb.availableMeters : wb.meters) || 0;
+          return {
+            ...wb,
+            availableMeters: Number(Math.min(wb.meters, currentAvail + restoredMtrs).toFixed(2)),
+            pieces: updatedPieces
+          };
+        } else if (wb.baleNo === itemToRemove.bale_roll_no && wb.invoiceNo === itemToRemove.invoice_no) {
+          const currentPieces = ensureBalePieces(wb).map(p => ({ ...p, isDispatched: false }));
           const restored = (parseFloat(wb.availableMeters) || 0) + (parseFloat(itemToRemove.dispatched_meters) || 0);
-          return { ...wb, availableMeters: Number(restored.toFixed(2)) };
+          return { ...wb, availableMeters: Number(Math.min(wb.meters, restored).toFixed(2)), pieces: currentPieces };
         }
         return wb;
       }));
@@ -1072,7 +1675,7 @@ export default function ProcessChallanForm({
                     className="form-control form-control-sm bg-light fs-13 text-dark"
                     style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
                     value={[
-                      stylesInfo && stylesInfo.length > 0 ? stylesInfo.join(', ') : '',
+                      Array.isArray(stylesInfo) && stylesInfo.length > 0 ? stylesInfo.join(', ') : (typeof stylesInfo === 'string' ? stylesInfo : ''),
                       customerBrand ? `(${customerBrand})` : ''
                     ].filter(Boolean).join(' ') || 'Auto-carried from PO'}
                     placeholder="Auto-carried from PO"
@@ -1153,7 +1756,7 @@ export default function ProcessChallanForm({
                   <i className="ti ti-packages fs-16"></i>
                 </div>
                 <div>
-                  <h6 className="mb-0 fw-bold text-dark fs-14">Warehouse Stock Allocation (Bales / Rolls Dispatch)</h6>
+                  <h6 className="mb-0 fw-bold text-dark fs-14">Warehouse Stock Allocation (Bales / Pieces Dispatch)</h6>
                   <p className="text-muted fs-11 mb-0">Warehouse inward stock pool • Single Batch Rule (Do Not Mix Invoices) • Folding L100 vs L98</p>
                 </div>
               </div>
@@ -1219,18 +1822,18 @@ export default function ProcessChallanForm({
                         {grandTotalMeters.toFixed(2)} m
                       </span>
                       <span className="text-muted fs-11">({items.length} rolls/bales)</span>
+                      <span className="text-muted fs-11">({items.length} bales/thans)</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="col-12 col-md-3">
-                  <div className={`p-2.5 rounded border shadow-xs bg-white ${
-                    totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05
-                      ? 'border-success'
-                      : balancePendingMeters > 0
-                        ? 'border-warning'
-                        : 'border-light'
-                  }`}>
+                  <div className={`p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05
+                    ? 'border-success'
+                    : balancePendingMeters > 0
+                      ? 'border-warning'
+                      : 'border-light'
+                    }`}>
                     <span className="text-muted fs-11 fw-medium text-uppercase d-block">Fulfillment Status</span>
                     {totalRequiredMeters > 0 ? (
                       grandTotalMeters >= totalRequiredMeters - 0.05 ? (
@@ -1279,7 +1882,7 @@ export default function ProcessChallanForm({
                   <thead style={{ background: '#f8fafc' }}>
                     <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
                       <th className="text-center py-2" style={{ width: '35px' }}>#</th>
-                      <th style={{ minWidth: '140px' }}>Bale / Roll No *</th>
+                      <th style={{ minWidth: '140px' }}>Bale / Piece (Than) No *</th>
                       <th style={{ minWidth: '140px' }}>Stock Invoice Ref *</th>
                       <th style={{ minWidth: '150px' }}>Fabric Quality</th>
                       <th style={{ minWidth: '110px' }}>Color Shade</th>
@@ -1300,8 +1903,8 @@ export default function ProcessChallanForm({
                             <h6 className="fs-14 fw-semibold text-dark mb-1">No Warehouse Stock Allocated Yet</h6>
                             <p className="fs-12 text-muted mb-3">
                               {totalRequiredMeters > 0
-                                ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/rolls from warehouse inventory or auto-fulfill.`
-                                : 'Select bales/rolls from warehouse inventory to dispatch on this Process Challan.'}
+                                ? `Order requires ${totalRequiredMeters.toFixed(2)} meters. Select bales/pieces from warehouse inventory or auto-fulfill.`
+                                : 'Select bales/pieces from warehouse inventory to dispatch on this Process Challan.'}
                             </p>
                             <div className="d-flex justify-content-center gap-2">
                               <button
@@ -1340,7 +1943,7 @@ export default function ProcessChallanForm({
                               value={it.bale_roll_no}
                               disabled={!isSectionEditable('items')}
                               onChange={(e) => handleItemFieldChange(idx, 'bale_roll_no', e.target.value)}
-                              placeholder="e.g. Bale 6 or Roll 2376-A"
+                              placeholder="e.g. Bale 6 or Than 2376-A / Piece 1"
                               required
                             />
                           </td>
@@ -1385,23 +1988,35 @@ export default function ProcessChallanForm({
                             />
                           </td>
 
-                          {/* Dispatch Mode Dropdown: Scenario A vs Scenario B */}
+                          {/* Dispatch Mode Dropdown: Scenario A vs Scenario B vs Piece Allocation */}
                           <td className="text-center" style={{ minWidth: '150px' }}>
-                            <select
-                              className={`form-select form-select-sm fs-11 fw-semibold ${it.is_partial_cut ? 'border-warning bg-warning-subtle text-dark' : 'bg-white text-dark'}`}
-                              style={{ borderColor: '#cbd5e1', height: '32px', borderRadius: '5px' }}
-                              value={it.is_partial_cut ? 'cut' : 'full'}
-                              disabled={!isSectionEditable('items')}
-                              onChange={(e) => {
-                                const isCut = e.target.value === 'cut';
-                                handleItemFieldChange(idx, 'is_partial_cut', isCut);
-                              }}
-                            >
-                              <option value="full">Scenario A: Full Bale</option>
-                              <option value="cut">Scenario B: Cut Piece</option>
-                            </select>
-                            {it.is_partial_cut && (
-                              <div className="text-muted mt-0.5" style={{ fontSize: '10px' }}>Partial cut deduction</div>
+                            {it.piece_id ? (
+                              <div className="d-flex flex-column align-items-center">
+                                <span className="badge px-2 py-1 fs-11 fw-semibold rounded" style={{ backgroundColor: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+                                  <i className="ti ti-package me-1"></i> Piece / Roll
+                                  <i className="ti ti-package me-1"></i> Than (Piece)
+                                </span>
+                                <span className="text-muted mt-0.5" style={{ fontSize: '10px' }}>From {it.bale_roll_no?.split('(')[0]?.trim() || 'Bale'}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <select
+                                  className={`form-select form-select-sm fs-11 fw-semibold ${it.is_partial_cut ? 'border-warning bg-warning-subtle text-dark' : 'bg-white text-dark'}`}
+                                  style={{ borderColor: '#cbd5e1', height: '32px', borderRadius: '5px' }}
+                                  value={it.is_partial_cut ? 'cut' : 'full'}
+                                  disabled={!isSectionEditable('items')}
+                                  onChange={(e) => {
+                                    const isCut = e.target.value === 'cut';
+                                    handleItemFieldChange(idx, 'is_partial_cut', isCut);
+                                  }}
+                                >
+                                  <option value="full">Scenario A: Full Bale</option>
+                                  <option value="cut">Scenario B: Cut Piece</option>
+                                </select>
+                                {it.is_partial_cut && (
+                                  <div className="text-muted mt-0.5" style={{ fontSize: '10px' }}>Partial cut deduction</div>
+                                )}
+                              </>
                             )}
                           </td>
 
@@ -1622,9 +2237,11 @@ export default function ProcessChallanForm({
                   <h6 className="modal-title fw-bold text-dark fs-16 mb-0">
                     <i className="ti ti-building-warehouse text-primary me-2"></i>
                     Warehouse Stock Allocation (Bales / Rolls Inventory)
+                    Warehouse Stock Allocation (Bales &amp; Thans Inventory)
                   </h6>
                   <p className="text-muted fs-11 mb-0">
                     Inward purchase stock • FIFO priority • Scenario A (Full Bale) vs Scenario B (Cut Piece) • Single Batch Check
+                    Inward procurement stock • Real Purchase Orders &amp; GRNs • Pick Full Bales, Individual Thans, or Cut Meters
                   </p>
                 </div>
                 <button type="button" className="btn-close" onClick={() => setShowStockPickerModal(false)}></button>
@@ -1719,7 +2336,7 @@ export default function ProcessChallanForm({
                       <input
                         type="text"
                         className="form-control form-control-sm border-start-0 fs-12"
-                        placeholder="Search Bale 1-9, Mega Bale, Invoice, Fabric..."
+                        placeholder="Search Bale No, PO Ref, Invoice, Fabric..."
                         value={modalSearchTerm}
                         onChange={(e) => setModalSearchTerm(e.target.value)}
                       />
@@ -1763,13 +2380,12 @@ export default function ProcessChallanForm({
                             }}
                           />
                         </th>
-                        <th style={{ width: '130px' }}>Priority (FIFO)</th>
-                        <th style={{ minWidth: '180px' }}>Bale / Roll No &amp; Structure</th>
-                        <th style={{ minWidth: '160px' }}>Vendor &amp; Invoice Ref</th>
-                        <th style={{ minWidth: '140px' }}>Fabric &amp; Shade</th>
+                        <th style={{ minWidth: '180px' }}>Bale No &amp; Structure</th>
+                        <th style={{ minWidth: '180px' }}>PO &amp; Invoice Ref</th>
+                        <th style={{ minWidth: '150px' }}>Fabric Quality &amp; Shade</th>
                         <th style={{ width: '85px' }} className="text-center">Folding</th>
-                        <th style={{ width: '120px' }} className="text-end">Available (M)</th>
-                        <th style={{ minWidth: '240px' }} className="text-center">Dispatch Allocation Actions</th>
+                        <th style={{ width: '130px' }} className="text-end">Available (M)</th>
+                        <th style={{ minWidth: '320px' }} className="text-center">Dispatch Allocation Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1782,9 +2398,10 @@ export default function ProcessChallanForm({
                           if (modalSearchTerm.trim()) {
                             const q = modalSearchTerm.toLowerCase();
                             const match = String(roll.baleNo || '').toLowerCase().includes(q) ||
-                                          String(roll.invoiceNo || '').toLowerCase().includes(q) ||
-                                          String(roll.fabric || '').toLowerCase().includes(q) ||
-                                          String(roll.vendorName || '').toLowerCase().includes(q);
+                              String(roll.invoiceNo || '').toLowerCase().includes(q) ||
+                              String(roll.fabric || '').toLowerCase().includes(q) ||
+                              String(roll.vendorName || '').toLowerCase().includes(q) ||
+                              String(roll.poId || '').toLowerCase().includes(q);
                             if (!match) return false;
                           }
                           return true;
@@ -1795,127 +2412,283 @@ export default function ProcessChallanForm({
                           const foldCode = roll.folding || foldingNotation || 'L100';
                           const actualMetersAtFold = computeFoldedMeters(avail, foldCode);
                           const customVal = customCutInputs[roll.id] || '';
+                          const pieces = ensureBalePieces(roll);
+                          const availPieces = pieces.filter(p => !p.isDispatched);
+                          const dispatchedPieces = pieces.filter(p => p.isDispatched);
+                          const selectedPieceIds = modalSelectedPieceIds[roll.id] || [];
+                          const selectedPieceCount = selectedPieceIds.length;
+                          const selectedMeters = pieces
+                            .filter(p => selectedPieceIds.includes(p.id))
+                            .reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
+                          const isExpanded = expandedBaleId === roll.id;
 
                           return (
-                            <tr key={roll.id || idx} className={isSelected ? 'table-primary-subtle' : ''}>
-                              {/* Checkbox for Multi-Select */}
-                              <td className="text-center">
-                                <input
-                                  type="checkbox"
-                                  className="form-check-input"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setModalSelectedBaleIds(prev => [...prev, roll.id]);
-                                    } else {
-                                      setModalSelectedBaleIds(prev => prev.filter(id => id !== roll.id));
-                                    }
-                                  }}
-                                />
-                              </td>
+                            <React.Fragment key={roll.id || idx}>
+                              <tr className={isSelected ? 'table-primary-subtle' : ''}>
+                                {/* Checkbox for Multi-Select */}
+                                <td className="text-center">
+                                  <input
+                                    type="checkbox"
+                                    className="form-check-input"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setModalSelectedBaleIds(prev => [...prev, roll.id]);
+                                      } else {
+                                        setModalSelectedBaleIds(prev => prev.filter(id => id !== roll.id));
+                                      }
+                                    }}
+                                  />
+                                </td>
 
-                              {/* FIFO Priority */}
-                              <td>
-                                <span className={`badge ${roll.ageDays > 60 ? 'bg-danger-subtle text-danger border-danger-subtle' : 'bg-primary-subtle text-primary border-primary-subtle'} border fs-10`}>
-                                  FIFO #{idx + 1} • {roll.ageDays}d old
-                                </span>
-                              </td>
-
-                              {/* Bale No & Details */}
-                              <td>
-                                <div className="fw-bold font-monospace text-dark fs-13">{roll.baleNo}</div>
-                                {roll.subRolls && (
-                                  <div className="text-muted fs-11 mt-0.5">
-                                    <i className="ti ti-layers-intersect fs-11 me-1 text-secondary"></i>
-                                    {roll.subRolls}
+                                {/* Bale No & Structure */}
+                                <td>
+                                  <div className="d-flex align-items-center gap-1.5">
+                                    <i className="ti ti-package text-primary fs-14"></i>
+                                    <span className="fw-bold font-monospace text-dark fs-13">{roll.baleNo}</span>
                                   </div>
-                                )}
-                              </td>
+                                  <div className="text-muted fs-11 mt-0.5 d-flex align-items-center gap-1">
+                                    <span className="badge bg-light text-secondary border font-monospace fs-10">FIFO #{idx + 1}</span>
+                                    <span>{roll.subRolls ? String(roll.subRolls).replace(/rolls?/gi, 'Thans') : `${pieces.length} Thans`}</span>
+                                  </div>
+                                </td>
 
-                              {/* Vendor & Invoice */}
-                              <td>
-                                <div className="fw-semibold text-dark fs-12">{roll.vendorName || 'Warehouse Stock'}</div>
-                                <div className="font-monospace text-muted fs-11">{roll.invoiceNo}</div>
-                              </td>
-
-                              {/* Fabric & Color */}
-                              <td>
-                                <div className="text-dark fw-medium fs-12">{roll.fabric}</div>
-                                <div className="text-muted fs-11">{roll.color}</div>
-                              </td>
-
-                              {/* Folding Notation */}
-                              <td className="text-center">
-                                <span className={`badge ${foldCode.includes('98') ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-light text-secondary border'} fs-11 font-monospace`}>
-                                  {foldCode}
-                                </span>
-                              </td>
-
-                              {/* Available Meters */}
-                              <td className="text-end">
-                                <div className="fw-bold text-success fs-13 font-monospace">{avail.toFixed(2)} m</div>
-                                {foldCode.includes('98') && (
-                                  <div className="text-muted fs-10">(= {actualMetersAtFold.toFixed(2)}m @ 98%)</div>
-                                )}
-                              </td>
-
-                              {/* Allocation Actions */}
-                              <td>
-                                <div className="d-flex flex-column gap-1.5">
+                                {/* PO & Invoice Ref */}
+                                <td>
                                   <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                    {roll.poId && (
+                                      <span className="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold font-monospace">
+                                        {roll.poId}
+                                      </span>
+                                    )}
+                                    <span className="fw-semibold text-dark fs-12">{roll.vendorName || 'Procurement Stock'}</span>
+                                  </div>
+                                  <div className="font-monospace text-muted fs-11 mt-0.5">
+                                    <i className="ti ti-receipt fs-11 me-1 text-secondary"></i>
+                                    {roll.invoiceNo}
+                                  </div>
+                                </td>
+
+                                {/* Fabric Quality & Shade */}
+                                <td>
+                                  <div className="text-dark fw-bold fs-12">{roll.fabricQuality || roll.fabric}</div>
+                                  <div className="text-muted fs-11 d-flex align-items-center gap-1 mt-0.5">
+                                    <span
+                                      className="d-inline-block rounded-circle"
+                                      style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        backgroundColor: String(roll.color || '').toLowerCase() === 'black' ? '#0f172a' : '#94a3b8'
+                                      }}
+                                    ></span>
+                                    <span>{roll.color || 'Grey'}</span>
+                                    {roll.width && <span className="ms-1 font-monospace">[{roll.width}]</span>}
+                                  </div>
+                                </td>
+
+                                {/* Folding */}
+                                <td className="text-center">
+                                  <span className={`badge ${foldCode.includes('98') ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-light text-secondary border'} fs-11 font-monospace px-2 py-1`}>
+                                    {foldCode}
+                                  </span>
+                                </td>
+
+                                {/* Available Meters */}
+                                <td className="text-end">
+                                  <div className="fw-bold text-success fs-14 font-monospace">{avail.toFixed(2)} m</div>
+                                  {foldCode.includes('98') && (
+                                    <div className="text-muted fs-10">(= {actualMetersAtFold.toFixed(2)}m @ 98%)</div>
+                                  )}
+                                </td>
+
+                                {/* Clean Consolidated Dispatch Actions */}
+                                <td>
+                                  <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap">
                                     {/* Action 1: Scenario A - Full Bale */}
                                     <button
                                       type="button"
-                                      className="btn btn-outline-primary btn-xs py-1 px-2 rounded shadow-xs fw-semibold"
+                                      className="btn btn-primary btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1"
                                       onClick={() => handleSelectWarehouseRoll(roll)}
-                                      title="Allocate entire bale (Scenario A)"
+                                      title="Allocate the entire bale (Scenario A)"
                                     >
-                                      + Full Bale ({avail}m)
+                                      <i className="ti ti-plus fs-12"></i>
+                                      <span>Full Bale ({avail}m)</span>
                                     </button>
 
-                                    {/* Action 2: Scenario B - Cut Needed to hit 100% */}
-                                    {balancePendingMeters > 0 && avail >= balancePendingMeters && (
+                                    {/* Action 2: Pick Thans / Pieces Button (Single Clean Toggle!) */}
+                                    {pieces.length > 0 && (
                                       <button
                                         type="button"
-                                        className="btn btn-outline-warning btn-xs py-1 px-2 rounded shadow-xs fw-bold"
-                                        onClick={() => handleSelectWarehouseRoll(roll, balancePendingMeters)}
-                                        title={`Cut exactly remaining ${balancePendingMeters}m from this bale (Scenario B)`}
+                                        className={`btn btn-sm py-1 px-2.5 rounded shadow-xs fw-semibold fs-11 d-flex align-items-center gap-1 ${isExpanded ? 'btn-dark' : 'btn-outline-primary'
+                                          }`}
+                                        onClick={() => setExpandedBaleId(isExpanded ? null : roll.id)}
+                                        title="View and pick individual thans/pieces from this bale"
                                       >
-                                        ✂ Cut Needed ({balancePendingMeters}m)
+                                        <i className={`ti ${isExpanded ? 'ti-chevron-up' : 'ti-list-details'} fs-12`}></i>
+                                        <span>{isExpanded ? 'Hide Thans' : `Pick Thans (${availPieces.length})`}</span>
                                       </button>
                                     )}
-                                  </div>
 
-                                  {/* Action 3: Custom Partial Cut Input */}
-                                  <div className="d-flex align-items-center gap-1">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      className="form-control form-control-xs py-0.5 px-1.5 fs-11 font-monospace"
-                                      style={{ width: '85px', height: '26px' }}
-                                      placeholder="Cut mtrs..."
-                                      value={customVal}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setCustomCutInputs(prev => ({ ...prev, [roll.id]: val }));
-                                      }}
-                                    />
-                                    <button
-                                      type="button"
-                                      className="btn btn-light border btn-xs py-0.5 px-2 text-dark fs-11 rounded"
-                                      style={{ height: '26px' }}
-                                      disabled={!customVal || parseFloat(customVal) <= 0 || parseFloat(customVal) > avail}
-                                      onClick={() => {
-                                        handleSelectWarehouseRoll(roll, parseFloat(customVal));
-                                        setCustomCutInputs(prev => ({ ...prev, [roll.id]: '' }));
-                                      }}
-                                    >
-                                      Cut &amp; Add
-                                    </button>
+                                    {/* Action 3: Cut Meters (Inline Input + Cut Button) */}
+                                    <div className="d-flex align-items-center gap-1">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        className="form-control form-control-sm py-0.5 px-1.5 fs-11 font-monospace text-end"
+                                        style={{ width: '75px', height: '29px' }}
+                                        placeholder="Meters"
+                                        value={customVal}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setCustomCutInputs(prev => ({ ...prev, [roll.id]: val }));
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-secondary btn-sm py-1 px-2 text-dark fs-11 rounded fw-medium"
+                                        style={{ height: '29px' }}
+                                        disabled={!customVal || parseFloat(customVal) <= 0 || parseFloat(customVal) > avail}
+                                        onClick={() => {
+                                          handleSelectWarehouseRoll(roll, parseFloat(customVal));
+                                          setCustomCutInputs(prev => ({ ...prev, [roll.id]: '' }));
+                                        }}
+                                        title="Cut exact meters from this bale"
+                                      >
+                                        ✂ Cut
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
-                              </td>
-                            </tr>
+                                </td>
+                              </tr>
+
+                              {/* Expandable Than Sub-Table (Clean, compact ERP table instead of giant cards) */}
+                              {isExpanded && (
+                                <tr className="bg-light-subtle">
+                                  <td colSpan={7} className="p-3 border-top-0 border-bottom">
+                                    <div className="p-3 bg-white rounded-3 border shadow-sm" style={{ borderColor: '#cbd5e1' }}>
+                                      {/* Sub-table Header Bar */}
+                                      <div className="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom flex-wrap gap-2">
+                                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                                          <span className="badge px-2.5 py-1.5 fs-12 fw-bold rounded" style={{ backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+                                            <i className="ti ti-layers-intersect me-1"></i> {roll.baleNo} Individual Thans (Pieces)
+                                          </span>
+                                          <span className="text-muted fs-12">
+                                            Total <strong>{pieces.length} Thans</strong> • <span className="text-success fw-bold">{availPieces.length} In Stock</span> • <span className="text-secondary">{dispatchedPieces.length} Dispatched</span>
+                                          </span>
+                                        </div>
+
+                                        <div className="d-flex align-items-center gap-2">
+                                          {availPieces.length > 0 && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-xs btn-outline-secondary py-1 px-2.5 rounded fs-11 fw-medium"
+                                              onClick={() => handleSelectAllPieces(roll)}
+                                            >
+                                              {selectedPieceCount === availPieces.length ? 'Deselect All' : 'Select All Available'}
+                                            </button>
+                                          )}
+
+                                          {selectedPieceCount > 0 && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-xs btn-success py-1 px-3 fw-bold rounded shadow-xs fs-11 d-flex align-items-center gap-1"
+                                              onClick={() => handleAllocateSelectedPieces(roll)}
+                                            >
+                                              <i className="ti ti-check fs-12"></i>
+                                              <span>Allocate {selectedPieceCount} Selected Thans ({selectedMeters.toFixed(2)}m) →</span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            className="btn btn-xs btn-light border py-1 px-2 rounded text-secondary"
+                                            onClick={() => setExpandedBaleId(null)}
+                                            title="Close"
+                                          >
+                                            <i className="ti ti-x fs-12"></i>
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Clean, Compact Than Sub-Table */}
+                                      <div className="table-responsive rounded border" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                                        <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: '12px' }}>
+                                          <thead className="table-light sticky-top">
+                                            <tr className="text-secondary fs-11 fw-bold text-uppercase">
+                                              <th style={{ width: '40px' }} className="text-center">#</th>
+                                              <th style={{ minWidth: '150px' }}>Than (Piece) No</th>
+                                              <th style={{ minWidth: '130px' }}>Length (Meters)</th>
+                                              <th style={{ width: '110px' }} className="text-center">Status</th>
+                                              <th style={{ width: '130px' }} className="text-end">Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {pieces.map((piece, pIdx) => {
+                                              const isPieceSelected = selectedPieceIds.includes(piece.id);
+                                              const isPieceDispatched = piece.isDispatched;
+                                              const actualPieceMtrs = computeFoldedMeters(piece.meters, foldCode);
+
+                                              return (
+                                                <tr
+                                                  key={piece.id || pIdx}
+                                                  className={isPieceDispatched ? 'table-light opacity-60 text-muted' : isPieceSelected ? 'table-primary-subtle' : ''}
+                                                  style={{ cursor: isPieceDispatched ? 'not-allowed' : 'pointer' }}
+                                                  onClick={() => {
+                                                    if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
+                                                  }}
+                                                >
+                                                  <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                      type="checkbox"
+                                                      className="form-check-input"
+                                                      checked={isPieceSelected}
+                                                      disabled={isPieceDispatched}
+                                                      onChange={() => {
+                                                        if (!isPieceDispatched) handleTogglePieceSelect(roll.id, piece.id);
+                                                      }}
+                                                    />
+                                                  </td>
+                                                  <td>
+                                                    <span className={`fw-bold font-monospace fs-12 ${isPieceDispatched ? 'text-decoration-line-through text-muted' : 'text-dark'}`}>
+                                                      {piece.pieceNo}
+                                                    </span>
+                                                  </td>
+                                                  <td>
+                                                    <span className="fw-bold font-monospace fs-12 text-primary">{piece.meters} m</span>
+                                                    {foldCode.includes('98') && (
+                                                      <span className="text-muted fs-10 ms-1">(= {actualPieceMtrs.toFixed(2)}m)</span>
+                                                    )}
+                                                  </td>
+                                                  <td className="text-center">
+                                                    {isPieceDispatched ? (
+                                                      <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-10">Dispatched</span>
+                                                    ) : (
+                                                      <span className="badge bg-success-subtle text-success border border-success-subtle fs-10">In Stock</span>
+                                                    )}
+                                                  </td>
+                                                  <td className="text-end" onClick={(e) => e.stopPropagation()}>
+                                                    {!isPieceDispatched && (
+                                                      <button
+                                                        type="button"
+                                                        className="btn btn-outline-primary btn-xs py-0.5 px-2 rounded fs-11 fw-semibold"
+                                                        onClick={() => handleAllocateSinglePiece(roll, piece)}
+                                                        title={`Allocate ${piece.pieceNo} only`}
+                                                      >
+                                                        + Allocate Than
+                                                      </button>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                     </tbody>

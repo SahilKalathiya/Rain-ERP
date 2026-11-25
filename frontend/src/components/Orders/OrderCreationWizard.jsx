@@ -1945,7 +1945,9 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
   // Helper: customer total pieces
   const getCustomerTotalPieces = (cust) => {
     let sum = 0;
-    const assigned = cust.assignedArticleIds || [];
+    const assigned = Array.from(new Set(cust.assignedArticleIds || [])).filter(id =>
+      addedArticles.some(a => a.id === id)
+    );
     assigned.forEach(artId => {
       const artCols = (!cust.configMode || cust.configMode.sameColor)
         ? (cust.selectedColors || [])
@@ -2029,7 +2031,7 @@ export default function OrderCreationWizard({ onSaveOrder, onCancel, editingOrde
   // Grand total pieces in the order
   const grandTotalOrderPieces = useMemo(() => {
     return orderCustomers.reduce((acc, c) => acc + getCustomerTotalPieces(c), 0);
-  }, [orderCustomers]);
+  }, [orderCustomers, addedArticles]);
 
   // =========================================================================
   // SECTION 12.5 FABRIC CONSUMPTION FORMULA (STRICT SPECIFICATION)

@@ -222,8 +222,8 @@ export default function ProcessPOForm({
 
               if (!itemRate && o.customMarketRates && typeof o.customMarketRates === 'object') {
                 const cmVal = o.customMarketRates[`${artName}___${fabName}___${cleanWidthStr}`] ||
-                              o.customMarketRates[`${fabName}_${cleanWidthStr}`] ||
-                              o.customMarketRates[fabName];
+                  o.customMarketRates[`${fabName}_${cleanWidthStr}`] ||
+                  o.customMarketRates[fabName];
                 if (cmVal && parseFloat(cmVal) > 0) {
                   itemRate = parseFloat(cmVal);
                 }
@@ -662,6 +662,17 @@ export default function ProcessPOForm({
 
   const currentSelectedOrder = availableSalesOrders.find(o => o.id === linkedOrderId) || null;
 
+  // Custom rates entered in Fabric Requirements table
+  const [orderItemRates, setOrderItemRates] = useState({});
+
+  // Requirement item IDs that have been selected / added to PO items
+  const [selectedRequirementIds, setSelectedRequirementIds] = useState(
+    () => (initialPO?.items || []).map(it => it.order_item_id).filter(Boolean)
+  );
+
+  // Toggle to hide selected requirement items from the active list
+  const [hideSelectedRequirements, setHideSelectedRequirements] = useState(true);
+
   // Custom Styles Added by User
   const [customStyleInput, setCustomStyleInput] = useState('');
   const [addedCustomStyles, setAddedCustomStyles] = useState([]);
@@ -672,9 +683,94 @@ export default function ProcessPOForm({
   const masterStyleOptions = Array.from(new Set([
     ...(currentSelectedOrder?.styles || []),
     ...availableSalesOrders.flatMap(o => o.styles || []),
+    ...(currentSelectedOrder?.items || []).map(it => it.article),
+    ...(currentSelectedOrder?.items || []).map(it => it.style),
+    ...availableSalesOrders.flatMap(o => (o.items || []).map(it => it.article)),
     ...articleList.map(a => a.name),
     ...addedCustomStyles
   ])).filter(Boolean);
+
+  // Helper to resolve requirement items for each style in turn (PDF Section 3.2: Multi-Style display)
+  const getRequirementsForStyle = (styleName, sIdx) => {
+    if (!styleName || !styleName.trim()) return [];
+    const cleanStyle = styleName.trim().toLowerCase();
+
+    // 1. If an order in availableSalesOrders directly matches this style
+    const matchingOrder = availableSalesOrders.find(o =>
+      (o.styles && o.styles.some(s => s.toLowerCase().trim() === cleanStyle)) ||
+      (o.styleName && o.styleName.toLowerCase().trim() === cleanStyle) ||
+      cleanStyle.includes(o.id.toLowerCase()) ||
+      (o.items && o.items.some(it => String(it.style || '').toLowerCase().trim() === cleanStyle))
+    );
+
+    if (matchingOrder && Array.isArray(matchingOrder.items) && matchingOrder.items.length > 0) {
+      const exactStyleItems = matchingOrder.items.filter(it =>
+        String(it.style || '').toLowerCase().trim() === cleanStyle
+      );
+      if (exactStyleItems.length > 0) return exactStyleItems;
+      return matchingOrder.items;
+    }
+
+    // 2. Check currentSelectedOrder items
+    if (currentSelectedOrder && Array.isArray(currentSelectedOrder.items)) {
+      // Check if any item matches the style name or article name
+      const byArticleOrStyle = currentSelectedOrder.items.filter(it => {
+        const itStyle = String(it.style || '').toLowerCase().trim();
+        const itArt = String(it.article || '').toLowerCase().trim();
+        return itStyle === cleanStyle ||
+          itArt === cleanStyle ||
+          itArt.includes(cleanStyle) ||
+          cleanStyle.includes(itArt) ||
+          (sIdx === 0 && (/top|kurta|shirt/i.test(cleanStyle) && /kurta|top|shirt/i.test(itArt))) ||
+          (sIdx === 1 && (/bottom|pant|pyjama|salwar|penat/i.test(cleanStyle) && /pant|pyjama|salwar|penat|bottom/i.test(itArt)));
+      });
+
+      if (byArticleOrStyle.length > 0) return byArticleOrStyle;
+
+      // If multi-style PO and current order has top and bottom articles, partition them
+      if (styleCountOption === '2+' || styleCountOption === 'more') {
+        const bottomItems = currentSelectedOrder.items.filter(it =>
+          /pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ''))
+        );
+        const topItems = currentSelectedOrder.items.filter(it =>
+          !/pant|penat|pyjama|salwar|trouser|bottom/i.test(String(it.article || ''))
+        );
+
+        if (bottomItems.length > 0 && topItems.length > 0) {
+          if (sIdx === 0) return topItems;
+          if (sIdx === 1) return bottomItems;
+        }
+      }
+    }
+
+    // 3. Fallback for custom or master style:
+    const defFab = fabricList[sIdx % Math.max(1, fabricList.length)] || { id: 'FAB-001', name: 'Cotton 100*100' };
+    const defCol = colorList[0] || { name: 'Black', hex: '#000000' };
+    const artName = sIdx === 1 ? 'Pant / Bottom' : 'Kurta / Top';
+
+    return [
+      {
+        id: `REQ-${cleanStyle.replace(/\W+/g, '_')}-${sIdx + 1}`,
+        style: styleName,
+        fabric: defFab.name || 'Cotton 100*100',
+        fabricId: defFab.id || 'FAB-001',
+        color: defCol.name || 'Black',
+        colorHex: defCol.hex || '#000000',
+        article: artName,
+        width: '44"',
+        rate: 0,
+        requiredMeters: 300,
+        alreadyReceivedMeters: 0,
+        orderedMeters: 0,
+        pendingMeters: 300,
+        status: 'Not Ordered',
+        consumption: sIdx === 1 ? 2.0 : 2.5,
+        shrinkage: 4.0,
+        pcs: 100,
+        isCustomStyleRequirement: true
+      }
+    ];
+  };
 
   const handleAddCustomStyle = () => {
     if (isLocked) return;
@@ -747,6 +843,8 @@ export default function ProcessPOForm({
   const handleSelectOrder = (orderId) => {
     if (isLocked) return;
     setLinkedOrderId(orderId);
+    setOrderItemRates({});
+    setSelectedRequirementIds([]);
     const ord = availableSalesOrders.find(o => o.id === orderId);
     if (ord) {
       if (ord.brand) setCustomerBrandName(ord.brand);
@@ -856,11 +954,51 @@ export default function ProcessPOForm({
     return articleList;
   };
 
+  // Recommended Dyeing/Job Work Rate by Width & Process Type (PDF Section 3.1 & 3.2)
+  const getRecommendedDyeingRate = (item) => {
+    const w = parseFloat(String(item.width || '').replace(/[^\d.]/g, '')) || 44;
+    let base = w <= 44 ? 10 : (w <= 54 ? 12 : 15);
+    const pType = String(processType || '').toLowerCase();
+    if (pType.includes('print')) base += 5;
+    else if (pType.includes('embroider')) base += 10;
+    return base;
+  };
+
   // Row update calculation using exact PDF Section 3.2 formulas
   const updateItem = (index, updates) => {
     if (isLocked) return;
     const updated = [...items];
     const item = { ...updated[index], ...updates };
+
+    // PDF Section 12.1: Live re-validation of search narrowing when prior selection changes
+    if (isOrderLinked && currentSelectedOrder) {
+      if ('style_name' in updates && item.fabric_name) {
+        const validFabrics = getFilteredFabrics(item);
+        if (!validFabrics.some(f => f.name === item.fabric_name || f.id === item.fabric_id)) {
+          item.fabric_id = '';
+          item.fabric_name = '';
+          item.color_id = '';
+          item.color_name = '';
+          item.color_hex = '';
+          item.article_name = '';
+        }
+      }
+      if (('style_name' in updates || 'fabric_id' in updates || 'fabric_name' in updates) && item.color_name) {
+        const validColors = getFilteredColors(item);
+        if (!validColors.some(c => c.name === item.color_name)) {
+          item.color_id = '';
+          item.color_name = '';
+          item.color_hex = '';
+          item.article_name = '';
+        }
+      }
+      if (('style_name' in updates || 'fabric_id' in updates || 'fabric_name' in updates || 'color_name' in updates) && item.article_name) {
+        const validArticles = getFilteredArticles(item);
+        if (!validArticles.some(a => (a.name || a) === item.article_name)) {
+          item.article_name = '';
+        }
+      }
+    }
 
     // If fabric changed, lookup master shrinkage and default width
     if (updates.fabric_id && updates.fabric_id !== updated[index].fabric_id) {
@@ -939,6 +1077,10 @@ export default function ProcessPOForm({
 
   const removeItemRow = (index) => {
     if (isLocked) return;
+    const itemToRemove = items[index];
+    if (itemToRemove && itemToRemove.order_item_id) {
+      setSelectedRequirementIds(prev => prev.filter(id => id !== itemToRemove.order_item_id));
+    }
     const remaining = items.filter((_, i) => i !== index);
     setItems(remaining.length > 0 ? remaining : [createBlankRow()]);
   };
@@ -954,7 +1096,12 @@ export default function ProcessPOForm({
     const shrink = parseFloat(orderItem.shrinkage) || 4.0;
     const calculatedPcs = totalPcs > 0 ? totalPcs : (reqMeters > 0 && cons > 0 ? Math.floor(reqMeters / cons) : '');
     const rawMtrs = reqMeters > 0 ? Number((reqMeters * (1 + shrink / 100)).toFixed(2)) : '';
-    const itemRate = orderItem.rate ? parseFloat(orderItem.rate) : '';
+
+    // Check if custom rate was entered in rate box
+    const customRate = orderItemRates[orderItem.id];
+    const itemRate = (customRate !== undefined && customRate !== '')
+      ? (parseFloat(customRate) || 0)
+      : (orderItem.rate ? parseFloat(orderItem.rate) : '');
 
     // Match real fabric from fabricList so dropdown does not show "Select Fabric Quality"
     const matchedFab = fabricList.find(f =>
@@ -966,6 +1113,7 @@ export default function ProcessPOForm({
 
     const newRow = {
       id: Date.now() + Math.random(),
+      order_item_id: orderItem.id,
       style_name: orderItem.style || selectedStyles[0] || '',
       fabric_id: matchedFab ? matchedFab.id : (orderItem.fabricId || 'FAB-001'),
       fabric_name: matchedFab ? matchedFab.name : (orderItem.fabric || '100x100 Voile (Grey)'),
@@ -993,6 +1141,9 @@ export default function ProcessPOForm({
     } else {
       setItems([...items, newRow]);
     }
+
+    // Mark as selected to hide/remove from pending list
+    setSelectedRequirementIds(prev => prev.includes(orderItem.id) ? prev : [...prev, orderItem.id]);
   };
 
   // Standard terms insertion
@@ -1188,13 +1339,13 @@ export default function ProcessPOForm({
                       onChange={(e) => handleProcessTypeChange(e.target.value)}
                     >
                       <option value="">-- Select Vendor Type --</option>
-                      <option value="Dyeing">Dyeing (Dyeing Mill / Processor)</option>
-                      <option value="Printing">Printing (Digital, Screen &amp; Rotary Printing)</option>
-                      <option value="Processing">Processing (Dyeing, Printing &amp; Mill Finish)</option>
-                      <option value="Embroidery">Embroidery (Computer / Machine Embroidery)</option>
-                      <option value="Washing">Washing (Enzyme, Silicon &amp; Garment Wash)</option>
-                      <option value="Stitching / Job Worker">Stitching / Job Worker (CMT, Tailoring)</option>
-                      <option value="All Processes">All Processes (Show All Vendors)</option>
+                      <option value="Dyeing">Dyeing</option>
+                      <option value="Printing">Printing</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Embroidery">Embroidery</option>
+                      <option value="Washing">Washing</option>
+                      <option value="Stitching / Job Worker">Stitching / Job Worker</option>
+                      <option value="All Processes">All Processes</option>
                     </select>
                   </div>
 
@@ -1740,177 +1891,530 @@ export default function ProcessPOForm({
             </div>
           )}
 
-          {/* Linked Sales Order Item Selection Matrix */}
+          {/* Linked Sales Order Item Selection Matrix (PDF Section 3.2: Multi-Style display in turn) */}
           {isOrderLinked && currentSelectedOrder && (
-            <div className="mt-4 p-3 border rounded-3 bg-light" style={{ borderColor: '#e2e8f0' }}>
-              <div className="d-flex align-items-center justify-content-between mb-2">
-                <span className="fs-12 fw-bold text-dark d-flex align-items-center gap-1.5">
-                  <i className="ti ti-clipboard-list text-primary"></i>
-                  Fabric Requirements for {currentSelectedOrder.id} ({currentSelectedOrder.customer})
-                </span>
-                <span className="badge bg-white text-secondary border fs-11">
-                  Required vs Received Balance
-                </span>
-              </div>
+            (styleCountOption === '2+' || selectedStyles.length > 1) ? (
+                    selectedStyles.map((styleVal, sIdx) => {
+                      const positionLabel = sIdx === 0
+                        ? 'Top Style'
+                        : sIdx === 1
+                          ? 'Bottom Style'
+                          : `Style Component #${sIdx + 1}`;
 
-              <div className="table-responsive">
-                <table className="table table-sm table-bordered bg-white align-middle mb-0" style={{ fontSize: '12px' }}>
-                  <thead className="table-light">
-                    <tr>
-                      <th>Style</th>
-                      <th>Fabric Quality</th>
-                      <th>Color</th>
-                      <th>Article</th>
-                      <th>Width</th>
-                      <th className="text-end">Rate (₹)</th>
-                      <th className="text-end">Required (m)</th>
-                      <th className="text-end">Already Received (m)</th>
-                      <th className="text-end">Pending (m)</th>
-                      <th className="text-center">Status</th>
-                      <th className="text-center" style={{ width: '90px' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentSelectedOrder.items.map((ordIt) => {
-                      const isFullyOrdered = ordIt.requiredMeters > 0
-                        ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
-                        : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
-                      return (
-                        <tr key={ordIt.id} className={isFullyOrdered ? 'table-light text-muted' : ''}>
-                          <td className="fw-medium">{ordIt.style}</td>
-                          <td>{ordIt.fabric}</td>
-                          <td>
-                            <span className="d-inline-flex align-items-center gap-1">
-                              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: ordIt.colorHex, border: '1px solid #999' }} />
-                              {ordIt.color}
-                            </span>
-                          </td>
-                          <td>
-                            {ordIt.articlesList && ordIt.articlesList.length > 1 ? (
-                              <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                                <span className="fw-semibold text-primary" title={ordIt.article}>
-                                  {ordIt.article}
+                      const styleItems = getRequirementsForStyle(styleVal, sIdx);
+                      const isStyleSet = Boolean(styleVal && styleVal.trim());
+
+                      if (!isStyleSet) {
+                        return (
+                          <div key={`pending-style-${sIdx}`} className="mt-4 p-3 border rounded-3 bg-white shadow-xs" style={{ borderColor: '#cbd5e1', borderStyle: 'dashed' }}>
+                            <div className="d-flex align-items-center justify-content-between mb-2">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge bg-secondary text-white px-2.5 py-1 fs-11 font-monospace rounded-pill">
+                                  #{sIdx + 1}
                                 </span>
-                                <span className="badge bg-light text-dark border fs-11" title="Sum of pieces across all combined articles">
-                                  {ordIt.pcs} pcs
-                                </span>
+                                <span className="fs-13 fw-bold text-dark">{positionLabel} (Pending Selection)</span>
                               </div>
-                            ) : (
-                              <div className="d-flex align-items-center gap-1.5">
-                                <span>{ordIt.article}</span>
-                                {ordIt.pcs > 0 && (
-                                  <span className="badge bg-light text-muted border fs-11">
-                                    {ordIt.pcs} pcs
+                              <span className="badge bg-light text-muted border fs-11">Display Priority {sIdx + 1}</span>
+                            </div>
+
+                            <div className="p-3 bg-light-subtle rounded-2 text-center">
+                              <i className="ti ti-hand-click fs-22 text-primary mb-1 d-block opacity-75"></i>
+                              <span className="fw-semibold text-dark fs-13 d-block">
+                                Choose or Type Style #{sIdx + 1} ({positionLabel}) in the slot above
+                              </span>
+                              <span className="text-muted fs-12 mb-2 d-block">
+                                Its fabric qualities, colors, articles and required meters will automatically open in this box (PDF Section 3.2).
+                              </span>
+
+                              {/* Quick-Pick suggestions from available styles/articles */}
+                              <div className="d-flex align-items-center justify-content-center gap-1.5 flex-wrap mt-2">
+                                <span className="text-muted fs-11 me-1">Quick Select:</span>
+                                {masterStyleOptions.slice(0, 6).map(st => (
+                                  <button
+                                    key={st}
+                                    type="button"
+                                    className="btn btn-xs btn-outline-primary py-0.5 px-2 rounded fs-11 shadow-xs"
+                                    onClick={() => handleUpdateStyleAt(sIdx, st)}
+                                  >
+                                    + {st}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const totalReqCount = styleItems.length;
+                      const selectedCount = styleItems.filter(ordIt =>
+                        selectedRequirementIds.includes(ordIt.id) || items.some(it => it.order_item_id === ordIt.id)
+                      ).length;
+
+                      const visibleItems = styleItems.filter(ordIt => {
+                        const isSelected = selectedRequirementIds.includes(ordIt.id) ||
+                          items.some(it => it.order_item_id === ordIt.id);
+                        if (hideSelectedRequirements && isSelected) {
+                          return false;
+                        }
+                        return true;
+                      });
+
+                      return (
+                        <div key={`style-box-${sIdx}-${styleVal}`} className="mt-4 p-3 border rounded-3 bg-light shadow-xs" style={{ borderColor: '#e2e8f0' }}>
+                          <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                              <span className="badge bg-primary text-white px-2.5 py-1 fs-11 font-monospace rounded-pill">
+                                #{sIdx + 1}
+                              </span>
+                                      <span className="fs-13 fw-bold text-dark d-flex align-items-center gap-1.5">
+                                        <i className="ti ti-clipboard-list text-primary"></i>
+                                        Fabric Requirements for #{sIdx + 1} {positionLabel}: <span className="text-primary ms-1">{styleVal}</span>
+                                      </span>
+                                      {selectedCount > 0 && (
+                                        <span className="badge bg-success-subtle text-success border border-success-subtle fs-11">
+                                          ✓ {selectedCount} Selected &amp; Added
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="d-flex align-items-center gap-2">
+                                      {selectedCount > 0 && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline-secondary py-0.5 px-2 fs-11 rounded d-flex align-items-center gap-1 shadow-xs"
+                                          onClick={() => setHideSelectedRequirements(prev => !prev)}
+                                        >
+                                          <i className={`ti ${hideSelectedRequirements ? 'ti-eye' : 'ti-eye-off'} fs-12`}></i>
+                                          <span>{hideSelectedRequirements ? `Show Hidden (${selectedCount})` : 'Hide Selected'}</span>
+                                        </button>
+                                      )}
+                                      <span className="badge bg-white text-secondary border fs-11">
+                                        {positionLabel} (Priority {sIdx + 1})
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="table-responsive">
+                                      <table className="table table-sm table-bordered bg-white align-middle mb-0" style={{ fontSize: '12px' }}>
+                                        <thead className="table-light">
+                                          <tr>
+                                            <th>Style</th>
+                                            <th>Fabric Quality</th>
+                                            <th>Color</th>
+                                            <th>Article</th>
+                                            <th>Width</th>
+                                            <th className="text-end" style={{ width: '115px' }}>Rate (₹)</th>
+                                            <th className="text-end">Required (m)</th>
+                                            <th className="text-end">Already Received (m)</th>
+                                            <th className="text-end">Pending (m)</th>
+                                            <th className="text-center">Status</th>
+                                            <th className="text-center" style={{ width: '90px' }}>Action</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {visibleItems.length === 0 ? (
+                                            <tr>
+                                              <td colSpan={11} className="text-center py-4 text-muted bg-white">
+                                                <div className="d-flex flex-column align-items-center gap-1.5 py-2">
+                                                  <i className="ti ti-circle-check text-success fs-28 mb-1"></i>
+                                                  <span className="fw-semibold text-dark fs-13">All fabric requirements for {styleVal} have been selected!</span>
+                                                  <span className="text-muted fs-11">Selected items have been added to the Fabric &amp; Processing Line Items table below.</span>
+                                                  {selectedRequirementIds.length > 0 && (
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-outline-primary btn-xs mt-1 py-1 px-2.5 rounded fs-11 shadow-xs"
+                                                      onClick={() => setHideSelectedRequirements(false)}
+                                                    >
+                                                      <i className="ti ti-eye me-1"></i> View / Edit Selected Items
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ) : (
+                                            visibleItems.map((ordIt) => {
+                                              const isAlreadySelected = selectedRequirementIds.includes(ordIt.id) ||
+                                                items.some(it => it.order_item_id === ordIt.id);
+                                              const isFullyOrdered = ordIt.requiredMeters > 0
+                                                ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
+                                                : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
+
+                                              return (
+                                                <tr key={ordIt.id} className={isAlreadySelected ? 'table-success-subtle' : isFullyOrdered ? 'table-light text-muted' : ''}>
+                                                  <td className="fw-medium">{ordIt.style || styleVal}</td>
+                                                  <td>{ordIt.fabric}</td>
+                                                  <td>
+                                                    <span className="d-inline-flex align-items-center gap-1">
+                                                      <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: ordIt.colorHex, border: '1px solid #999' }} />
+                                                      {ordIt.color}
+                                                    </span>
+                                                  </td>
+                                                  <td>
+                                                    {ordIt.articlesList && ordIt.articlesList.length > 1 ? (
+                                                      <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                                        <span className="fw-semibold text-primary" title={ordIt.article}>
+                                                          {ordIt.article}
+                                                        </span>
+                                                        <span className="badge bg-light text-dark border fs-11" title="Sum of pieces across all combined articles">
+                                                          {ordIt.pcs} pcs
+                                                        </span>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="d-flex align-items-center gap-1.5">
+                                                        <span>{ordIt.article}</span>
+                                                        {ordIt.pcs > 0 && (
+                                                          <span className="badge bg-light text-muted border fs-11">
+                                                            {ordIt.pcs} pcs
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                  <td>{ordIt.width}"</td>
+
+                                                  {/* Editable Rate Box */}
+                                                  <td className="text-end" style={{ width: '115px' }}>
+                                                    <div className="input-group input-group-sm" style={{ width: '105px', marginLeft: 'auto' }}>
+                                                      <span className="input-group-text px-1 text-muted bg-light" style={{ fontSize: '11px' }}>₹</span>
+                                                      <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        className="form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white"
+                                                        style={{ fontSize: '12px', borderColor: '#cbd5e1', height: '28px' }}
+                                                        value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : (ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : '')}
+                                                        placeholder="0.00"
+                                                        disabled={isLocked || isFullyOrdered || isAlreadySelected}
+                                                        onChange={(e) => {
+                                                          const val = e.target.value;
+                                                          setOrderItemRates(prev => ({
+                                                            ...prev,
+                                                            [ordIt.id]: val
+                                                          }));
+                                                        }}
+                                                        title="Enter or modify fabric purchase rate per metre"
+                                                      />
+                                                    </div>
+                                                  </td>
+
+                                                  <td className="text-end fw-semibold">{ordIt.requiredMeters.toFixed(2)}</td>
+                                                  <td className="text-end text-success">{ordIt.alreadyReceivedMeters.toFixed(2)}</td>
+                                                  <td className="text-end fw-bold text-dark">{ordIt.pendingMeters.toFixed(2)}</td>
+                                                  <td className="text-center">
+                                                    {isAlreadySelected ? (
+                                                      <span className="badge bg-success-subtle text-success border border-success-subtle fs-10">
+                                                        ✓ Added to PO
+                                                      </span>
+                                                    ) : isFullyOrdered ? (
+                                                      <span className="badge bg-secondary-subtle text-secondary border fs-10">
+                                                        🔒 Already Ordered
+                                                      </span>
+                                                    ) : ordIt.orderedMeters > 0 ? (
+                                                      <span className="badge bg-warning-subtle text-warning border fs-10">
+                                                        Partially Ordered
+                                                      </span>
+                                                    ) : (
+                                                      <span className="badge bg-light text-secondary border fs-10">
+                                                        Not Ordered
+                                                      </span>
+                                                    )}
+                                                  </td>
+
+                                                  {/* Action Column */}
+                                                  <td className="text-center">
+                                                    {isAlreadySelected ? (
+                                                      <span className="text-success fs-11 fw-bold d-inline-flex align-items-center gap-1">
+                                                        <i className="ti ti-check fs-13"></i> Selected
+                                                      </span>
+                                                    ) : isFullyOrdered ? (
+                                                      <button type="button" className="btn btn-sm btn-light border py-0 px-2 fs-11 text-muted" disabled>
+                                                        Locked
+                                                      </button>
+                                                    ) : (
+                                                      <button
+                                                        type="button"
+                                                        disabled={isLocked}
+                                                        className="btn btn-sm btn-outline-primary py-0 px-2 fs-11 fw-semibold shadow-xs"
+                                                        onClick={() => handleSelectOrderItem({ ...ordIt, style: ordIt.style || styleVal })}
+                                                        title="Select this requirement and add to PO items below"
+                                                      >
+                                                        <i className="ti ti-plus me-1"></i> Select
+                                                      </button>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                  );
+              })
+            ) : (
+              /* Single Style Display */
+              <div className="mt-4 p-3 border rounded-3 bg-light" style={{ borderColor: '#e2e8f0' }}>
+                {(() => {
+                  const selectedCount = (currentSelectedOrder.items || []).filter(ordIt =>
+                    selectedRequirementIds.includes(ordIt.id) || items.some(it => it.order_item_id === ordIt.id)
+                  ).length;
+                  return (
+                    <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fs-12 fw-bold text-dark d-flex align-items-center gap-1.5">
+                          <i className="ti ti-clipboard-list text-primary"></i>
+                          Fabric Requirements for {currentSelectedOrder.id} ({currentSelectedOrder.customer})
+                        </span>
+                        {selectedCount > 0 && (
+                          <span className="badge bg-success-subtle text-success border border-success-subtle fs-11">
+                            ✓ {selectedCount} Selected &amp; Added
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        {selectedCount > 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-outline-secondary py-0.5 px-2 fs-11 rounded d-flex align-items-center gap-1 shadow-xs"
+                            onClick={() => setHideSelectedRequirements(prev => !prev)}
+                          >
+                            <i className={`ti ${hideSelectedRequirements ? 'ti-eye' : 'ti-eye-off'} fs-12`}></i>
+                            <span>{hideSelectedRequirements ? `Show Hidden (${selectedCount})` : 'Hide Selected'}</span>
+                          </button>
+                        )}
+                        <span className="badge bg-white text-secondary border fs-11">
+                          Required vs Received Balance
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered bg-white align-middle mb-0" style={{ fontSize: '12px' }}>
+                    <thead className="table-light">
+                      <tr>
+                        <th>Style</th>
+                        <th>Fabric Quality</th>
+                        <th>Color</th>
+                        <th>Article</th>
+                        <th>Width</th>
+                        <th className="text-end" style={{ width: '115px' }}>Rate (₹)</th>
+                        <th className="text-end">Required (m)</th>
+                        <th className="text-end">Already Received (m)</th>
+                        <th className="text-end">Pending (m)</th>
+                        <th className="text-center">Status</th>
+                        <th className="text-center" style={{ width: '90px' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const visibleItems = currentSelectedOrder.items.filter(ordIt => {
+                          const isSelected = selectedRequirementIds.includes(ordIt.id) ||
+                            items.some(it => it.order_item_id === ordIt.id);
+                          if (hideSelectedRequirements && isSelected) {
+                            return false;
+                          }
+                          return true;
+                        });
+
+                        if (visibleItems.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={11} className="text-center py-4 text-muted bg-white">
+                                <div className="d-flex flex-column align-items-center gap-1.5 py-2">
+                                  <i className="ti ti-circle-check text-success fs-28 mb-1"></i>
+                                  <span className="fw-semibold text-dark fs-13">All fabric requirements have been selected!</span>
+                                  <span className="text-muted fs-11">Selected items have been added to the Fabric &amp; Processing Line Items table below.</span>
+                                  {selectedRequirementIds.length > 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-primary btn-xs mt-1 py-1 px-2.5 rounded fs-11 shadow-xs"
+                                      onClick={() => setHideSelectedRequirements(false)}
+                                    >
+                                      <i className="ti ti-eye me-1"></i> View / Edit Selected Items ({selectedRequirementIds.length})
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return visibleItems.map((ordIt) => {
+                          const isAlreadySelected = selectedRequirementIds.includes(ordIt.id) ||
+                            items.some(it => it.order_item_id === ordIt.id);
+                          const isFullyOrdered = ordIt.requiredMeters > 0
+                            ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
+                            : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
+
+                          return (
+                            <tr key={ordIt.id} className={isAlreadySelected ? 'table-success-subtle' : isFullyOrdered ? 'table-light text-muted' : ''}>
+                              <td className="fw-medium">{ordIt.style}</td>
+                              <td>{ordIt.fabric}</td>
+                              <td>
+                                <span className="d-inline-flex align-items-center gap-1">
+                                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: ordIt.colorHex, border: '1px solid #999' }} />
+                                  {ordIt.color}
+                                </span>
+                              </td>
+                              <td>
+                                {ordIt.articlesList && ordIt.articlesList.length > 1 ? (
+                                  <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span className="fw-semibold text-primary" title={ordIt.article}>
+                                      {ordIt.article}
+                                    </span>
+                                    <span className="badge bg-light text-dark border fs-11" title="Sum of pieces across all combined articles">
+                                      {ordIt.pcs} pcs
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="d-flex align-items-center gap-1.5">
+                                    <span>{ordIt.article}</span>
+                                    {ordIt.pcs > 0 && (
+                                      <span className="badge bg-light text-muted border fs-11">
+                                        {ordIt.pcs} pcs
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td>{ordIt.width}"</td>
+
+                              {/* Editable Rate Box */}
+                              <td className="text-end" style={{ width: '115px' }}>
+                                <div className="input-group input-group-sm" style={{ width: '105px', marginLeft: 'auto' }}>
+                                  <span className="input-group-text px-1 text-muted bg-light" style={{ fontSize: '11px' }}>₹</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="form-control form-control-sm text-end px-1.5 py-0.5 fw-semibold bg-white"
+                                    style={{ fontSize: '12px', borderColor: '#cbd5e1', height: '28px' }}
+                                    value={orderItemRates[ordIt.id] !== undefined ? orderItemRates[ordIt.id] : (ordIt.rate && parseFloat(ordIt.rate) > 0 ? ordIt.rate : '')}
+                                    placeholder="0.00"
+                                    disabled={isLocked || isFullyOrdered || isAlreadySelected}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setOrderItemRates(prev => ({
+                                        ...prev,
+                                        [ordIt.id]: val
+                                      }));
+                                    }}
+                                    title="Enter or modify fabric purchase rate per metre"
+                                  />
+                                </div>
+                              </td>
+
+                              <td className="text-end fw-semibold">{ordIt.requiredMeters.toFixed(2)}</td>
+                              <td className="text-end text-success">{ordIt.alreadyReceivedMeters.toFixed(2)}</td>
+                              <td className="text-end fw-bold text-dark">{ordIt.pendingMeters.toFixed(2)}</td>
+                              <td className="text-center">
+                                {isAlreadySelected ? (
+                                  <span className="badge bg-success-subtle text-success border border-success-subtle fs-10">
+                                    ✓ Added to PO
+                                  </span>
+                                ) : isFullyOrdered ? (
+                                  <span className="badge bg-secondary-subtle text-secondary border fs-10">
+                                    🔒 Already Ordered
+                                  </span>
+                                ) : ordIt.orderedMeters > 0 ? (
+                                  <span className="badge bg-warning-subtle text-warning border fs-10">
+                                    Partially Ordered
+                                  </span>
+                                ) : (
+                                  <span className="badge bg-light text-secondary border fs-10">
+                                    Not Ordered
                                   </span>
                                 )}
-                              </div>
-                            )}
-                          </td>
-                          <td>{ordIt.width}"</td>
-                          <td className="text-end fw-semibold text-dark">
-                            {ordIt.rate && parseFloat(ordIt.rate) > 0 ? (
-                              `₹${parseFloat(ordIt.rate).toFixed(2)}`
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
-                          </td>
-                          <td className="text-end fw-semibold">{ordIt.requiredMeters.toFixed(2)}</td>
-                          <td className="text-end text-success">{ordIt.alreadyReceivedMeters.toFixed(2)}</td>
-                          <td className="text-end fw-bold text-dark">{ordIt.pendingMeters.toFixed(2)}</td>
-                          <td className="text-center">
-                            {isFullyOrdered ? (
-                              <span className="badge bg-secondary-subtle text-secondary border fs-10">
-                                🔒 Already Ordered
-                              </span>
-                            ) : ordIt.orderedMeters > 0 ? (
-                              <span className="badge bg-warning-subtle text-warning border fs-10">
-                                Partially Ordered
-                              </span>
-                            ) : (
-                              <span className="badge bg-light text-secondary border fs-10">
-                                Not Ordered
-                              </span>
-                            )}
-                          </td>
-                          <td className="text-center">
-                            {isFullyOrdered ? (
-                              <button type="button" className="btn btn-sm btn-light border py-0 px-2 fs-11 text-muted" disabled>
-                                Locked
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={isLocked}
-                                className="btn btn-sm btn-outline-primary py-0 px-2 fs-11 fw-semibold"
-                                onClick={() => handleSelectOrderItem(ordIt)}
-                              >
-                                <i className="ti ti-plus me-1"></i> Select
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                              </td>
+
+                              {/* Action Column: When selected, button goes away / hides */}
+                              <td className="text-center">
+                                {isAlreadySelected ? (
+                                  <span className="text-success fs-11 fw-bold d-inline-flex align-items-center gap-1">
+                                    <i className="ti ti-check fs-13"></i> Selected
+                                  </span>
+                                ) : isFullyOrdered ? (
+                                  <button type="button" className="btn btn-sm btn-light border py-0 px-2 fs-11 text-muted" disabled>
+                                    Locked
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isLocked}
+                                    className="btn btn-sm btn-outline-primary py-0 px-2 fs-11 fw-semibold shadow-xs"
+                                    onClick={() => handleSelectOrderItem(ordIt)}
+                                    title="Select this requirement and add to PO items below"
+                                  >
+                                    <i className="ti ti-plus me-1"></i> Select
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       </div>
 
       {/* ========================================================================= */}
       {/* SECTION: FABRIC & PROCESSING LINE ITEMS (SQUISH-PROOF MIN-WIDTH 1440PX)   */}
-      {/* ========================================================================= */}
-      <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
-        <div className="p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ background: '#fafbfc' }}>
-          <div className="d-flex align-items-center gap-2.5">
-            <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb' }}>
-              <i className="ti ti-layers-linked fs-16"></i>
-            </div>
-            <div>
-              <h6 className="mb-0 fw-bold text-dark fs-14">Fabric &amp; Processing Line Items</h6>
-              <p className="text-muted fs-11 mb-0">Bi-directional calculation, shrinkage %, dyeing rate recommendation &amp; swatch</p>
-            </div>
-          </div>
+                                {/* ========================================================================= */}
+                                <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
+                                  <div className="p-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ background: '#fafbfc' }}>
+                                    <div className="d-flex align-items-center gap-2.5">
+                                      <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb' }}>
+                                        <i className="ti ti-layers-linked fs-16"></i>
+                                      </div>
+                                      <div>
+                                        <h6 className="mb-0 fw-bold text-dark fs-14">Fabric &amp; Processing Line Items</h6>
+                                        <p className="text-muted fs-11 mb-0">Bi-directional calculation, shrinkage %, dyeing rate recommendation &amp; swatch</p>
+                                      </div>
+                                    </div>
 
-          <div className="d-flex align-items-center gap-2">
-            {!isLocked && isSectionEditable('items') && (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
-                onClick={addItemRow}
-              >
-                <i className="ti ti-plus fs-14"></i>
-                <span>Add Manual Line Item</span>
-              </button>
-            )}
+                                    <div className="d-flex align-items-center gap-2">
+                                      {!isLocked && isSectionEditable('items') && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
+                                          onClick={addItemRow}
+                                        >
+                                          <i className="ti ti-plus fs-14"></i>
+                                          <span>Add Manual Line Item</span>
+                                        </button>
+                                      )}
 
-            {!isLocked && isReadOnly && editingSection !== 'items' && (
-              <button
-                type="button"
-                className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
-                onClick={() => setEditingSection('items')}
-              >
-                <i className="ti ti-edit me-1"></i> Edit Items
-              </button>
-            )}
-            {!isLocked && isReadOnly && editingSection === 'items' && (
-              <button
-                type="button"
-                className="btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold"
-                onClick={() => setEditingSection(null)}
-              >
-                <i className="ti ti-check me-1"></i> Done
-              </button>
-            )}
-          </div>
-        </div>
+                                      {!isLocked && isReadOnly && editingSection !== 'items' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-light btn-sm border text-dark px-2.5 py-1 rounded fs-12 fw-semibold"
+                                          onClick={() => setEditingSection('items')}
+                                        >
+                                          <i className="ti ti-edit me-1"></i> Edit Items
+                                        </button>
+                                      )}
+                                      {!isLocked && isReadOnly && editingSection === 'items' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-success btn-sm px-2.5 py-1 rounded fs-12 fw-semibold"
+                                          onClick={() => setEditingSection(null)}
+                                        >
+                                          <i className="ti ti-check me-1"></i> Done
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
 
-        <div className="p-0">
-          {/* Table Responsive Wrapper with Min-Width Guarantee */}
-          <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <style>{`
+                                  <div className="p-0">
+                                    {/* Table Responsive Wrapper with Min-Width Guarantee */}
+                                    <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                                      <style>{`
               .line-items-po-table th,
               .line-items-po-table td {
                 padding: 6px 6px !important;
@@ -1931,378 +2435,429 @@ export default function ProcessPOForm({
                 padding-left: 8px !important;
               }
             `}</style>
-            <table
-              className="table table-bordered align-middle mb-0 line-items-po-table"
-              style={{ minWidth: '1540px', tableLayout: 'fixed', fontSize: '13px' }}
-            >
-              <thead style={{ background: '#f8fafc' }}>
-                <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th className="text-center py-2" style={{ width: '38px' }}>#</th>
-                  <th style={{ width: '220px' }}>
-                    <div className="d-flex align-items-center justify-content-between text-nowrap">
-                      <span>FABRIC QUALITY *</span>
-                      {!isLocked && isSectionEditable('items') && (
-                        <button
-                          type="button"
-                          className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
-                          onClick={() => setShowInlineFabricModal(true)}
-                        >
-                          + New
-                        </button>
-                      )}
-                    </div>
-                  </th>
-                  <th style={{ width: '195px' }}>
-                    <div className="d-flex align-items-center justify-content-between text-nowrap">
-                      <span>COLOR SHADE *</span>
-                      {!isLocked && isSectionEditable('items') && (
-                        <button
-                          type="button"
-                          className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
-                          onClick={() => {
-                            setActiveColorRowIndex(0);
-                            setShowInlineColorModal(true);
-                          }}
-                        >
-                          + New
-                        </button>
-                      )}
-                    </div>
-                  </th>
-                  <th style={{ width: '170px' }}>ARTICLE</th>
-                  <th style={{ width: '110px' }}>WIDTH</th>
-                  <th style={{ width: '100px' }} className="text-center" title="Consumption per garment piece in metres">CONS (M)</th>
-                  <th style={{ width: '115px' }} className="text-end text-dark">METRES *</th>
-                  <th style={{ width: '100px' }} className="text-end text-dark">PIECES *</th>
-                  <th style={{ width: '100px' }} className="text-end">FAB RATE (₹)</th>
-                  <th style={{ width: '105px' }} className="text-end">DYE RATE (₹)</th>
-                  <th style={{ width: '105px' }} className="text-end text-nowrap">TOTAL/M (₹)</th>
-                  <th style={{ width: '120px' }} className="text-end text-success text-nowrap">TOTAL AMOUNT (₹)</th>
-                  <th style={{ width: '80px' }} className="text-center text-nowrap">SWATCH</th>
-                  {!isLocked && isSectionEditable('items') && (
-                    <th style={{ width: '75px' }} className="text-center text-nowrap">ACTION</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={!isLocked && isSectionEditable('items') ? 14 : 13} className="text-center py-5 bg-white">
-                      <div className="py-4">
-                        <div className="rounded-circle bg-light d-inline-flex align-items-center justify-content-center p-3 mb-2 text-muted" style={{ width: '54px', height: '54px' }}>
-                          <i className="ti ti-layers-linked fs-24"></i>
-                        </div>
-                        <h6 className="fw-semibold text-dark fs-14 mb-1">No Line Items Added Yet</h6>
-                        <p className="text-muted fs-12 mb-3">Click "+ Add Manual Line Item" or select requirements from a linked Sales Order above.</p>
-                        {!isLocked && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm px-3 shadow-xs"
-                            onClick={addItemRow}
-                          >
-                            <i className="ti ti-plus me-1"></i> Add First Line Item
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((item, idx) => {
-                    const rowWidthOptions = getAvailableWidthsForItem(item);
-                    const filteredFabrics = getFilteredFabrics(item);
-                    const filteredColors = getFilteredColors(item);
-                    const filteredArticles = getFilteredArticles(item);
+                                      <table
+                                        className="table table-bordered align-middle mb-0 line-items-po-table"
+                                        style={{ minWidth: '1540px', tableLayout: 'fixed', fontSize: '13px' }}
+                                      >
+                                        <thead style={{ background: '#f8fafc' }}>
+                                          <tr style={{ color: '#475569', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            <th className="text-center py-2" style={{ width: '38px' }}>#</th>
+                                            <th style={{ width: '220px' }}>
+                                              <div className="d-flex align-items-center justify-content-between text-nowrap">
+                                                <span>FABRIC QUALITY *</span>
+                                                {!isLocked && isSectionEditable('items') && (
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
+                                                    onClick={() => setShowInlineFabricModal(true)}
+                                                  >
+                                                    + New
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </th>
+                                            <th style={{ width: '195px' }}>
+                                              <div className="d-flex align-items-center justify-content-between text-nowrap">
+                                                <span>COLOR SHADE *</span>
+                                                {!isLocked && isSectionEditable('items') && (
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-link btn-sm p-0 text-primary text-decoration-none fs-11"
+                                                    onClick={() => {
+                                                      setActiveColorRowIndex(0);
+                                                      setShowInlineColorModal(true);
+                                                    }}
+                                                  >
+                                                    + New
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </th>
+                                            <th style={{ width: '170px' }}>ARTICLE</th>
+                                            <th style={{ width: '110px' }}>WIDTH</th>
+                                            <th style={{ width: '100px' }} className="text-center" title="Consumption per garment piece in metres">CONS (M)</th>
+                                            <th style={{ width: '115px' }} className="text-end text-dark">METRES *</th>
+                                            <th style={{ width: '100px' }} className="text-end text-dark">PIECES *</th>
+                                            <th style={{ width: '100px' }} className="text-end">FAB RATE (₹)</th>
+                                            <th style={{ width: '105px' }} className="text-end">DYE RATE (₹)</th>
+                                            <th style={{ width: '105px' }} className="text-end text-nowrap">TOTAL/M (₹)</th>
+                                            <th style={{ width: '120px' }} className="text-end text-success text-nowrap">TOTAL AMOUNT (₹)</th>
+                                            <th style={{ width: '80px' }} className="text-center text-nowrap">SWATCH</th>
+                                            {!isLocked && isSectionEditable('items') && (
+                                              <th style={{ width: '75px' }} className="text-center text-nowrap">ACTION</th>
+                                            )}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {items.length === 0 ? (
+                                            <tr>
+                                              <td colSpan={!isLocked && isSectionEditable('items') ? 14 : 13} className="text-center py-5 bg-white">
+                                                <div className="py-4">
+                                                  <div className="rounded-circle bg-light d-inline-flex align-items-center justify-content-center p-3 mb-2 text-muted" style={{ width: '54px', height: '54px' }}>
+                                                    <i className="ti ti-layers-linked fs-24"></i>
+                                                  </div>
+                                                  <h6 className="fw-semibold text-dark fs-14 mb-1">No Line Items Added Yet</h6>
+                                                  <p className="text-muted fs-12 mb-3">Click "+ Add Manual Line Item" or select requirements from a linked Sales Order above.</p>
+                                                  {!isLocked && (
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-primary btn-sm px-3 shadow-xs"
+                                                      onClick={addItemRow}
+                                                    >
+                                                      <i className="ti ti-plus me-1"></i> Add First Line Item
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ) : (
+                                            items.map((item, idx) => {
+                                              const rowWidthOptions = getAvailableWidthsForItem(item);
+                                              const filteredFabrics = getFilteredFabrics(item);
+                                              const filteredColors = getFilteredColors(item);
+                                              const filteredArticles = getFilteredArticles(item);
 
-                    return (
-                      <tr key={item.id || idx}>
-                        <td className="text-center fw-bold text-muted">{idx + 1}</td>
+                                              return (
+                                                <tr key={item.id || idx}>
+                                                  <td className="text-center fw-bold text-muted">{idx + 1}</td>
 
-                        {/* Fabric Quality from Master (Search Narrowing via PDF Section 3.2) */}
+                                                  {/* Fabric Quality from Master (Search Narrowing via PDF Section 3.2) */}
+                                                  <td>
+                                                    <select
+                                                      className="form-select form-select-sm fs-13 bg-white w-100 form-select-clean"
+                                                      value={item.fabric_id || ''}
+                                                      disabled={!isSectionEditable('items')}
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      onChange={(e) => {
+                                                        const f = fabricList.find(fab => fab.id === e.target.value);
+                                                        if (f) {
+                                                          updateItem(idx, {
+                                                            fabric_id: f.id,
+                                                            fabric_name: f.name,
+                                                            shrinkage_percent: f.shrinkage || 4.0
+                                                          });
+                                                        } else {
+                                                          updateItem(idx, { fabric_id: '', fabric_name: '' });
+                                                        }
+                                                      }}
+                                                    >
+                                                      <option value="">Select Fabric Quality</option>
+                                                      {item.fabric_id && !filteredFabrics.some(fab => fab.id === item.fabric_id) && (
+                                                        <option value={item.fabric_id}>{item.fabric_name || item.fabric_id}</option>
+                                                      )}
+                                                      {filteredFabrics.map(fab => (
+                                                        <option key={fab.id} value={fab.id}>{fab.name}</option>
+                                                      ))}
+                                                    </select>
+                                                    {selectedStyles.filter(Boolean).length > 1 ? (
+                                                      <div className="d-flex align-items-center gap-1 mt-1 text-nowrap">
+                                                        <span className="text-muted fs-11">Style:</span>
+                                                        <select
+                                                          className="form-select form-select-xs border-0 p-0 fs-11 fw-semibold text-dark bg-transparent"
+                                                          style={{ outline: 'none', cursor: 'pointer', maxWidth: '140px' }}
+                                                          value={item.style_name || selectedStyles[0] || ''}
+                                                          disabled={!isSectionEditable('items')}
+                                                          onChange={(e) => updateItem(idx, { style_name: e.target.value })}
+                                                        >
+                                                          {selectedStyles.filter(Boolean).map(st => (
+                                                            <option key={st} value={st}>{st}</option>
+                                                          ))}
+                                                        </select>
+                                                      </div>
+                                                    ) : (
+                                                      Boolean((item.style_name || selectedStyles[0]) && (item.style_name || selectedStyles[0]) !== 'Standard') && (
+                                                        <div className="text-muted fs-11 mt-1 text-truncate" title={item.style_name || selectedStyles[0]}>
+                                                          Style: <strong className="text-dark">{item.style_name || selectedStyles[0]}</strong>
+                                                        </div>
+                                                      )
+                                                    )}
+                                                  </td>
+
+                                                  {/* Color Shade from Master (Search Narrowing via PDF Section 3.2) */}
+                                                  <td>
+                                                    <div className="d-flex align-items-center bg-white border rounded px-2 w-100" style={{ borderColor: '#cbd5e1', height: '36px' }}>
+                                                      <span style={{ width: '16px', height: '16px', borderRadius: '3px', background: item.color_hex || '#cbd5e1', marginRight: '8px', border: '1px solid #999', flexShrink: 0 }} />
+                                                      <select
+                                                        className="border-0 p-0 fs-13 bg-transparent text-dark fw-medium w-100"
+                                                        style={{ outline: 'none' }}
+                                                        value={item.color_name || ''}
+                                                        disabled={!isSectionEditable('items')}
+                                                        onChange={(e) => {
+                                                          const c = colorList.find(col => col.name === e.target.value);
+                                                          if (c) {
+                                                            updateItem(idx, { color_id: c.id, color_name: c.name, color_hex: c.hex || '#cbd5e1' });
+                                                          } else {
+                                                            updateItem(idx, { color_name: e.target.value });
+                                                          }
+                                                        }}
+                                                      >
+                                                        <option value="">Select Color</option>
+                                                        {filteredColors.map(c => (
+                                                          <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                                                        ))}
+                                                      </select>
+                                                    </div>
+                                                  </td>
+
+                                                  {/* Article from Master (Search Narrowing via PDF Section 3.2) */}
+                                                  <td>
+                                                    <select
+                                                      className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.article_name || ''}
+                                                      disabled={!isSectionEditable('items')}
+                                                      onChange={(e) => updateItem(idx, { article_name: e.target.value })}
+                                                    >
+                                                      <option value="">Select Article</option>
+                                                      {item.article_name && !filteredArticles.some(a => (a.name || a) === item.article_name) && (
+                                                        <option value={item.article_name}>{item.article_name}</option>
+                                                      )}
+                                                      {filteredArticles.map(a => (
+                                                        <option key={a.id || a.name} value={a.name}>{a.name}</option>
+                                                      ))}
+                                                    </select>
+                                                  </td>
+
+                                                  {/* Width from Fabric Master */}
+                                                  <td>
+                                                    <select
+                                                      className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.width || ''}
+                                                      disabled={!isSectionEditable('items')}
+                                                      onChange={(e) => updateItem(idx, { width: e.target.value })}
+                                                    >
+                                                      <option value="">Width</option>
+                                                      {item.width && !rowWidthOptions.some(w => String(w).replace(/"/g, '') === String(item.width).replace(/"/g, '')) && (
+                                                        <option value={String(item.width).replace(/"/g, '')}>{String(item.width).replace(/"/g, '')}"</option>
+                                                      )}
+                                                      {rowWidthOptions.map(w => {
+                                                        const cleanW = String(w).replace(/"/g, '');
+                                                        return <option key={cleanW} value={cleanW}>{cleanW}"</option>;
+                                                      })}
+                                                    </select>
+                                                  </td>
+
+                                                  {/* Dynamic Consumption Formula Input (PDF Section 3.2) */}
+                                                  <td>
+                                                    <input
+                                                      type="number"
+                                                      step="0.01"
+                                                      placeholder="m/pc"
+                                                      className="form-control form-control-sm text-center bg-white fs-13 w-100"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.consumption_per_piece}
+                                                      disabled={!isSectionEditable('items')}
+                                                      title="Fabric consumption per piece in metres (e.g. 2.60)"
+                                                      onChange={(e) => updateItem(idx, { consumption_per_piece: e.target.value })}
+                                                    />
+                                                  </td>
+
+                                                  {/* Metres (PDF Section 3.2: entering metres auto-computes pieces) */}
+                                                  <td>
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      placeholder="0.00"
+                                                      className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13 w-100"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.quantity_meters}
+                                                      disabled={!isSectionEditable('items')}
+                                                      onChange={(e) => updateItem(idx, { quantity_meters: e.target.value })}
+                                                    />
+                                                    {parseFloat(item.quantity_meters) > 0 && (
+                                                      <div className="text-muted text-end fs-10 mt-0.5 text-nowrap" title="Raw fabric required factoring shrinkage">
+                                                        Raw: {item.raw_fabric_meters}m ({item.shrinkage_percent || 0}%)
+                                                      </div>
+                                                    )}
+                                                  </td>
+
+                                                  {/* Pieces (PDF Section 3.2: entering pieces auto-computes metres) */}
+                                                  <td>
+                                                    <input
+                                                      type="number"
+                                                      placeholder="0"
+                                                      className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13 w-100"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.quantity_pieces}
+                                                      disabled={!isSectionEditable('items')}
+                                                      onChange={(e) => updateItem(idx, { quantity_pieces: e.target.value })}
+                                                    />
+                                                  </td>
+
+                                                  {/* Fabric Rate */}
+                                                  <td>
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      placeholder="0.00"
+                                                      className="form-control form-control-sm text-end bg-white fs-13 w-100"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px' }}
+                                                      value={item.fabric_rate}
+                                                      disabled={!isSectionEditable('items')}
+                                                      onChange={(e) => updateItem(idx, { fabric_rate: e.target.value })}
+                                                    />
+                                                  </td>
+
+                        {/* Dyeing Rate (with Auto-Recommendation button per PDF Section 3.2) */}
                         <td>
-                          <select
-                            className="form-select form-select-sm fs-13 bg-white w-100 form-select-clean"
-                            value={item.fabric_id || ''}
-                            disabled={!isSectionEditable('items')}
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            onChange={(e) => {
-                              const f = fabricList.find(fab => fab.id === e.target.value);
-                              if (f) {
-                                updateItem(idx, {
-                                  fabric_id: f.id,
-                                  fabric_name: f.name,
-                                  shrinkage_percent: f.shrinkage || 4.0
-                                });
-                              } else {
-                                updateItem(idx, { fabric_id: '', fabric_name: '' });
-                              }
-                            }}
-                          >
-                            <option value="">Select Fabric Quality</option>
-                            {item.fabric_id && !filteredFabrics.some(fab => fab.id === item.fabric_id) && (
-                              <option value={item.fabric_id}>{item.fabric_name || item.fabric_id}</option>
-                            )}
-                            {filteredFabrics.map(fab => (
-                              <option key={fab.id} value={fab.id}>{fab.name}</option>
-                            ))}
-                          </select>
-                          {selectedStyles.filter(Boolean).length > 1 ? (
-                            <div className="d-flex align-items-center gap-1 mt-1 text-nowrap">
-                              <span className="text-muted fs-11">Style:</span>
-                              <select
-                                className="form-select form-select-xs border-0 p-0 fs-11 fw-semibold text-dark bg-transparent"
-                                style={{ outline: 'none', cursor: 'pointer', maxWidth: '140px' }}
-                                value={item.style_name || selectedStyles[0] || ''}
-                                disabled={!isSectionEditable('items')}
-                                onChange={(e) => updateItem(idx, { style_name: e.target.value })}
-                              >
-                                {selectedStyles.filter(Boolean).map(st => (
-                                  <option key={st} value={st}>{st}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : (
-                            Boolean((item.style_name || selectedStyles[0]) && (item.style_name || selectedStyles[0]) !== 'Standard') && (
-                              <div className="text-muted fs-11 mt-1 text-truncate" title={item.style_name || selectedStyles[0]}>
-                                Style: <strong className="text-dark">{item.style_name || selectedStyles[0]}</strong>
-                              </div>
-                            )
-                          )}
-                        </td>
-
-                        {/* Color Shade from Master (Search Narrowing via PDF Section 3.2) */}
-                        <td>
-                          <div className="d-flex align-items-center bg-white border rounded px-2 w-100" style={{ borderColor: '#cbd5e1', height: '36px' }}>
-                            <span style={{ width: '16px', height: '16px', borderRadius: '3px', background: item.color_hex || '#cbd5e1', marginRight: '8px', border: '1px solid #999', flexShrink: 0 }} />
-                            <select
-                              className="border-0 p-0 fs-13 bg-transparent text-dark fw-medium w-100"
-                              style={{ outline: 'none' }}
-                              value={item.color_name || ''}
+                          <div className="input-group input-group-sm">
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0.00"
+                              className="form-control form-control-sm text-end bg-white fs-13"
+                              style={{ borderColor: '#cbd5e1', height: '36px' }}
+                              value={item.dyeing_rate}
                               disabled={!isSectionEditable('items')}
-                              onChange={(e) => {
-                                const c = colorList.find(col => col.name === e.target.value);
-                                if (c) {
-                                  updateItem(idx, { color_id: c.id, color_name: c.name, color_hex: c.hex || '#cbd5e1' });
-                                } else {
-                                  updateItem(idx, { color_name: e.target.value });
-                                }
-                              }}
-                            >
-                              <option value="">Select Color</option>
-                              {filteredColors.map(c => (
-                                <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-
-                        {/* Article from Master (Search Narrowing via PDF Section 3.2) */}
-                        <td>
-                          <select
-                            className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.article_name || ''}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { article_name: e.target.value })}
-                          >
-                            <option value="">Select Article</option>
-                            {item.article_name && !filteredArticles.some(a => (a.name || a) === item.article_name) && (
-                              <option value={item.article_name}>{item.article_name}</option>
+                              onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
+                            />
+                            {isSectionEditable('items') && (
+                              <button
+                                type="button"
+                                className="btn btn-outline-primary btn-sm px-1.5"
+                                style={{ height: '36px', fontSize: '10px', borderColor: '#cbd5e1' }}
+                                title={`Auto-recommend rate (₹${getRecommendedDyeingRate(item)}/m for ${item.width || '44'}" ${processType || 'Dyeing'})`}
+                                onClick={() => updateItem(idx, { dyeing_rate: getRecommendedDyeingRate(item) })}
+                              >
+                                Auto
+                              </button>
                             )}
-                            {filteredArticles.map(a => (
-                              <option key={a.id || a.name} value={a.name}>{a.name}</option>
-                            ))}
-                          </select>
-                        </td>
-
-                        {/* Width from Fabric Master */}
-                        <td>
-                          <select
-                            className="form-select form-select-sm bg-white fs-13 w-100 form-select-clean"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.width || ''}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { width: e.target.value })}
-                          >
-                            <option value="">Width</option>
-                            {item.width && !rowWidthOptions.some(w => String(w).replace(/"/g, '') === String(item.width).replace(/"/g, '')) && (
-                              <option value={String(item.width).replace(/"/g, '')}>{String(item.width).replace(/"/g, '')}"</option>
-                            )}
-                            {rowWidthOptions.map(w => {
-                              const cleanW = String(w).replace(/"/g, '');
-                              return <option key={cleanW} value={cleanW}>{cleanW}"</option>;
-                            })}
-                          </select>
-                        </td>
-
-                        {/* Dynamic Consumption Formula Input (PDF Section 3.2) */}
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="m/pc"
-                            className="form-control form-control-sm text-center bg-white fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.consumption_per_piece}
-                            disabled={!isSectionEditable('items')}
-                            title="Fabric consumption per piece in metres (e.g. 2.60)"
-                            onChange={(e) => updateItem(idx, { consumption_per_piece: e.target.value })}
-                          />
-                        </td>
-
-                        {/* Metres (PDF Section 3.2: entering metres auto-computes pieces) */}
-                        <td>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="0.00"
-                            className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.quantity_meters}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { quantity_meters: e.target.value })}
-                          />
-                          {parseFloat(item.quantity_meters) > 0 && (
-                            <div className="text-muted text-end fs-10 mt-0.5 text-nowrap" title="Raw fabric required factoring shrinkage">
-                              Raw: {item.raw_fabric_meters}m ({item.shrinkage_percent || 0}%)
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Pieces (PDF Section 3.2: entering pieces auto-computes metres) */}
-                        <td>
-                          <input
-                            type="number"
-                            placeholder="0"
-                            className="form-control form-control-sm text-end fw-semibold text-dark bg-white fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.quantity_pieces}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { quantity_pieces: e.target.value })}
-                          />
-                        </td>
-
-                        {/* Fabric Rate */}
-                        <td>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="0.00"
-                            className="form-control form-control-sm text-end bg-white fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.fabric_rate}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { fabric_rate: e.target.value })}
-                          />
-                        </td>
-
-                        {/* Dyeing Rate */}
-                        <td>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="0.00"
-                            className="form-control form-control-sm text-end bg-white fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px' }}
-                            value={item.dyeing_rate}
-                            disabled={!isSectionEditable('items')}
-                            onChange={(e) => updateItem(idx, { dyeing_rate: e.target.value })}
-                          />
-                        </td>
-
-                        {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) in clean box */}
-                        <td>
-                          <div
-                            className="form-control form-control-sm text-end fw-semibold text-dark bg-light d-flex align-items-center justify-content-end fs-13 w-100"
-                            style={{ borderColor: '#cbd5e1', height: '36px', minWidth: '90px' }}
-                            title="Total Actual Cost per Metre (Fabric Rate + Dyeing Rate)"
-                          >
-                            ₹{Number(item.total_actual_cost || 0).toFixed(2)}
                           </div>
                         </td>
 
-                        {/* Total Line Amount in clean box */}
-                        <td>
-                          <div
-                            className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-flex align-items-center justify-content-end fs-13 w-100"
-                            style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '100px' }}
-                            title="Total Line Item Amount (Metres × Total Cost/m)"
-                          >
-                            ₹{Number(item.total_amount || 0).toFixed(2)}
-                          </div>
-                        </td>
+                                                  {/* Total Actual Cost per Metre (PDF: Fabric Rate + Dyeing Rate) in clean box */}
+                                                  <td>
+                                                    <div
+                                                      className="form-control form-control-sm text-end fw-semibold text-dark bg-light d-flex align-items-center justify-content-end fs-13 w-100"
+                                                      style={{ borderColor: '#cbd5e1', height: '36px', minWidth: '90px' }}
+                                                      title="Total Actual Cost per Metre (Fabric Rate + Dyeing Rate)"
+                                                    >
+                                                      ₹{Number(item.total_actual_cost || 0).toFixed(2)}
+                                                    </div>
+                                                  </td>
 
-                        {/* Swatch Photo Upload / Camera */}
+                                                  {/* Total Line Amount in clean box */}
+                                                  <td>
+                                                    <div
+                                                      className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-flex align-items-center justify-content-end fs-13 w-100"
+                                                      style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '100px' }}
+                                                      title="Total Line Item Amount (Metres × Total Cost/m)"
+                                                    >
+                                                      ₹{Number(item.total_amount || 0).toFixed(2)}
+                                                    </div>
+                                                  </td>
+
+                        {/* Swatch Photo: Camera Capture or File Chooser (PDF Section 3.2) */}
                         <td className="text-center">
-                          <label className={`btn btn-sm btn-light border p-1 rounded-2 mb-0 ${isLocked ? 'disabled' : ''}`} style={{ cursor: isLocked ? 'not-allowed' : 'pointer' }} title="Capture / Upload Fabric Swatch">
-                            <i className={`ti ${item.sample_photo ? 'ti-photo-check text-success' : 'ti-camera text-muted'} fs-15`}></i>
+                          <div className="d-flex align-items-center justify-content-center gap-1">
+                            <label
+                              className={`btn btn-sm btn-light border p-1 rounded-2 mb-0 ${isLocked ? 'disabled' : ''}`}
+                              style={{ cursor: isLocked ? 'not-allowed' : 'pointer' }}
+                              title="Capture Swatch via Camera"
+                            >
+                              <i className={`ti ${item.sample_photo ? 'ti-photo-check text-success' : 'ti-camera text-muted'} fs-14`}></i>
+                              {!isLocked && (
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="d-none"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onload = (re) => updateItem(idx, { sample_photo: re.target.result });
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              )}
+                            </label>
                             {!isLocked && (
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                className="d-none"
-                                onChange={(e) => {
-                                  const file = e.target.files[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = (re) => updateItem(idx, { sample_photo: re.target.result });
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                              />
+                              <label
+                                className="btn btn-sm btn-light border p-1 rounded-2 mb-0"
+                                style={{ cursor: 'pointer' }}
+                                title="Choose Swatch Image File"
+                              >
+                                <i className="ti ti-upload text-muted fs-14"></i>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="d-none"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onload = (re) => updateItem(idx, { sample_photo: re.target.result });
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
                             )}
-                          </label>
+                            {item.sample_photo && !isLocked && (
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm text-danger p-0 text-decoration-none"
+                                title="Remove swatch photo"
+                                onClick={() => updateItem(idx, { sample_photo: null })}
+                              >
+                                <i className="ti ti-x fs-12"></i>
+                              </button>
+                            )}
+                          </div>
                         </td>
 
-                        {/* Action: Delete Row */}
-                        {!isLocked && isSectionEditable('items') && (
-                          <td className="text-center">
-                            <button
-                              type="button"
-                              className="btn btn-link btn-sm text-danger p-0 text-decoration-none"
-                              title="Delete row"
-                              onClick={() => removeItemRow(idx)}
-                            >
-                              <i className="ti ti-trash fs-14"></i>
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-              {items.length > 0 && (
-                <tfoot style={{ background: '#f8fafc', fontWeight: 'bold' }}>
-                  <tr>
-                    <td colSpan={6} className="text-end text-secondary fs-12 py-2">
-                      GRAND TOTALS:
-                    </td>
-                    <td className="text-end text-dark fs-13 py-2">
-                      {grandTotalMeters.toFixed(2)} m
-                    </td>
-                    <td className="text-end text-dark fs-13 py-2">
-                      {grandTotalPieces} pcs
-                    </td>
-                    <td colSpan={2} className="text-end text-secondary fs-12 py-2">
-                      Total Actual Job Cost:
-                    </td>
-                    <td colSpan={2} className="text-end py-2">
-                      <div
-                        className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-inline-flex align-items-center justify-content-end fs-13 px-3"
-                        style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '110px' }}
-                        title="Grand Total Actual Job Cost"
-                      >
-                        ₹{grandTotalCost.toFixed(2)}
-                      </div>
-                    </td>
-                    <td colSpan={!isLocked && isSectionEditable('items') ? 2 : 1}></td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </div>
+                                                  {/* Action: Delete Row */}
+                                                  {!isLocked && isSectionEditable('items') && (
+                                                    <td className="text-center">
+                                                      <button
+                                                        type="button"
+                                                        className="btn btn-link btn-sm text-danger p-0 text-decoration-none"
+                                                        title="Delete row"
+                                                        onClick={() => removeItemRow(idx)}
+                                                      >
+                                                        <i className="ti ti-trash fs-14"></i>
+                                                      </button>
+                                                    </td>
+                                                  )}
+                                                </tr>
+                                              );
+                                            })
+                                          )}
+                                        </tbody>
+                                        {items.length > 0 && (
+                                          <tfoot style={{ background: '#f8fafc', fontWeight: 'bold' }}>
+                                            <tr>
+                                              <td colSpan={6} className="text-end text-secondary fs-12 py-2">
+                                                GRAND TOTALS:
+                                              </td>
+                                              <td className="text-end text-dark fs-13 py-2">
+                                                {grandTotalMeters.toFixed(2)} m
+                                              </td>
+                                              <td className="text-end text-dark fs-13 py-2">
+                                                {grandTotalPieces} pcs
+                                              </td>
+                                              <td colSpan={2} className="text-end text-secondary fs-12 py-2">
+                                                Total Actual Job Cost:
+                                              </td>
+                                              <td colSpan={2} className="text-end py-2">
+                                                <div
+                                                  className="form-control form-control-sm text-end fw-bold text-success bg-success-subtle d-inline-flex align-items-center justify-content-end fs-13 px-3"
+                                                  style={{ borderColor: '#a7f3d0', height: '36px', minWidth: '110px' }}
+                                                  title="Grand Total Actual Job Cost"
+                                                >
+                                                  ₹{grandTotalCost.toFixed(2)}
+                                                </div>
+                                              </td>
+                                              <td colSpan={!isLocked && isSectionEditable('items') ? 2 : 1}></td>
+                                            </tr>
+                                          </tfoot>
+                                        )}
+                                      </table>
+                                    </div>
+                                  </div>
 
         {/* Running PO Summary Table below items */}
         {items.length > 0 && (
@@ -2315,7 +2870,11 @@ export default function ProcessPOForm({
                 <div key={i} className="badge bg-white text-dark border p-2 d-flex align-items-center gap-2 shadow-2xs" style={{ borderColor: '#cbd5e1' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: it.color_hex || '#cbd5e1', border: '1px solid #999' }} />
                   <span><strong>{it.color_name || 'Item'}</strong>:</span>
-                  <span>{it.fabric_name ? `${it.fabric_name} ${it.width ? `(${it.width}")` : ''}` : '(No Fabric)'}</span>
+                  <span>{it.fabric_name ? `${it.fabric_name}${it.width ? ` (${it.width}")` : ''}` : '(No Fabric)'}</span>
+                  {it.article_name && <span className="text-primary">• {it.article_name}</span>}
+                  {(it.style_name || selectedStyles[0]) && (
+                    <span className="text-muted">({it.style_name || selectedStyles[0]})</span>
+                  )}
                   <span className="text-dark fw-bold">[{it.quantity_meters || 0}m / {it.quantity_pieces || 0}pcs]</span>
                 </div>
               ))}
@@ -2324,152 +2883,153 @@ export default function ProcessPOForm({
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* SECTION: TERMS, SPECIAL INSTRUCTIONS & REMARKS                            */}
-      {/* ========================================================================= */}
-      <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
-        <div className="p-3 px-4 border-bottom d-flex align-items-center justify-content-between" style={{ background: '#fafbfc' }}>
-          <div className="d-flex align-items-center gap-2.5">
-            <i className="ti ti-notes text-secondary fs-16"></i>
-            <h6 className="mb-0 fw-bold text-dark fs-14">Terms, Special Instructions &amp; Remarks</h6>
-          </div>
-        </div>
-        <div className="p-4">
-          <textarea
-            className="form-control form-control-sm bg-white fs-13"
-            rows={3}
-            placeholder="Enter terms, tolerance limits, dyeing instructions, or remarks..."
-            style={{ borderColor: '#cbd5e1', borderRadius: '6px' }}
-            value={terms}
-            disabled={isLocked || (!isSectionEditable('terms') && !isSectionEditable('all'))}
-            onChange={(e) => setTerms(e.target.value)}
-          />
-        </div>
-      </div>
+                                {/* ========================================================================= */}
+                                {/* SECTION: TERMS, SPECIAL INSTRUCTIONS & REMARKS                            */}
+                                {/* ========================================================================= */}
+                                <div className="card border mb-4 shadow-sm" style={{ borderRadius: '10px', borderColor: '#e2e8f0', background: '#ffffff' }}>
+                                  <div className="p-3 px-4 border-bottom d-flex align-items-center justify-content-between" style={{ background: '#fafbfc' }}>
+                                    <div className="d-flex align-items-center gap-2.5">
+                                      <i className="ti ti-notes text-secondary fs-16"></i>
+                                      <h6 className="mb-0 fw-bold text-dark fs-14">Terms, Special Instructions &amp; Remarks</h6>
+                                    </div>
+                                  </div>
+                                  <div className="p-4">
+                                    <textarea
+                                      className="form-control form-control-sm bg-white fs-13"
+                                      rows={3}
+                                      placeholder="Enter terms, tolerance limits, dyeing instructions, or remarks..."
+                                      style={{ borderColor: '#cbd5e1', borderRadius: '6px' }}
+                                      value={terms}
+                                      disabled={isLocked || (!isSectionEditable('terms') && !isSectionEditable('all'))}
+                                      onChange={(e) => setTerms(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
 
-      {/* ========================================================================= */}
-      {/* BOTTOM ACTION BAR                                                         */}
-      {/* ========================================================================= */}
-      <div className="d-flex align-items-center justify-content-between pb-5">
-        <button
-          type="button"
-          className="btn btn-light border px-4 py-2 text-secondary fs-13 fw-semibold rounded-2"
-          onClick={handleExit}
-          style={{ borderColor: '#cbd5e1' }}
-        >
-          {isLocked ? 'Close' : 'Cancel'}
-        </button>
+                                {/* ========================================================================= */}
+                                {/* BOTTOM ACTION BAR                                                         */}
+                                {/* ========================================================================= */}
+                                <div className="d-flex align-items-center justify-content-between pb-5">
+                                  <button
+                                    type="button"
+                                    className="btn btn-light border px-4 py-2 text-secondary fs-13 fw-semibold rounded-2"
+                                    onClick={handleExit}
+                                    style={{ borderColor: '#cbd5e1' }}
+                                  >
+                                    {isLocked ? 'Close' : 'Cancel'}
+                                  </button>
 
-        <div className="d-flex align-items-center gap-2">
-          {initialPO && (
-            <button
-              type="button"
-              className="btn btn-outline-secondary px-3.5 py-2 fs-13 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-              onClick={() => onPrintPO && onPrintPO(initialPO)}
-            >
-              <i className="ti ti-printer fs-15"></i>
-              <span>Print PO Slip</span>
-            </button>
-          )}
+                                  <div className="d-flex align-items-center gap-2">
+                                    {initialPO && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-secondary px-3.5 py-2 fs-13 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                                        onClick={() => onPrintPO && onPrintPO(initialPO)}
+                                      >
+                                        <i className="ti ti-printer fs-15"></i>
+                                        <span>Print PO Slip</span>
+                                      </button>
+                                    )}
 
-          {!isLocked && (
-            <>
-              <button
-                type="button"
-                className="btn btn-light border px-3.5 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                style={{ borderColor: '#cbd5e1' }}
-                onClick={() => handleSubmit('draft')}
-                title="Save as Draft (keep in draft state, not ready for Challan)"
-              >
-                <i className="ti ti-file-text fs-15 text-muted"></i>
-                <span>Save as Draft</span>
-              </button>
+                                    {!isLocked && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="btn btn-light border px-3.5 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                                          style={{ borderColor: '#cbd5e1' }}
+                                          onClick={() => handleSubmit('draft')}
+                                          title="Save as Draft (keep in draft state, not ready for Challan)"
+                                        >
+                                          <i className="ti ti-file-text fs-15 text-muted"></i>
+                                          <span>Save as Draft</span>
+                                        </button>
 
-              <button
-                type="button"
-                className="btn btn-primary px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                onClick={() => handleSubmit('issue')}
-                title="Save & Issue PO (official PO ready for Challan dispatch)"
-              >
-                <i className="ti ti-check fs-15"></i>
-                <span>Save &amp; Issue PO</span>
-              </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-primary px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                                          onClick={() => handleSubmit('issue')}
+                                          title="Save & Issue PO (official PO ready for Challan dispatch)"
+                                        >
+                                          <i className="ti ti-check fs-15"></i>
+                                          <span>Save &amp; Issue PO</span>
+                                        </button>
 
-              <button
-                type="button"
-                className="btn btn-dark px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                onClick={() => handleSubmit('challan')}
-                title="Save PO and immediately create Dispatch Challan"
-              >
-                <i className="ti ti-truck-delivery fs-15"></i>
-                <span>Save &amp; Create Dispatch Challan</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+                                        <button
+                                          type="button"
+                                          className="btn btn-dark px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
+                                          onClick={() => handleSubmit('challan')}
+                                          title="Save PO and immediately create Dispatch Challan"
+                                        >
+                                          <i className="ti ti-truck-delivery fs-15"></i>
+                                          <span>Save &amp; Create Dispatch Challan</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
 
-      {/* ========================================================================= */}
-      {/* INLINE MASTER MODALS                                                      */}
-      {/* ========================================================================= */}
-      {showInlineVendorModal && (
-        <VendorMasterView
-          isInline={true}
-          vendors={vendorList}
-          defaultTypes={processType && processType !== 'All Processes' ? [processType] : ['Dyeing']}
-          onCloseInline={(saved) => {
-            if (saved && (saved.name || saved.vendorName)) {
-              handleVendorSaved(saved);
-            } else {
-              setShowInlineVendorModal(false);
-            }
-          }}
-          onSaveVendor={(newVendor) => {
-            handleVendorSaved(newVendor);
-          }}
-        />
-      )}
+                                {/* ========================================================================= */}
+                                {/* INLINE MASTER MODALS                                                      */}
+                                {/* ========================================================================= */}
+                                {showInlineVendorModal && (
+                                  <VendorMasterView
+                                    isInline={true}
+                                    vendors={vendorList}
+                                    defaultTypes={processType && processType !== 'All Processes' ? [processType] : ['Dyeing']}
+                                    onCloseInline={(saved) => {
+                                      if (saved && (saved.name || saved.vendorName)) {
+                                        handleVendorSaved(saved);
+                                      } else {
+                                        setShowInlineVendorModal(false);
+                                      }
+                                    }}
+                                    onSaveVendor={(newVendor) => {
+                                      handleVendorSaved(newVendor);
+                                    }}
+                                  />
+                                )}
 
-      {showInlineFabricModal && (
-        <FabricMasterView
-          isInline={true}
-          onCloseInline={() => setShowInlineFabricModal(false)}
-          onSaveFabric={(newFabric) => {
-            const formatted = {
-              id: newFabric.id,
-              name: newFabric.qualityName || newFabric.name,
-              widths: newFabric.widths || ['44', '48', '58'],
-              shrinkage: parseFloat(newFabric.defaultShrinkage) || 4.0,
-              defaultRate: ''
-            };
-            setFabricList([formatted, ...fabricList]);
-            setShowInlineFabricModal(false);
-          }}
-        />
-      )}
+                                {showInlineFabricModal && (
+                                  <FabricMasterView
+                                    isInline={true}
+                                    onCloseInline={() => setShowInlineFabricModal(false)}
+                                    onSaveFabric={(newFabric) => {
+                                      const formatted = {
+                                        id: newFabric.id,
+                                        name: newFabric.qualityName || newFabric.name,
+                                        widths: newFabric.widths || ['44', '48', '58'],
+                                        shrinkage: parseFloat(newFabric.defaultShrinkage) || 4.0,
+                                        defaultRate: ''
+                                      };
+                                      setFabricList([formatted, ...fabricList]);
+                                      setShowInlineFabricModal(false);
+                                    }}
+                                  />
+                                )}
 
-      {showInlineColorModal && (
-        <AddColorModal
-          isOpen={showInlineColorModal}
-          onClose={() => setShowInlineColorModal(false)}
-          onAddColor={(newColor) => {
-            const formatted = {
-              id: newColor.id,
-              name: newColor.name,
-              hex: newColor.hex || '#333333'
-            };
-            setColorList([formatted, ...colorList]);
-            if (activeColorRowIndex !== null && items[activeColorRowIndex]) {
-              updateItem(activeColorRowIndex, {
-                color_id: formatted.id,
-                color_name: formatted.name,
-                color_hex: formatted.hex
-              });
-            }
-            setShowInlineColorModal(false);
-          }}
-        />
-      )}
-    </div>
-  );
+                                {showInlineColorModal && (
+                                  <AddColorModal
+                                    isOpen={showInlineColorModal}
+                                    onClose={() => setShowInlineColorModal(false)}
+                                    onAddColor={(newColor) => {
+                                      const formatted = {
+                                        id: newColor.id,
+                                        name: newColor.name,
+                                        hex: newColor.hex || '#333333'
+                                      };
+                                      setColorList([formatted, ...colorList]);
+                                      if (activeColorRowIndex !== null && items[activeColorRowIndex]) {
+                                        updateItem(activeColorRowIndex, {
+                                          color_id: formatted.id,
+                                          color_name: formatted.name,
+                                          color_hex: formatted.hex
+                                        });
+                                      }
+                                      setShowInlineColorModal(false);
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            );
 }
+                    
