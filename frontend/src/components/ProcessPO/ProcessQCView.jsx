@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * ProcessQCView - Quality Control, Defect Management & Lot Splitting
@@ -13,7 +13,12 @@ import React, { useState } from 'react';
  * - Handwritten defect log photo & Adjusted Yield (Page 25 pink slip)
  * - Color Fastness Pass/Fail with swatch proof image
  */
-export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
+export default function ProcessQCView({
+  qcRecords = [],
+  onSaveQC,
+  initialReturnToInspect = null,
+  onClearInitialReturn
+}) {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'inspect'
   const [searchTerm, setSearchTerm] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState('ALL');
@@ -46,15 +51,22 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
   // Color Fastness Test
   const [colorFastness, setColorFastness] = useState(''); // '' | 'Pass' | 'Fail'
   const [colorFastnessProof, setColorFastnessProof] = useState(null);
+  const [returnContextPieces, setReturnContextPieces] = useState([]);
+  const [returnContextMeta, setReturnContextMeta] = useState(null);
 
   // Open a specific piece for inspection
-  const handleOpenPieceQC = (record) => {
+  const handleOpenPieceQC = (record, keepReturnContext = false) => {
+    if (!keepReturnContext) {
+      setReturnContextPieces([]);
+      setReturnContextMeta(null);
+    }
     setSelectedPiece({
       id: record.id || `PQC-${Date.now().toString().slice(-4)}`,
       return_id: record.return_id || '',
       piece_no: record.piece_no || 1,
       original_length: record.original_length ? parseFloat(record.original_length) : '',
       color_name: record.color_name || '',
+      fabric_name: record.fabric_name || '',
       vendor_challan_ref: record.vendor_challan_ref || (record.return_id ? `Return ${record.return_id}` : '')
     });
 
@@ -74,6 +86,57 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
 
     setViewMode('inspect');
   };
+
+  const openPieceFromReturnContext = (piece, retMeta) => {
+    const existingQc = (qcRecords || []).find(q =>
+      q.return_id === retMeta.id && Number(q.piece_no) === Number(piece.piece_no)
+    );
+    if (existingQc) {
+      handleOpenPieceQC({
+        ...existingQc,
+        color_name: existingQc.color_name || piece.color_name || '',
+        fabric_name: existingQc.fabric_name || piece.fabric_name || retMeta.fabric_quality || '',
+        vendor_challan_ref: existingQc.vendor_challan_ref || retMeta.vendor_challan_ref
+      }, true);
+    } else {
+      handleOpenPieceQC({
+        id: `PQC-${Date.now().toString().slice(-4)}`,
+        return_id: retMeta.id || '',
+        piece_no: piece.piece_no || 1,
+        original_length: piece.meters || retMeta.total_meters || '',
+        color_name: piece.color_name || '',
+        fabric_name: piece.fabric_name || retMeta.fabric_quality || '',
+        vendor_challan_ref: retMeta.vendor_challan_ref
+      }, true);
+    }
+  };
+
+  useEffect(() => {
+    if (!initialReturnToInspect) return;
+    const validPieces = (initialReturnToInspect.pieces || []).filter(p => (parseFloat(p.meters) || 0) > 0);
+    const piecesToUse = validPieces.length > 0 ? validPieces : (initialReturnToInspect.pieces || [{
+      piece_no: 1,
+      meters: initialReturnToInspect.total_meters || '',
+      color_name: ''
+    }]);
+    const retMeta = {
+      id: initialReturnToInspect.id || '',
+      total_meters: initialReturnToInspect.total_meters || '',
+      fabric_quality: initialReturnToInspect.fabric_quality || '',
+      vendor_challan_ref: initialReturnToInspect.vendor_external_challan_no
+        ? `Challan #${initialReturnToInspect.vendor_external_challan_no} (${initialReturnToInspect.vendor_name || 'Vendor'})`
+        : (initialReturnToInspect.id || '')
+    };
+    setReturnContextPieces(piecesToUse);
+    setReturnContextMeta(retMeta);
+
+    const firstUninspected = piecesToUse.find(p =>
+      !(qcRecords || []).some(q => q.return_id === retMeta.id && Number(q.piece_no) === Number(p.piece_no))
+    ) || piecesToUse[0];
+
+    openPieceFromReturnContext(firstUninspected, retMeta);
+    if (onClearInitialReturn) onClearInitialReturn();
+  }, [initialReturnToInspect]);
 
   const handleSplitMeterChange = (index, value) => {
     const updated = [...pieceSplits];
@@ -113,6 +176,9 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
       return_id: selectedPiece.return_id || 'PRN-2196',
       piece_no: selectedPiece.piece_no,
       original_length: selectedPiece.original_length,
+      color_name: selectedPiece.color_name || '',
+      fabric_name: selectedPiece.fabric_name || '',
+      vendor_challan_ref: selectedPiece.vendor_challan_ref || '',
       qc_outcome: finalOutcome,
       rejection_action: finalRejAction,
       reprocessing_challan_id: (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess') ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null,
@@ -514,6 +580,28 @@ export default function ProcessQCView({ qcRecords = [], onSaveQC }) {
               <i className="ti ti-user-check me-1"></i> Inspector: Priya Sharma
             </span>
           </div>
+
+          {returnContextPieces.length > 1 && returnContextMeta && (
+            <div className="px-4 py-2 border-bottom bg-light d-flex flex-wrap align-items-center gap-2" style={{ borderColor: '#e2e8f0' }}>
+              <span className="fs-11 fw-bold text-secondary text-uppercase me-1">
+                Thans in {returnContextMeta.id}:
+              </span>
+              {returnContextPieces.map((p) => {
+                const isSelected = Number(selectedPiece.piece_no) === Number(p.piece_no);
+                const doneQc = (qcRecords || []).find(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(p.piece_no));
+                return (
+                  <button
+                    key={p.piece_no}
+                    type="button"
+                    className={`btn btn-xs ${isSelected ? 'btn-primary' : (doneQc ? 'btn-outline-success' : 'btn-outline-secondary')}`}
+                    onClick={() => openPieceFromReturnContext(p, returnContextMeta)}
+                  >
+                    Than #{p.piece_no} ({p.meters}m){doneQc ? ` • ${doneQc.qc_outcome}` : ''}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <form onSubmit={handleSaveCurrentQC}>
             <div className="p-4">

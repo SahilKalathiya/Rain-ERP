@@ -40,6 +40,7 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [editingReturn, setEditingReturn] = useState(null);
+  const [qcTargetReturn, setQcTargetReturn] = useState(null);
 
   // Print Modal state
   const [printModalConfig, setPrintModalConfig] = useState(null); // { type: 'PO' | 'CHALLAN', data }
@@ -106,32 +107,6 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     const poNum = po.po_number || String(po.id).replace(/\D/g, '') || '';
     const poRef = po.id || (poNum ? `PPO-${poNum}` : '');
 
-    const challanItems = po.items && po.items.length > 0 ? po.items.map((it, idx) => ({
-      id: Date.now() + idx,
-      bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-${String.fromCharCode(65 + idx)}`,
-      fabric_name: it.fabric_name || po.fabric_quality || '100x100 Voile (Grey)',
-      color_name: it.color_name || 'Standard',
-      invoice_no: 'INV-MS-0091',
-      original_piece_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
-      dispatched_meters: parseFloat(it.quantity_meters) || parseFloat(po.total_meters) || 100,
-      is_partial_cut: false,
-      folding: ''
-    })) : [
-      {
-        id: Date.now(),
-        bale_roll_no: `Roll-${Math.floor(2000 + Math.random() * 1000)}-A`,
-        fabric_name: po.fabric_quality || '100x100 Voile (Grey)',
-        color_name: 'Standard',
-        invoice_no: 'INV-MS-0091',
-        original_piece_meters: parseFloat(po.total_meters) || 100,
-        dispatched_meters: parseFloat(po.total_meters) || 100,
-        is_partial_cut: false,
-        folding: ''
-      }
-    ];
-
-    const grandTotal = challanItems.reduce((acc, it) => acc + (parseFloat(it.dispatched_meters) || 0), 0);
-
     const generatedChallan = {
       id: null,
       challan_number: '',
@@ -144,16 +119,16 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       po_link_status: 'Linked',
       admin_alert_triggered: false,
       folding_notation: '',
-      total_bales: 1,
-      total_pieces: challanItems.length,
-      grand_total_meters: Number(grandTotal.toFixed(2)),
+      total_bales: 0,
+      total_pieces: 0,
+      grand_total_meters: 0,
       remarks: `Dispatch Challan for PO #${poNum}`,
       receiver_signature: '',
       company_representative: 'Saksham Garg',
       status: 'Draft',
       created_by: 'Saksham Garg',
       created_at: new Date().toISOString(),
-      items: challanItems,
+      items: [],
       is_draft: true
     };
 
@@ -221,29 +196,19 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setChallans(updatedChallans);
     saveStoredProcessChallans(updatedChallans);
 
-    const defaultPieces = challan.items && challan.items.length > 0
-      ? challan.items.map((it, idx) => ({
-        id: idx + 1,
-        piece_no: idx + 1,
-        meters: it.dispatched_meters || it.original_piece_meters || 100,
-        color_name: it.color_name || 'Standard',
-        folding: it.folding || ''
-      }))
-      : [
-        { id: 1, piece_no: 1, meters: challan.grand_total_meters || 100, color_name: 'Standard', folding: '' }
-      ];
-
     setEditingReturn({
       vendor_id: challan.vendor_id || '',
       vendor_name: challan.vendor_name || '',
       linked_challan_id: challan.challan_number || challan.id,
-      linked_po_id: challan.linked_pos?.[0] || 'PPO-7611',
-      fabric_quality: challan.items?.[0]?.fabric_name || '100x100 Voile (Grey)',
-      width: '48',
-      folding_standard: '',
-      vendor_declared_meters: challan.grand_total_meters || defaultPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0),
-      vendor_declared_pieces: defaultPieces.length,
-      pieces: defaultPieces
+      linked_challan_ids: [challan.challan_number || challan.id].filter(Boolean),
+      linked_po_id: challan.linked_pos?.[0] || '',
+      linked_po_ids: Array.isArray(challan.linked_pos) ? challan.linked_pos : [],
+      fabric_quality: challan.items?.[0]?.fabric_name || '',
+      width: challan.items?.[0]?.width || '',
+      folding_standard: challan.folding_notation || '',
+      vendor_declared_meters: '',
+      vendor_declared_pieces: '',
+      pieces: []
     });
     setActiveTab('returns');
     setShowReturnForm(true);
@@ -279,16 +244,19 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
     // If grey fabric returned, create an Open Bale (Section 5.3)
     if (returnData.grey_fabric_returned_meters > 0) {
+      const targetInv = returnData.target_invoice_for_grey || 'INV-MS-0091';
       const newOpenBale = {
         id: `OB-${Date.now().toString().slice(-4)}`,
         return_id: returnData.id,
         fabric_id: 'FAB-001',
-        fabric_name: returnData.fabric_quality,
-        original_vendor_invoice_ref: 'INV-MS-0091 (M.S. Textiles - Auto Assigned)',
+        fabric_name: returnData.fabric_quality || 'Grey',
+        width: returnData.width || '',
+        color: 'Grey',
+        original_vendor_invoice_ref: targetInv,
         returned_meters: returnData.grey_fabric_returned_meters,
         remaining_meters: returnData.grey_fabric_returned_meters,
         audit_trail: [
-          { date: returnData.received_date, action: `Logged from Inward Return ${returnData.vendor_external_challan_no}` }
+          { date: returnData.received_date, action: `Logged from Inward Return ${returnData.vendor_external_challan_no} (${targetInv})` }
         ],
         status: 'Available',
         created_at: new Date().toISOString()
@@ -301,8 +269,10 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     setShowReturnForm(false);
     setEditingReturn(null);
     if (andInspectQC) {
+      setQcTargetReturn(returnData);
+      setActiveTab('qc');
+      lastRouteRef.current = '/process-qc';
       if (onNavigate) onNavigate('/process-qc');
-      else setActiveTab('qc'); // Proceed directly to QC
     } else {
       setActiveTab('returns');
     }
@@ -310,29 +280,69 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
 
   // 4. QC Handlers
   const handleSaveQC = (qcData) => {
-    const updated = [qcData, ...qcRecords];
+    const existingIndex = qcRecords.findIndex(q => q.id === qcData.id);
+    const updated = existingIndex >= 0
+      ? qcRecords.map((q, idx) => (idx === existingIndex ? qcData : q))
+      : [qcData, ...qcRecords];
     setQcRecords(updated);
     saveStoredProcessQCRecords(updated);
+
+    const linkedReturn = returns.find(r => r.id === qcData.return_id);
+    const linkedPO = linkedReturn
+      ? pos.find(p => (linkedReturn.linked_pos || []).includes(p.id) || (linkedReturn.linked_pos || []).includes(p.po_number))
+      : null;
+
+    if (linkedReturn) {
+      const pieceStatus = qcData.qc_outcome === 'Accepted'
+        ? 'Accepted'
+        : qcData.rejection_action === 'Reprocess'
+          ? 'Rejected - Reprocess'
+          : 'Rejected - Scrap';
+      const updatedReturns = returns.map(r => {
+        if (r.id !== linkedReturn.id) return r;
+        const updatedPieces = (r.pieces || []).map(p =>
+          Number(p.piece_no) === Number(qcData.piece_no)
+            ? { ...p, qc_status: pieceStatus }
+            : p
+        );
+        return { ...r, pieces: updatedPieces };
+      });
+      setReturns(updatedReturns);
+      saveStoredProcessReturns(updatedReturns);
+    }
 
     // Section 6.2 A: If Reprocess chosen, automatically generate a Reprocess Job Work Challan with No New Payment
     if (qcData.rejection_action === 'Reprocess') {
       const repChNo = `${Math.floor(4900 + Math.random() * 99)}-REPROC`;
+      const vendorId = linkedReturn?.vendor_id || linkedPO?.vendor_id || '';
+      const vendorName = linkedReturn?.vendor_name || linkedPO?.vendor_name || 'Job Worker';
+      const linkedPos = linkedReturn?.linked_pos?.length
+        ? linkedReturn.linked_pos
+        : (linkedPO ? [linkedPO.po_number || linkedPO.id] : []);
+      const styleNames = linkedPO?.style_name
+        ? [linkedPO.style_name]
+        : (linkedPO?.items?.map(i => i.style_name).filter(Boolean) || []);
+      const matchingPiece = (linkedReturn?.pieces || []).find(p => Number(p.piece_no) === Number(qcData.piece_no));
+      const fabricName = qcData.fabric_name || matchingPiece?.fabric_name || linkedReturn?.fabric_quality || linkedPO?.items?.[0]?.fabric_name || 'Fabric';
+      const colorName = qcData.color_name || matchingPiece?.color_name || linkedPO?.items?.[0]?.color_name || '';
+      const pieceLength = parseFloat(qcData.original_length) || parseFloat(matchingPiece?.meters) || 0;
+
       const reprocessChallan = {
         id: `PCH-${repChNo}`,
         challan_number: `CH-${repChNo}`,
         date: new Date().toISOString().split('T')[0],
-        vendor_id: 'VEND-0003',
-        vendor_name: 'Raju Dyeing (Krishna Dyeing)',
-        linked_pos: ['PPO-7611'],
-        styles_info: ['Graphic Boota Kurta'],
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        linked_pos: linkedPos,
+        styles_info: styleNames,
         po_link_status: 'Reprocess In Loop',
         admin_alert_triggered: false,
-        folding_notation: '',
+        folding_notation: matchingPiece?.folding || '',
         total_bales: 1,
         total_pieces: 1,
-        grand_total_meters: qcData.original_length || 119.60,
-        remarks: `Reprocessing Rectification Challan for Than #${qcData.piece_no}. No new payment obligation.`,
-        receiver_signature: 'Raju Dyeing Rep',
+        grand_total_meters: pieceLength,
+        remarks: `Reprocessing Rectification Challan for Than #${qcData.piece_no} (${qcData.return_id || 'QC'}). No new payment obligation.`,
+        receiver_signature: `${vendorName} Rep`,
         company_representative: 'Anurag',
         status: 'In Reprocess Loop',
         created_by: 'Saksham Garg',
@@ -341,20 +351,20 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
           {
             id: Date.now(),
             bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
-            fabric_name: '100x100 Voile (Grey)',
-            color_name: 'Beige',
-            invoice_no: 'INV-MS-0091',
-            original_piece_meters: qcData.original_length || 119.60,
-            dispatched_meters: qcData.original_length || 119.60,
+            fabric_name: fabricName,
+            color_name: colorName,
+            invoice_no: linkedReturn?.vendor_external_challan_no || qcData.return_id || '',
+            original_piece_meters: pieceLength,
+            dispatched_meters: pieceLength,
             is_partial_cut: false,
-            folding: ''
+            folding: matchingPiece?.folding || ''
           }
         ]
       };
       const updatedChallans = [reprocessChallan, ...challans];
       setChallans(updatedChallans);
       saveStoredProcessChallans(updatedChallans);
-      alert(`QC Rejection saved! Reprocess Challan #${reprocessChallan.challan_number} generated with zero new payment obligation. Item is flagged In Loop.`);
+      alert(`QC Rejection saved! Reprocess Challan #${reprocessChallan.challan_number} generated for ${vendorName} with zero new payment obligation. Item is flagged In Loop.`);
     } else {
       alert('QC Record saved successfully! Cutting-Room planning & Stock ledger updated.');
     }
@@ -475,7 +485,10 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
               setShowReturnForm(true);
             }}
             onInspectInQC={(record) => {
+              setQcTargetReturn(record);
               setActiveTab('qc');
+              lastRouteRef.current = '/process-qc';
+              if (onNavigate) onNavigate('/process-qc');
             }}
             qcRecords={qcRecords}
           />
@@ -486,6 +499,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         <ProcessQCView
           qcRecords={qcRecords}
           onSaveQC={handleSaveQC}
+          initialReturnToInspect={qcTargetReturn}
+          onClearInitialReturn={() => setQcTargetReturn(null)}
         />
       )}
 

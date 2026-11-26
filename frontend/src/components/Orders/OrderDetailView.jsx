@@ -500,11 +500,10 @@ export default function OrderDetailView({
       'Other'
     ];
 
-    const allCatNames = [...defaultOrder];
-    (customAccessoryCategories || []).forEach(c => {
-      const cname = (typeof c === 'string' ? c : c?.name || '').trim();
-      if (cname && !allCatNames.some(existing => matchesCategory(cname, existing))) {
-        allCatNames.push(cname);
+    const allCatNames = [];
+    defaultOrder.forEach(cat => {
+      if (masterAccessories.some(m => matchesCategory(m.category, cat))) {
+        allCatNames.push(cat);
       }
     });
     masterAccessories.forEach(m => {
@@ -1474,6 +1473,7 @@ export default function OrderDetailView({
     }
 
     const unitLabel = item.unit || (['Lace', 'Thread', 'Dori', 'Elastic'].some(k => matchesCategory(k, item.category)) ? 'MTR' : 'PCS');
+    const isButtonCategory = matchesCategory('Buttons', item.category) || matchesCategory('Button', item.category);
 
     return (
       <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -1484,12 +1484,15 @@ export default function OrderDetailView({
               <th style={{ padding: '8px 10px' }}>Article Colour</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>Garment Pcs</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>Req / Pc</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Req Qty</th>
+              {isButtonCategory && (
+                <th style={{ padding: '8px 10px', textAlign: 'center' }}>Extra Pc / Pack</th>
+              )}
               <th style={{ padding: '8px 10px' }}>Placement</th>
               <th style={{ padding: '8px 10px' }}>Accessory Colour</th>
               <th style={{ padding: '8px 10px' }}>Size</th>
               <th style={{ padding: '8px 10px' }}>Source</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>Buffer %</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Total Req Qty</th>
             </tr>
           </thead>
           <tbody>
@@ -1596,12 +1599,31 @@ export default function OrderDetailView({
                       )}
                     </td>
 
-                    {/* 5. Total Req Qty */}
-                    <td style={{ textAlign: 'center', minWidth: '105px', padding: '6px 8px' }}>
-                      <span className="badge fw-bold shadow-xs" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
-                        {liveTotal} {unitLabel}
-                      </span>
-                    </td>
+                    {/* 4b. Extra Piece Per Pack (Buttons) */}
+                    {isButtonCategory && (
+                      <td style={{ minWidth: '105px', padding: '6px 8px' }}>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="form-control form-control-sm text-center"
+                            value={row.extraPerPack ?? ''}
+                            placeholder="0"
+                            onKeyDown={(e) => {
+                              if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                            }}
+                            onChange={(e) => handleUpdateCardRowField(item.id, currentArticle, rIdx, 'extraPerPack', e.target.value)}
+                            style={inputStyle}
+                            title="Extra Piece Per Pack"
+                          />
+                        ) : (
+                          <span className="d-block text-center text-dark" style={{ fontSize: '13px' }}>
+                            {row.extraPerPack || '0'}
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* 6. Placement */}
                     <td style={{ minWidth: '130px', padding: '6px 8px' }}>
@@ -1755,6 +1777,13 @@ export default function OrderDetailView({
                           </div>
                         </div>
                       )}
+                    </td>
+
+                    {/* Total Req Qty (Last Column) */}
+                    <td style={{ textAlign: 'center', minWidth: '105px', padding: '6px 8px' }}>
+                      <span className="badge fw-bold shadow-xs" style={{ backgroundColor: '#eef2ff', color: '#2e37a4', border: '1px solid #c7d2fe', fontSize: '12.5px', padding: '6px 12px', borderRadius: '6px' }}>
+                        {liveTotal} {unitLabel}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -2627,16 +2656,10 @@ export default function OrderDetailView({
     return [];
   };
 
-  const getPOWidthForGroup = (grp, selectedWidths = []) => {
+  const getPOWidthForGroup = (grp) => {
     const k = `${grp.articleName}___${grp.fabricQuality || ''}___${grp.role || ''}`;
     if (groupPoWidths[k]) {
       return groupPoWidths[k];
-    }
-    if (selectedWidths.length > 0) {
-      return selectedWidths[0];
-    }
-    if (grp.width && grp.width !== '—') {
-      return grp.width;
     }
     return '';
   };
@@ -2644,26 +2667,27 @@ export default function OrderDetailView({
   const handleSetPOWidthForGroup = (artName, fabricQuality, role, targetWidth) => {
     const cleanWidth = targetWidth === '—' ? '' : targetWidth;
     const k = `${artName}___${fabricQuality || ''}___${role || ''}`;
+    const nextPoWidth = groupPoWidths[k] === cleanWidth ? '' : cleanWidth;
 
-    setGroupPoWidths(prev => ({
-      ...prev,
-      [k]: cleanWidth
-    }));
+    const nextGroupPoWidths = {
+      ...groupPoWidths,
+      [k]: nextPoWidth
+    };
+    setGroupPoWidths(nextGroupPoWidths);
 
+    let nextGroupSelectedWidths = groupSelectedWidths;
     if (cleanWidth) {
-      setGroupSelectedWidths(prev => {
-        const cur = prev[k] || [];
-        if (!cur.includes(cleanWidth)) {
-          return { ...prev, [k]: [...cur, cleanWidth] };
-        }
-        return prev;
-      });
+      const cur = groupSelectedWidths[k] || [];
+      if (!cur.includes(cleanWidth)) {
+        nextGroupSelectedWidths = { ...groupSelectedWidths, [k]: [...cur, cleanWidth] };
+        setGroupSelectedWidths(nextGroupSelectedWidths);
+      }
     }
 
-    const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${cleanWidth}`;
+    const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${nextPoWidth}`;
     const storedRate = widthDyedRates[rateKey];
 
-    setConsumptionRows(prev => prev.map(r => {
+    const nextRows = consumptionRows.map(r => {
       const matchArt = r.articleName === artName;
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
@@ -2673,15 +2697,39 @@ export default function OrderDetailView({
           : (parseFloat(r.dyedRate) || 0);
         return {
           ...r,
-          width: cleanWidth,
-          poWidth: cleanWidth,
-          selectedWidth: cleanWidth,
+          width: nextPoWidth,
+          poWidth: nextPoWidth,
+          selectedWidth: nextPoWidth,
           dyedRate: nextDyed,
-          _userSelectedWidth: Boolean(cleanWidth)
+          _userSelectedWidth: Boolean(nextPoWidth)
         };
       }
       return r;
-    }));
+    });
+    setConsumptionRows(nextRows);
+
+    // Persist PO width selection immediately so Process PO sees it without requiring another Save click
+    if (order?.id) {
+      try {
+        const saved = getStoredData('erp_sales_orders_v1', []);
+        if (Array.isArray(saved) && saved.some(o => o.id === order.id)) {
+          const updatedList = saved.map(o =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  groupPoWidths: nextGroupPoWidths,
+                  groupSelectedWidths: nextGroupSelectedWidths,
+                  fabricConsumptions: nextRows
+                }
+              : o
+          );
+          setStoredData('erp_sales_orders_v1', updatedList);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('storage'));
+          }
+        }
+      } catch (e) { }
+    }
   };
 
   const handleToggleGroupWidth = (artName, fabricQuality, role, targetWidth, options) => {
@@ -4464,13 +4512,13 @@ export default function OrderDetailView({
                                           key={w}
                                           className="d-inline-flex align-items-center justify-content-between font-monospace fw-bold"
                                           style={{
-                                            minWidth: '82px',
+                                            minWidth: '72px',
                                             height: '28px',
                                             padding: '2px 6px',
                                             fontSize: '12px',
-                                            color: isPoW ? '#1d4ed8' : '#334155',
-                                            backgroundColor: isPoW ? '#eff6ff' : '#f8fafc',
-                                            border: isPoW ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                            color: '#334155',
+                                            backgroundColor: '#f8fafc',
+                                            border: '1px solid #cbd5e1',
                                             borderRadius: '4px',
                                             gap: '4px'
                                           }}
@@ -4478,22 +4526,10 @@ export default function OrderDetailView({
                                           <div
                                             className="d-inline-flex align-items-center gap-1"
                                             style={{ cursor: 'pointer' }}
-                                            onClick={() => handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w)}
-                                            title={isPoW ? "Active width for Purchase Order (Print PO)" : "Click to select for Purchase Order (Print PO)"}
+                                            onClick={(e) => handleOpenWidthDropdown(e, groupKey, groupData)}
+                                            title="Click to change width"
                                           >
-                                            <i
-                                              className={isPoW ? "ti ti-circle-check-filled text-primary" : "ti ti-circle text-muted"}
-                                              style={{ fontSize: '13px' }}
-                                            />
                                             <span>{w}</span>
-                                            {isPoW && (
-                                              <span
-                                                className="badge bg-primary text-white"
-                                                style={{ fontSize: '8.5px', padding: '1px 3px', lineHeight: 1 }}
-                                              >
-                                                PO
-                                              </span>
-                                            )}
                                           </div>
                                           <div className="d-flex align-items-center gap-1">
                                             <button
@@ -5416,7 +5452,7 @@ export default function OrderDetailView({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
             gap: '12px',
             marginBottom: '24px'
           }}
@@ -5461,7 +5497,7 @@ export default function OrderDetailView({
             );
           })}
 
-          {/* + New Category Quick Link (Linked with Accessories Master) */}
+          {/* + New Accessory Master Quick Link */}
           <button
             type="button"
             className="btn rounded-3 d-flex flex-column align-items-center justify-content-center p-2 transition-all shadow-xs"
@@ -5475,13 +5511,8 @@ export default function OrderDetailView({
               color: '#2e37a4',
               cursor: 'pointer'
             }}
-            onClick={() => {
-              setNewCategoryName('');
-              setNewCategoryUnit('PIECE');
-              setNewCategoryError('');
-              setShowNewCategoryModal(true);
-            }}
-            title="Add new category directly to Accessories Master"
+            onClick={() => setShowNewAccessoryModal(true)}
+            title="Add new accessory directly to Accessories Master"
           >
             <div
               className="rounded-circle d-flex align-items-center justify-content-center mb-1"

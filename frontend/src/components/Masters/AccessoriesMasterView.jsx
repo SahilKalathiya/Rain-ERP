@@ -2771,7 +2771,7 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                     )}
 
                     {/* ============================================================== */}
-                    {/* COMMON FIELDS: MAXIMUM BUFFER, HSN, ACTIVE (ALL 5 SCREENSHOTS) */}
+                    {/* COMMON FIELDS: MAXIMUM BUFFER, HSN, ACTIVE                     */}
                     {/* ============================================================== */}
                     <div className="row g-3 mb-3 align-items-end">
                       <div className="col-md-4">
@@ -2779,7 +2779,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                         <input
                           type="number"
                           min="0"
-                          max="5"
                           step="any"
                           className="form-control"
                           placeholder="e.g. 5"
@@ -2796,8 +2795,6 @@ export default function AccessoriesMasterView({ isInline = false, onSaveInline, 
                             const num = parseFloat(val);
                             if (isNaN(num)) {
                               setFormData({ ...formData, maxBuffer: '' });
-                            } else if (num > 5) {
-                              setFormData({ ...formData, maxBuffer: 5 });
                             } else if (num < 0) {
                               setFormData({ ...formData, maxBuffer: 0 });
                             } else {

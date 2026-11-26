@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { initialVendors } from '../../data/procurementData';
+import React, { useState, useEffect, useRef } from 'react';
+import { initialVendors, initialTransporters } from '../../data/procurementData';
 import { initialColors } from '../../data/salesOrderData';
 import AddColorModal from '../Procurement/AddColorModal';
 
@@ -51,6 +51,29 @@ export default function ProcessReturnForm({
     return initialReturn?.linked_po_id ? [initialReturn.linked_po_id] : [];
   });
   const [linkedChallanId, setLinkedChallanId] = useState(initialReturn?.linked_challan_id || '');
+  const [selectedChallanIds, setSelectedChallanIds] = useState(() => {
+    if (Array.isArray(initialReturn?.linked_challan_ids) && initialReturn.linked_challan_ids.length > 0) {
+      return initialReturn.linked_challan_ids;
+    }
+    return initialReturn?.linked_challan_id ? [initialReturn.linked_challan_id] : [];
+  });
+  const [showPoMultiDropdown, setShowPoMultiDropdown] = useState(false);
+  const [showChallanMultiDropdown, setShowChallanMultiDropdown] = useState(false);
+  const poDropdownRef = useRef(null);
+  const challanDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (poDropdownRef.current && !poDropdownRef.current.contains(e.target)) {
+        setShowPoMultiDropdown(false);
+      }
+      if (challanDropdownRef.current && !challanDropdownRef.current.contains(e.target)) {
+        setShowChallanMultiDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
   // Vendor Identification
   const [vendorId, setVendorId] = useState(initialReturn?.vendor_id || '');
@@ -114,6 +137,29 @@ export default function ProcessReturnForm({
   useEffect(() => {
     setVendorList(loadVendorsFromMaster());
   }, [availablePOs, availableChallans]);
+
+  // Transporter Master Dynamic State (raindrop_transporters_v1)
+  const loadTransportersFromMaster = () => {
+    try {
+      const s = localStorage.getItem('raindrop_transporters_v1');
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return initialTransporters || [];
+  };
+  const [transporterList, setTransporterList] = useState(loadTransportersFromMaster);
+
+  useEffect(() => {
+    const syncTransporters = () => setTransporterList(loadTransportersFromMaster());
+    window.addEventListener('raindrop_transporters_updated', syncTransporters);
+    window.addEventListener('storage', syncTransporters);
+    return () => {
+      window.removeEventListener('raindrop_transporters_updated', syncTransporters);
+      window.removeEventListener('storage', syncTransporters);
+    };
+  }, []);
 
   // Helper to auto-generate a new Process PO and link it here
   const handleAutoGeneratePO = () => {
@@ -275,6 +321,48 @@ export default function ProcessReturnForm({
     setPieces(prev => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, piece_no: i + 1 })));
   };
 
+  const handleStatedPiecesChange = (val) => {
+    setVendorDeclaredPieces(val);
+    const targetCount = parseInt(val, 10);
+    if (isNaN(targetCount) || targetCount <= 0) {
+      setPieces(prev => prev.filter(p => (parseFloat(p.meters) || 0) > 0).map((p, i) => ({ ...p, piece_no: i + 1 })));
+      return;
+    }
+    const capped = Math.min(targetCount, 500);
+    setPieces(prev => {
+      if (prev.length < capped) {
+        const last = prev[prev.length - 1];
+        const basePo = last?.po_ref || linkedPoId || '';
+        const baseCh = last?.challan_ref || linkedChallanId || '';
+        const baseCol = last?.color_name || (colorMasterList[0]?.name || '');
+        const baseFold = foldingStandard || '';
+        const extra = [];
+        for (let i = prev.length; i < capped; i++) {
+          extra.push({
+            id: Date.now() + Math.random() + i,
+            piece_no: i + 1,
+            meters: '',
+            po_ref: basePo,
+            challan_ref: baseCh,
+            color_name: baseCol,
+            folding: baseFold
+          });
+        }
+        return [...prev, ...extra];
+      }
+      if (prev.length > capped) {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0 && next.length > capped; i--) {
+          if (!(parseFloat(next[i].meters) > 0)) {
+            next.splice(i, 1);
+          }
+        }
+        return next.map((p, i) => ({ ...p, piece_no: i + 1 }));
+      }
+      return prev;
+    });
+  };
+
   // Pending items from selected PO(s) for quick selection (Section 5.2)
   const pendingPoItems = React.useMemo(() => {
     const activePoIds = selectedPoIds.length > 0 ? selectedPoIds : (linkedPoId ? [linkedPoId] : []);
@@ -284,16 +372,27 @@ export default function ProcessReturnForm({
     const list = [];
     matchedPOs.forEach(po => {
       const poRef = po.po_number || po.id;
-      (po.items || []).forEach((it, idx) => {
-        list.push({
-          key: `${poRef}-${idx}`,
-          po_ref: poRef,
-          fabric_name: it.fabric_name || po.fabric_quality || '',
-          color_name: it.color_name || '',
-          width: it.width || '',
-          ordered_meters: parseFloat(it.quantity_meters) || 0
+      if (Array.isArray(po.items) && po.items.length > 0) {
+        po.items.forEach((it, idx) => {
+          list.push({
+            key: `${poRef}-${idx}`,
+            po_ref: poRef,
+            fabric_name: it.fabric_name || po.fabric_quality || '',
+            color_name: it.color_name || '',
+            width: it.width || '',
+            ordered_meters: parseFloat(it.quantity_meters) || 0
+          });
         });
-      });
+      } else {
+        list.push({
+          key: `${poRef}-0`,
+          po_ref: poRef,
+          fabric_name: po.fabric_quality || po.fabric_name || '',
+          color_name: po.color_name || '',
+          width: po.width || '',
+          ordered_meters: parseFloat(po.total_meters) || 0
+        });
+      }
     });
     return list;
   }, [availablePOs, selectedPoIds, linkedPoId]);
@@ -338,13 +437,6 @@ export default function ProcessReturnForm({
       return;
     }
 
-    if (isPoMeterMismatch) {
-      alert(
-        `Cannot Complete GRN — PO Meters Mismatch:\n\nSelected PO(s) Target: ${selectedPoTotalMeters.toFixed(2)}m\nTotal Returned (Dyed + Grey): ${totalReturnedWithGrey.toFixed(2)}m\nDifference: ${poMeterDifference}m\n\nReturned metres must match the selected PO metres to complete this GRN.`
-      );
-      return;
-    }
-
     const returnPayload = {
       id: initialReturn?.id || `PRN-${externalChallanNo}`,
       vendor_id: vendorId || vendorName,
@@ -357,7 +449,8 @@ export default function ProcessReturnForm({
       internal_series: 'Job Work',
       linked_po_id: linkedPoId || selectedPoIds[0] || '',
       linked_po_ids: selectedPoIds.length > 0 ? selectedPoIds : (linkedPoId ? [linkedPoId] : []),
-      linked_challan_id: linkedChallanId,
+      linked_challan_id: linkedChallanId || selectedChallanIds[0] || '',
+      linked_challan_ids: selectedChallanIds.length > 0 ? selectedChallanIds : (linkedChallanId ? [linkedChallanId] : []),
       received_date: receivedDate,
       fabric_quality: fabricQuality,
       width,
@@ -490,6 +583,24 @@ export default function ProcessReturnForm({
 
             <div className="p-4">
               <div className="row g-3">
+                {/* 1. Vendor's External Challan No. First */}
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Vendor's External Challan No. <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={externalChallanNo}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => setExternalChallanNo(e.target.value)}
+                    placeholder="e.g. 2196 (Page 20 slip)"
+                    required
+                  />
+                </div>
+
+                {/* 2. Vendor (Job Worker) */}
                 <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Vendor (Job Worker) <span className="text-danger">*</span>
@@ -509,6 +620,7 @@ export default function ProcessReturnForm({
                       setLinkedPoId('');
                       setSelectedPoIds([]);
                       setLinkedChallanId('');
+                      setSelectedChallanIds([]);
                     }}
                     required
                   >
@@ -519,24 +631,11 @@ export default function ProcessReturnForm({
                   </select>
                 </div>
 
+                {/* 3. Vendor's Challan Date */}
                 <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Vendor's External Challan No. <span className="text-danger">*</span>
+                    Vendor's Challan Date <span className="text-danger">*</span>
                   </label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={externalChallanNo}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setExternalChallanNo(e.target.value)}
-                    placeholder="e.g. 2196 (Page 20 slip)"
-                    required
-                  />
-                </div>
-
-                <div className="col-12 col-md-3">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Vendor's Challan Date</label>
                   <input
                     type="date"
                     className="form-control form-control-sm bg-white fs-13"
@@ -544,11 +643,15 @@ export default function ProcessReturnForm({
                     value={externalChallanDate}
                     disabled={!isSectionEditable('header')}
                     onChange={(e) => setExternalChallanDate(e.target.value)}
+                    required
                   />
                 </div>
 
+                {/* 4. Received Date at Factory */}
                 <div className="col-12 col-md-3">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Received Date at Factory</label>
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Received Date at Factory <span className="text-danger">*</span>
+                  </label>
                   <input
                     type="date"
                     className="form-control form-control-sm bg-white fs-13"
@@ -556,101 +659,292 @@ export default function ProcessReturnForm({
                     value={receivedDate}
                     disabled={!isSectionEditable('header')}
                     onChange={(e) => setReceivedDate(e.target.value)}
+                    required
                   />
                 </div>
 
-                {/* Linked PO & Internal Challan */}
-                <div className="col-12 col-md-3">
-                  <div className="d-flex align-items-center justify-content-between mb-1">
-                    <label className="form-label fs-12 fw-semibold text-secondary mb-0">Linked Process PO</label>
-                    {isSectionEditable('header') && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-11 fw-semibold d-flex align-items-center gap-1"
-                        onClick={handleAutoGeneratePO}
-                        title="Auto-generate a new Process PO and link it here"
+                {/* Linked PO & Internal Challan (Multi-Select) */}
+                <div className="col-12 col-md-3" ref={poDropdownRef}>
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Linked Process PO(s)
+                  </label>
+                  <div className="position-relative">
+                    <button
+                      type="button"
+                      className="form-select form-select-sm bg-white fs-13 text-start text-truncate"
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                      disabled={!isSectionEditable('header')}
+                      onClick={() => setShowPoMultiDropdown(prev => !prev)}
+                    >
+                      {selectedPoIds.length === 0 ? (
+                        <span className="text-muted">-- Select Linked PO(s) --</span>
+                      ) : selectedPoIds.length === 1 ? (
+                        (() => {
+                          const poObj = availablePOs.find(p => String(p.po_number || p.id) === String(selectedPoIds[0]));
+                          return `${poObj?.vendor_name || 'Vendor'} — PO #${selectedPoIds[0]}${poObj?.total_meters ? ` (${poObj.total_meters}m)` : ''}`;
+                        })()
+                      ) : (
+                        <span className="fw-semibold text-primary">
+                          {selectedPoIds.length} POs Selected ({selectedPoIds.map(id => `#${id}`).join(', ')})
+                        </span>
+                      )}
+                    </button>
+
+                    {showPoMultiDropdown && isSectionEditable('header') && (
+                      <div
+                        className="position-absolute bg-white border rounded-3 shadow-lg p-2"
+                        style={{ top: '100%', left: 0, right: 0, zIndex: 1050, marginTop: '4px', maxHeight: '240px', overflowY: 'auto' }}
                       >
-                        <i className="ti ti-plus fs-12"></i>
-                        <span>+ Auto-Generate PO</span>
-                      </button>
+                        {(() => {
+                          const filteredPOs = availablePOs.filter(po =>
+                            !vendorName || String(po.vendor_name || '').trim().toLowerCase() === String(vendorName).trim().toLowerCase()
+                          );
+                          if (filteredPOs.length === 0) {
+                            return <div className="text-muted fs-12 p-2 text-center">No Process POs found.</div>;
+                          }
+                          return (
+                            <>
+                              <div className="d-flex align-items-center justify-content-between px-1 pb-1 mb-1 border-bottom">
+                                <span className="fs-11 text-secondary fw-semibold">{selectedPoIds.length} selected</span>
+                                <div className="d-flex gap-2">
+                                  {selectedPoIds.length > 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-link btn-sm p-0 fs-11 text-danger text-decoration-none"
+                                      onClick={() => {
+                                        setSelectedPoIds([]);
+                                        setLinkedPoId('');
+                                      }}
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-xs px-2 py-0 fs-11"
+                                    onClick={() => setShowPoMultiDropdown(false)}
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                              </div>
+                              {filteredPOs.map(po => {
+                                const poRef = String(po.po_number || po.id);
+                                const isChecked = selectedPoIds.some(id => String(id) === poRef);
+                                return (
+                                  <div
+                                    key={po.id || po.po_number}
+                                    className={`d-flex align-items-center gap-2 p-1.5 rounded-2 fs-12 ${isChecked ? 'bg-primary-subtle text-primary fw-semibold' : 'hover-bg-light text-dark'}`}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                      const next = isChecked
+                                        ? selectedPoIds.filter(id => String(id) !== poRef)
+                                        : [...selectedPoIds, poRef];
+                                      setSelectedPoIds(next);
+                                      setLinkedPoId(next[0] || '');
+                                      if (!isChecked) {
+                                        if (po.vendor_name && !vendorName) {
+                                          setVendorName(po.vendor_name);
+                                          setVendorId(po.vendor_id || po.vendor_name);
+                                        }
+                                        if ((po.fabric_quality || po.items?.[0]?.fabric_name) && !fabricQuality) {
+                                          setFabricQuality(po.fabric_quality || po.items?.[0]?.fabric_name);
+                                        }
+                                        if (!foldingStandard) {
+                                          let resolvedFold = po.folding_standard || po.folding || po.foldingNotation || '';
+                                          const orderRefId = po.linked_order_id || po.order_id || po.sales_order_id;
+                                          if (!resolvedFold && orderRefId) {
+                                            try {
+                                              const orders = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
+                                              const ord = (Array.isArray(orders) ? orders : []).find(o => o.id === orderRefId);
+                                              if (ord) resolvedFold = ord.foldingStandard || ord.folding_standard || ord.folding || ord.foldingNotation || '';
+                                            } catch (e) {}
+                                          }
+                                          if (resolvedFold) {
+                                            setFoldingStandard(resolvedFold);
+                                            setPieces(prev => prev.map(p => ({ ...p, folding: p.folding || resolvedFold })));
+                                          }
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="form-check-input mt-0"
+                                      checked={isChecked}
+                                      onChange={() => {}}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    <div className="text-truncate">
+                                      <span>{po.vendor_name || 'Vendor'} — PO #{poRef}</span>
+                                      {po.total_meters ? <span className="text-muted ms-1">({po.total_meters}m)</span> : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          );
+                        })()}
+                      </div>
                     )}
                   </div>
-                  <select
-                    className="form-select form-select-sm bg-white fs-13"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={linkedPoId}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLinkedPoId(val);
-                      if (val && !selectedPoIds.includes(val)) {
-                        setSelectedPoIds(prev => [...prev, val]);
-                      }
-                      if (val) {
-                        const poObj = availablePOs.find(p => String(p.po_number) === String(val) || String(p.id) === String(val));
-                        if (poObj) {
-                          if (poObj.vendor_name) {
-                            setVendorName(poObj.vendor_name);
-                            setVendorId(poObj.vendor_id || poObj.vendor_name);
-                          }
-                          if (poObj.fabric_quality || poObj.items?.[0]?.fabric_name) {
-                            setFabricQuality(poObj.fabric_quality || poObj.items?.[0]?.fabric_name);
-                          }
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">-- Select Linked PO by Vendor Name --</option>
-                    {availablePOs
-                      .filter(po => !vendorName || String(po.vendor_name || '').trim().toLowerCase() === String(vendorName).trim().toLowerCase())
-                      .map(po => (
-                        <option key={po.id || po.po_number} value={po.po_number || po.id}>
-                          {po.vendor_name || 'Vendor'} — PO #{po.po_number || po.id} ({po.total_meters}m)
-                        </option>
+                  {selectedPoIds.length > 0 && (
+                    <div className="d-flex flex-wrap gap-1 mt-1.5">
+                      {selectedPoIds.map(pid => (
+                        <span key={pid} className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 d-inline-flex align-items-center gap-1">
+                          PO #{pid}
+                          {isSectionEditable('header') && (
+                            <button
+                              type="button"
+                              className="btn-close"
+                              style={{ fontSize: '7px' }}
+                              onClick={() => {
+                                const next = selectedPoIds.filter(id => String(id) !== String(pid));
+                                setSelectedPoIds(next);
+                                setLinkedPoId(next[0] || '');
+                              }}
+                            />
+                          )}
+                        </span>
                       ))}
-                  </select>
+                    </div>
+                  )}
                 </div>
 
-                <div className="col-12 col-md-3">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Linked Internal Challan</label>
-                  <select
-                    className="form-select form-select-sm bg-white fs-13"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={linkedChallanId}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLinkedChallanId(val);
-                      if (val) {
-                        const chObj = availableChallans.find(c => String(c.challan_number) === String(val) || String(c.id) === String(val));
-                        if (chObj) {
-                          if (!vendorName && chObj.vendor_name) {
-                            setVendorName(chObj.vendor_name);
-                            setVendorId(chObj.vendor_id || chObj.vendor_name);
+                <div className="col-12 col-md-3" ref={challanDropdownRef}>
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Linked Internal Challan(s)</label>
+                  <div className="position-relative">
+                    <button
+                      type="button"
+                      className="form-select form-select-sm bg-white fs-13 text-start text-truncate"
+                      style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                      disabled={!isSectionEditable('header')}
+                      onClick={() => setShowChallanMultiDropdown(prev => !prev)}
+                    >
+                      {selectedChallanIds.length === 0 ? (
+                        <span className="text-muted">-- Select Linked Challan(s) --</span>
+                      ) : selectedChallanIds.length === 1 ? (
+                        (() => {
+                          const chObj = availableChallans.find(c => String(c.challan_number || c.id) === String(selectedChallanIds[0]));
+                          return `${chObj?.vendor_name || 'Vendor'} — CH #${selectedChallanIds[0]}`;
+                        })()
+                      ) : (
+                        <span className="fw-semibold text-primary">
+                          {selectedChallanIds.length} Challans Selected ({selectedChallanIds.map(id => `#${id}`).join(', ')})
+                        </span>
+                      )}
+                    </button>
+
+                    {showChallanMultiDropdown && isSectionEditable('header') && (
+                      <div
+                        className="position-absolute bg-white border rounded-3 shadow-lg p-2"
+                        style={{ top: '100%', left: 0, right: 0, zIndex: 1050, marginTop: '4px', maxHeight: '240px', overflowY: 'auto' }}
+                      >
+                        {(() => {
+                          const filteredChallans = availableChallans.filter(ch =>
+                            !vendorName || String(ch.vendor_name || '').trim().toLowerCase() === String(vendorName).trim().toLowerCase()
+                          );
+                          if (filteredChallans.length === 0) {
+                            return <div className="text-muted fs-12 p-2 text-center">No Internal Challans found.</div>;
                           }
-                          if (!fabricQuality && chObj.items?.[0]?.fabric_name) {
-                            setFabricQuality(chObj.items[0].fabric_name);
-                          }
-                          if (!foldingStandard && chObj.folding_notation) {
-                            setFoldingStandard(chObj.folding_notation);
-                            setPieces(prev => prev.map(p => ({
-                              ...p,
-                              folding: p.folding || chObj.folding_notation
-                            })));
-                          }
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">-- Select Linked Challan by Vendor Name --</option>
-                    {availableChallans
-                      .filter(ch => !vendorName || String(ch.vendor_name || '').trim().toLowerCase() === String(vendorName).trim().toLowerCase())
-                      .map(ch => (
-                        <option key={ch.id || ch.challan_number} value={ch.challan_number || ch.id}>
-                          {ch.vendor_name || 'Vendor'} — CH #{ch.challan_number || ch.id}
-                        </option>
+                          return (
+                            <>
+                              <div className="d-flex align-items-center justify-content-between px-1 pb-1 mb-1 border-bottom">
+                                <span className="fs-11 text-secondary fw-semibold">{selectedChallanIds.length} selected</span>
+                                <div className="d-flex gap-2">
+                                  {selectedChallanIds.length > 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-link btn-sm p-0 fs-11 text-danger text-decoration-none"
+                                      onClick={() => {
+                                        setSelectedChallanIds([]);
+                                        setLinkedChallanId('');
+                                      }}
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-xs px-2 py-0 fs-11"
+                                    onClick={() => setShowChallanMultiDropdown(false)}
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                              </div>
+                              {filteredChallans.map(ch => {
+                                const chRef = String(ch.challan_number || ch.id);
+                                const isChecked = selectedChallanIds.some(id => String(id) === chRef);
+                                return (
+                                  <div
+                                    key={ch.id || ch.challan_number}
+                                    className={`d-flex align-items-center gap-2 p-1.5 rounded-2 fs-12 ${isChecked ? 'bg-primary-subtle text-primary fw-semibold' : 'hover-bg-light text-dark'}`}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                      const next = isChecked
+                                        ? selectedChallanIds.filter(id => String(id) !== chRef)
+                                        : [...selectedChallanIds, chRef];
+                                      setSelectedChallanIds(next);
+                                      setLinkedChallanId(next[0] || '');
+                                      if (!isChecked) {
+                                        if (!vendorName && ch.vendor_name) {
+                                          setVendorName(ch.vendor_name);
+                                          setVendorId(ch.vendor_id || ch.vendor_name);
+                                        }
+                                        if (!fabricQuality && ch.items?.[0]?.fabric_name) {
+                                          setFabricQuality(ch.items[0].fabric_name);
+                                        }
+                                        if (!foldingStandard && ch.folding_notation) {
+                                          setFoldingStandard(ch.folding_notation);
+                                          setPieces(prev => prev.map(p => ({
+                                            ...p,
+                                            folding: p.folding || ch.folding_notation
+                                          })));
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="form-check-input mt-0"
+                                      checked={isChecked}
+                                      onChange={() => {}}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    <div className="text-truncate">
+                                      <span>{ch.vendor_name || 'Vendor'} — CH #{chRef}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                  {selectedChallanIds.length > 0 && (
+                    <div className="d-flex flex-wrap gap-1 mt-1.5">
+                      {selectedChallanIds.map(cid => (
+                        <span key={cid} className="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-11 d-inline-flex align-items-center gap-1">
+                          CH #{cid}
+                          {isSectionEditable('header') && (
+                            <button
+                              type="button"
+                              className="btn-close"
+                              style={{ fontSize: '7px' }}
+                              onClick={() => {
+                                const next = selectedChallanIds.filter(id => String(id) !== String(cid));
+                                setSelectedChallanIds(next);
+                                setLinkedChallanId(next[0] || '');
+                              }}
+                            />
+                          )}
+                        </span>
                       ))}
-                  </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-12 col-md-3">
@@ -684,74 +978,70 @@ export default function ProcessReturnForm({
                     placeholder="Enter folding (e.g. L100, Fold 98)"
                   />
                 </div>
-              </div>
 
-              {/* Collapsible Transport & LR Details inside Section 1 (Section 5.2) */}
-              <div className="mt-3 pt-3 border-top" style={{ borderColor: '#e2e8f0' }}>
-                <div
-                  className="d-flex align-items-center justify-content-between py-1 px-2 rounded-2"
-                  style={{ cursor: 'pointer', background: '#f8fafc' }}
-                  onClick={() => setShowTransport(!showTransport)}
-                >
-                  <div className="d-flex align-items-center gap-2">
-                    <i className="ti ti-truck-delivery text-secondary fs-15"></i>
-                    <span className="fw-semibold text-dark fs-12">Transport &amp; LR Details (Collapsible)</span>
-                    <span className="badge bg-white text-muted border fs-10">Hidden by default for local job work</span>
-                  </div>
-                  <i className={`ti ti-chevron-${showTransport ? 'up' : 'down'} text-secondary`}></i>
+                {/* Transport & LR Fields merged directly into Section 1 */}
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Number</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-white fs-13"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={lrNumber}
+                    disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
+                    onChange={(e) => setLrNumber(e.target.value)}
+                    placeholder="e.g. LR-9981"
+                  />
                 </div>
 
-                {showTransport && (
-                  <div className="row g-3 mt-1">
-                    <div className="col-12 col-md-3">
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Number</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm bg-white fs-13"
-                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                        value={lrNumber}
-                        disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
-                        onChange={(e) => setLrNumber(e.target.value)}
-                        placeholder="e.g. LR-9981"
-                      />
-                    </div>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Date</label>
-                      <input
-                        type="date"
-                        className="form-control form-control-sm bg-white fs-13"
-                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                        value={lrDate}
-                        disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
-                        onChange={(e) => setLrDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">Transporter Name</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm bg-white fs-13"
-                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                        value={transporterName}
-                        disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
-                        onChange={(e) => setTransporterName(e.target.value)}
-                        placeholder="e.g. Local Auto Tempo"
-                      />
-                    </div>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label fs-12 fw-semibold text-secondary mb-1">Vehicle No.</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm bg-white fs-13"
-                        style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                        value={vehicleNo}
-                        disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
-                        onChange={(e) => setVehicleNo(e.target.value)}
-                        placeholder="e.g. GJ-05-BX-4120"
-                      />
-                    </div>
-                  </div>
-                )}
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">LR Date</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm bg-white fs-13"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={lrDate}
+                    disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
+                    onChange={(e) => setLrDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Transporter Name</label>
+                  <select
+                    className="form-select form-select-sm bg-white fs-13"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={transporterName}
+                    disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
+                    onChange={(e) => setTransporterName(e.target.value)}
+                  >
+                    <option value="">-- Select Transporter --</option>
+                    {transporterName && !transporterList.some(t => (t.name || t.transporterName || '') === transporterName) && (
+                      <option value={transporterName}>{transporterName}</option>
+                    )}
+                    {transporterList.map((t, idx) => {
+                      const tName = t.name || t.transporterName || '';
+                      if (!tName) return null;
+                      return (
+                        <option key={t.id || tName || idx} value={tName}>
+                          {tName}{t.city ? ` (${t.city})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">Vehicle No.</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-white fs-13"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={vehicleNo}
+                    disabled={!isSectionEditable('header') && !isSectionEditable('transport')}
+                    onChange={(e) => setVehicleNo(e.target.value)}
+                    placeholder="e.g. GJ-05-BX-4120"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -776,10 +1066,10 @@ export default function ProcessReturnForm({
                   <button
                     type="button"
                     className="btn btn-primary btn-sm px-3 rounded-2 d-flex align-items-center gap-1.5 shadow-xs"
-                    onClick={() => addPieceRow({ po_ref: linkedPoId || '', color_name: '' }, 20)}
+                    onClick={() => addPieceRow({ po_ref: linkedPoId || '', color_name: '' }, 1)}
                   >
                     <i className="ti ti-plus fs-14"></i>
-                    <span>Add 20-Row Column</span>
+                    <span>Add Row</span>
                   </button>
                 )}
               </div>
@@ -799,7 +1089,7 @@ export default function ProcessReturnForm({
                       style={{ width: '130px', height: '36px', borderColor: '#cbd5e1' }}
                       value={vendorDeclaredPieces}
                       disabled={!isSectionEditable('pieces')}
-                      onChange={(e) => setVendorDeclaredPieces(e.target.value)}
+                      onChange={(e) => handleStatedPiecesChange(e.target.value)}
                       placeholder="e.g. 13"
                     />
                   </div>
@@ -903,25 +1193,52 @@ export default function ProcessReturnForm({
                     </div>
                   </div>
                   <div className="d-flex flex-wrap gap-2">
-                    {pendingPoItems.map(pit => (
-                      <button
-                        key={pit.key}
-                        type="button"
-                        className="btn btn-outline-primary btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5"
-                        onClick={() => addPieceRow({
-                          po_ref: pit.po_ref,
-                          challan_ref: linkedChallanId || '',
-                          color_name: pit.color_name,
-                          folding: foldingStandard || ''
-                        }, 20)}
-                        title="Add a 20-row Than column for this PO & Color"
-                      >
-                        <i className="ti ti-plus fs-12"></i>
-                        <span className="font-monospace">PO #{pit.po_ref}</span>
-                        <span>• {pit.color_name || 'Color'}</span>
-                        <span className="text-muted">({pit.ordered_meters.toFixed(0)}m)</span>
-                      </button>
-                    ))}
+                    {pendingPoItems.map(pit => {
+                      const isLotAlreadyOpen = pieces.some(p =>
+                        String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
+                        (!pit.color_name || String(p.color_name || '').trim().toLowerCase() === String(pit.color_name || '').trim().toLowerCase())
+                      );
+                      return (
+                        <button
+                          key={pit.key}
+                          type="button"
+                          disabled={isLotAlreadyOpen}
+                          className={`btn btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 ${
+                            isLotAlreadyOpen ? 'btn-success-subtle text-success border border-success-subtle' : 'btn-outline-primary'
+                          }`}
+                          onClick={() => {
+                            if (isLotAlreadyOpen) return;
+                            const hasEmptySamePo = pieces.some(p =>
+                              String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
+                              !(parseFloat(p.meters) > 0)
+                            );
+                            const hasAnySamePo = pieces.some(p =>
+                              String(p.po_ref || '').trim() === String(pit.po_ref || '').trim()
+                            );
+                            if (hasAnySamePo && hasEmptySamePo && pit.color_name) {
+                              setPieces(prev => prev.map(p =>
+                                String(p.po_ref || '').trim() === String(pit.po_ref || '').trim()
+                                  ? { ...p, color_name: pit.color_name }
+                                  : p
+                              ));
+                              return;
+                            }
+                            addPieceRow({
+                              po_ref: pit.po_ref,
+                              challan_ref: linkedChallanId || '',
+                              color_name: pit.color_name,
+                              folding: foldingStandard || ''
+                            }, statedPieces > 0 && pieces.length === 0 ? statedPieces : 1);
+                          }}
+                          title={isLotAlreadyOpen ? 'Already added to slip below' : 'Add piece rows for this PO & Color'}
+                        >
+                          <i className={`ti ${isLotAlreadyOpen ? 'ti-check' : 'ti-plus'} fs-12`}></i>
+                          <span className="font-monospace">PO #{pit.po_ref}</span>
+                          <span>• {pit.color_name || 'Color'}</span>
+                          <span className="text-muted">({pit.ordered_meters.toFixed(0)}m)</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -950,16 +1267,7 @@ export default function ProcessReturnForm({
                     return (
                       <div className="p-4 text-center text-muted bg-white border rounded-3">
                         <i className="ti ti-receipt-off fs-24 d-block mb-1 text-secondary opacity-50"></i>
-                        <p className="mb-2 fs-13">No piece / than entries recorded yet.</p>
-                        {isSectionEditable('pieces') && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm px-3"
-                            onClick={() => addPieceRow({ po_ref: linkedPoId || '', color_name: colorMasterList[0]?.name || '' }, 20)}
-                          >
-                            <i className="ti ti-plus me-1"></i> Start First 20-Row Column
-                          </button>
-                        )}
+                        <p className="mb-0 fs-13">Enter <strong>Vendor Stated Thans / Pieces</strong> above to open piece boxes.</p>
                       </div>
                     );
                   }
@@ -976,14 +1284,35 @@ export default function ProcessReturnForm({
                             chunks.push(grp.entries.slice(c, c + 20));
                           }
                           return (
-                            <div key={grp.groupKey + gIdx} className={chunks.length > 1 ? 'col-12' : 'col-12 col-lg-6'}>
+                            <div key={grp.groupKey + gIdx} className={chunks.length > 1 ? 'col-12' : 'col-12 col-md-auto'}>
                               <div className="border rounded-3 bg-white shadow-2xs overflow-hidden" style={{ borderColor: '#cbd5e1' }}>
                                 {/* Slip Column Header: C.No / O.No + Color */}
                                 <div className="p-2.5 px-3 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
                                   <div className="d-flex align-items-center gap-2 flex-wrap">
                                     <span className="badge bg-primary text-white font-monospace fs-11">
-                                      {grp.challan_ref ? `C.No: ${grp.challan_ref}` : 'Lot'}
+                                      Lot {gIdx + 1}
                                     </span>
+                                    <input
+                                      type="text"
+                                      list={`challan-list-${gIdx}`}
+                                      className="form-control form-control-sm font-monospace fw-bold bg-white px-2 py-0"
+                                      style={{ width: '95px', height: '32px', fontSize: '12px' }}
+                                      value={grp.challan_ref}
+                                      disabled={!isSectionEditable('pieces')}
+                                      placeholder="C.No #"
+                                      title="Internal Challan No. (C.No)"
+                                      onChange={(e) => {
+                                        const newCh = e.target.value;
+                                        setPieces(prev => prev.map((p, pIdx) =>
+                                          grp.entries.some(en => en.idx === pIdx) ? { ...p, challan_ref: newCh } : p
+                                        ));
+                                      }}
+                                    />
+                                    <datalist id={`challan-list-${gIdx}`}>
+                                      {(selectedChallanIds.length > 0 ? selectedChallanIds : availableChallans.map(c => c.challan_number || c.id)).map(cid => (
+                                        <option key={cid} value={cid} />
+                                      ))}
+                                    </datalist>
                                     <input
                                       type="text"
                                       className="form-control form-control-sm font-monospace fw-bold bg-white px-2 py-0"
@@ -1011,19 +1340,75 @@ export default function ProcessReturnForm({
                                       }}
                                     >
                                       <option value="">Select Color...</option>
+                                      {grp.color_name && !colorMasterList.some(c => String(c.name || '').toLowerCase() === String(grp.color_name).toLowerCase()) && (
+                                        <option value={grp.color_name}>{grp.color_name}</option>
+                                      )}
                                       {colorMasterList.map(c => (
                                         <option key={c.id || c.name} value={c.name}>{c.name}</option>
                                       ))}
                                     </select>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm text-center fw-semibold bg-white px-2 py-0"
+                                      style={{ width: '88px', height: '32px', fontSize: '12px' }}
+                                      value={grp.entries[0]?.piece?.folding || foldingStandard || ''}
+                                      disabled={!isSectionEditable('pieces')}
+                                      placeholder="Folding"
+                                      title="Folding Standard (applied to all pieces in this lot)"
+                                      onChange={(e) => {
+                                        const newFold = e.target.value;
+                                        setFoldingStandard(newFold);
+                                        setPieces(prev => prev.map((p, pIdx) =>
+                                          grp.entries.some(en => en.idx === pIdx) ? { ...p, folding: newFold } : p
+                                        ));
+                                      }}
+                                    />
                                   </div>
                                   {isSectionEditable('pieces') && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold"
-                                      onClick={() => addPieceRow({ po_ref: grp.po_ref, challan_ref: grp.challan_ref, color_name: grp.color_name }, 20)}
-                                    >
-                                      +20 Rows
-                                    </button>
+                                    <div className="d-flex align-items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="500"
+                                        className="form-control form-control-sm text-center fw-bold bg-white px-1"
+                                        style={{ width: '58px', height: '28px', fontSize: '12px' }}
+                                        value={grp.entries.length}
+                                        title="Number of piece boxes for this PO / Color Lot"
+                                        onChange={(e) => {
+                                          const target = Math.max(1, Math.min(500, parseInt(e.target.value, 10) || 1));
+                                          const currentCount = grp.entries.length;
+                                          if (target > currentCount) {
+                                            addPieceRow(
+                                              {
+                                                po_ref: grp.po_ref,
+                                                challan_ref: grp.challan_ref,
+                                                color_name: grp.color_name,
+                                                folding: grp.entries[0]?.piece?.folding || foldingStandard || ''
+                                              },
+                                              target - currentCount
+                                            );
+                                          } else if (target < currentCount) {
+                                            const toRemove = currentCount - target;
+                                            const removableIndices = grp.entries
+                                              .slice()
+                                              .reverse()
+                                              .filter(en => !(parseFloat(en.piece.meters) > 0))
+                                              .slice(0, toRemove)
+                                              .map(en => en.idx);
+                                            if (removableIndices.length > 0) {
+                                              setPieces(prev => prev.filter((_, i) => !removableIndices.includes(i)).map((p, i) => ({ ...p, piece_no: i + 1 })));
+                                            }
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold"
+                                        onClick={() => addPieceRow({ po_ref: grp.po_ref, challan_ref: grp.challan_ref, color_name: grp.color_name }, 1)}
+                                      >
+                                        +1 Row
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
 
@@ -1039,14 +1424,13 @@ export default function ProcessReturnForm({
                                         : 'col-12';
                                     return (
                                       <div key={chunkIdx} className={colClass}>
-                                        <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: '12px' }}>
+                                        <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: '12px', width: 'auto', minWidth: '290px' }}>
                                           <thead className="table-light">
                                             <tr className="text-secondary fs-10 text-uppercase">
-                                              <th className="text-center" style={{ width: '32px' }}>#</th>
-                                              <th style={{ width: '96px' }}>Length (m)</th>
-                                              <th style={{ width: '68px' }}>Fold</th>
-                                              <th style={{ width: '66px' }} className="text-center">QC</th>
-                                              {isSectionEditable('pieces') && <th style={{ width: '28px' }}></th>}
+                                              <th className="text-center px-2" style={{ width: '34px' }}>#</th>
+                                              <th className="px-2" style={{ width: '104px' }}>Length (m)</th>
+                                              <th className="text-center px-2" style={{ width: '76px' }}>QC</th>
+                                              {isSectionEditable('pieces') && <th style={{ width: '32px' }}></th>}
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -1065,21 +1449,6 @@ export default function ProcessReturnForm({
                                                       disabled={!isSectionEditable('pieces')}
                                                       onChange={(e) => handlePieceMeterChange(idx, e.target.value)}
                                                       placeholder="—"
-                                                    />
-                                                  </td>
-                                                  <td>
-                                                    <input
-                                                      type="text"
-                                                      className="form-control form-control-sm fs-11 text-center px-1"
-                                                      style={{ borderColor: '#cbd5e1', height: '26px', width: '62px' }}
-                                                      value={p.folding || ''}
-                                                      disabled={!isSectionEditable('pieces')}
-                                                      onChange={(e) => {
-                                                        const updated = [...pieces];
-                                                        updated[idx].folding = e.target.value;
-                                                        setPieces(updated);
-                                                      }}
-                                                      placeholder="L100"
                                                     />
                                                   </td>
                                                   <td className="text-center">
@@ -1108,7 +1477,7 @@ export default function ProcessReturnForm({
                                               <td colSpan={2} className="text-end text-secondary fs-11 py-1.5">
                                                 Col {chunkIdx + 1} ({chunkFilled} Thans):
                                               </td>
-                                              <td colSpan={isSectionEditable('pieces') ? 3 : 2} className="text-end text-primary fs-12 py-1.5 pe-2 font-monospace">
+                                              <td colSpan={isSectionEditable('pieces') ? 2 : 1} className="text-end text-primary fs-12 py-1.5 pe-2 font-monospace">
                                                 {chunkMeters.toFixed(2)} m
                                               </td>
                                             </tr>
@@ -1131,17 +1500,28 @@ export default function ProcessReturnForm({
                         })}
                       </div>
 
-                      {/* Grand Total Strip across all columns */}
+                      {/* Grand Total Strip across all PO / Color Lots */}
                       <div className="mt-3 p-2.5 px-3 rounded-3 bg-light border d-flex flex-wrap align-items-center justify-content-between gap-2" style={{ borderColor: '#cbd5e1' }}>
-                        <span className="fw-bold text-secondary fs-12 text-uppercase">
-                          Grand Total Recorded ({colGroups.length} Lot Column{colGroups.length > 1 ? 's' : ''}):
-                        </span>
+                        <div className="d-flex flex-wrap align-items-center gap-2">
+                          <span className="fw-bold text-secondary fs-12 text-uppercase">
+                            Grand Total ({colGroups.length} Lot{colGroups.length > 1 ? 's' : ''}):
+                          </span>
+                          {colGroups.length > 1 && (
+                            <span className="fs-12 text-secondary font-monospace">
+                              {colGroups.map((grp) => {
+                                const lotM = grp.entries.reduce((s, e) => s + (parseFloat(e.piece.meters) || 0), 0);
+                                return `${grp.po_ref ? `PO #${grp.po_ref}` : 'Lot'} (${grp.color_name || 'Std'}): ${lotM.toFixed(2)}m`;
+                              }).join(' + ')}
+                            </span>
+                          )}
+                        </div>
                         <div className="d-flex align-items-center gap-3">
                           <span className="badge bg-white text-dark border px-2.5 py-1 fs-12 font-monospace">
-                            {filledPieces.length} Thans
+                            {filledPieces.length}{statedPieces > 0 ? ` / ${statedPieces}` : ''} Thans
                           </span>
                           <span className="fw-bold text-dark fs-15 font-monospace">
                             {Number(calculatedTotalMeters).toFixed(2)} m
+                            {statedMeters > 0 ? <span className="text-muted fs-12 fw-normal"> / {statedMeters.toFixed(2)} m</span> : null}
                           </span>
                         </div>
                       </div>

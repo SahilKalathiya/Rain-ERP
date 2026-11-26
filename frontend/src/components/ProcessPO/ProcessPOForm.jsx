@@ -109,12 +109,12 @@ export default function ProcessPOForm({
                   resolvedWidth = String(fc.width);
                 } else if (fc.selectedWidth && fc.selectedWidth !== '—' && fc.selectedWidth !== '-') {
                   resolvedWidth = String(fc.selectedWidth);
-                } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths[0] && fc.selectedWidths[0] !== '—') {
+                } else if (Array.isArray(fc.selectedWidths) && fc.selectedWidths.length === 1 && fc.selectedWidths[0] && fc.selectedWidths[0] !== '—') {
                   resolvedWidth = String(fc.selectedWidths[0]);
                 }
               }
 
-              // 3. Check user's selected width in groupSelectedWidths
+              // 3. Check user's selected width in groupSelectedWidths (only auto-pick if single width is selected)
               if (!resolvedWidth && o.groupSelectedWidths && typeof o.groupSelectedWidths === 'object') {
                 const kExact = `${artName}___${fabName}___${roleName}`;
                 const kNoRole = `${artName}___${fabName}___`;
@@ -123,7 +123,7 @@ export default function ProcessPOForm({
                   k.toLowerCase().startsWith(`${artName.toLowerCase()}___`)
                 );
                 const gw = o.groupSelectedWidths[kExact] || o.groupSelectedWidths[kNoRole] || (kAnyRole ? o.groupSelectedWidths[kAnyRole] : null);
-                if (Array.isArray(gw) && gw[0] && gw[0] !== '—') {
+                if (Array.isArray(gw) && gw.length === 1 && gw[0] && gw[0] !== '—') {
                   resolvedWidth = String(gw[0]);
                 } else if (typeof gw === 'string' && gw && gw !== '—') {
                   resolvedWidth = gw;
@@ -832,7 +832,7 @@ export default function ProcessPOForm({
       setItems(prev => prev.map(it => ({ ...it, style_name: value })));
     }
     // PDF Section 3.2: Starting from Style auto-fetches & links matching Sales Order data
-    if (value && value.trim() && !linkedOrderId) {
+    if (value && value.trim()) {
       const cleanVal = value.trim().toLowerCase();
       const matchingOrder = availableSalesOrders.find(o =>
         (o.styles && o.styles.some(s => s.toLowerCase().trim() === cleanVal)) ||
@@ -844,10 +844,12 @@ export default function ProcessPOForm({
         ))
       );
       if (matchingOrder) {
-        setIsOrderLinked(true);
-        setLinkedOrderId(matchingOrder.id);
-        if (matchingOrder.customer) setCustomerBrand(matchingOrder.customer);
-        if (matchingOrder.deliveryDate) setDeliveryDate(matchingOrder.deliveryDate);
+        if (!linkedOrderId || styleCountOption === '1') {
+          setIsOrderLinked(true);
+          setLinkedOrderId(matchingOrder.id);
+          if (matchingOrder.customer) setCustomerBrand(matchingOrder.customer);
+          if (matchingOrder.deliveryDate) setDeliveryDate(matchingOrder.deliveryDate);
+        }
         checkOrderWidthAlert(matchingOrder.id, matchingOrder);
       }
     }
@@ -878,48 +880,67 @@ export default function ProcessPOForm({
 
   const [multipleWidthsAlert, setMultipleWidthsAlert] = useState('');
 
-  // Check if Sales Order has multiple widths selected; alert only when >1 distinct width exists
+  // Check if any row/group in the Sales Order has no PO width selected (or >1 unresolved width) in "Select for PO"
   const checkOrderWidthAlert = (orderId, ordObj = null) => {
     if (!orderId) {
       setMultipleWidthsAlert('');
       return;
     }
-    const ord = ordObj || availableSalesOrders.find(o => o.id === orderId);
-    const widthSet = new Set();
+    const unresolvedWidths = new Set();
+    let missingPoWidthSelection = false;
 
     try {
       const rawOrders = JSON.parse(localStorage.getItem('erp_sales_orders_v1') || '[]');
       const rawOrd = (Array.isArray(rawOrders) ? rawOrders : []).find(o => o.id === orderId);
       if (rawOrd) {
-        if (rawOrd.groupPoWidths && typeof rawOrd.groupPoWidths === 'object') {
-          Object.values(rawOrd.groupPoWidths).forEach(w => {
-            const clean = String(w || '').replace(/["\s—-]/g, '');
-            if (clean) widthSet.add(`${clean}"`);
-          });
-        }
-        if (rawOrd.groupSelectedWidths && typeof rawOrd.groupSelectedWidths === 'object') {
-          Object.entries(rawOrd.groupSelectedWidths).forEach(([k, arr]) => {
-            if (Array.isArray(arr) && arr.length > 1 && !(rawOrd.groupPoWidths && rawOrd.groupPoWidths[k])) {
-              arr.forEach(w => {
-                const clean = String(w || '').replace(/["\s—-]/g, '');
-                if (clean) widthSet.add(`${clean}"`);
-              });
+        const poWidthsMap = rawOrd.groupPoWidths && typeof rawOrd.groupPoWidths === 'object' ? rawOrd.groupPoWidths : {};
+        const selectedWidthsMap = rawOrd.groupSelectedWidths && typeof rawOrd.groupSelectedWidths === 'object' ? rawOrd.groupSelectedWidths : {};
+        const fcList = Array.isArray(rawOrd.fabricConsumptions) ? rawOrd.fabricConsumptions : [];
+        const activeGroupKeys = new Set(
+          fcList.map(fc => `${fc.articleName}___${fc.fabricQuality || ''}___${fc.role || ''}`)
+        );
+
+        Object.entries(selectedWidthsMap).forEach(([k, arr]) => {
+          // Ignore stale keys in groupSelectedWidths that are no longer in fabricConsumptions
+          if (activeGroupKeys.size > 0 && !activeGroupKeys.has(k)) return;
+          const matchingFc = fcList.find(fc => `${fc.articleName}___${fc.fabricQuality || ''}___${fc.role || ''}` === k);
+          const hasPoWidth = Boolean(
+            (poWidthsMap[k] && String(poWidthsMap[k]).trim() && poWidthsMap[k] !== '—') ||
+            (matchingFc?.poWidth && String(matchingFc.poWidth).trim() && matchingFc.poWidth !== '—' && matchingFc.poWidth !== '-')
+          );
+          if (!hasPoWidth && Array.isArray(arr) && arr.length > 0) {
+            missingPoWidthSelection = true;
+            arr.forEach(w => {
+              const clean = String(w || '').replace(/["\s—-]/g, '');
+              if (clean) unresolvedWidths.add(`${clean}"`);
+            });
+          }
+        });
+
+        if (Object.keys(poWidthsMap).length === 0 && fcList.length > 0) {
+          fcList.forEach(fc => {
+            const hasFcPo = Boolean(fc?.poWidth && fc.poWidth !== '—' && fc.poWidth !== '-');
+            if (!hasFcPo) {
+              missingPoWidthSelection = true;
+              if (Array.isArray(fc?.selectedWidths)) {
+                fc.selectedWidths.forEach(w => {
+                  const clean = String(w || '').replace(/["\s—-]/g, '');
+                  if (clean) unresolvedWidths.add(`${clean}"`);
+                });
+              }
             }
           });
         }
       }
     } catch (e) { }
 
-    if (ord && Array.isArray(ord.items)) {
-      ord.items.forEach(it => {
-        const clean = String(it.width || '').replace(/["\s—-]/g, '');
-        if (clean) widthSet.add(`${clean}"`);
-      });
-    }
-
-    const distinctWidths = Array.from(widthSet);
-    if (distinctWidths.length > 1) {
-      const msg = `Multiple widths (${distinctWidths.join(', ')}) are selected in Order #${orderId}. Please first fix a single width in the Order ("Select for PO") before creating a Process PO.`;
+    const distinctUnresolved = Array.from(unresolvedWidths);
+    if (distinctUnresolved.length > 1) {
+      const msg = `Multiple widths (${distinctUnresolved.join(', ')}) are selected in Order #${orderId}. Please first select a PO width in the Order ("Select for PO") before creating a Process PO.`;
+      setMultipleWidthsAlert(msg);
+      window.alert(`⚠️ ${msg}`);
+    } else if (missingPoWidthSelection) {
+      const msg = `PO width is not selected in Order #${orderId}. Please first select a width in the Order ("Select for PO") before creating a Process PO.`;
       setMultipleWidthsAlert(msg);
       window.alert(`⚠️ ${msg}`);
     } else {
@@ -1174,6 +1195,26 @@ export default function ProcessPOForm({
     setItems(remaining.length > 0 ? remaining : [createBlankRow()]);
   };
 
+  const isOrderRequirementSelected = (ordIt) => {
+    if (!ordIt) return false;
+    if (selectedRequirementIds.includes(ordIt.id)) return true;
+    if (items.some(it => it.order_item_id === ordIt.id)) return true;
+    // Match when a combined PO line item (e.g. "Kurta + Pant") covers this article + fabric + color + width
+    const ordFab = String(ordIt.fabric || '').trim().toLowerCase();
+    const ordCol = String(ordIt.color || '').trim().toLowerCase();
+    const ordWidth = String(ordIt.width || '').replace(/"/g, '').trim().toLowerCase();
+    const ordArts = String(ordIt.article || '').split('+').map(a => a.trim().toLowerCase()).filter(Boolean);
+    return items.some(it => {
+      if (!it.order_item_id) return false;
+      const itFab = String(it.fabric_name || '').trim().toLowerCase();
+      const itCol = String(it.color_name || '').trim().toLowerCase();
+      const itWidth = String(it.width || '').replace(/"/g, '').trim().toLowerCase();
+      if (itFab !== ordFab || itCol !== ordCol || itWidth !== ordWidth) return false;
+      const itArts = String(it.article_name || '').split('+').map(a => a.trim().toLowerCase()).filter(Boolean);
+      return ordArts.length > 0 && ordArts.every(a => itArts.includes(a));
+    });
+  };
+
   // Add Item from Order Requirement (PDF Section 3.2: auto-populate from Order)
   const handleSelectOrderItem = (orderItem) => {
     if (isLocked) return;
@@ -1262,6 +1303,13 @@ export default function ProcessPOForm({
     if (items.length === 0) {
       alert('Please add at least one fabric line item.');
       return;
+    }
+    if (andCreateChallan !== 'draft') {
+      const missingRate = items.some(it => (parseFloat(it.fabric_rate) || 0) <= 0 && (parseFloat(it.dyeing_rate) || 0) <= 0);
+      if (missingRate) {
+        alert('Please enter Rate (Fabric Rate or Dyeing Rate) for all line items before saving.');
+        return;
+      }
     }
 
     const fullPoId = cleanPoNum.startsWith('PPO-') ? cleanPoNum : `PPO-${cleanPoNum}`;
@@ -1983,13 +2031,12 @@ export default function ProcessPOForm({
           {/* Linked Sales Order Item Selection Matrix (PDF Section 3.2: Multi-Style display in turn) */}
           {isOrderLinked && currentSelectedOrder && (
             <>
-              {multipleWidthsAlert && (
+              {multipleWidthsAlert ? (
                 <div className="alert alert-danger d-flex align-items-center gap-2 mt-3 mb-0 py-2.5 px-3 fs-12 fw-semibold" role="alert">
                   <i className="ti ti-alert-triangle fs-16"></i>
                   <span>{multipleWidthsAlert}</span>
                 </div>
-              )}
-              {(styleCountOption === '2+' || selectedStyles.length > 1) ? (
+              ) : (styleCountOption === '2+' || selectedStyles.length > 1) ? (
                     selectedStyles.map((styleVal, sIdx) => {
                       const positionLabel = sIdx === 0
                         ? 'Top Style'
@@ -2042,13 +2089,10 @@ export default function ProcessPOForm({
                       }
 
                       const totalReqCount = styleItems.length;
-                      const selectedCount = styleItems.filter(ordIt =>
-                        selectedRequirementIds.includes(ordIt.id) || items.some(it => it.order_item_id === ordIt.id)
-                      ).length;
+                      const selectedCount = styleItems.filter(ordIt => isOrderRequirementSelected(ordIt)).length;
 
                       const visibleItems = styleItems.filter(ordIt => {
-                        const isSelected = selectedRequirementIds.includes(ordIt.id) ||
-                          items.some(it => it.order_item_id === ordIt.id);
+                        const isSelected = isOrderRequirementSelected(ordIt);
                         if (hideSelectedRequirements && isSelected) {
                           return false;
                         }
@@ -2145,8 +2189,7 @@ export default function ProcessPOForm({
                                             </tr>
                                           ) : (
                                             visibleItems.map((ordIt) => {
-                                              const isAlreadySelected = selectedRequirementIds.includes(ordIt.id) ||
-                                                items.some(it => it.order_item_id === ordIt.id);
+                                              const isAlreadySelected = isOrderRequirementSelected(ordIt);
                                               const isFullyOrdered = ordIt.requiredMeters > 0
                                                 ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
                                                 : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
@@ -2270,9 +2313,7 @@ export default function ProcessPOForm({
                   const singleItems = isStyleCombined(0)
                     ? (currentSelectedOrder.items || [])
                     : (currentSelectedOrder.separateItems || currentSelectedOrder.items || []);
-                  const selectedCount = singleItems.filter(ordIt =>
-                    selectedRequirementIds.includes(ordIt.id) || items.some(it => it.order_item_id === ordIt.id)
-                  ).length;
+                  const selectedCount = singleItems.filter(ordIt => isOrderRequirementSelected(ordIt)).length;
                   return (
                     <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
                       <div className="d-flex align-items-center gap-2">
@@ -2344,8 +2385,7 @@ export default function ProcessPOForm({
                           ? (currentSelectedOrder.items || [])
                           : (currentSelectedOrder.separateItems || currentSelectedOrder.items || []);
                         const visibleItems = baseItems.filter(ordIt => {
-                          const isSelected = selectedRequirementIds.includes(ordIt.id) ||
-                            items.some(it => it.order_item_id === ordIt.id);
+                          const isSelected = isOrderRequirementSelected(ordIt);
                           if (hideSelectedRequirements && isSelected) {
                             return false;
                           }
@@ -2376,8 +2416,7 @@ export default function ProcessPOForm({
                         }
 
                         return visibleItems.map((ordIt) => {
-                          const isAlreadySelected = selectedRequirementIds.includes(ordIt.id) ||
-                            items.some(it => it.order_item_id === ordIt.id);
+                          const isAlreadySelected = isOrderRequirementSelected(ordIt);
                           const isFullyOrdered = ordIt.requiredMeters > 0
                             ? (ordIt.orderedMeters >= ordIt.requiredMeters || ordIt.status === 'Already Ordered')
                             : (ordIt.status === 'Already Ordered' && ordIt.orderedMeters > 0);
@@ -3043,17 +3082,6 @@ export default function ProcessPOForm({
                                   </button>
 
                                   <div className="d-flex align-items-center gap-2">
-                                    {initialPO && (
-                                      <button
-                                        type="button"
-                                        className="btn btn-outline-secondary px-3.5 py-2 fs-13 rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                                        onClick={() => onPrintPO && onPrintPO(initialPO)}
-                                      >
-                                        <i className="ti ti-printer fs-15"></i>
-                                        <span>Print PO Slip</span>
-                                      </button>
-                                    )}
-
                                     {!isLocked && (
                                       <>
                                         <button
@@ -3070,16 +3098,6 @@ export default function ProcessPOForm({
                                         <button
                                           type="button"
                                           className="btn btn-primary px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
-                                          onClick={() => handleSubmit('issue')}
-                                          title="Save & Issue PO (official PO ready for Challan dispatch)"
-                                        >
-                                          <i className="ti ti-check fs-15"></i>
-                                          <span>Save &amp; Issue PO</span>
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          className="btn btn-dark px-4 py-2 fs-13 fw-semibold rounded-2 shadow-xs d-flex align-items-center gap-1.5"
                                           onClick={() => handleSubmit('challan')}
                                           title="Save PO and immediately create Dispatch Challan"
                                         >

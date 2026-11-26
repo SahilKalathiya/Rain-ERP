@@ -765,16 +765,36 @@ export default function ProcessChallanForm({
         if (firstPO.vendor_name) setVendorName(firstPO.vendor_name);
 
         const allStyles = [];
+        const allFabrics = [];
         selectedPOObjects.forEach(p => {
           if (Array.isArray(p.style_names)) {
             p.style_names.forEach(s => {
               if (s && !allStyles.includes(s)) allStyles.push(s);
             });
           }
+          if (p.style_name && !allStyles.includes(p.style_name)) {
+            allStyles.push(p.style_name);
+          }
+          const fabCandidates = [p.fabric_quality, p.fabric_name, p.fabric];
+          if (Array.isArray(p.items)) {
+            p.items.forEach(it => {
+              if (it.style_name && !allStyles.includes(it.style_name)) allStyles.push(it.style_name);
+              fabCandidates.push(it.fabric_name, it.fabric_quality, it.fabric);
+            });
+          }
+          fabCandidates.forEach(f => {
+            const clean = String(f || '').trim();
+            if (clean && clean.toLowerCase() !== 'fabric (auto generated)' && !allFabrics.includes(clean)) {
+              allFabrics.push(clean);
+            }
+          });
         });
         setStylesInfo(allStyles);
         if (firstPO.customer_brand_name) {
           setCustomerBrand(firstPO.customer_brand_name);
+        }
+        if (allFabrics.length > 0 && !particulars) {
+          setParticulars(allFabrics.join(', '));
         }
       }
     }
@@ -1592,24 +1612,93 @@ export default function ProcessChallanForm({
             </div>
 
             <div className="p-4">
-              {/* Multi-PO Bundling Selector (Section 4.2 & Page 15: PO=7611, 7612, 7613) */}
+              {/* 1. Primary Header Row: Vendor First, then Challan Number & Date */}
+              <div className="row g-3 mb-3 pb-3 border-bottom">
+                {/* 1. Vendor (Job Worker) First */}
+                <div className="col-12 col-md-4">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Vendor (Job Worker) <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    className="form-select form-select-sm bg-white fs-13 text-dark fw-semibold"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={vendorName || ''}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => {
+                      const chosenName = e.target.value;
+                      setVendorName(chosenName);
+                      const v = initialVendors.find(vend => vend.name === chosenName);
+                      if (v) setVendorId(v.id);
+                      if (selectedPOs.length > 0) {
+                        const mismatch = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)) && p.vendor_name !== chosenName);
+                        if (mismatch.length > 0) {
+                          setSelectedPOs(selectedPOs.filter(ref => {
+                            const po = availablePOs.find(p => isPOMatched(p, ref));
+                            return po && po.vendor_name === chosenName;
+                          }));
+                        }
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">-- Select Vendor Name --</option>
+                    {Array.from(new Set([
+                      ...initialVendors.map(v => v.name),
+                      ...availablePOs.map(p => p.vendor_name).filter(Boolean)
+                    ])).map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Challan Number */}
+                <div className="col-12 col-md-4">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Challan Number <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={challanNumber}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => setChallanNumber(e.target.value)}
+                    placeholder="e.g. CH-4903"
+                    required
+                  />
+                </div>
+
+                {/* 3. Date */}
+                <div className="col-12 col-md-4">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Date of Dispatch <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm bg-white fs-13 text-dark"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={date}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 2. Multi-PO Bundling Selector (Filtered by Selected Vendor) */}
               {!isEmergencyDispatch && (
                 <div className="mb-3 pb-3 border-bottom" ref={poDropdownRef}>
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                    <span>Link by Vendor / Party Name &amp; Process POs (Multi-Select) <span className="text-danger">*</span></span>
+                    <span>
+                      Link by Vendor / Party Name &amp; Process POs (Multi-Select) <span className="text-danger">*</span>
+                      {vendorName && (
+                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle ms-2 fs-11">
+                          {vendorName}
+                        </span>
+                      )}
+                    </span>
                     <div className="d-flex align-items-center gap-2">
                       <span className="text-muted fs-11">Page 15 slip: Bundles multiple POs to same vendor</span>
-                      {isSectionEditable('header') && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-link p-0 text-primary text-decoration-none fs-11 fw-semibold d-flex align-items-center gap-1"
-                          onClick={handleAutoGenerateAndLinkPO}
-                          title="Auto-generate a new Process PO and link to this Challan"
-                        >
-                          <i className="ti ti-plus fs-12"></i>
-                          <span>+ Auto-Generate PO</span>
-                        </button>
-                      )}
                     </div>
                   </label>
 
@@ -1630,7 +1719,13 @@ export default function ProcessChallanForm({
                     >
                       <span className="text-truncate pe-3">
                         {selectedPOs.length === 0 ? (
-                          <span className="text-muted">-- Select Vendor Name / Process PO(s) to bundle --</span>
+                          vendorName ? (
+                            <span className="text-dark fw-semibold">
+                              {vendorName} <span className="text-muted fw-normal">— Select Process PO(s) to bundle --</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted">-- Select Vendor Name / Process PO(s) to bundle --</span>
+                          )
                         ) : selectedPOs.length === 1 ? (
                           (() => {
                             const po = availablePOs.find(p => isPOMatched(p, selectedPOs[0]));
@@ -1701,7 +1796,15 @@ export default function ProcessChallanForm({
 
                         {/* List of Available POs with checkboxes */}
                         {(() => {
-                          const eligiblePOs = availablePOs.filter(p => p.status !== 'Draft');
+                          const eligiblePOs = availablePOs.filter(p => {
+                            if (p.status === 'Draft') return false;
+                            if (vendorName && vendorName.trim()) {
+                              const vTarget = vendorName.trim().toLowerCase();
+                              const pVend = String(p.vendor_name || '').trim().toLowerCase();
+                              return pVend === vTarget;
+                            }
+                            return true;
+                          });
                           const filtered = eligiblePOs.filter(po => {
                             if (!poSearchTerm.trim()) return true;
                             const term = poSearchTerm.toLowerCase();
@@ -1714,13 +1817,60 @@ export default function ProcessChallanForm({
                           if (filtered.length === 0) {
                             return (
                               <div className="text-muted fs-12 p-3 text-center">
-                                No eligible Process POs found.
+                                {vendorName ? `No eligible Process POs found for ${vendorName}.` : 'No eligible Process POs found.'}
                               </div>
                             );
                           }
 
+                          const allFilteredSelected = filtered.every(po => selectedPOs.some(ref => isPOMatched(po, ref)));
+
                           return (
-                            <div className="d-flex flex-column gap-1">
+                            <>
+                              <div className="d-flex align-items-center justify-content-between px-2 py-1.5 mb-1 border-bottom bg-light rounded-2">
+                                <span className="fs-11 fw-semibold text-secondary">
+                                  {filtered.length} PO{filtered.length === 1 ? '' : 's'} available • {selectedPOs.length} selected
+                                </span>
+                                <div className="d-flex align-items-center gap-2">
+                                  {filtered.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-link btn-sm p-0 fs-11 fw-semibold text-primary text-decoration-none"
+                                      onClick={() => {
+                                        if (allFilteredSelected) {
+                                          setSelectedPOs(prev => prev.filter(ref => !filtered.some(po => isPOMatched(po, ref))));
+                                        } else {
+                                          const firstVend = vendorName || filtered[0]?.vendor_name || '';
+                                          const sameVendorPOs = firstVend
+                                            ? filtered.filter(po => !po.vendor_name || po.vendor_name.trim().toLowerCase() === firstVend.trim().toLowerCase())
+                                            : filtered;
+                                          const keysToAdd = sameVendorPOs.map(po => po.po_number || po.id).filter(Boolean);
+                                          setSelectedPOs(prev => Array.from(new Set([...prev, ...keysToAdd])));
+                                          if (firstVend && !vendorName) setVendorName(firstVend);
+                                        }
+                                      }}
+                                    >
+                                      {allFilteredSelected ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                  )}
+                                  {selectedPOs.length > 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-link btn-sm p-0 fs-11 fw-semibold text-danger text-decoration-none"
+                                      onClick={() => setSelectedPOs([])}
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-xs px-2 py-0.5 fs-11 fw-semibold rounded-1"
+                                    onClick={() => setShowPODropdown(false)}
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="d-flex flex-column gap-1">
                               {filtered.map((po) => {
                                 const isSelected = selectedPOs.some(ref => isPOMatched(po, ref));
                                 return (
@@ -1764,6 +1914,7 @@ export default function ProcessChallanForm({
                                 );
                               })}
                             </div>
+                            </>
                           );
                         })()}
                       </div>
@@ -1810,76 +1961,6 @@ export default function ProcessChallanForm({
 
               {/* Data Fields strictly matching Section 4.1 Data Structure */}
               <div className="row g-3">
-                {/* 1. Challan Number */}
-                <div className="col-12 col-md-4">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Challan Number <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={challanNumber}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setChallanNumber(e.target.value)}
-                    placeholder="e.g. CH-4903"
-                    required
-                  />
-                </div>
-
-                {/* 2. Date */}
-                <div className="col-12 col-md-4">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Date of Dispatch <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm bg-white fs-13 text-dark"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={date}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* 3. Vendor */}
-                <div className="col-12 col-md-4">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Vendor (Job Worker) <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    className="form-select form-select-sm bg-white fs-13 text-dark fw-semibold"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={vendorName || ''}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => {
-                      const chosenName = e.target.value;
-                      setVendorName(chosenName);
-                      const v = initialVendors.find(vend => vend.name === chosenName);
-                      if (v) setVendorId(v.id);
-                      if (selectedPOs.length > 0) {
-                        const mismatch = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)) && p.vendor_name !== chosenName);
-                        if (mismatch.length > 0) {
-                          setSelectedPOs(selectedPOs.filter(ref => {
-                            const po = availablePOs.find(p => isPOMatched(p, ref));
-                            return po && po.vendor_name === chosenName;
-                          }));
-                        }
-                      }
-                    }}
-                    required
-                  >
-                    <option value="">-- Select Vendor Name --</option>
-                    {Array.from(new Set([
-                      ...initialVendors.map(v => v.name),
-                      ...availablePOs.map(p => p.vendor_name).filter(Boolean)
-                    ])).map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* 4. Style / Customer / Brand */}
                 <div className="col-12 col-md-4">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
@@ -1895,29 +1976,6 @@ export default function ProcessChallanForm({
                     ].filter(Boolean).join(' ') || 'Auto-carried from PO'}
                     placeholder="Auto-carried from PO"
                     readOnly
-                  />
-                </div>
-
-                {/* 5. Folding Notation */}
-                <div className="col-12 col-md-4">
-                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
-                    Folding Notation (e.g. L100)
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control form-control-sm bg-white fs-13 text-dark"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
-                    value={foldingNotation}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFoldingNotation(val);
-                      setItems(prev => prev.map(it => ({
-                        ...it,
-                        folding: (!it.folding || it.folding === foldingNotation) ? val : it.folding
-                      })));
-                    }}
-                    placeholder="e.g. L100 / Fold 98"
                   />
                 </div>
 
@@ -2013,7 +2071,7 @@ export default function ProcessChallanForm({
             {/* Real-Time Requirement vs Dispatched Tracker Bar */}
             <div className="p-3 px-4 border-bottom bg-light-subtle">
               <div className="row g-2 align-items-center">
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-md-3">
                   <div className="p-2.5 rounded border bg-white shadow-xs">
                     <span className="text-muted fs-11 fw-medium text-uppercase d-block">PO Required Meters</span>
                     <div className="d-flex align-items-baseline gap-1.5">
@@ -2029,7 +2087,7 @@ export default function ProcessChallanForm({
                   </div>
                 </div>
 
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-md-3">
                   <div className="p-2.5 rounded border bg-white shadow-xs">
                     <span className="text-muted fs-11 fw-medium text-uppercase d-block">Total Dispatched</span>
                     <div className="d-flex align-items-baseline gap-1.5">
@@ -2041,7 +2099,30 @@ export default function ProcessChallanForm({
                   </div>
                 </div>
 
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-md-3">
+                  {(() => {
+                    const extraMtrs = totalRequiredMeters > 0
+                      ? Math.max(0, Number((grandTotalMeters - totalRequiredMeters).toFixed(2)))
+                      : 0;
+                    return (
+                      <div className={`p-2.5 rounded border shadow-xs bg-white ${extraMtrs > 0.05 ? 'border-info' : ''}`}>
+                        <span className="text-muted fs-11 fw-medium text-uppercase d-block">Extra Sent (Grey Return)</span>
+                        <div className="d-flex align-items-baseline gap-1.5">
+                          <span className={`fs-16 fw-bold ${extraMtrs > 0.05 ? 'text-info-emphasis' : 'text-muted'}`}>
+                            {extraMtrs > 0.05 ? `+${extraMtrs.toFixed(2)} m` : '0.00 m'}
+                          </span>
+                          {extraMtrs > 0.05 && (
+                            <span className="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-10">
+                              Returnable
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="col-12 col-md-3">
                   <div className={`p-2.5 rounded border shadow-xs bg-white ${totalRequiredMeters > 0 && grandTotalMeters >= totalRequiredMeters - 0.05
                     ? 'border-success'
                     : balancePendingMeters > 0
@@ -2079,7 +2160,6 @@ export default function ProcessChallanForm({
                       <th style={{ minWidth: '110px' }}>Color Shade</th>
                       <th style={{ width: '150px' }} className="text-center">Dispatch Mode</th>
                       <th style={{ width: '100px' }} className="text-end">Original (m)</th>
-                      <th style={{ width: '85px' }} className="text-center">Folding</th>
                       <th style={{ width: '120px' }} className="text-end text-dark">Dispatched (m) *</th>
                       <th style={{ width: '140px' }} className="text-end">Remaining in Stock (m)</th>
                       {isSectionEditable('items') && <th style={{ width: '40px' }} className="text-center">Act</th>}
@@ -2088,7 +2168,7 @@ export default function ProcessChallanForm({
                   <tbody>
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="text-center py-5 text-muted">
+                        <td colSpan={10} className="text-center py-5 text-muted">
                           <div className="py-3">
                             <i className="ti ti-packages fs-32 text-secondary mb-2 d-block opacity-50"></i>
                             <h6 className="fs-14 fw-semibold text-dark mb-1">No Warehouse Stock Allocated Yet</h6>
@@ -2217,19 +2297,6 @@ export default function ProcessChallanForm({
                             />
                           </td>
 
-                          {/* Folding */}
-                          <td>
-                            <input
-                              type="text"
-                              className="form-control form-control-sm text-center fs-12 px-1"
-                              style={{ borderColor: '#cbd5e1' }}
-                              value={it.folding || foldingNotation || ''}
-                              disabled={!isSectionEditable('items')}
-                              onChange={(e) => handleItemFieldChange(idx, 'folding', e.target.value)}
-                              placeholder="L100"
-                            />
-                          </td>
-
                           {/* Dispatched Meters */}
                           <td>
                             <input
@@ -2284,7 +2351,7 @@ export default function ProcessChallanForm({
 
                   <tfoot style={{ background: '#f8fafc' }}>
                     <tr className="fw-bold">
-                      <td colSpan={8} className="text-end text-uppercase text-secondary py-2 fs-12">
+                      <td colSpan={7} className="text-end text-uppercase text-secondary py-2 fs-12">
                         Grand Total Dispatched:
                       </td>
                       <td className="text-end text-dark fs-13 py-2">
@@ -2537,9 +2604,40 @@ export default function ProcessChallanForm({
 
               <div className="modal-body p-4" style={{ background: '#f8fafc' }}>
                 {(() => {
+                  // Collect target fabrics from linked Process PO(s) so Warehouse only shows matching fabric(s)
+                  const normalizeFab = (f) => String(f || '')
+                    .replace(/\s*\[[^\]]+\]/g, '')
+                    .replace(/\s*\([^)]*\)/g, '')
+                    .replace(/\s*—.*$/g, '')
+                    .replace(/(\d)\s*[*×xX]\s*(\d)/g, '$1x$2')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .toLowerCase();
+                  const targetFabrics = [];
+                  if (!isEmergencyDispatch && selectedPOs.length > 0) {
+                    const linkedObjs = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)));
+                    linkedObjs.forEach(po => {
+                      const candidates = [po.fabric_quality, po.fabric_name, po.fabric];
+                      if (Array.isArray(po.items)) {
+                        po.items.forEach(it => candidates.push(it.fabric_quality, it.fabric_name, it.fabric));
+                      }
+                      candidates.forEach(c => {
+                        const norm = normalizeFab(c);
+                        if (norm && norm !== 'fabric' && norm !== 'fabric (auto generated)' && !targetFabrics.includes(norm)) {
+                          targetFabrics.push(norm);
+                        }
+                      });
+                    });
+                  }
+
                   const filteredBales = warehouseStockPool.filter(roll => {
                     const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
                     if (avail <= 0) return false;
+                    if (targetFabrics.length > 0) {
+                      const rollFabNorm = normalizeFab(roll.fabricQuality || roll.fabric);
+                      const matchesTarget = targetFabrics.some(tf => rollFabNorm === tf || rollFabNorm.includes(tf) || tf.includes(rollFabNorm));
+                      if (!matchesTarget) return false;
+                    }
                     if (modalVendorFilter !== 'All' && roll.vendorName !== modalVendorFilter) return false;
                     if (modalInvoiceFilter !== 'All' && roll.invoiceNo !== modalInvoiceFilter) return false;
                     if (modalSearchTerm.trim()) {
