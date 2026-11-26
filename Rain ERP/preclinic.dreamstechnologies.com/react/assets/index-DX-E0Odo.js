@@ -23368,8 +23368,8 @@
       const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
       rows.forEach((r) => {
         const k = `${r.articleName}___${r.fabricQuality || ""}___${r.role || ""}`;
-        if (!initial[k] && r.width && r.width !== "\u2014") {
-          initial[k] = r.width;
+        if (!initial[k] && r.poWidth && r.poWidth !== "\u2014" && r.poWidth !== "-") {
+          initial[k] = r.poWidth;
         }
       });
       return initial;
@@ -23511,13 +23511,13 @@
         ...prev,
         [k]: nextList
       }));
-      const curPO = groupPoWidths[k];
+      const curPO = groupPoWidths[k] || "";
       let newPO = curPO;
-      if (!nextList.includes(curPO)) {
-        newPO = nextList[0] || "";
+      if (curPO && !nextList.includes(curPO)) {
+        newPO = "";
         setGroupPoWidths((prev) => ({
           ...prev,
-          [k]: newPO
+          [k]: ""
         }));
       }
       const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${newPO}`;
@@ -52153,8 +52153,11 @@
     const [challanNumber, setChallanNumber] = (0, import_react38.useState)(
       initialChallan?.challan_number || generateSystemChallanNumber()
     );
+    const [challanDate, setChallanDate] = (0, import_react38.useState)(
+      initialChallan?.challan_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+    );
     const [date, setDate] = (0, import_react38.useState)(
-      initialChallan?.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+      initialChallan?.date || ""
     );
     const [isEmergencyDispatch, setIsEmergencyDispatch] = (0, import_react38.useState)(
       initialChallan ? initialChallan.po_link_status === "Pending PO Link" || Boolean(initialChallan.admin_alert_triggered) : false
@@ -52183,8 +52186,8 @@
     const [foldingNotation, setFoldingNotation] = (0, import_react38.useState)(initialChallan?.folding_notation || "");
     const [particulars, setParticulars] = (0, import_react38.useState)(initialChallan?.particulars || "");
     const [remarks, setRemarks] = (0, import_react38.useState)(initialChallan?.remarks || "");
-    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "Anurag");
-    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "Anurag");
+    const [companyRep, setCompanyRep] = (0, import_react38.useState)(initialChallan?.company_representative || "");
+    const [receiverSignature, setReceiverSignature] = (0, import_react38.useState)(initialChallan?.receiver_signature || "");
     const [items, setItems] = (0, import_react38.useState)(() => {
       const it = initialChallan?.items;
       return Array.isArray(it) ? it : [];
@@ -52304,6 +52307,7 @@
         ...initialChallan || {},
         id: initialChallan?.id || `PCH-${String(challanNumber).replace(/\D/g, "") || "4903"}`,
         challan_number: challanNumber,
+        challan_date: challanDate,
         date,
         vendor_name: vendorName || "Raju dyeing",
         vendor_id: vendorId || "VEND-0003",
@@ -52315,8 +52319,8 @@
         grand_total_meters: grandTotalMeters || 2418.8,
         items: items.length > 0 ? items : initialChallan?.items || [],
         remarks: remarks || "Fab issue for dyeing",
-        receiver_signature: receiverSignature || "Anurag",
-        company_representative: companyRep || "Anurag"
+        receiver_signature: receiverSignature || "",
+        company_representative: companyRep || ""
       };
     };
     const togglePOSelection = (po) => {
@@ -52601,23 +52605,101 @@ Confirm dispatch with mixed batch lots?`
         [roll.id]: []
       }));
     };
+    const normalizeFab = (f) => String(f || "").replace(/\s*\[[^\]]+\]/g, "").replace(/\s*\([^)]*\)/g, "").replace(/\s*—.*$/g, "").replace(/(\d)\s*[*×xX]\s*(\d)/g, "$1x$2").replace(/\s+/g, " ").trim().toLowerCase();
+    const normalizeWidth = (w) => String(w || "").replace(/["\s—-]/g, "").trim().toLowerCase();
+    const extractWidthFromText = (txt) => {
+      const m = String(txt || "").match(/\[(\d+(?:\.\d+)?)\s*"?\]|\((\d+(?:\.\d+)?)\s*"\)/);
+      return m ? m[1] || m[2] || "" : "";
+    };
+    const getPOTargetCriteria = () => {
+      if (isEmergencyDispatch || selectedPOs.length === 0) return [];
+      const linkedObjs = availablePOs.filter((p) => selectedPOs.some((ref) => isPOMatched(p, ref)));
+      const targets = [];
+      const seen = /* @__PURE__ */ new Set();
+      const addTarget = (fabRaw, widthRaw) => {
+        const fabNorm = normalizeFab(fabRaw);
+        if (!fabNorm || fabNorm === "fabric" || fabNorm === "fabric (auto generated)") return;
+        const wRaw = widthRaw || extractWidthFromText(fabRaw);
+        const widthNorm = normalizeWidth(wRaw);
+        const key = `${fabNorm}___${widthNorm}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          targets.push({
+            fabNorm,
+            widthNorm,
+            label: widthNorm ? `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, "").trim()} (${widthNorm}")` : String(fabRaw).trim()
+          });
+        }
+      };
+      linkedObjs.forEach((po) => {
+        if (Array.isArray(po.items) && po.items.length > 0) {
+          po.items.forEach((it) => {
+            const fab = it.fabric_quality || it.fabric_name || it.fabric || po.fabric_quality || po.fabric_name;
+            const w = it.width || po.width;
+            addTarget(fab, w);
+          });
+        } else {
+          addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width);
+        }
+      });
+      return targets;
+    };
+    const doesRollMatchPOTargets = (roll, targets) => {
+      if (!targets || targets.length === 0) return true;
+      const rollFabNorm = normalizeFab(roll.fabricQuality || roll.fabric);
+      const rollWidthNorm = normalizeWidth(roll.width || extractWidthFromText(roll.fabric));
+      return targets.some((t) => {
+        const fabOk = rollFabNorm === t.fabNorm || rollFabNorm.includes(t.fabNorm) || t.fabNorm.includes(rollFabNorm);
+        if (!fabOk) return false;
+        if (t.widthNorm && rollWidthNorm) {
+          return rollWidthNorm === t.widthNorm;
+        }
+        return true;
+      });
+    };
+    const sortRollsFIFO = (rolls) => {
+      return [...rolls].sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db = b.date ? new Date(b.date).getTime() : 0;
+        if (da && db && da !== db) return da - db;
+        return (Number(b.ageDays) || 0) - (Number(a.ageDays) || 0);
+      });
+    };
     const handleAutoFulfillBalance = () => {
       let remainingNeeded = balancePendingMeters;
       if (remainingNeeded <= 0) {
         alert("Order requirement is already 100% fulfilled!");
         return;
       }
+      const targets = getPOTargetCriteria();
+      const targetLabel = targets.map((t) => t.label).join(", ");
+      const matchingRolls = sortRollsFIFO(
+        warehouseStockPool.filter((roll) => {
+          const avail = parseFloat(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters) || 0;
+          return avail > 0 && doesRollMatchPOTargets(roll, targets);
+        })
+      );
+      if (matchingRolls.length === 0) {
+        alert(
+          targets.length > 0 ? `\u26A0\uFE0F Stock Not Available!
+
+Required fabric & width (${targetLabel}) is not available in our Warehouse Stock.` : "\u26A0\uFE0F No available stock found in Warehouse Stock."
+        );
+        return;
+      }
       const newItems = [...items];
       const updatedStock = [...warehouseStockPool];
-      for (let i = 0; i < updatedStock.length; i++) {
-        const roll = updatedStock[i];
-        const avail = parseFloat(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters);
+      for (let m = 0; m < matchingRolls.length; m++) {
+        const roll = matchingRolls[m];
+        const idx = updatedStock.findIndex((r) => r.id === roll.id);
+        if (idx === -1) continue;
+        const avail = parseFloat(updatedStock[idx].availableMeters !== void 0 ? updatedStock[idx].availableMeters : updatedStock[idx].meters) || 0;
         if (avail > 0) {
           const foldCode = roll.folding || foldingNotation || "L100";
           if (avail <= remainingNeeded) {
             const actualMtrs = computeFoldedMeters(avail, foldCode);
             newItems.push({
-              id: Date.now() + Math.random() + i,
+              id: Date.now() + Math.random() + m,
               bale_roll_no: roll.baleNo,
               invoice_no: roll.invoiceNo,
               vendor_name: roll.vendorName || "",
@@ -52630,11 +52712,11 @@ Confirm dispatch with mixed batch lots?`
               remaining_stock_meters: 0
             });
             remainingNeeded = Number(Math.max(0, remainingNeeded - actualMtrs).toFixed(2));
-            updatedStock[i] = { ...roll, availableMeters: 0 };
+            updatedStock[idx] = { ...updatedStock[idx], availableMeters: 0 };
           } else {
             const actualCut = computeFoldedMeters(remainingNeeded, foldCode);
             newItems.push({
-              id: Date.now() + Math.random() + i,
+              id: Date.now() + Math.random() + m,
               bale_roll_no: roll.baleNo,
               invoice_no: roll.invoiceNo,
               vendor_name: roll.vendorName || "",
@@ -52646,7 +52728,7 @@ Confirm dispatch with mixed batch lots?`
               folding: foldCode,
               remaining_stock_meters: Number((avail - remainingNeeded).toFixed(2))
             });
-            updatedStock[i] = { ...roll, availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
+            updatedStock[idx] = { ...updatedStock[idx], availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
             remainingNeeded = 0;
             break;
           }
@@ -52655,6 +52737,9 @@ Confirm dispatch with mixed batch lots?`
       }
       setItems(newItems);
       setWarehouseStockPool(updatedStock);
+      if (remainingNeeded > 0) {
+        alert(`\u26A0\uFE0F Partial FIFO Allocation: Allocated available stock for ${targetLabel || "selected PO"}. Still short by ${remainingNeeded.toFixed(2)} m (not enough stock in warehouse).`);
+      }
     };
     const handleAllocateMultiBales = () => {
       if (modalSelectedBaleIds.length === 0) return;
@@ -52798,6 +52883,7 @@ Confirm dispatch with mixed batches?`
       const challanPayload = {
         id: initialChallan?.id || `PCH-${trimmedChallanNo}`,
         challan_number: trimmedChallanNo,
+        challan_date: challanDate,
         date,
         vendor_id: vendorId,
         vendor_name: vendorName,
@@ -52930,7 +53016,7 @@ Confirm dispatch with mixed batches?`
           if (e.target.checked) setSelectedPOs([]);
         }
       }
-    ), /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-check-label fs-12 fw-semibold text-danger", htmlFor: "emergencySwitch" }, "Emergency Dispatch (No PO)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-3 mb-3 pb-3 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Vendor (Job Worker) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
+    ), /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-check-label fs-12 fw-semibold text-danger", htmlFor: "emergencySwitch" }, "Emergency Dispatch (No PO)")))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "row g-3 mb-3 pb-3 border-bottom" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Vendor (Job Worker) ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
       "select",
       {
         className: "form-select form-select-sm bg-white fs-13 text-dark fw-semibold",
@@ -52959,7 +53045,7 @@ Confirm dispatch with mixed batches?`
         ...initialVendors.map((v) => v.name),
         ...availablePOs.map((p) => p.vendor_name).filter(Boolean)
       ])).map((name) => /* @__PURE__ */ import_react38.default.createElement("option", { key: name, value: name }, name))
-    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Challan Number ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Challan Number ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
       "input",
       {
         type: "text",
@@ -52971,7 +53057,18 @@ Confirm dispatch with mixed batches?`
         placeholder: "e.g. CH-4903",
         required: true
       }
-    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-4" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Date of Dispatch ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Date of Challan ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
+      "input",
+      {
+        type: "date",
+        className: "form-control form-control-sm bg-white fs-13 text-dark",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        value: challanDate,
+        disabled: !isSectionEditable("header"),
+        onChange: (e) => setChallanDate(e.target.value),
+        required: true
+      }
+    )), /* @__PURE__ */ import_react38.default.createElement("div", { className: "col-12 col-md-3" }, /* @__PURE__ */ import_react38.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1" }, "Date of Dispatch ", /* @__PURE__ */ import_react38.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react38.default.createElement(
       "input",
       {
         type: "date",
@@ -53432,40 +53529,23 @@ Confirm dispatch with mixed batches?`
       },
       "Clear"
     ))))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "modal-body p-4", style: { background: "#f8fafc" } }, (() => {
-      const normalizeFab = (f) => String(f || "").replace(/\s*\[[^\]]+\]/g, "").replace(/\s*\([^)]*\)/g, "").replace(/\s*—.*$/g, "").replace(/(\d)\s*[*×xX]\s*(\d)/g, "$1x$2").replace(/\s+/g, " ").trim().toLowerCase();
-      const targetFabrics = [];
-      if (!isEmergencyDispatch && selectedPOs.length > 0) {
-        const linkedObjs = availablePOs.filter((p) => selectedPOs.some((ref) => isPOMatched(p, ref)));
-        linkedObjs.forEach((po) => {
-          const candidates = [po.fabric_quality, po.fabric_name, po.fabric];
-          if (Array.isArray(po.items)) {
-            po.items.forEach((it) => candidates.push(it.fabric_quality, it.fabric_name, it.fabric));
+      const targets = getPOTargetCriteria();
+      const targetLabel = targets.map((t) => t.label).join(", ");
+      const filteredBales = sortRollsFIFO(
+        warehouseStockPool.filter((roll) => {
+          const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
+          if (avail <= 0) return false;
+          if (!doesRollMatchPOTargets(roll, targets)) return false;
+          if (modalVendorFilter !== "All" && roll.vendorName !== modalVendorFilter) return false;
+          if (modalInvoiceFilter !== "All" && roll.invoiceNo !== modalInvoiceFilter) return false;
+          if (modalSearchTerm.trim()) {
+            const q = modalSearchTerm.toLowerCase();
+            const match = String(roll.baleNo || "").toLowerCase().includes(q) || String(roll.invoiceNo || "").toLowerCase().includes(q) || String(roll.fabric || "").toLowerCase().includes(q) || String(roll.fabricQuality || "").toLowerCase().includes(q) || String(roll.color || "").toLowerCase().includes(q) || String(roll.vendorName || "").toLowerCase().includes(q) || String(roll.poId || "").toLowerCase().includes(q);
+            if (!match) return false;
           }
-          candidates.forEach((c) => {
-            const norm = normalizeFab(c);
-            if (norm && norm !== "fabric" && norm !== "fabric (auto generated)" && !targetFabrics.includes(norm)) {
-              targetFabrics.push(norm);
-            }
-          });
-        });
-      }
-      const filteredBales = warehouseStockPool.filter((roll) => {
-        const avail = roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters;
-        if (avail <= 0) return false;
-        if (targetFabrics.length > 0) {
-          const rollFabNorm = normalizeFab(roll.fabricQuality || roll.fabric);
-          const matchesTarget = targetFabrics.some((tf) => rollFabNorm === tf || rollFabNorm.includes(tf) || tf.includes(rollFabNorm));
-          if (!matchesTarget) return false;
-        }
-        if (modalVendorFilter !== "All" && roll.vendorName !== modalVendorFilter) return false;
-        if (modalInvoiceFilter !== "All" && roll.invoiceNo !== modalInvoiceFilter) return false;
-        if (modalSearchTerm.trim()) {
-          const q = modalSearchTerm.toLowerCase();
-          const match = String(roll.baleNo || "").toLowerCase().includes(q) || String(roll.invoiceNo || "").toLowerCase().includes(q) || String(roll.fabric || "").toLowerCase().includes(q) || String(roll.fabricQuality || "").toLowerCase().includes(q) || String(roll.color || "").toLowerCase().includes(q) || String(roll.vendorName || "").toLowerCase().includes(q) || String(roll.poId || "").toLowerCase().includes(q);
-          if (!match) return false;
-        }
-        return true;
-      });
+          return true;
+        })
+      );
       const groupsMap = /* @__PURE__ */ new Map();
       filteredBales.forEach((roll) => {
         const avail = Number(roll.availableMeters !== void 0 ? roll.availableMeters : roll.meters) || 0;
@@ -53490,7 +53570,7 @@ Confirm dispatch with mixed batches?`
       const stockGroups = Array.from(groupsMap.values());
       const activeGroup = selectedStockGroupKey ? groupsMap.get(selectedStockGroupKey) : null;
       if (!activeGroup) {
-        return /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "200px" } }, "Fabric"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" } }, "Width"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Colour"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "160px" }, className: "text-end" }, "Available Quantity"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Bales / Lots"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "50px" } }))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, stockGroups.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 6, className: "text-center py-5 text-muted" }, "No available stock found matching your filters.")) : stockGroups.map((grp) => /* @__PURE__ */ import_react38.default.createElement(
+        return /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "200px" } }, "Fabric"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" } }, "Width"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Colour"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "160px" }, className: "text-end" }, "Available Quantity"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Bales / Lots"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "50px" } }))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, stockGroups.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 6, className: "text-center py-5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-danger fw-bold fs-14 mb-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-alert-circle me-1" }), targets.length > 0 ? `Stock Not Available in Warehouse (${targetLabel})` : "No available stock found in Warehouse."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, targets.length > 0 ? "Selected PO fabric & width is not available in our warehouse stock." : "Try clearing search or vendor/invoice filters."))) : stockGroups.map((grp) => /* @__PURE__ */ import_react38.default.createElement(
           "tr",
           {
             key: grp.key,
@@ -54020,8 +54100,10 @@ Confirm dispatch with mixed batches?`
     });
     const [showPoMultiDropdown, setShowPoMultiDropdown] = (0, import_react40.useState)(false);
     const [showChallanMultiDropdown, setShowChallanMultiDropdown] = (0, import_react40.useState)(false);
+    const [showColorMultiDropdown, setShowColorMultiDropdown] = (0, import_react40.useState)(false);
     const poDropdownRef = (0, import_react40.useRef)(null);
     const challanDropdownRef = (0, import_react40.useRef)(null);
+    const colorDropdownRef = (0, import_react40.useRef)(null);
     (0, import_react40.useEffect)(() => {
       const handleOutside = (e) => {
         if (poDropdownRef.current && !poDropdownRef.current.contains(e.target)) {
@@ -54029,6 +54111,9 @@ Confirm dispatch with mixed batches?`
         }
         if (challanDropdownRef.current && !challanDropdownRef.current.contains(e.target)) {
           setShowChallanMultiDropdown(false);
+        }
+        if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target)) {
+          setShowColorMultiDropdown(false);
         }
       };
       document.addEventListener("mousedown", handleOutside);
@@ -54196,10 +54281,11 @@ Confirm dispatch with mixed batches?`
     const calculatedTotalMeters = filledPieces.reduce((acc, p) => acc + (parseFloat(p.meters) || 0), 0);
     const greyReturnedNum = parseFloat(greyFabricReturned) || 0;
     const totalReturnedWithGrey = calculatedTotalMeters + greyReturnedNum;
+    const openLotCount = Math.max(1, new Set(pieces.map((p) => `${String(p.po_ref || linkedPoId || "General").trim()}___${String(p.color_name || "Standard").trim()}`)).size);
     const statedMeters = parseFloat(vendorDeclaredMeters) || 0;
     const statedPieces = parseInt(vendorDeclaredPieces, 10) || 0;
     const isMeterMismatch = statedMeters > 0 && Math.abs(calculatedTotalMeters - statedMeters) > 0.05;
-    const isPieceCountMismatch = statedPieces > 0 && filledPieces.length !== statedPieces;
+    const isPieceCountMismatch = statedPieces > 0 && filledPieces.length !== statedPieces && filledPieces.length !== statedPieces * openLotCount;
     const meterDifference = statedMeters > 0 ? (calculatedTotalMeters - statedMeters).toFixed(2) : 0;
     const selectedPoTotalMeters = import_react40.default.useMemo(() => {
       const activePoIds = selectedPoIds.length > 0 ? selectedPoIds : linkedPoId ? [linkedPoId] : [];
@@ -54218,7 +54304,7 @@ Confirm dispatch with mixed batches?`
         const last = prev[prev.length - 1];
         const basePo = overrides.po_ref !== void 0 ? overrides.po_ref : last?.po_ref || linkedPoId || "";
         const baseCh = overrides.challan_ref !== void 0 ? overrides.challan_ref : last?.challan_ref || linkedChallanId || "";
-        const baseCol = overrides.color_name !== void 0 ? overrides.color_name : last?.color_name || (colorMasterList[0]?.name || "");
+        const baseCol = overrides.color_name !== void 0 ? overrides.color_name : last?.color_name || "";
         const baseFold = overrides.folding !== void 0 ? overrides.folding : foldingStandard || "";
         const newRows = [];
         for (let i = 0; i < count; i++) {
@@ -54247,36 +54333,57 @@ Confirm dispatch with mixed batches?`
       }
       const capped = Math.min(targetCount, 500);
       setPieces((prev) => {
-        if (prev.length < capped) {
-          const last = prev[prev.length - 1];
-          const basePo = last?.po_ref || linkedPoId || "";
-          const baseCh = last?.challan_ref || linkedChallanId || "";
-          const baseCol = last?.color_name || (colorMasterList[0]?.name || "");
-          const baseFold = foldingStandard || "";
+        if (prev.length === 0) {
           const extra = [];
-          for (let i = prev.length; i < capped; i++) {
+          for (let i = 0; i < capped; i++) {
             extra.push({
               id: Date.now() + Math.random() + i,
               piece_no: i + 1,
               meters: "",
-              po_ref: basePo,
-              challan_ref: baseCh,
-              color_name: baseCol,
-              folding: baseFold
+              po_ref: linkedPoId || "",
+              challan_ref: linkedChallanId || "",
+              color_name: "",
+              folding: foldingStandard || ""
             });
           }
-          return [...prev, ...extra];
+          return extra;
         }
-        if (prev.length > capped) {
-          const next = [...prev];
-          for (let i = next.length - 1; i >= 0 && next.length > capped; i--) {
-            if (!(parseFloat(next[i].meters) > 0)) {
-              next.splice(i, 1);
+        const lotOrder = [];
+        const lotBuckets = /* @__PURE__ */ new Map();
+        prev.forEach((p) => {
+          const k = `${String(p.po_ref || linkedPoId || "General").trim()}___${String(p.color_name || "Standard").trim()}`;
+          if (!lotBuckets.has(k)) {
+            lotBuckets.set(k, []);
+            lotOrder.push(k);
+          }
+          lotBuckets.get(k).push(p);
+        });
+        const rebuilt = [];
+        lotOrder.forEach((k, lotIdx) => {
+          const bucket = lotBuckets.get(k);
+          if (bucket.length < capped) {
+            const sample = bucket[bucket.length - 1];
+            for (let i = bucket.length; i < capped; i++) {
+              bucket.push({
+                id: Date.now() + Math.random() + lotIdx * 1e3 + i,
+                piece_no: 0,
+                meters: "",
+                po_ref: sample.po_ref || linkedPoId || "",
+                challan_ref: sample.challan_ref || linkedChallanId || "",
+                color_name: sample.color_name || "",
+                folding: sample.folding || foldingStandard || ""
+              });
+            }
+          } else if (bucket.length > capped) {
+            for (let i = bucket.length - 1; i >= 0 && bucket.length > capped; i--) {
+              if (!(parseFloat(bucket[i].meters) > 0)) {
+                bucket.splice(i, 1);
+              }
             }
           }
-          return next.map((p, i) => ({ ...p, piece_no: i + 1 }));
-        }
-        return prev;
+          rebuilt.push(...bucket);
+        });
+        return rebuilt.map((p, i) => ({ ...p, piece_no: i + 1 }));
       });
     };
     const pendingPoItems = import_react40.default.useMemo(() => {
@@ -54841,7 +54948,91 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
       },
       /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check me-1" }),
       " Done"
-    ), (statedMeters > 0 || statedPieces > 0) && (isMeterMismatch || isPieceCountMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Summary Mismatch:"), " ", isPieceCountMismatch ? `Stated ${statedPieces} thans vs ${filledPieces.length} filled` : "", isPieceCountMismatch && isMeterMismatch ? " \u2022 " : "", isMeterMismatch ? `Stated ${statedMeters.toFixed(2)}m vs Grid ${calculatedTotalMeters.toFixed(2)}m (Diff: ${meterDifference > 0 ? `+${meterDifference}` : meterDifference}m)` : "")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Summary Match:"), " ", filledPieces.length, " Thans \u2022 ", calculatedTotalMeters.toFixed(2), "m"))), selectedPoTotalMeters > 0 && (isPoMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-triangle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Mismatch:"), " PO ", selectedPoTotalMeters.toFixed(2), "m vs Returned ", totalReturnedWithGrey.toFixed(2), "m (Diff: ", poMeterDifference > 0 ? `+${poMeterDifference}` : poMeterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Matched:"), " ", totalReturnedWithGrey.toFixed(2), "m / ", selectedPoTotalMeters.toFixed(2), "m"))))), isSectionEditable("pieces") && pendingPoItems.length > 0 && /* @__PURE__ */ import_react40.default.createElement("div", { className: "mb-3 p-3 rounded-3 border bg-white", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-list-check text-primary fs-15" }), /* @__PURE__ */ import_react40.default.createElement("span", null, "Pending Items from Selected PO(s) \u2014 Quick Add to Slip")), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, selectedPoIds.map((pid) => /* @__PURE__ */ import_react40.default.createElement("span", { key: pid, className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11 font-monospace d-inline-flex align-items-center gap-1" }, "PO #", pid, selectedPoIds.length > 1 && /* @__PURE__ */ import_react40.default.createElement(
+    ), (statedMeters > 0 || statedPieces > 0) && (isMeterMismatch || isPieceCountMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-circle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "Summary Mismatch:"), " ", isPieceCountMismatch ? `Stated ${statedPieces} thans vs ${filledPieces.length} filled` : "", isPieceCountMismatch && isMeterMismatch ? " \u2022 " : "", isMeterMismatch ? `Stated ${statedMeters.toFixed(2)}m vs Grid ${calculatedTotalMeters.toFixed(2)}m (Diff: ${meterDifference > 0 ? `+${meterDifference}` : meterDifference}m)` : "")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-circle-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "100% Summary Match:"), " ", filledPieces.length, " Thans \u2022 ", calculatedTotalMeters.toFixed(2), "m"))), selectedPoTotalMeters > 0 && (isPoMeterMismatch ? /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-danger-subtle text-danger border border-danger-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-alert-triangle fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Mismatch:"), " PO ", selectedPoTotalMeters.toFixed(2), "m vs Returned ", totalReturnedWithGrey.toFixed(2), "m (Diff: ", poMeterDifference > 0 ? `+${poMeterDifference}` : poMeterDifference, "m)")) : /* @__PURE__ */ import_react40.default.createElement("div", { className: "badge bg-success-subtle text-success border border-success-subtle p-2 fs-12 d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-check fs-16" }), /* @__PURE__ */ import_react40.default.createElement("span", null, /* @__PURE__ */ import_react40.default.createElement("strong", null, "PO Target Matched:"), " ", totalReturnedWithGrey.toFixed(2), "m / ", selectedPoTotalMeters.toFixed(2), "m"))))), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("div", { className: "mb-3 p-3 rounded-3 border bg-white", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-palette text-primary fs-15" }), /* @__PURE__ */ import_react40.default.createElement("span", null, "Colors in this Return (Multi-Select)"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted fw-normal fs-11" }, "\u2014 Same color = 1 Lot \u2022 Different colors = separate Lots")), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-2 flex-wrap" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "position-relative", ref: colorDropdownRef }, /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-outline-primary btn-xs px-2.5 py-1 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5",
+        onClick: () => setShowColorMultiDropdown((prev) => !prev)
+      },
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-color-swatch fs-13" }),
+      /* @__PURE__ */ import_react40.default.createElement("span", null, "Select Multiple Colors"),
+      /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-chevron-down fs-12" })
+    ), showColorMultiDropdown && /* @__PURE__ */ import_react40.default.createElement(
+      "div",
+      {
+        className: "position-absolute end-0 mt-1 bg-white border rounded-3 shadow-lg p-2",
+        style: { width: "250px", maxHeight: "260px", overflowY: "auto", zIndex: 1050, borderColor: "#cbd5e1" }
+      },
+      (() => {
+        const poColors = Array.from(new Set(pendingPoItems.map((p) => p.color_name).filter(Boolean)));
+        const allColorNames = poColors.length > 0 ? poColors : colorMasterList.map((c) => c.name).filter(Boolean);
+        return allColorNames.map((cName) => {
+          const isChecked = pieces.some((p) => String(p.color_name || "").trim().toLowerCase() === cName.toLowerCase());
+          return /* @__PURE__ */ import_react40.default.createElement(
+            "label",
+            {
+              key: cName,
+              className: "d-flex align-items-center gap-2 px-2 py-1.5 rounded hover-bg-light cursor-pointer fs-12 mb-0",
+              style: { cursor: "pointer" }
+            },
+            /* @__PURE__ */ import_react40.default.createElement(
+              "input",
+              {
+                type: "checkbox",
+                className: "form-check-input mt-0",
+                checked: isChecked,
+                onChange: () => {
+                  if (isChecked) {
+                    const matching = pieces.filter((p) => String(p.color_name || "").trim().toLowerCase() === cName.toLowerCase());
+                    const hasMeters = matching.some((p) => (parseFloat(p.meters) || 0) > 0);
+                    if (hasMeters && !window.confirm(`Remove "${cName}" lot and its entered meters?`)) return;
+                    setPieces((prev) => prev.filter((p) => String(p.color_name || "").trim().toLowerCase() !== cName.toLowerCase()).map((p, i) => ({ ...p, piece_no: i + 1 })));
+                  } else {
+                    const emptyUncolored = pieces.some((p) => !String(p.color_name || "").trim() && !(parseFloat(p.meters) > 0));
+                    if (emptyUncolored) {
+                      setPieces((prev) => prev.map((p) => !String(p.color_name || "").trim() && !(parseFloat(p.meters) > 0) ? { ...p, color_name: cName } : p));
+                    } else {
+                      addPieceRow({
+                        po_ref: linkedPoId || selectedPoIds[0] || "",
+                        challan_ref: linkedChallanId || "",
+                        color_name: cName,
+                        folding: foldingStandard || ""
+                      }, statedPieces > 0 ? statedPieces : 1);
+                    }
+                  }
+                }
+              }
+            ),
+            /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-semibold text-dark" }, cName)
+          );
+        });
+      })()
+    )), pendingPoItems.length > 1 && /* @__PURE__ */ import_react40.default.createElement(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary btn-xs px-2.5 py-1 fs-11 fw-semibold",
+        onClick: () => {
+          pendingPoItems.forEach((pit) => {
+            const already = pieces.some(
+              (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim() && (!pit.color_name || String(p.color_name || "").trim().toLowerCase() === String(pit.color_name || "").trim().toLowerCase())
+            );
+            if (!already) {
+              addPieceRow({
+                po_ref: pit.po_ref,
+                challan_ref: linkedChallanId || "",
+                color_name: pit.color_name,
+                folding: foldingStandard || ""
+              }, statedPieces > 0 ? statedPieces : 1);
+            }
+          });
+        }
+      },
+      "+ Add All PO Colors (",
+      pendingPoItems.length,
+      ")"
+    ))), pendingPoItems.length > 0 && /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between mb-2 pt-2 border-top flex-wrap gap-2" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fs-12 fw-bold text-dark d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-list-check text-primary fs-15" }), /* @__PURE__ */ import_react40.default.createElement("span", null, "Pending Items from Selected PO(s) \u2014 Quick Add to Slip")), /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-1.5 flex-wrap" }, selectedPoIds.map((pid) => /* @__PURE__ */ import_react40.default.createElement("span", { key: pid, className: "badge bg-primary-subtle text-primary border border-primary-subtle fs-11 font-monospace d-inline-flex align-items-center gap-1" }, "PO #", pid, selectedPoIds.length > 1 && /* @__PURE__ */ import_react40.default.createElement(
       "button",
       {
         type: "button",
@@ -54862,15 +55053,12 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
           className: `btn btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 ${isLotAlreadyOpen ? "btn-success-subtle text-success border border-success-subtle" : "btn-outline-primary"}`,
           onClick: () => {
             if (isLotAlreadyOpen) return;
-            const hasEmptySamePo = pieces.some(
-              (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim() && !(parseFloat(p.meters) > 0)
+            const hasEmptyUncoloredSamePo = pieces.some(
+              (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim() && !String(p.color_name || "").trim() && !(parseFloat(p.meters) > 0)
             );
-            const hasAnySamePo = pieces.some(
-              (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim()
-            );
-            if (hasAnySamePo && hasEmptySamePo && pit.color_name) {
+            if (hasEmptyUncoloredSamePo && pit.color_name) {
               setPieces((prev) => prev.map(
-                (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim() ? { ...p, color_name: pit.color_name } : p
+                (p) => String(p.po_ref || "").trim() === String(pit.po_ref || "").trim() && !String(p.color_name || "").trim() ? { ...p, color_name: pit.color_name } : p
               ));
               return;
             }
@@ -54879,7 +55067,7 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
               challan_ref: linkedChallanId || "",
               color_name: pit.color_name,
               folding: foldingStandard || ""
-            }, statedPieces > 0 && pieces.length === 0 ? statedPieces : 1);
+            }, statedPieces > 0 ? statedPieces : 1);
           },
           title: isLotAlreadyOpen ? "Already added to slip below" : "Add piece rows for this PO & Color"
         },
@@ -54888,7 +55076,7 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
         /* @__PURE__ */ import_react40.default.createElement("span", null, "\u2022 ", pit.color_name || "Color"),
         /* @__PURE__ */ import_react40.default.createElement("span", { className: "text-muted" }, "(", pit.ordered_meters.toFixed(0), "m)")
       );
-    }))), (() => {
+    })))), (() => {
       const colMap = /* @__PURE__ */ new Map();
       pieces.forEach((p, idx) => {
         const poKey = String(p.po_ref || linkedPoId || "General").trim();
@@ -54965,8 +55153,12 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
             }
           },
           /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "Select Color..."),
-          grp.color_name && !colorMasterList.some((c) => String(c.name || "").toLowerCase() === String(grp.color_name).toLowerCase()) && /* @__PURE__ */ import_react40.default.createElement("option", { value: grp.color_name }, grp.color_name),
-          colorMasterList.map((c) => /* @__PURE__ */ import_react40.default.createElement("option", { key: c.id || c.name, value: c.name }, c.name))
+          (() => {
+            const poColors = Array.from(new Set(pendingPoItems.map((p) => p.color_name).filter(Boolean)));
+            const optionsList = poColors.length > 0 ? poColors : colorMasterList.map((c) => c.name).filter(Boolean);
+            const hasCurrent = grp.color_name && optionsList.some((c) => String(c).toLowerCase() === String(grp.color_name).toLowerCase());
+            return /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, grp.color_name && !hasCurrent && /* @__PURE__ */ import_react40.default.createElement("option", { value: grp.color_name }, grp.color_name), optionsList.map((cName) => /* @__PURE__ */ import_react40.default.createElement("option", { key: cName, value: cName }, cName)));
+          })()
         ), /* @__PURE__ */ import_react40.default.createElement(
           "input",
           {
@@ -54985,46 +55177,6 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
               ));
             }
           }
-        )), isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center gap-1.5" }, /* @__PURE__ */ import_react40.default.createElement(
-          "input",
-          {
-            type: "number",
-            min: "1",
-            max: "500",
-            className: "form-control form-control-sm text-center fw-bold bg-white px-1",
-            style: { width: "58px", height: "28px", fontSize: "12px" },
-            value: grp.entries.length,
-            title: "Number of piece boxes for this PO / Color Lot",
-            onChange: (e) => {
-              const target = Math.max(1, Math.min(500, parseInt(e.target.value, 10) || 1));
-              const currentCount = grp.entries.length;
-              if (target > currentCount) {
-                addPieceRow(
-                  {
-                    po_ref: grp.po_ref,
-                    challan_ref: grp.challan_ref,
-                    color_name: grp.color_name,
-                    folding: grp.entries[0]?.piece?.folding || foldingStandard || ""
-                  },
-                  target - currentCount
-                );
-              } else if (target < currentCount) {
-                const toRemove = currentCount - target;
-                const removableIndices = grp.entries.slice().reverse().filter((en) => !(parseFloat(en.piece.meters) > 0)).slice(0, toRemove).map((en) => en.idx);
-                if (removableIndices.length > 0) {
-                  setPieces((prev) => prev.filter((_, i) => !removableIndices.includes(i)).map((p, i) => ({ ...p, piece_no: i + 1 })));
-                }
-              }
-            }
-          }
-        ), /* @__PURE__ */ import_react40.default.createElement(
-          "button",
-          {
-            type: "button",
-            className: "btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold",
-            onClick: () => addPieceRow({ po_ref: grp.po_ref, challan_ref: grp.challan_ref, color_name: grp.color_name }, 1)
-          },
-          "+1 Row"
         ))), /* @__PURE__ */ import_react40.default.createElement("div", { className: "row g-0" }, chunks.map((chunk, chunkIdx) => {
           const chunkMeters = chunk.reduce((s, e) => s + (parseFloat(e.piece.meters) || 0), 0);
           const chunkFilled = chunk.filter((e) => (parseFloat(e.piece.meters) || 0) > 0).length;
@@ -55053,7 +55205,20 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
               },
               /* @__PURE__ */ import_react40.default.createElement("i", { className: "ti ti-trash fs-13" })
             )));
-          })), /* @__PURE__ */ import_react40.default.createElement("tfoot", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: 2, className: "text-end text-secondary fs-11 py-1.5" }, "Col ", chunkIdx + 1, " (", chunkFilled, " Thans):"), /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 2 : 1, className: "text-end text-primary fs-12 py-1.5 pe-2 font-monospace" }, chunkMeters.toFixed(2), " m")))));
+          })), /* @__PURE__ */ import_react40.default.createElement("tfoot", { className: "table-light" }, /* @__PURE__ */ import_react40.default.createElement("tr", { className: "fw-bold" }, /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: 2, className: "text-secondary fs-11 py-1.5 px-2" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex align-items-center justify-content-between gap-2" }, isSectionEditable("pieces") && /* @__PURE__ */ import_react40.default.createElement(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold",
+              onClick: () => addPieceRow({
+                po_ref: grp.po_ref,
+                challan_ref: grp.challan_ref,
+                color_name: grp.color_name,
+                folding: grp.entries[0]?.piece?.folding || foldingStandard || ""
+              }, 1)
+            },
+            "+ Add Row"
+          ), /* @__PURE__ */ import_react40.default.createElement("span", { className: "ms-auto" }, "Col ", chunkIdx + 1, " (", chunkFilled, " Thans):"))), /* @__PURE__ */ import_react40.default.createElement("td", { colSpan: isSectionEditable("pieces") ? 2 : 1, className: "text-end text-primary fs-12 py-1.5 pe-2 font-monospace" }, chunkMeters.toFixed(2), " m")))));
         })), chunks.length > 1 && /* @__PURE__ */ import_react40.default.createElement("div", { className: "p-2 px-3 bg-light border-top d-flex justify-content-between align-items-center" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-secondary fs-11" }, "Lot Sub-Total (", filledInGroup, " Thans):"), /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-primary fs-13 font-monospace" }, subTotalMeters.toFixed(2), " m"))));
       })), /* @__PURE__ */ import_react40.default.createElement("div", { className: "mt-3 p-2.5 px-3 rounded-3 bg-light border d-flex flex-wrap align-items-center justify-content-between gap-2", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "d-flex flex-wrap align-items-center gap-2" }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "fw-bold text-secondary fs-12 text-uppercase" }, "Grand Total (", colGroups.length, " Lot", colGroups.length > 1 ? "s" : "", "):"), colGroups.length > 1 && /* @__PURE__ */ import_react40.default.createElement("span", { className: "fs-12 text-secondary font-monospace" }, colGroups.map((grp) => {
         const lotM = grp.entries.reduce((s, e) => s + (parseFloat(e.piece.meters) || 0), 0);
@@ -55160,10 +55325,12 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
     const [colorFastnessProof, setColorFastnessProof] = (0, import_react41.useState)(null);
     const [returnContextPieces, setReturnContextPieces] = (0, import_react41.useState)([]);
     const [returnContextMeta, setReturnContextMeta] = (0, import_react41.useState)(null);
+    const [selectedPieceNos, setSelectedPieceNos] = (0, import_react41.useState)([]);
     const handleOpenPieceQC = (record, keepReturnContext = false) => {
       if (!keepReturnContext) {
         setReturnContextPieces([]);
         setReturnContextMeta(null);
+        setSelectedPieceNos([]);
       }
       setSelectedPiece({
         id: record.id || `PQC-${Date.now().toString().slice(-4)}`,
@@ -55231,6 +55398,7 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
       const firstUninspected = piecesToUse.find(
         (p) => !(qcRecords || []).some((q) => q.return_id === retMeta.id && Number(q.piece_no) === Number(p.piece_no))
       ) || piecesToUse[0];
+      setSelectedPieceNos([Number(firstUninspected.piece_no || 1)]);
       openPieceFromReturnContext(firstUninspected, retMeta);
       if (onClearInitialReturn) onClearInitialReturn();
     }, [initialReturnToInspect]);
@@ -55261,17 +55429,18 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
       }
       const finalOutcome = colorFastness === "Fail" ? "Full Rejection" : qcOutcome;
       const finalRejAction = finalOutcome === "Full Rejection" ? rejectionAction : null;
-      const payload = {
-        id: selectedPiece.id || `PQC-${Date.now().toString().slice(-4)}`,
-        return_id: selectedPiece.return_id || "PRN-2196",
-        piece_no: selectedPiece.piece_no,
-        original_length: selectedPiece.original_length,
-        color_name: selectedPiece.color_name || "",
-        fabric_name: selectedPiece.fabric_name || "",
-        vendor_challan_ref: selectedPiece.vendor_challan_ref || "",
+      const sharedReprocId = finalOutcome === "Full Rejection" && finalRejAction === "Reprocess" ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null;
+      const buildPayloadForPiece = (pieceInfo, idxOffset = 0) => ({
+        id: pieceInfo.id || `PQC-${Date.now().toString().slice(-4)}${idxOffset > 0 ? `-${idxOffset}` : ""}`,
+        return_id: pieceInfo.return_id || "PRN-2196",
+        piece_no: pieceInfo.piece_no,
+        original_length: pieceInfo.original_length,
+        color_name: pieceInfo.color_name || "",
+        fabric_name: pieceInfo.fabric_name || "",
+        vendor_challan_ref: pieceInfo.vendor_challan_ref || "",
         qc_outcome: finalOutcome,
         rejection_action: finalRejAction,
-        reprocessing_challan_id: finalOutcome === "Full Rejection" && finalRejAction === "Reprocess" ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null,
+        reprocessing_challan_id: sharedReprocId,
         reprocessing_loop_status: finalOutcome === "Full Rejection" && finalRejAction === "Reprocess" ? "In Loop" : "Cleared",
         division_type: finalOutcome === "Accepted" ? divisionType : "None",
         piece_splits: finalOutcome === "Accepted" && divisionType === "Piece Division" ? pieceSplits : [],
@@ -55283,9 +55452,26 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
         inspector_name: "Priya Sharma",
         notes,
         created_at: (/* @__PURE__ */ new Date()).toISOString()
-      };
+      });
       if (onSaveQC) {
-        onSaveQC(payload);
+        if (returnContextPieces.length > 0 && returnContextMeta && selectedPieceNos.length > 1) {
+          const batchPayloads = selectedPieceNos.map((pNo, i) => {
+            const pObj = returnContextPieces.find((p) => Number(p.piece_no) === Number(pNo));
+            const existingQc = (qcRecords || []).find((q) => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(pNo));
+            return buildPayloadForPiece({
+              id: existingQc?.id || `PQC-${Date.now().toString().slice(-4)}-${pNo}`,
+              return_id: returnContextMeta.id,
+              piece_no: pNo,
+              original_length: pObj?.meters ? parseFloat(pObj.meters) : selectedPiece.original_length,
+              color_name: pObj?.color_name || selectedPiece.color_name || "",
+              fabric_name: pObj?.fabric_name || returnContextMeta.fabric_quality || selectedPiece.fabric_name || "",
+              vendor_challan_ref: returnContextMeta.vendor_challan_ref || selectedPiece.vendor_challan_ref || ""
+            }, i);
+          });
+          onSaveQC(batchPayloads);
+        } else {
+          onSaveQC(buildPayloadForPiece(selectedPiece));
+        }
       }
       setViewMode("list");
     };
@@ -55539,7 +55725,7 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
           },
           /* @__PURE__ */ import_react41.default.createElement("i", { className: "ti ti-arrow-left fs-14" }),
           /* @__PURE__ */ import_react41.default.createElement("span", { className: "fw-semibold" }, "Back to QC Queue")
-        ), /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h5", { className: "mb-0 fw-bold text-dark fs-15" }, "Inspecting Than #", selectedPiece.piece_no, " \u2014 ", selectedPiece.original_length, "m (", selectedPiece.color_name, ")"), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-11" }, "Reference: ", selectedPiece.vendor_challan_ref, " \u2022 Section 6 PDF Compliance"))),
+        ), /* @__PURE__ */ import_react41.default.createElement("div", null, /* @__PURE__ */ import_react41.default.createElement("h5", { className: "mb-0 fw-bold text-dark fs-15" }, returnContextPieces.length > 0 && selectedPieceNos.length > 1 ? `Batch Inspecting ${selectedPieceNos.length} Thans (${selectedPieceNos.map((n) => `#${n}`).join(", ")})` : `Inspecting Than #${selectedPiece.piece_no} \u2014 ${selectedPiece.original_length}m (${selectedPiece.color_name})`), /* @__PURE__ */ import_react41.default.createElement("small", { className: "text-muted fs-11" }, "Reference: ", selectedPiece.vendor_challan_ref, " \u2022 Section 6 PDF Compliance"))),
         /* @__PURE__ */ import_react41.default.createElement(
           "span",
           {
@@ -55550,23 +55736,57 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
           " Inspector: Priya Sharma"
         )
       ),
-      returnContextPieces.length > 1 && returnContextMeta && /* @__PURE__ */ import_react41.default.createElement("div", { className: "px-4 py-2 border-bottom bg-light d-flex flex-wrap align-items-center gap-2", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "fs-11 fw-bold text-secondary text-uppercase me-1" }, "Thans in ", returnContextMeta.id, ":"), returnContextPieces.map((p) => {
-        const isSelected = Number(selectedPiece.piece_no) === Number(p.piece_no);
-        const doneQc = (qcRecords || []).find((q) => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(p.piece_no));
+      returnContextPieces.length > 1 && returnContextMeta && /* @__PURE__ */ import_react41.default.createElement("div", { className: "px-4 py-2.5 border-bottom bg-light d-flex flex-wrap align-items-center gap-2", style: { borderColor: "#e2e8f0" } }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "fs-11 fw-bold text-secondary text-uppercase me-1" }, "Thans in ", returnContextMeta.id, " (", selectedPieceNos.length, " selected):"), /* @__PURE__ */ import_react41.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-primary btn-xs fw-semibold",
+          onClick: () => setSelectedPieceNos(returnContextPieces.map((p) => Number(p.piece_no)))
+        },
+        "Select All (",
+        returnContextPieces.length,
+        ")"
+      ), /* @__PURE__ */ import_react41.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-outline-secondary btn-xs fw-semibold",
+          onClick: () => {
+            const pending = returnContextPieces.filter((p) => !(qcRecords || []).some((q) => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(p.piece_no))).map((p) => Number(p.piece_no));
+            setSelectedPieceNos(pending.length > 0 ? pending : [Number(returnContextPieces[0].piece_no)]);
+          }
+        },
+        "Pending Only"
+      ), /* @__PURE__ */ import_react41.default.createElement("div", { className: "vr mx-1", style: { height: "18px" } }), returnContextPieces.map((p) => {
+        const pNo = Number(p.piece_no);
+        const isChecked = selectedPieceNos.includes(pNo);
+        const isFocused = Number(selectedPiece.piece_no) === pNo;
+        const doneQc = (qcRecords || []).find((q) => q.return_id === returnContextMeta.id && Number(q.piece_no) === pNo);
         return /* @__PURE__ */ import_react41.default.createElement(
-          "button",
+          "div",
           {
             key: p.piece_no,
-            type: "button",
-            className: `btn btn-xs ${isSelected ? "btn-primary" : doneQc ? "btn-outline-success" : "btn-outline-secondary"}`,
-            onClick: () => openPieceFromReturnContext(p, returnContextMeta)
+            className: `btn btn-xs d-inline-flex align-items-center gap-1.5 ${isChecked ? "btn-primary" : doneQc ? "btn-outline-success" : "btn-outline-secondary"} ${isFocused ? "shadow-xs" : ""}`,
+            style: { cursor: "pointer" },
+            onClick: () => {
+              setSelectedPieceNos(
+                (prev) => prev.includes(pNo) ? prev.length > 1 ? prev.filter((n) => n !== pNo) : prev : [...prev, pNo]
+              );
+              openPieceFromReturnContext(p, returnContextMeta);
+            }
           },
-          "Than #",
-          p.piece_no,
-          " (",
-          p.meters,
-          "m)",
-          doneQc ? ` \u2022 ${doneQc.qc_outcome}` : ""
+          /* @__PURE__ */ import_react41.default.createElement(
+            "input",
+            {
+              type: "checkbox",
+              className: "form-check-input mt-0",
+              style: { width: "13px", height: "13px", cursor: "pointer" },
+              checked: isChecked,
+              onChange: () => {
+              }
+            }
+          ),
+          /* @__PURE__ */ import_react41.default.createElement("span", null, "Than #", p.piece_no, " (", p.meters, "m", p.color_name ? ` \u2022 ${p.color_name}` : "", ")", doneQc ? ` \u2022 ${doneQc.qc_outcome}` : "")
         );
       })),
       /* @__PURE__ */ import_react41.default.createElement("form", { onSubmit: handleSaveCurrentQC }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "p-4" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "mb-4" }, /* @__PURE__ */ import_react41.default.createElement("label", { className: "form-label fs-12 fw-bold text-uppercase text-secondary mb-2 d-block" }, "Step 1: First-Level Quality Control Outcome *"), /* @__PURE__ */ import_react41.default.createElement("div", { className: "row g-3" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "col-md-6" }, /* @__PURE__ */ import_react41.default.createElement(
@@ -56380,7 +56600,8 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
       const generatedChallan = {
         id: null,
         challan_number: "",
-        date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        challan_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        date: "",
         vendor_id: po.vendor_id || "",
         vendor_name: po.vendor_name || "",
         linked_pos: [po.po_number || po.id].filter(Boolean),
@@ -56392,9 +56613,9 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
         total_bales: 0,
         total_pieces: 0,
         grand_total_meters: 0,
-        remarks: `Dispatch Challan for PO #${poNum}`,
+        remarks: "",
         receiver_signature: "",
-        company_representative: "Saksham Garg",
+        company_representative: "",
         status: "Draft",
         created_by: "Saksham Garg",
         created_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -56522,35 +56743,62 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
         setActiveTab("returns");
       }
     };
-    const handleSaveQC = (qcData) => {
-      const existingIndex = qcRecords.findIndex((q) => q.id === qcData.id);
-      const updated = existingIndex >= 0 ? qcRecords.map((q, idx) => idx === existingIndex ? qcData : q) : [qcData, ...qcRecords];
+    const handleSaveQC = (qcInput) => {
+      const qcItems = Array.isArray(qcInput) ? qcInput : [qcInput];
+      if (qcItems.length === 0) return;
+      let updated = [...qcRecords];
+      qcItems.forEach((qcData) => {
+        const existingIndex = updated.findIndex((q) => q.id === qcData.id);
+        if (existingIndex >= 0) {
+          updated[existingIndex] = qcData;
+        } else {
+          updated = [qcData, ...updated];
+        }
+      });
       setQcRecords(updated);
       saveStoredProcessQCRecords(updated);
-      const linkedReturn = returns.find((r) => r.id === qcData.return_id);
+      const primaryQc = qcItems[0];
+      const linkedReturn = returns.find((r) => r.id === primaryQc.return_id);
       const linkedPO = linkedReturn ? pos.find((p) => (linkedReturn.linked_pos || []).includes(p.id) || (linkedReturn.linked_pos || []).includes(p.po_number)) : null;
       if (linkedReturn) {
-        const pieceStatus = qcData.qc_outcome === "Accepted" ? "Accepted" : qcData.rejection_action === "Reprocess" ? "Rejected - Reprocess" : "Rejected - Scrap";
         const updatedReturns = returns.map((r) => {
           if (r.id !== linkedReturn.id) return r;
-          const updatedPieces = (r.pieces || []).map(
-            (p) => Number(p.piece_no) === Number(qcData.piece_no) ? { ...p, qc_status: pieceStatus } : p
-          );
+          const updatedPieces = (r.pieces || []).map((p) => {
+            const matchedQc = qcItems.find((q) => Number(q.piece_no) === Number(p.piece_no));
+            if (!matchedQc) return p;
+            const pieceStatus = matchedQc.qc_outcome === "Accepted" ? "Accepted" : matchedQc.rejection_action === "Reprocess" ? "Rejected - Reprocess" : "Rejected - Scrap";
+            return { ...p, qc_status: pieceStatus };
+          });
           return { ...r, pieces: updatedPieces };
         });
         setReturns(updatedReturns);
         saveStoredProcessReturns(updatedReturns);
       }
-      if (qcData.rejection_action === "Reprocess") {
+      const reprocessItems = qcItems.filter((q) => q.rejection_action === "Reprocess");
+      if (reprocessItems.length > 0) {
         const repChNo = `${Math.floor(4900 + Math.random() * 99)}-REPROC`;
         const vendorId = linkedReturn?.vendor_id || linkedPO?.vendor_id || "";
         const vendorName = linkedReturn?.vendor_name || linkedPO?.vendor_name || "Job Worker";
         const linkedPos = linkedReturn?.linked_pos?.length ? linkedReturn.linked_pos : linkedPO ? [linkedPO.po_number || linkedPO.id] : [];
         const styleNames = linkedPO?.style_name ? [linkedPO.style_name] : linkedPO?.items?.map((i) => i.style_name).filter(Boolean) || [];
-        const matchingPiece = (linkedReturn?.pieces || []).find((p) => Number(p.piece_no) === Number(qcData.piece_no));
-        const fabricName = qcData.fabric_name || matchingPiece?.fabric_name || linkedReturn?.fabric_quality || linkedPO?.items?.[0]?.fabric_name || "Fabric";
-        const colorName = qcData.color_name || matchingPiece?.color_name || linkedPO?.items?.[0]?.color_name || "";
-        const pieceLength = parseFloat(qcData.original_length) || parseFloat(matchingPiece?.meters) || 0;
+        const challanItems = reprocessItems.map((qcData, idx) => {
+          const matchingPiece = (linkedReturn?.pieces || []).find((p) => Number(p.piece_no) === Number(qcData.piece_no));
+          const fabricName = qcData.fabric_name || matchingPiece?.fabric_name || linkedReturn?.fabric_quality || linkedPO?.items?.[0]?.fabric_name || "Fabric";
+          const colorName = qcData.color_name || matchingPiece?.color_name || linkedPO?.items?.[0]?.color_name || "";
+          const pieceLength = parseFloat(qcData.original_length) || parseFloat(matchingPiece?.meters) || 0;
+          return {
+            id: Date.now() + idx,
+            bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
+            fabric_name: fabricName,
+            color_name: colorName,
+            invoice_no: linkedReturn?.vendor_external_challan_no || qcData.return_id || "",
+            original_piece_meters: pieceLength,
+            dispatched_meters: pieceLength,
+            is_partial_cut: false,
+            folding: matchingPiece?.folding || ""
+          };
+        });
+        const totalRepMeters = challanItems.reduce((s, it) => s + (parseFloat(it.dispatched_meters) || 0), 0);
         const reprocessChallan = {
           id: `PCH-${repChNo}`,
           challan_number: `CH-${repChNo}`,
@@ -56561,36 +56809,24 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
           styles_info: styleNames,
           po_link_status: "Reprocess In Loop",
           admin_alert_triggered: false,
-          folding_notation: matchingPiece?.folding || "",
-          total_bales: 1,
-          total_pieces: 1,
-          grand_total_meters: pieceLength,
-          remarks: `Reprocessing Rectification Challan for Than #${qcData.piece_no} (${qcData.return_id || "QC"}). No new payment obligation.`,
+          folding_notation: challanItems[0]?.folding || "",
+          total_bales: challanItems.length,
+          total_pieces: challanItems.length,
+          grand_total_meters: totalRepMeters,
+          remarks: `Reprocessing Rectification Challan for ${reprocessItems.map((q) => `Than #${q.piece_no}`).join(", ")} (${primaryQc.return_id || "QC"}). No new payment obligation.`,
           receiver_signature: `${vendorName} Rep`,
           company_representative: "Anurag",
           status: "In Reprocess Loop",
           created_by: "Saksham Garg",
           created_at: (/* @__PURE__ */ new Date()).toISOString(),
-          items: [
-            {
-              id: Date.now(),
-              bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
-              fabric_name: fabricName,
-              color_name: colorName,
-              invoice_no: linkedReturn?.vendor_external_challan_no || qcData.return_id || "",
-              original_piece_meters: pieceLength,
-              dispatched_meters: pieceLength,
-              is_partial_cut: false,
-              folding: matchingPiece?.folding || ""
-            }
-          ]
+          items: challanItems
         };
         const updatedChallans = [reprocessChallan, ...challans];
         setChallans(updatedChallans);
         saveStoredProcessChallans(updatedChallans);
-        alert(`QC Rejection saved! Reprocess Challan #${reprocessChallan.challan_number} generated for ${vendorName} with zero new payment obligation. Item is flagged In Loop.`);
+        alert(`QC Rejection saved for ${reprocessItems.length} Than(s)! Reprocess Challan #${reprocessChallan.challan_number} generated for ${vendorName} with zero new payment obligation. Item is flagged In Loop.`);
       } else {
-        alert("QC Record saved successfully! Cutting-Room planning & Stock ledger updated.");
+        alert(`QC Record saved successfully for ${qcItems.length} Than(s)! Cutting-Room planning & Stock ledger updated.`);
       }
     };
     return /* @__PURE__ */ import_react44.default.createElement("div", { className: "container-fluid py-3 px-4" }, /* @__PURE__ */ import_react44.default.createElement("div", { className: "d-flex flex-wrap justify-content-between align-items-center mb-4" }, /* @__PURE__ */ import_react44.default.createElement("div", null, /* @__PURE__ */ import_react44.default.createElement("h4", { className: "fw-bold text-dark mb-1" }, /* @__PURE__ */ import_react44.default.createElement("i", { className: "ti ti-building-factory-2 me-2 text-primary" }), activeTab === "pos" && "Purchase Orders (Processing)", activeTab === "challans" && "Challans (Fabric Dispatch to Vendor)", activeTab === "returns" && "Vendor Returns (Inbound Processing GRN)", activeTab === "qc" && "Quality Control & Lot Splitting", activeTab === "tracking" && "Live Tracking & Open Bales Pool"), /* @__PURE__ */ import_react44.default.createElement("p", { className: "text-muted small mb-0" }, activeTab === "pos" && "Issue new dyeing & processing purchase orders or track existing ones", activeTab === "challans" && "Warehouse stock allocation, roll dispatch, FIFO & single batch fulfilment", activeTab === "returns" && "Piece-wise meterage receipt, validation against vendor summary & grey fabric returns", activeTab === "qc" && "Inspection branching: Accepted (Piece/Lot Division) vs Full Rejection (Reprocess/Scrap)", activeTab === "tracking" && "Live running calculation: Required vs Sent vs Received vs Pending per Order"))), activeTab === "pos" && (showPOForm ? /* @__PURE__ */ import_react44.default.createElement(

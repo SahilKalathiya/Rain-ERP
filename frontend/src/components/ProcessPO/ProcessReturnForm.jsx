@@ -59,8 +59,10 @@ export default function ProcessReturnForm({
   });
   const [showPoMultiDropdown, setShowPoMultiDropdown] = useState(false);
   const [showChallanMultiDropdown, setShowChallanMultiDropdown] = useState(false);
+  const [showColorMultiDropdown, setShowColorMultiDropdown] = useState(false);
   const poDropdownRef = useRef(null);
   const challanDropdownRef = useRef(null);
+  const colorDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleOutside = (e) => {
@@ -69,6 +71,9 @@ export default function ProcessReturnForm({
       }
       if (challanDropdownRef.current && !challanDropdownRef.current.contains(e.target)) {
         setShowChallanMultiDropdown(false);
+      }
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target)) {
+        setShowColorMultiDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -270,10 +275,11 @@ export default function ProcessReturnForm({
   const greyReturnedNum = parseFloat(greyFabricReturned) || 0;
   const totalReturnedWithGrey = calculatedTotalMeters + greyReturnedNum;
 
+  const openLotCount = Math.max(1, new Set(pieces.map(p => `${String(p.po_ref || linkedPoId || 'General').trim()}___${String(p.color_name || 'Standard').trim()}`)).size);
   const statedMeters = parseFloat(vendorDeclaredMeters) || 0;
   const statedPieces = parseInt(vendorDeclaredPieces, 10) || 0;
   const isMeterMismatch = statedMeters > 0 && Math.abs(calculatedTotalMeters - statedMeters) > 0.05;
-  const isPieceCountMismatch = statedPieces > 0 && filledPieces.length !== statedPieces;
+  const isPieceCountMismatch = statedPieces > 0 && filledPieces.length !== statedPieces && filledPieces.length !== statedPieces * openLotCount;
   const meterDifference = statedMeters > 0 ? (calculatedTotalMeters - statedMeters).toFixed(2) : 0;
 
   // Selected PO(s) total meters validation
@@ -299,7 +305,7 @@ export default function ProcessReturnForm({
       const last = prev[prev.length - 1];
       const basePo = overrides.po_ref !== undefined ? overrides.po_ref : (last?.po_ref || linkedPoId || '');
       const baseCh = overrides.challan_ref !== undefined ? overrides.challan_ref : (last?.challan_ref || linkedChallanId || '');
-      const baseCol = overrides.color_name !== undefined ? overrides.color_name : (last?.color_name || (colorMasterList[0]?.name || ''));
+      const baseCol = overrides.color_name !== undefined ? overrides.color_name : (last?.color_name || '');
       const baseFold = overrides.folding !== undefined ? overrides.folding : (foldingStandard || '');
       const newRows = [];
       for (let i = 0; i < count; i++) {
@@ -330,36 +336,61 @@ export default function ProcessReturnForm({
     }
     const capped = Math.min(targetCount, 500);
     setPieces(prev => {
-      if (prev.length < capped) {
-        const last = prev[prev.length - 1];
-        const basePo = last?.po_ref || linkedPoId || '';
-        const baseCh = last?.challan_ref || linkedChallanId || '';
-        const baseCol = last?.color_name || (colorMasterList[0]?.name || '');
-        const baseFold = foldingStandard || '';
+      if (prev.length === 0) {
         const extra = [];
-        for (let i = prev.length; i < capped; i++) {
+        for (let i = 0; i < capped; i++) {
           extra.push({
             id: Date.now() + Math.random() + i,
             piece_no: i + 1,
             meters: '',
-            po_ref: basePo,
-            challan_ref: baseCh,
-            color_name: baseCol,
-            folding: baseFold
+            po_ref: linkedPoId || '',
+            challan_ref: linkedChallanId || '',
+            color_name: '',
+            folding: foldingStandard || ''
           });
         }
-        return [...prev, ...extra];
+        return extra;
       }
-      if (prev.length > capped) {
-        const next = [...prev];
-        for (let i = next.length - 1; i >= 0 && next.length > capped; i--) {
-          if (!(parseFloat(next[i].meters) > 0)) {
-            next.splice(i, 1);
+
+      // Apply target row count to EVERY open Lot so Lot 1, Lot 2, etc. all get the same number of piece boxes
+      const lotOrder = [];
+      const lotBuckets = new Map();
+      prev.forEach(p => {
+        const k = `${String(p.po_ref || linkedPoId || 'General').trim()}___${String(p.color_name || 'Standard').trim()}`;
+        if (!lotBuckets.has(k)) {
+          lotBuckets.set(k, []);
+          lotOrder.push(k);
+        }
+        lotBuckets.get(k).push(p);
+      });
+
+      const rebuilt = [];
+      lotOrder.forEach((k, lotIdx) => {
+        const bucket = lotBuckets.get(k);
+        if (bucket.length < capped) {
+          const sample = bucket[bucket.length - 1];
+          for (let i = bucket.length; i < capped; i++) {
+            bucket.push({
+              id: Date.now() + Math.random() + lotIdx * 1000 + i,
+              piece_no: 0,
+              meters: '',
+              po_ref: sample.po_ref || linkedPoId || '',
+              challan_ref: sample.challan_ref || linkedChallanId || '',
+              color_name: sample.color_name || '',
+              folding: sample.folding || foldingStandard || ''
+            });
+          }
+        } else if (bucket.length > capped) {
+          for (let i = bucket.length - 1; i >= 0 && bucket.length > capped; i--) {
+            if (!(parseFloat(bucket[i].meters) > 0)) {
+              bucket.splice(i, 1);
+            }
           }
         }
-        return next.map((p, i) => ({ ...p, piece_no: i + 1 }));
-      }
-      return prev;
+        rebuilt.push(...bucket);
+      });
+
+      return rebuilt.map((p, i) => ({ ...p, piece_no: i + 1 }));
     });
   };
 
@@ -1168,78 +1199,178 @@ export default function ProcessReturnForm({
                 </div>
               </div>
 
-              {/* Multi-PO Pending Items Quick Selector (Section 5.2) */}
-              {isSectionEditable('pieces') && pendingPoItems.length > 0 && (
+              {/* Multi-Color Selector + Multi-PO Pending Items Quick Selector (Section 5.2) */}
+              {isSectionEditable('pieces') && (
                 <div className="mb-3 p-3 rounded-3 border bg-white" style={{ borderColor: '#e2e8f0' }}>
                   <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
                     <span className="fs-12 fw-bold text-dark d-flex align-items-center gap-1.5">
-                      <i className="ti ti-list-check text-primary fs-15"></i>
-                      <span>Pending Items from Selected PO(s) — Quick Add to Slip</span>
+                      <i className="ti ti-palette text-primary fs-15"></i>
+                      <span>Colors in this Return (Multi-Select)</span>
+                      <span className="text-muted fw-normal fs-11">
+                        — Same color = 1 Lot • Different colors = separate Lots
+                      </span>
                     </span>
-                    <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                      {selectedPoIds.map(pid => (
-                        <span key={pid} className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 font-monospace d-inline-flex align-items-center gap-1">
-                          PO #{pid}
-                          {selectedPoIds.length > 1 && (
-                            <button
-                              type="button"
-                              className="btn-close"
-                              style={{ fontSize: '8px' }}
-                              onClick={() => setSelectedPoIds(prev => prev.filter(id => id !== pid))}
-                            />
-                          )}
-                        </span>
-                      ))}
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <div className="position-relative" ref={colorDropdownRef}>
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-xs px-2.5 py-1 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5"
+                          onClick={() => setShowColorMultiDropdown(prev => !prev)}
+                        >
+                          <i className="ti ti-color-swatch fs-13"></i>
+                          <span>Select Multiple Colors</span>
+                          <i className="ti ti-chevron-down fs-12"></i>
+                        </button>
+                        {showColorMultiDropdown && (
+                          <div
+                            className="position-absolute end-0 mt-1 bg-white border rounded-3 shadow-lg p-2"
+                            style={{ width: '250px', maxHeight: '260px', overflowY: 'auto', zIndex: 1050, borderColor: '#cbd5e1' }}
+                          >
+                            {(() => {
+                              const poColors = Array.from(new Set(pendingPoItems.map(p => p.color_name).filter(Boolean)));
+                              const allColorNames = poColors.length > 0
+                                ? poColors
+                                : colorMasterList.map(c => c.name).filter(Boolean);
+                              return allColorNames.map(cName => {
+                                const isChecked = pieces.some(p => String(p.color_name || '').trim().toLowerCase() === cName.toLowerCase());
+                                return (
+                                  <label
+                                    key={cName}
+                                    className="d-flex align-items-center gap-2 px-2 py-1.5 rounded hover-bg-light cursor-pointer fs-12 mb-0"
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="form-check-input mt-0"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          const matching = pieces.filter(p => String(p.color_name || '').trim().toLowerCase() === cName.toLowerCase());
+                                          const hasMeters = matching.some(p => (parseFloat(p.meters) || 0) > 0);
+                                          if (hasMeters && !window.confirm(`Remove "${cName}" lot and its entered meters?`)) return;
+                                          setPieces(prev => prev.filter(p => String(p.color_name || '').trim().toLowerCase() !== cName.toLowerCase()).map((p, i) => ({ ...p, piece_no: i + 1 })));
+                                        } else {
+                                          const emptyUncolored = pieces.some(p => !String(p.color_name || '').trim() && !(parseFloat(p.meters) > 0));
+                                          if (emptyUncolored) {
+                                            setPieces(prev => prev.map(p => (!String(p.color_name || '').trim() && !(parseFloat(p.meters) > 0)) ? { ...p, color_name: cName } : p));
+                                          } else {
+                                            addPieceRow({
+                                              po_ref: linkedPoId || selectedPoIds[0] || '',
+                                              challan_ref: linkedChallanId || '',
+                                              color_name: cName,
+                                              folding: foldingStandard || ''
+                                            }, statedPieces > 0 ? statedPieces : 1);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    <span className="fw-semibold text-dark">{cName}</span>
+                                  </label>
+                                );
+                              });
+                            })()}
+                          </div>
+                        )}
+                      </div>
+
+                      {pendingPoItems.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-xs px-2.5 py-1 fs-11 fw-semibold"
+                          onClick={() => {
+                            pendingPoItems.forEach(pit => {
+                              const already = pieces.some(p =>
+                                String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
+                                (!pit.color_name || String(p.color_name || '').trim().toLowerCase() === String(pit.color_name || '').trim().toLowerCase())
+                              );
+                              if (!already) {
+                                addPieceRow({
+                                  po_ref: pit.po_ref,
+                                  challan_ref: linkedChallanId || '',
+                                  color_name: pit.color_name,
+                                  folding: foldingStandard || ''
+                                }, statedPieces > 0 ? statedPieces : 1);
+                              }
+                            });
+                          }}
+                        >
+                          + Add All PO Colors ({pendingPoItems.length})
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="d-flex flex-wrap gap-2">
-                    {pendingPoItems.map(pit => {
-                      const isLotAlreadyOpen = pieces.some(p =>
-                        String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
-                        (!pit.color_name || String(p.color_name || '').trim().toLowerCase() === String(pit.color_name || '').trim().toLowerCase())
-                      );
-                      return (
-                        <button
-                          key={pit.key}
-                          type="button"
-                          disabled={isLotAlreadyOpen}
-                          className={`btn btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 ${
-                            isLotAlreadyOpen ? 'btn-success-subtle text-success border border-success-subtle' : 'btn-outline-primary'
-                          }`}
-                          onClick={() => {
-                            if (isLotAlreadyOpen) return;
-                            const hasEmptySamePo = pieces.some(p =>
-                              String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
-                              !(parseFloat(p.meters) > 0)
-                            );
-                            const hasAnySamePo = pieces.some(p =>
-                              String(p.po_ref || '').trim() === String(pit.po_ref || '').trim()
-                            );
-                            if (hasAnySamePo && hasEmptySamePo && pit.color_name) {
-                              setPieces(prev => prev.map(p =>
-                                String(p.po_ref || '').trim() === String(pit.po_ref || '').trim()
-                                  ? { ...p, color_name: pit.color_name }
-                                  : p
-                              ));
-                              return;
-                            }
-                            addPieceRow({
-                              po_ref: pit.po_ref,
-                              challan_ref: linkedChallanId || '',
-                              color_name: pit.color_name,
-                              folding: foldingStandard || ''
-                            }, statedPieces > 0 && pieces.length === 0 ? statedPieces : 1);
-                          }}
-                          title={isLotAlreadyOpen ? 'Already added to slip below' : 'Add piece rows for this PO & Color'}
-                        >
-                          <i className={`ti ${isLotAlreadyOpen ? 'ti-check' : 'ti-plus'} fs-12`}></i>
-                          <span className="font-monospace">PO #{pit.po_ref}</span>
-                          <span>• {pit.color_name || 'Color'}</span>
-                          <span className="text-muted">({pit.ordered_meters.toFixed(0)}m)</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+
+                  {pendingPoItems.length > 0 && (
+                    <>
+                      <div className="d-flex align-items-center justify-content-between mb-2 pt-2 border-top flex-wrap gap-2">
+                        <span className="fs-12 fw-bold text-dark d-flex align-items-center gap-1.5">
+                          <i className="ti ti-list-check text-primary fs-15"></i>
+                          <span>Pending Items from Selected PO(s) — Quick Add to Slip</span>
+                        </span>
+                        <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                          {selectedPoIds.map(pid => (
+                            <span key={pid} className="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 font-monospace d-inline-flex align-items-center gap-1">
+                              PO #{pid}
+                              {selectedPoIds.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="btn-close"
+                                  style={{ fontSize: '8px' }}
+                                  onClick={() => setSelectedPoIds(prev => prev.filter(id => id !== pid))}
+                                />
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="d-flex flex-wrap gap-2">
+                        {pendingPoItems.map(pit => {
+                          const isLotAlreadyOpen = pieces.some(p =>
+                            String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
+                            (!pit.color_name || String(p.color_name || '').trim().toLowerCase() === String(pit.color_name || '').trim().toLowerCase())
+                          );
+                          return (
+                            <button
+                              key={pit.key}
+                              type="button"
+                              disabled={isLotAlreadyOpen}
+                              className={`btn btn-xs px-2.5 py-1 rounded-2 fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 ${
+                                isLotAlreadyOpen ? 'btn-success-subtle text-success border border-success-subtle' : 'btn-outline-primary'
+                              }`}
+                              onClick={() => {
+                                if (isLotAlreadyOpen) return;
+                                const hasEmptyUncoloredSamePo = pieces.some(p =>
+                                  String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() &&
+                                  !String(p.color_name || '').trim() &&
+                                  !(parseFloat(p.meters) > 0)
+                                );
+                                if (hasEmptyUncoloredSamePo && pit.color_name) {
+                                  setPieces(prev => prev.map(p =>
+                                    (String(p.po_ref || '').trim() === String(pit.po_ref || '').trim() && !String(p.color_name || '').trim())
+                                      ? { ...p, color_name: pit.color_name }
+                                      : p
+                                  ));
+                                  return;
+                                }
+                                addPieceRow({
+                                  po_ref: pit.po_ref,
+                                  challan_ref: linkedChallanId || '',
+                                  color_name: pit.color_name,
+                                  folding: foldingStandard || ''
+                                }, statedPieces > 0 ? statedPieces : 1);
+                              }}
+                              title={isLotAlreadyOpen ? 'Already added to slip below' : 'Add piece rows for this PO & Color'}
+                            >
+                              <i className={`ti ${isLotAlreadyOpen ? 'ti-check' : 'ti-plus'} fs-12`}></i>
+                              <span className="font-monospace">PO #{pit.po_ref}</span>
+                              <span>• {pit.color_name || 'Color'}</span>
+                              <span className="text-muted">({pit.ordered_meters.toFixed(0)}m)</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1340,12 +1471,23 @@ export default function ProcessReturnForm({
                                       }}
                                     >
                                       <option value="">Select Color...</option>
-                                      {grp.color_name && !colorMasterList.some(c => String(c.name || '').toLowerCase() === String(grp.color_name).toLowerCase()) && (
-                                        <option value={grp.color_name}>{grp.color_name}</option>
-                                      )}
-                                      {colorMasterList.map(c => (
-                                        <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                                      ))}
+                                      {(() => {
+                                        const poColors = Array.from(new Set(pendingPoItems.map(p => p.color_name).filter(Boolean)));
+                                        const optionsList = poColors.length > 0
+                                          ? poColors
+                                          : colorMasterList.map(c => c.name).filter(Boolean);
+                                        const hasCurrent = grp.color_name && optionsList.some(c => String(c).toLowerCase() === String(grp.color_name).toLowerCase());
+                                        return (
+                                          <>
+                                            {grp.color_name && !hasCurrent && (
+                                              <option value={grp.color_name}>{grp.color_name}</option>
+                                            )}
+                                            {optionsList.map(cName => (
+                                              <option key={cName} value={cName}>{cName}</option>
+                                            ))}
+                                          </>
+                                        );
+                                      })()}
                                     </select>
                                     <input
                                       type="text"
@@ -1364,52 +1506,6 @@ export default function ProcessReturnForm({
                                       }}
                                     />
                                   </div>
-                                  {isSectionEditable('pieces') && (
-                                    <div className="d-flex align-items-center gap-1.5">
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max="500"
-                                        className="form-control form-control-sm text-center fw-bold bg-white px-1"
-                                        style={{ width: '58px', height: '28px', fontSize: '12px' }}
-                                        value={grp.entries.length}
-                                        title="Number of piece boxes for this PO / Color Lot"
-                                        onChange={(e) => {
-                                          const target = Math.max(1, Math.min(500, parseInt(e.target.value, 10) || 1));
-                                          const currentCount = grp.entries.length;
-                                          if (target > currentCount) {
-                                            addPieceRow(
-                                              {
-                                                po_ref: grp.po_ref,
-                                                challan_ref: grp.challan_ref,
-                                                color_name: grp.color_name,
-                                                folding: grp.entries[0]?.piece?.folding || foldingStandard || ''
-                                              },
-                                              target - currentCount
-                                            );
-                                          } else if (target < currentCount) {
-                                            const toRemove = currentCount - target;
-                                            const removableIndices = grp.entries
-                                              .slice()
-                                              .reverse()
-                                              .filter(en => !(parseFloat(en.piece.meters) > 0))
-                                              .slice(0, toRemove)
-                                              .map(en => en.idx);
-                                            if (removableIndices.length > 0) {
-                                              setPieces(prev => prev.filter((_, i) => !removableIndices.includes(i)).map((p, i) => ({ ...p, piece_no: i + 1 })));
-                                            }
-                                          }
-                                        }}
-                                      />
-                                      <button
-                                        type="button"
-                                        className="btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold"
-                                        onClick={() => addPieceRow({ po_ref: grp.po_ref, challan_ref: grp.challan_ref, color_name: grp.color_name }, 1)}
-                                      >
-                                        +1 Row
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
 
                                 {/* 20-Row Slip Columns side by side */}
@@ -1474,8 +1570,24 @@ export default function ProcessReturnForm({
                                           </tbody>
                                           <tfoot className="table-light">
                                             <tr className="fw-bold">
-                                              <td colSpan={2} className="text-end text-secondary fs-11 py-1.5">
-                                                Col {chunkIdx + 1} ({chunkFilled} Thans):
+                                              <td colSpan={2} className="text-secondary fs-11 py-1.5 px-2">
+                                                <div className="d-flex align-items-center justify-content-between gap-2">
+                                                  {isSectionEditable('pieces') && (
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-outline-primary btn-xs px-2 py-0.5 fs-11 fw-semibold"
+                                                      onClick={() => addPieceRow({
+                                                        po_ref: grp.po_ref,
+                                                        challan_ref: grp.challan_ref,
+                                                        color_name: grp.color_name,
+                                                        folding: grp.entries[0]?.piece?.folding || foldingStandard || ''
+                                                      }, 1)}
+                                                    >
+                                                      + Add Row
+                                                    </button>
+                                                  )}
+                                                  <span className="ms-auto">Col {chunkIdx + 1} ({chunkFilled} Thans):</span>
+                                                </div>
                                               </td>
                                               <td colSpan={isSectionEditable('pieces') ? 2 : 1} className="text-end text-primary fs-12 py-1.5 pe-2 font-monospace">
                                                 {chunkMeters.toFixed(2)} m

@@ -53,12 +53,14 @@ export default function ProcessQCView({
   const [colorFastnessProof, setColorFastnessProof] = useState(null);
   const [returnContextPieces, setReturnContextPieces] = useState([]);
   const [returnContextMeta, setReturnContextMeta] = useState(null);
+  const [selectedPieceNos, setSelectedPieceNos] = useState([]);
 
   // Open a specific piece for inspection
   const handleOpenPieceQC = (record, keepReturnContext = false) => {
     if (!keepReturnContext) {
       setReturnContextPieces([]);
       setReturnContextMeta(null);
+      setSelectedPieceNos([]);
     }
     setSelectedPiece({
       id: record.id || `PQC-${Date.now().toString().slice(-4)}`,
@@ -134,6 +136,7 @@ export default function ProcessQCView({
       !(qcRecords || []).some(q => q.return_id === retMeta.id && Number(q.piece_no) === Number(p.piece_no))
     ) || piecesToUse[0];
 
+    setSelectedPieceNos([Number(firstUninspected.piece_no || 1)]);
     openPieceFromReturnContext(firstUninspected, retMeta);
     if (onClearInitialReturn) onClearInitialReturn();
   }, [initialReturnToInspect]);
@@ -170,18 +173,21 @@ export default function ProcessQCView({
     // PDF Section 12.4: A Colour Fastness "Fail" result must route the affected pieces back into the QC rejection branch
     const finalOutcome = colorFastness === 'Fail' ? 'Full Rejection' : qcOutcome;
     const finalRejAction = finalOutcome === 'Full Rejection' ? rejectionAction : null;
+    const sharedReprocId = (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess')
+      ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC`
+      : null;
 
-    const payload = {
-      id: selectedPiece.id || `PQC-${Date.now().toString().slice(-4)}`,
-      return_id: selectedPiece.return_id || 'PRN-2196',
-      piece_no: selectedPiece.piece_no,
-      original_length: selectedPiece.original_length,
-      color_name: selectedPiece.color_name || '',
-      fabric_name: selectedPiece.fabric_name || '',
-      vendor_challan_ref: selectedPiece.vendor_challan_ref || '',
+    const buildPayloadForPiece = (pieceInfo, idxOffset = 0) => ({
+      id: pieceInfo.id || `PQC-${Date.now().toString().slice(-4)}${idxOffset > 0 ? `-${idxOffset}` : ''}`,
+      return_id: pieceInfo.return_id || 'PRN-2196',
+      piece_no: pieceInfo.piece_no,
+      original_length: pieceInfo.original_length,
+      color_name: pieceInfo.color_name || '',
+      fabric_name: pieceInfo.fabric_name || '',
+      vendor_challan_ref: pieceInfo.vendor_challan_ref || '',
       qc_outcome: finalOutcome,
       rejection_action: finalRejAction,
-      reprocessing_challan_id: (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess') ? `PCH-${Math.floor(4900 + Math.random() * 100)}-REPROC` : null,
+      reprocessing_challan_id: sharedReprocId,
       reprocessing_loop_status: (finalOutcome === 'Full Rejection' && finalRejAction === 'Reprocess') ? 'In Loop' : 'Cleared',
       division_type: finalOutcome === 'Accepted' ? divisionType : 'None',
       piece_splits: (finalOutcome === 'Accepted' && divisionType === 'Piece Division') ? pieceSplits : [],
@@ -193,10 +199,27 @@ export default function ProcessQCView({
       inspector_name: 'Priya Sharma',
       notes,
       created_at: new Date().toISOString()
-    };
+    });
 
     if (onSaveQC) {
-      onSaveQC(payload);
+      if (returnContextPieces.length > 0 && returnContextMeta && selectedPieceNos.length > 1) {
+        const batchPayloads = selectedPieceNos.map((pNo, i) => {
+          const pObj = returnContextPieces.find(p => Number(p.piece_no) === Number(pNo));
+          const existingQc = (qcRecords || []).find(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(pNo));
+          return buildPayloadForPiece({
+            id: existingQc?.id || `PQC-${Date.now().toString().slice(-4)}-${pNo}`,
+            return_id: returnContextMeta.id,
+            piece_no: pNo,
+            original_length: pObj?.meters ? parseFloat(pObj.meters) : selectedPiece.original_length,
+            color_name: pObj?.color_name || selectedPiece.color_name || '',
+            fabric_name: pObj?.fabric_name || returnContextMeta.fabric_quality || selectedPiece.fabric_name || '',
+            vendor_challan_ref: returnContextMeta.vendor_challan_ref || selectedPiece.vendor_challan_ref || ''
+          }, i);
+        });
+        onSaveQC(batchPayloads);
+      } else {
+        onSaveQC(buildPayloadForPiece(selectedPiece));
+      }
     }
     setViewMode('list');
   };
@@ -565,7 +588,9 @@ export default function ProcessQCView({
               </button>
               <div>
                 <h5 className="mb-0 fw-bold text-dark fs-15">
-                  Inspecting Than #{selectedPiece.piece_no} — {selectedPiece.original_length}m ({selectedPiece.color_name})
+                  {returnContextPieces.length > 0 && selectedPieceNos.length > 1
+                    ? `Batch Inspecting ${selectedPieceNos.length} Thans (${selectedPieceNos.map(n => `#${n}`).join(', ')})`
+                    : `Inspecting Than #${selectedPiece.piece_no} — ${selectedPiece.original_length}m (${selectedPiece.color_name})`}
                 </h5>
                 <small className="text-muted fs-11">
                   Reference: {selectedPiece.vendor_challan_ref} • Section 6 PDF Compliance
@@ -582,22 +607,60 @@ export default function ProcessQCView({
           </div>
 
           {returnContextPieces.length > 1 && returnContextMeta && (
-            <div className="px-4 py-2 border-bottom bg-light d-flex flex-wrap align-items-center gap-2" style={{ borderColor: '#e2e8f0' }}>
+            <div className="px-4 py-2.5 border-bottom bg-light d-flex flex-wrap align-items-center gap-2" style={{ borderColor: '#e2e8f0' }}>
               <span className="fs-11 fw-bold text-secondary text-uppercase me-1">
-                Thans in {returnContextMeta.id}:
+                Thans in {returnContextMeta.id} ({selectedPieceNos.length} selected):
               </span>
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-xs fw-semibold"
+                onClick={() => setSelectedPieceNos(returnContextPieces.map(p => Number(p.piece_no)))}
+              >
+                Select All ({returnContextPieces.length})
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-xs fw-semibold"
+                onClick={() => {
+                  const pending = returnContextPieces
+                    .filter(p => !(qcRecords || []).some(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(p.piece_no)))
+                    .map(p => Number(p.piece_no));
+                  setSelectedPieceNos(pending.length > 0 ? pending : [Number(returnContextPieces[0].piece_no)]);
+                }}
+              >
+                Pending Only
+              </button>
+              <div className="vr mx-1" style={{ height: '18px' }}></div>
               {returnContextPieces.map((p) => {
-                const isSelected = Number(selectedPiece.piece_no) === Number(p.piece_no);
-                const doneQc = (qcRecords || []).find(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(p.piece_no));
+                const pNo = Number(p.piece_no);
+                const isChecked = selectedPieceNos.includes(pNo);
+                const isFocused = Number(selectedPiece.piece_no) === pNo;
+                const doneQc = (qcRecords || []).find(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === pNo);
                 return (
-                  <button
+                  <div
                     key={p.piece_no}
-                    type="button"
-                    className={`btn btn-xs ${isSelected ? 'btn-primary' : (doneQc ? 'btn-outline-success' : 'btn-outline-secondary')}`}
-                    onClick={() => openPieceFromReturnContext(p, returnContextMeta)}
+                    className={`btn btn-xs d-inline-flex align-items-center gap-1.5 ${isChecked ? 'btn-primary' : (doneQc ? 'btn-outline-success' : 'btn-outline-secondary')} ${isFocused ? 'shadow-xs' : ''}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedPieceNos(prev =>
+                        prev.includes(pNo)
+                          ? (prev.length > 1 ? prev.filter(n => n !== pNo) : prev)
+                          : [...prev, pNo]
+                      );
+                      openPieceFromReturnContext(p, returnContextMeta);
+                    }}
                   >
-                    Than #{p.piece_no} ({p.meters}m){doneQc ? ` • ${doneQc.qc_outcome}` : ''}
-                  </button>
+                    <input
+                      type="checkbox"
+                      className="form-check-input mt-0"
+                      style={{ width: '13px', height: '13px', cursor: 'pointer' }}
+                      checked={isChecked}
+                      onChange={() => {}}
+                    />
+                    <span>
+                      Than #{p.piece_no} ({p.meters}m{p.color_name ? ` • ${p.color_name}` : ''}){doneQc ? ` • ${doneQc.qc_outcome}` : ''}
+                    </span>
+                  </div>
                 );
               })}
             </div>

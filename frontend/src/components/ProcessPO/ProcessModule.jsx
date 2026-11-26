@@ -110,7 +110,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     const generatedChallan = {
       id: null,
       challan_number: '',
-      date: new Date().toISOString().split('T')[0],
+      challan_date: new Date().toISOString().split('T')[0],
+      date: '',
       vendor_id: po.vendor_id || '',
       vendor_name: po.vendor_name || '',
       linked_pos: [po.po_number || po.id].filter(Boolean),
@@ -122,9 +123,9 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       total_bales: 0,
       total_pieces: 0,
       grand_total_meters: 0,
-      remarks: `Dispatch Challan for PO #${poNum}`,
+      remarks: '',
       receiver_signature: '',
-      company_representative: 'Saksham Garg',
+      company_representative: '',
       status: 'Draft',
       created_by: 'Saksham Garg',
       created_at: new Date().toISOString(),
@@ -279,32 +280,41 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
   };
 
   // 4. QC Handlers
-  const handleSaveQC = (qcData) => {
-    const existingIndex = qcRecords.findIndex(q => q.id === qcData.id);
-    const updated = existingIndex >= 0
-      ? qcRecords.map((q, idx) => (idx === existingIndex ? qcData : q))
-      : [qcData, ...qcRecords];
+  const handleSaveQC = (qcInput) => {
+    const qcItems = Array.isArray(qcInput) ? qcInput : [qcInput];
+    if (qcItems.length === 0) return;
+
+    let updated = [...qcRecords];
+    qcItems.forEach(qcData => {
+      const existingIndex = updated.findIndex(q => q.id === qcData.id);
+      if (existingIndex >= 0) {
+        updated[existingIndex] = qcData;
+      } else {
+        updated = [qcData, ...updated];
+      }
+    });
     setQcRecords(updated);
     saveStoredProcessQCRecords(updated);
 
-    const linkedReturn = returns.find(r => r.id === qcData.return_id);
+    const primaryQc = qcItems[0];
+    const linkedReturn = returns.find(r => r.id === primaryQc.return_id);
     const linkedPO = linkedReturn
       ? pos.find(p => (linkedReturn.linked_pos || []).includes(p.id) || (linkedReturn.linked_pos || []).includes(p.po_number))
       : null;
 
     if (linkedReturn) {
-      const pieceStatus = qcData.qc_outcome === 'Accepted'
-        ? 'Accepted'
-        : qcData.rejection_action === 'Reprocess'
-          ? 'Rejected - Reprocess'
-          : 'Rejected - Scrap';
       const updatedReturns = returns.map(r => {
         if (r.id !== linkedReturn.id) return r;
-        const updatedPieces = (r.pieces || []).map(p =>
-          Number(p.piece_no) === Number(qcData.piece_no)
-            ? { ...p, qc_status: pieceStatus }
-            : p
-        );
+        const updatedPieces = (r.pieces || []).map(p => {
+          const matchedQc = qcItems.find(q => Number(q.piece_no) === Number(p.piece_no));
+          if (!matchedQc) return p;
+          const pieceStatus = matchedQc.qc_outcome === 'Accepted'
+            ? 'Accepted'
+            : matchedQc.rejection_action === 'Reprocess'
+              ? 'Rejected - Reprocess'
+              : 'Rejected - Scrap';
+          return { ...p, qc_status: pieceStatus };
+        });
         return { ...r, pieces: updatedPieces };
       });
       setReturns(updatedReturns);
@@ -312,7 +322,8 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
     }
 
     // Section 6.2 A: If Reprocess chosen, automatically generate a Reprocess Job Work Challan with No New Payment
-    if (qcData.rejection_action === 'Reprocess') {
+    const reprocessItems = qcItems.filter(q => q.rejection_action === 'Reprocess');
+    if (reprocessItems.length > 0) {
       const repChNo = `${Math.floor(4900 + Math.random() * 99)}-REPROC`;
       const vendorId = linkedReturn?.vendor_id || linkedPO?.vendor_id || '';
       const vendorName = linkedReturn?.vendor_name || linkedPO?.vendor_name || 'Job Worker';
@@ -322,10 +333,25 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
       const styleNames = linkedPO?.style_name
         ? [linkedPO.style_name]
         : (linkedPO?.items?.map(i => i.style_name).filter(Boolean) || []);
-      const matchingPiece = (linkedReturn?.pieces || []).find(p => Number(p.piece_no) === Number(qcData.piece_no));
-      const fabricName = qcData.fabric_name || matchingPiece?.fabric_name || linkedReturn?.fabric_quality || linkedPO?.items?.[0]?.fabric_name || 'Fabric';
-      const colorName = qcData.color_name || matchingPiece?.color_name || linkedPO?.items?.[0]?.color_name || '';
-      const pieceLength = parseFloat(qcData.original_length) || parseFloat(matchingPiece?.meters) || 0;
+
+      const challanItems = reprocessItems.map((qcData, idx) => {
+        const matchingPiece = (linkedReturn?.pieces || []).find(p => Number(p.piece_no) === Number(qcData.piece_no));
+        const fabricName = qcData.fabric_name || matchingPiece?.fabric_name || linkedReturn?.fabric_quality || linkedPO?.items?.[0]?.fabric_name || 'Fabric';
+        const colorName = qcData.color_name || matchingPiece?.color_name || linkedPO?.items?.[0]?.color_name || '';
+        const pieceLength = parseFloat(qcData.original_length) || parseFloat(matchingPiece?.meters) || 0;
+        return {
+          id: Date.now() + idx,
+          bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
+          fabric_name: fabricName,
+          color_name: colorName,
+          invoice_no: linkedReturn?.vendor_external_challan_no || qcData.return_id || '',
+          original_piece_meters: pieceLength,
+          dispatched_meters: pieceLength,
+          is_partial_cut: false,
+          folding: matchingPiece?.folding || ''
+        };
+      });
+      const totalRepMeters = challanItems.reduce((s, it) => s + (parseFloat(it.dispatched_meters) || 0), 0);
 
       const reprocessChallan = {
         id: `PCH-${repChNo}`,
@@ -337,36 +363,24 @@ export default function ProcessModule({ initialTab = 'pos', currentRoute = '/pro
         styles_info: styleNames,
         po_link_status: 'Reprocess In Loop',
         admin_alert_triggered: false,
-        folding_notation: matchingPiece?.folding || '',
-        total_bales: 1,
-        total_pieces: 1,
-        grand_total_meters: pieceLength,
-        remarks: `Reprocessing Rectification Challan for Than #${qcData.piece_no} (${qcData.return_id || 'QC'}). No new payment obligation.`,
+        folding_notation: challanItems[0]?.folding || '',
+        total_bales: challanItems.length,
+        total_pieces: challanItems.length,
+        grand_total_meters: totalRepMeters,
+        remarks: `Reprocessing Rectification Challan for ${reprocessItems.map(q => `Than #${q.piece_no}`).join(', ')} (${primaryQc.return_id || 'QC'}). No new payment obligation.`,
         receiver_signature: `${vendorName} Rep`,
         company_representative: 'Anurag',
         status: 'In Reprocess Loop',
         created_by: 'Saksham Garg',
         created_at: new Date().toISOString(),
-        items: [
-          {
-            id: Date.now(),
-            bale_roll_no: `Than #${qcData.piece_no} (Reprocess)`,
-            fabric_name: fabricName,
-            color_name: colorName,
-            invoice_no: linkedReturn?.vendor_external_challan_no || qcData.return_id || '',
-            original_piece_meters: pieceLength,
-            dispatched_meters: pieceLength,
-            is_partial_cut: false,
-            folding: matchingPiece?.folding || ''
-          }
-        ]
+        items: challanItems
       };
       const updatedChallans = [reprocessChallan, ...challans];
       setChallans(updatedChallans);
       saveStoredProcessChallans(updatedChallans);
-      alert(`QC Rejection saved! Reprocess Challan #${reprocessChallan.challan_number} generated for ${vendorName} with zero new payment obligation. Item is flagged In Loop.`);
+      alert(`QC Rejection saved for ${reprocessItems.length} Than(s)! Reprocess Challan #${reprocessChallan.challan_number} generated for ${vendorName} with zero new payment obligation. Item is flagged In Loop.`);
     } else {
-      alert('QC Record saved successfully! Cutting-Room planning & Stock ledger updated.');
+      alert(`QC Record saved successfully for ${qcItems.length} Than(s)! Cutting-Room planning & Stock ledger updated.`);
     }
   };
 

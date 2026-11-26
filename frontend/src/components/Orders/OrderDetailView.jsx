@@ -2593,8 +2593,8 @@ export default function OrderDetailView({
     const rows = Array.isArray(order?.fabricConsumptions) ? order.fabricConsumptions : [];
     rows.forEach(r => {
       const k = `${r.articleName}___${r.fabricQuality || ''}___${r.role || ''}`;
-      if (!initial[k] && r.width && r.width !== '—') {
-        initial[k] = r.width;
+      if (!initial[k] && r.poWidth && r.poWidth !== '—' && r.poWidth !== '-') {
+        initial[k] = r.poWidth;
       }
     });
     return initial;
@@ -2765,14 +2765,14 @@ export default function OrderDetailView({
       [k]: nextList
     }));
 
-    // 2. If existing PO width is not in nextList, pick first of nextList
-    const curPO = groupPoWidths[k];
+    // 2. Never auto-select a PO width when adding widths; only clear if an already-selected PO width was removed
+    const curPO = groupPoWidths[k] || '';
     let newPO = curPO;
-    if (!nextList.includes(curPO)) {
-      newPO = nextList[0] || '';
+    if (curPO && !nextList.includes(curPO)) {
+      newPO = '';
       setGroupPoWidths(prev => ({
         ...prev,
-        [k]: newPO
+        [k]: ''
       }));
     }
 

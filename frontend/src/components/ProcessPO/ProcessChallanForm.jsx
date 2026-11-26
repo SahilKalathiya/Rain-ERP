@@ -613,9 +613,12 @@ export default function ProcessChallanForm({
     initialChallan?.challan_number || generateSystemChallanNumber()
   );
 
-  // Dispatch Date
+  // Challan Date (pre-filled with today) & Dispatch Date (blank dd/mm/yyyy by default)
+  const [challanDate, setChallanDate] = useState(
+    initialChallan?.challan_date || new Date().toISOString().split('T')[0]
+  );
   const [date, setDate] = useState(
-    initialChallan?.date || new Date().toISOString().split('T')[0]
+    initialChallan?.date || ''
   );
 
   // Emergency Dispatch (Challan without PO, Section 4.3)
@@ -660,8 +663,8 @@ export default function ProcessChallanForm({
   const [remarks, setRemarks] = useState(initialChallan?.remarks || '');
 
   // Signatures (Section 9 & Page 15)
-  const [companyRep, setCompanyRep] = useState(initialChallan?.company_representative || 'Anurag');
-  const [receiverSignature, setReceiverSignature] = useState(initialChallan?.receiver_signature || 'Anurag');
+  const [companyRep, setCompanyRep] = useState(initialChallan?.company_representative || '');
+  const [receiverSignature, setReceiverSignature] = useState(initialChallan?.receiver_signature || '');
 
   // Stock Bales / Rolls allocated for dispatch
   const [items, setItems] = useState(() => {
@@ -814,6 +817,7 @@ export default function ProcessChallanForm({
       ...(initialChallan || {}),
       id: initialChallan?.id || `PCH-${String(challanNumber).replace(/\D/g, '') || '4903'}`,
       challan_number: challanNumber,
+      challan_date: challanDate,
       date,
       vendor_name: vendorName || 'Raju dyeing',
       vendor_id: vendorId || 'VEND-0003',
@@ -825,8 +829,8 @@ export default function ProcessChallanForm({
       grand_total_meters: grandTotalMeters || 2418.80,
       items: items.length > 0 ? items : (initialChallan?.items || []),
       remarks: remarks || 'Fab issue for dyeing',
-      receiver_signature: receiverSignature || 'Anurag',
-      company_representative: companyRep || 'Anurag'
+      receiver_signature: receiverSignature || '',
+      company_representative: companyRep || ''
     };
   };
 
@@ -1149,7 +1153,86 @@ export default function ProcessChallanForm({
     }));
   };
 
-  // Auto-Fulfill Pending Balance (FIFO sequence: takes full bales or cuts from next bale to reach 100%)
+  // Shared helpers for PO Fabric + Width matching and FIFO ordering
+  const normalizeFab = (f) => String(f || '')
+    .replace(/\s*\[[^\]]+\]/g, '')
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s*—.*$/g, '')
+    .replace(/(\d)\s*[*×xX]\s*(\d)/g, '$1x$2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const normalizeWidth = (w) => String(w || '')
+    .replace(/["\s—-]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const extractWidthFromText = (txt) => {
+    const m = String(txt || '').match(/\[(\d+(?:\.\d+)?)\s*"?\]|\((\d+(?:\.\d+)?)\s*"\)/);
+    return m ? (m[1] || m[2] || '') : '';
+  };
+
+  const getPOTargetCriteria = () => {
+    if (isEmergencyDispatch || selectedPOs.length === 0) return [];
+    const linkedObjs = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)));
+    const targets = [];
+    const seen = new Set();
+
+    const addTarget = (fabRaw, widthRaw) => {
+      const fabNorm = normalizeFab(fabRaw);
+      if (!fabNorm || fabNorm === 'fabric' || fabNorm === 'fabric (auto generated)') return;
+      const wRaw = widthRaw || extractWidthFromText(fabRaw);
+      const widthNorm = normalizeWidth(wRaw);
+      const key = `${fabNorm}___${widthNorm}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        targets.push({
+          fabNorm,
+          widthNorm,
+          label: widthNorm ? `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, '').trim()} (${widthNorm}")` : String(fabRaw).trim()
+        });
+      }
+    };
+
+    linkedObjs.forEach(po => {
+      if (Array.isArray(po.items) && po.items.length > 0) {
+        po.items.forEach(it => {
+          const fab = it.fabric_quality || it.fabric_name || it.fabric || po.fabric_quality || po.fabric_name;
+          const w = it.width || po.width;
+          addTarget(fab, w);
+        });
+      } else {
+        addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width);
+      }
+    });
+    return targets;
+  };
+
+  const doesRollMatchPOTargets = (roll, targets) => {
+    if (!targets || targets.length === 0) return true;
+    const rollFabNorm = normalizeFab(roll.fabricQuality || roll.fabric);
+    const rollWidthNorm = normalizeWidth(roll.width || extractWidthFromText(roll.fabric));
+    return targets.some(t => {
+      const fabOk = rollFabNorm === t.fabNorm || rollFabNorm.includes(t.fabNorm) || t.fabNorm.includes(rollFabNorm);
+      if (!fabOk) return false;
+      if (t.widthNorm && rollWidthNorm) {
+        return rollWidthNorm === t.widthNorm;
+      }
+      return true;
+    });
+  };
+
+  const sortRollsFIFO = (rolls) => {
+    return [...rolls].sort((a, b) => {
+      const da = a.date ? new Date(a.date).getTime() : 0;
+      const db = b.date ? new Date(b.date).getTime() : 0;
+      if (da && db && da !== db) return da - db; // oldest inward date first
+      return (Number(b.ageDays) || 0) - (Number(a.ageDays) || 0);
+    });
+  };
+
+  // Auto-Fulfill Pending Balance (FIFO sequence: matches PO Fabric + Width, oldest stock first)
   const handleAutoFulfillBalance = () => {
     let remainingNeeded = balancePendingMeters;
     if (remainingNeeded <= 0) {
@@ -1157,12 +1240,32 @@ export default function ProcessChallanForm({
       return;
     }
 
+    const targets = getPOTargetCriteria();
+    const targetLabel = targets.map(t => t.label).join(', ');
+    const matchingRolls = sortRollsFIFO(
+      warehouseStockPool.filter(roll => {
+        const avail = parseFloat(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters) || 0;
+        return avail > 0 && doesRollMatchPOTargets(roll, targets);
+      })
+    );
+
+    if (matchingRolls.length === 0) {
+      alert(
+        targets.length > 0
+          ? `⚠️ Stock Not Available!\n\nRequired fabric & width (${targetLabel}) is not available in our Warehouse Stock.`
+          : '⚠️ No available stock found in Warehouse Stock.'
+      );
+      return;
+    }
+
     const newItems = [...items];
     const updatedStock = [...warehouseStockPool];
 
-    for (let i = 0; i < updatedStock.length; i++) {
-      const roll = updatedStock[i];
-      const avail = parseFloat(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters);
+    for (let m = 0; m < matchingRolls.length; m++) {
+      const roll = matchingRolls[m];
+      const idx = updatedStock.findIndex(r => r.id === roll.id);
+      if (idx === -1) continue;
+      const avail = parseFloat(updatedStock[idx].availableMeters !== undefined ? updatedStock[idx].availableMeters : updatedStock[idx].meters) || 0;
 
       if (avail > 0) {
         const foldCode = roll.folding || foldingNotation || 'L100';
@@ -1171,7 +1274,7 @@ export default function ProcessChallanForm({
           // Take whole bale (Scenario A)
           const actualMtrs = computeFoldedMeters(avail, foldCode);
           newItems.push({
-            id: Date.now() + Math.random() + i,
+            id: Date.now() + Math.random() + m,
             bale_roll_no: roll.baleNo,
             invoice_no: roll.invoiceNo,
             vendor_name: roll.vendorName || '',
@@ -1184,12 +1287,12 @@ export default function ProcessChallanForm({
             remaining_stock_meters: 0
           });
           remainingNeeded = Number(Math.max(0, remainingNeeded - actualMtrs).toFixed(2));
-          updatedStock[i] = { ...roll, availableMeters: 0 };
+          updatedStock[idx] = { ...updatedStock[idx], availableMeters: 0 };
         } else {
           // Cut piece from bale (Scenario B)
           const actualCut = computeFoldedMeters(remainingNeeded, foldCode);
           newItems.push({
-            id: Date.now() + Math.random() + i,
+            id: Date.now() + Math.random() + m,
             bale_roll_no: roll.baleNo,
             invoice_no: roll.invoiceNo,
             vendor_name: roll.vendorName || '',
@@ -1201,7 +1304,7 @@ export default function ProcessChallanForm({
             folding: foldCode,
             remaining_stock_meters: Number((avail - remainingNeeded).toFixed(2))
           });
-          updatedStock[i] = { ...roll, availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
+          updatedStock[idx] = { ...updatedStock[idx], availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
           remainingNeeded = 0;
           break;
         }
@@ -1211,6 +1314,10 @@ export default function ProcessChallanForm({
 
     setItems(newItems);
     setWarehouseStockPool(updatedStock);
+
+    if (remainingNeeded > 0) {
+      alert(`⚠️ Partial FIFO Allocation: Allocated available stock for ${targetLabel || 'selected PO'}. Still short by ${remainingNeeded.toFixed(2)} m (not enough stock in warehouse).`);
+    }
   };
 
   // Allocate multiple selected bales in one click
@@ -1385,6 +1492,7 @@ export default function ProcessChallanForm({
     const challanPayload = {
       id: initialChallan?.id || `PCH-${trimmedChallanNo}`,
       challan_number: trimmedChallanNo,
+      challan_date: challanDate,
       date,
       vendor_id: vendorId,
       vendor_name: vendorName,
@@ -1615,7 +1723,7 @@ export default function ProcessChallanForm({
               {/* 1. Primary Header Row: Vendor First, then Challan Number & Date */}
               <div className="row g-3 mb-3 pb-3 border-bottom">
                 {/* 1. Vendor (Job Worker) First */}
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Vendor (Job Worker) <span className="text-danger">*</span>
                   </label>
@@ -1652,7 +1760,7 @@ export default function ProcessChallanForm({
                 </div>
 
                 {/* 2. Challan Number */}
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Challan Number <span className="text-danger">*</span>
                   </label>
@@ -1668,8 +1776,24 @@ export default function ProcessChallanForm({
                   />
                 </div>
 
-                {/* 3. Date */}
-                <div className="col-12 col-md-4">
+                {/* 3. Date of Challan */}
+                <div className="col-12 col-md-3">
+                  <label className="form-label fs-12 fw-semibold text-secondary mb-1">
+                    Date of Challan <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm bg-white fs-13 text-dark"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    value={challanDate}
+                    disabled={!isSectionEditable('header')}
+                    onChange={(e) => setChallanDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* 4. Date of Dispatch (No pre-fill) */}
+                <div className="col-12 col-md-3">
                   <label className="form-label fs-12 fw-semibold text-secondary mb-1">
                     Date of Dispatch <span className="text-danger">*</span>
                   </label>
@@ -2604,55 +2728,31 @@ export default function ProcessChallanForm({
 
               <div className="modal-body p-4" style={{ background: '#f8fafc' }}>
                 {(() => {
-                  // Collect target fabrics from linked Process PO(s) so Warehouse only shows matching fabric(s)
-                  const normalizeFab = (f) => String(f || '')
-                    .replace(/\s*\[[^\]]+\]/g, '')
-                    .replace(/\s*\([^)]*\)/g, '')
-                    .replace(/\s*—.*$/g, '')
-                    .replace(/(\d)\s*[*×xX]\s*(\d)/g, '$1x$2')
-                    .replace(/\s+/g, ' ')
-                    .trim()
-                    .toLowerCase();
-                  const targetFabrics = [];
-                  if (!isEmergencyDispatch && selectedPOs.length > 0) {
-                    const linkedObjs = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)));
-                    linkedObjs.forEach(po => {
-                      const candidates = [po.fabric_quality, po.fabric_name, po.fabric];
-                      if (Array.isArray(po.items)) {
-                        po.items.forEach(it => candidates.push(it.fabric_quality, it.fabric_name, it.fabric));
-                      }
-                      candidates.forEach(c => {
-                        const norm = normalizeFab(c);
-                        if (norm && norm !== 'fabric' && norm !== 'fabric (auto generated)' && !targetFabrics.includes(norm)) {
-                          targetFabrics.push(norm);
-                        }
-                      });
-                    });
-                  }
+                  // Collect target (fabric + width) from linked Process PO(s) so Warehouse only shows exact matching stock in FIFO order
+                  const targets = getPOTargetCriteria();
+                  const targetLabel = targets.map(t => t.label).join(', ');
 
-                  const filteredBales = warehouseStockPool.filter(roll => {
-                    const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
-                    if (avail <= 0) return false;
-                    if (targetFabrics.length > 0) {
-                      const rollFabNorm = normalizeFab(roll.fabricQuality || roll.fabric);
-                      const matchesTarget = targetFabrics.some(tf => rollFabNorm === tf || rollFabNorm.includes(tf) || tf.includes(rollFabNorm));
-                      if (!matchesTarget) return false;
-                    }
-                    if (modalVendorFilter !== 'All' && roll.vendorName !== modalVendorFilter) return false;
-                    if (modalInvoiceFilter !== 'All' && roll.invoiceNo !== modalInvoiceFilter) return false;
-                    if (modalSearchTerm.trim()) {
-                      const q = modalSearchTerm.toLowerCase();
-                      const match = String(roll.baleNo || '').toLowerCase().includes(q) ||
-                        String(roll.invoiceNo || '').toLowerCase().includes(q) ||
-                        String(roll.fabric || '').toLowerCase().includes(q) ||
-                        String(roll.fabricQuality || '').toLowerCase().includes(q) ||
-                        String(roll.color || '').toLowerCase().includes(q) ||
-                        String(roll.vendorName || '').toLowerCase().includes(q) ||
-                        String(roll.poId || '').toLowerCase().includes(q);
-                      if (!match) return false;
-                    }
-                    return true;
-                  });
+                  const filteredBales = sortRollsFIFO(
+                    warehouseStockPool.filter(roll => {
+                      const avail = roll.availableMeters !== undefined ? roll.availableMeters : roll.meters;
+                      if (avail <= 0) return false;
+                      if (!doesRollMatchPOTargets(roll, targets)) return false;
+                      if (modalVendorFilter !== 'All' && roll.vendorName !== modalVendorFilter) return false;
+                      if (modalInvoiceFilter !== 'All' && roll.invoiceNo !== modalInvoiceFilter) return false;
+                      if (modalSearchTerm.trim()) {
+                        const q = modalSearchTerm.toLowerCase();
+                        const match = String(roll.baleNo || '').toLowerCase().includes(q) ||
+                          String(roll.invoiceNo || '').toLowerCase().includes(q) ||
+                          String(roll.fabric || '').toLowerCase().includes(q) ||
+                          String(roll.fabricQuality || '').toLowerCase().includes(q) ||
+                          String(roll.color || '').toLowerCase().includes(q) ||
+                          String(roll.vendorName || '').toLowerCase().includes(q) ||
+                          String(roll.poId || '').toLowerCase().includes(q);
+                        if (!match) return false;
+                      }
+                      return true;
+                    })
+                  );
 
                   const groupsMap = new Map();
                   filteredBales.forEach(roll => {
@@ -2696,8 +2796,18 @@ export default function ProcessChallanForm({
                           <tbody>
                             {stockGroups.length === 0 ? (
                               <tr>
-                                <td colSpan={6} className="text-center py-5 text-muted">
-                                  No available stock found matching your filters.
+                                <td colSpan={6} className="text-center py-5">
+                                  <div className="text-danger fw-bold fs-14 mb-1">
+                                    <i className="ti ti-alert-circle me-1"></i>
+                                    {targets.length > 0
+                                      ? `Stock Not Available in Warehouse (${targetLabel})`
+                                      : 'No available stock found in Warehouse.'}
+                                  </div>
+                                  <div className="text-muted fs-12">
+                                    {targets.length > 0
+                                      ? 'Selected PO fabric & width is not available in our warehouse stock.'
+                                      : 'Try clearing search or vendor/invoice filters.'}
+                                  </div>
                                 </td>
                               </tr>
                             ) : (
