@@ -61,6 +61,21 @@ export default function ProcessPOForm({
     const groupsMap = new Map();
 
             o.fabricConsumptions.forEach((fc, idx) => {
+              const artName = String(fc.article || fc.articleName || '').trim();
+              const fabName = String(fc.fabricQuality || fc.fabricName || '').trim();
+              const roleName = String(fc.role || '').trim();
+              const srcMap = o.articleSourcing && typeof o.articleSourcing === 'object' ? o.articleSourcing : {};
+              const sourcingMode =
+                srcMap[`${artName}___${fabName}___${roleName}`] ||
+                srcMap[`${artName}___${fabName}___`] ||
+                srcMap[`${artName}_${fabName}`] ||
+                srcMap[artName] ||
+                '';
+              const isDyedSourced =
+                String(sourcingMode).toLowerCase() === 'dyed' ||
+                String(fc.source || '').toLowerCase().includes('dyed');
+              if (isDyedSourced) return;
+
               let req = parseFloat(
                 fc.totalFabricMeters ||
                 fc.requiredMeters ||
@@ -83,9 +98,6 @@ export default function ProcessPOForm({
               const rec = parseFloat(fc.receivedMeters || 0);
 
               let resolvedWidth = '';
-              const artName = String(fc.article || fc.articleName || '').trim();
-              const fabName = String(fc.fabricQuality || fc.fabricName || '').trim();
-              const roleName = String(fc.role || '').trim();
 
               // 1. Check user's designated PO Width in groupPoWidths
               if (o.groupPoWidths && typeof o.groupPoWidths === 'object') {
@@ -895,7 +907,15 @@ export default function ProcessPOForm({
       if (rawOrd) {
         const poWidthsMap = rawOrd.groupPoWidths && typeof rawOrd.groupPoWidths === 'object' ? rawOrd.groupPoWidths : {};
         const selectedWidthsMap = rawOrd.groupSelectedWidths && typeof rawOrd.groupSelectedWidths === 'object' ? rawOrd.groupSelectedWidths : {};
-        const fcList = Array.isArray(rawOrd.fabricConsumptions) ? rawOrd.fabricConsumptions : [];
+        const srcMap = rawOrd.articleSourcing && typeof rawOrd.articleSourcing === 'object' ? rawOrd.articleSourcing : {};
+        const isFcDyed = (fc) => {
+          const art = String(fc.article || fc.articleName || '').trim();
+          const fab = String(fc.fabricQuality || fc.fabricName || '').trim();
+          const role = String(fc.role || '').trim();
+          const mode = srcMap[`${art}___${fab}___${role}`] || srcMap[`${art}___${fab}___`] || srcMap[`${art}_${fab}`] || srcMap[art] || '';
+          return String(mode).toLowerCase() === 'dyed' || String(fc.source || '').toLowerCase().includes('dyed');
+        };
+        const fcList = (Array.isArray(rawOrd.fabricConsumptions) ? rawOrd.fabricConsumptions : []).filter(fc => !isFcDyed(fc));
         const activeGroupKeys = new Set(
           fcList.map(fc => `${fc.articleName}___${fc.fabricQuality || ''}___${fc.role || ''}`)
         );
@@ -1669,12 +1689,11 @@ export default function ProcessPOForm({
               </label>
               <input
                 type="text"
-                className="form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13"
-                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px' }}
+                className="form-control form-control-sm bg-light font-monospace fw-bold text-dark fs-13"
+                style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '8px', cursor: 'not-allowed' }}
                 placeholder="e.g. DYE-7613"
                 value={poNumber}
-                disabled={!isSectionEditable('header')}
-                onChange={(e) => setPoNumber(e.target.value)}
+                readOnly
               />
             </div>
 

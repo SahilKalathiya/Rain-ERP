@@ -23511,6 +23511,17 @@
         ...prev,
         [k]: nextList
       }));
+      const removedWidths = currentList.filter((x) => !nextList.includes(x));
+      if (removedWidths.length > 0) {
+        setWidthDyedRates((prev) => {
+          const nextRates = { ...prev };
+          removedWidths.forEach((rw) => {
+            const rk = `${artName}___${fabricQuality || ""}___${role || ""}___${rw}`;
+            delete nextRates[rk];
+          });
+          return nextRates;
+        });
+      }
       const curPO = groupPoWidths[k] || "";
       let newPO = curPO;
       if (curPO && !nextList.includes(curPO)) {
@@ -23521,13 +23532,13 @@
         }));
       }
       const rateKey = `${artName}___${fabricQuality || ""}___${role || ""}___${newPO}`;
-      const storedRate = widthDyedRates[rateKey];
+      const storedRate = removedWidths.includes(newPO) || !newPO ? void 0 : widthDyedRates[rateKey];
       setConsumptionRows((prevRows) => prevRows.map((r) => {
         const matchArt = r.articleName === artName;
         const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
         const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
         if (matchArt && matchFab && matchRole) {
-          const nextDyed = storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : parseFloat(r.dyedRate) || 0;
+          const nextDyed = nextList.length === 0 ? 0 : storedRate !== void 0 && storedRate !== null && storedRate !== "" ? parseFloat(storedRate) || 0 : newPO ? parseFloat(r.dyedRate) || 0 : 0;
           return {
             ...r,
             width: newPO,
@@ -25165,8 +25176,8 @@
                           "div",
                           {
                             key: w || `po_${wIdx}`,
-                            role: "button",
-                            tabIndex: 0,
+                            role: isConsumptionEditing ? "button" : void 0,
+                            tabIndex: isConsumptionEditing ? 0 : void 0,
                             className: "d-inline-flex align-items-center gap-1.5 font-monospace fw-semibold transition-all",
                             style: {
                               minWidth: "94px",
@@ -25177,11 +25188,15 @@
                               border: isPoW ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
                               color: isPoW ? "#15803d" : "#64748b",
                               fontSize: "11.5px",
-                              cursor: "pointer",
+                              cursor: isConsumptionEditing ? "pointer" : "default",
+                              opacity: !isConsumptionEditing && !isPoW ? 0.65 : 1,
                               userSelect: "none"
                             },
-                            onClick: () => handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w),
-                            title: isPoW ? `Selected for Purchase Order (${w})` : `Click to select ${w} for Print / Process PO`
+                            onClick: () => {
+                              if (!isConsumptionEditing) return;
+                              handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w);
+                            },
+                            title: !isConsumptionEditing ? isPoW ? `Selected for Purchase Order (${w}) \u2014 Click Edit to change` : "Click Edit to select width for PO" : isPoW ? `Selected for Purchase Order (${w})` : `Click to select ${w} for Print / Process PO`
                           },
                           /* @__PURE__ */ import_react7.default.createElement(
                             "i",
@@ -49193,6 +49208,13 @@
       if (!Array.isArray(o.fabricConsumptions)) return items2;
       const groupsMap = /* @__PURE__ */ new Map();
       o.fabricConsumptions.forEach((fc, idx) => {
+        const artName = String(fc.article || fc.articleName || "").trim();
+        const fabName = String(fc.fabricQuality || fc.fabricName || "").trim();
+        const roleName = String(fc.role || "").trim();
+        const srcMap = o.articleSourcing && typeof o.articleSourcing === "object" ? o.articleSourcing : {};
+        const sourcingMode = srcMap[`${artName}___${fabName}___${roleName}`] || srcMap[`${artName}___${fabName}___`] || srcMap[`${artName}_${fabName}`] || srcMap[artName] || "";
+        const isDyedSourced = String(sourcingMode).toLowerCase() === "dyed" || String(fc.source || "").toLowerCase().includes("dyed");
+        if (isDyedSourced) return;
         let req = parseFloat(
           fc.totalFabricMeters || fc.requiredMeters || fc.totalGreige || fc.orderQty || fc.totalDyed || fc.meters || 0
         );
@@ -49205,9 +49227,6 @@
         }
         const rec = parseFloat(fc.receivedMeters || 0);
         let resolvedWidth = "";
-        const artName = String(fc.article || fc.articleName || "").trim();
-        const fabName = String(fc.fabricQuality || fc.fabricName || "").trim();
-        const roleName = String(fc.role || "").trim();
         if (o.groupPoWidths && typeof o.groupPoWidths === "object") {
           const kExact = `${artName}___${fabName}___${roleName}`;
           const kNoRole = `${artName}___${fabName}___`;
@@ -49873,7 +49892,15 @@
         if (rawOrd) {
           const poWidthsMap = rawOrd.groupPoWidths && typeof rawOrd.groupPoWidths === "object" ? rawOrd.groupPoWidths : {};
           const selectedWidthsMap = rawOrd.groupSelectedWidths && typeof rawOrd.groupSelectedWidths === "object" ? rawOrd.groupSelectedWidths : {};
-          const fcList = Array.isArray(rawOrd.fabricConsumptions) ? rawOrd.fabricConsumptions : [];
+          const srcMap = rawOrd.articleSourcing && typeof rawOrd.articleSourcing === "object" ? rawOrd.articleSourcing : {};
+          const isFcDyed = (fc) => {
+            const art = String(fc.article || fc.articleName || "").trim();
+            const fab = String(fc.fabricQuality || fc.fabricName || "").trim();
+            const role = String(fc.role || "").trim();
+            const mode = srcMap[`${art}___${fab}___${role}`] || srcMap[`${art}___${fab}___`] || srcMap[`${art}_${fab}`] || srcMap[art] || "";
+            return String(mode).toLowerCase() === "dyed" || String(fc.source || "").toLowerCase().includes("dyed");
+          };
+          const fcList = (Array.isArray(rawOrd.fabricConsumptions) ? rawOrd.fabricConsumptions : []).filter((fc) => !isFcDyed(fc));
           const activeGroupKeys = new Set(
             fcList.map((fc) => `${fc.articleName}___${fc.fabricQuality || ""}___${fc.role || ""}`)
           );
@@ -50433,12 +50460,11 @@
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm bg-white font-monospace fw-bold text-dark fs-13",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px" },
+        className: "form-control form-control-sm bg-light font-monospace fw-bold text-dark fs-13",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "8px", cursor: "not-allowed" },
         placeholder: "e.g. DYE-7613",
         value: poNumber,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setPoNumber(e.target.value)
+        readOnly: true
       }
     )), /* @__PURE__ */ import_react36.default.createElement("div", { className: "col-12 col-sm-6 col-lg-3" }, /* @__PURE__ */ import_react36.default.createElement("label", { className: "form-label fs-12 fw-semibold text-secondary mb-1.5 d-flex align-items-center gap-1" }, /* @__PURE__ */ import_react36.default.createElement("span", null, "PO Date"), /* @__PURE__ */ import_react36.default.createElement("span", { className: "text-danger" }, "*")), /* @__PURE__ */ import_react36.default.createElement(
       "input",
@@ -52614,21 +52640,26 @@ Confirm dispatch with mixed batch lots?`
     const getPOTargetCriteria = () => {
       if (isEmergencyDispatch || selectedPOs.length === 0) return [];
       const linkedObjs = availablePOs.filter((p) => selectedPOs.some((ref) => isPOMatched(p, ref)));
-      const targets = [];
-      const seen = /* @__PURE__ */ new Set();
-      const addTarget = (fabRaw, widthRaw) => {
+      const targetMap = /* @__PURE__ */ new Map();
+      const addTarget = (fabRaw, widthRaw, colorRaw = "", qtyMeters = 0) => {
         const fabNorm = normalizeFab(fabRaw);
         if (!fabNorm || fabNorm === "fabric" || fabNorm === "fabric (auto generated)") return;
         const wRaw = widthRaw || extractWidthFromText(fabRaw);
         const widthNorm = normalizeWidth(wRaw);
-        const key = `${fabNorm}___${widthNorm}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          targets.push({
+        const colorNorm = String(colorRaw || "").trim().toLowerCase();
+        const key = `${fabNorm}___${widthNorm}___${colorNorm}`;
+        const qty = parseFloat(qtyMeters) || 0;
+        if (!targetMap.has(key)) {
+          targetMap.set(key, {
+            key,
             fabNorm,
             widthNorm,
-            label: widthNorm ? `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, "").trim()} (${widthNorm}")` : String(fabRaw).trim()
+            colorNorm,
+            requiredMeters: qty,
+            label: `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, "").trim()}${widthNorm ? ` (${widthNorm}")` : ""}${colorRaw ? ` \u2022 ${colorRaw}` : ""}`
           });
+        } else {
+          targetMap.get(key).requiredMeters = Number((targetMap.get(key).requiredMeters + qty).toFixed(2));
         }
       };
       linkedObjs.forEach((po) => {
@@ -52636,13 +52667,35 @@ Confirm dispatch with mixed batch lots?`
           po.items.forEach((it) => {
             const fab = it.fabric_quality || it.fabric_name || it.fabric || po.fabric_quality || po.fabric_name;
             const w = it.width || po.width;
-            addTarget(fab, w);
+            const col = it.color_name || po.color_name || "";
+            const qty = parseFloat(it.quantity_meters || it.meters || it.total_meters || 0) || 0;
+            addTarget(fab, w, col, qty);
           });
         } else {
-          addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width);
+          addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width, po.color_name || "", po.total_meters);
         }
       });
-      return targets;
+      return Array.from(targetMap.values());
+    };
+    const isColorMatchForTarget = (rollColorRaw, targetColorNorm) => {
+      if (!targetColorNorm) return true;
+      const rc = String(rollColorRaw || "").trim().toLowerCase();
+      if (!rc) return true;
+      return rc === targetColorNorm;
+    };
+    const getDispatchedForTarget = (target) => {
+      if (!target) return 0;
+      return items.reduce((sum, it) => {
+        const itFab = normalizeFab(it.fabric_name || it.fabric_quality);
+        const itWidth = normalizeWidth(it.width || extractWidthFromText(it.fabric_name));
+        const fabOk = itFab === target.fabNorm || itFab.includes(target.fabNorm) || target.fabNorm.includes(itFab);
+        const widthOk = !target.widthNorm || !itWidth || itWidth === target.widthNorm;
+        const colorOk = isColorMatchForTarget(it.color_name, target.colorNorm);
+        if (fabOk && widthOk && colorOk) {
+          return sum + (parseFloat(it.dispatched_meters) || 0);
+        }
+        return sum;
+      }, 0);
     };
     const doesRollMatchPOTargets = (roll, targets) => {
       if (!targets || targets.length === 0) return true;
@@ -52651,9 +52704,8 @@ Confirm dispatch with mixed batch lots?`
       return targets.some((t) => {
         const fabOk = rollFabNorm === t.fabNorm || rollFabNorm.includes(t.fabNorm) || t.fabNorm.includes(rollFabNorm);
         if (!fabOk) return false;
-        if (t.widthNorm && rollWidthNorm) {
-          return rollWidthNorm === t.widthNorm;
-        }
+        if (t.widthNorm && rollWidthNorm && rollWidthNorm !== t.widthNorm) return false;
+        if (!isColorMatchForTarget(roll.color, t.colorNorm)) return false;
         return true;
       });
     };
@@ -53049,11 +53101,10 @@ Confirm dispatch with mixed batches?`
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        className: "form-control form-control-sm bg-light fs-13 fw-bold text-dark font-monospace",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px", cursor: "not-allowed" },
         value: challanNumber,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setChallanNumber(e.target.value),
+        readOnly: true,
         placeholder: "e.g. CH-4903",
         required: true
       }
@@ -53570,33 +53621,56 @@ Confirm dispatch with mixed batches?`
       const stockGroups = Array.from(groupsMap.values());
       const activeGroup = selectedStockGroupKey ? groupsMap.get(selectedStockGroupKey) : null;
       if (!activeGroup) {
-        return /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "200px" } }, "Fabric"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "100px" } }, "Width"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "150px" } }, "Colour"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "160px" }, className: "text-end" }, "Available Quantity"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "130px" }, className: "text-center" }, "Bales / Lots"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "50px" } }))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, stockGroups.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: 6, className: "text-center py-5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-danger fw-bold fs-14 mb-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-alert-circle me-1" }), targets.length > 0 ? `Stock Not Available in Warehouse (${targetLabel})` : "No available stock found in Warehouse."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, targets.length > 0 ? "Selected PO fabric & width is not available in our warehouse stock." : "Try clearing search or vendor/invoice filters."))) : stockGroups.map((grp) => /* @__PURE__ */ import_react38.default.createElement(
-          "tr",
-          {
-            key: grp.key,
-            style: { cursor: "pointer" },
-            onClick: () => {
-              setSelectedStockGroupKey(grp.key);
-              setExpandedBaleId(null);
-            }
-          },
-          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-dark" }, grp.fabricQuality)),
-          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "font-monospace text-dark" }, grp.width)),
-          /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
+        return /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, targets.length > 0 && /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3 p-2.5 px-3 bg-white border rounded-3 d-flex flex-wrap align-items-center gap-2", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fs-11 fw-bold text-secondary text-uppercase me-1" }, "PO Requirement by Fabric & Width:"), targets.map((t) => {
+          const picked = getDispatchedForTarget(t);
+          const bal = Math.max(0, Number((t.requiredMeters - picked).toFixed(2)));
+          const hasStock = filteredBales.some((roll) => doesRollMatchPOTargets(roll, [t]));
+          return /* @__PURE__ */ import_react38.default.createElement(
             "span",
             {
-              className: "d-inline-block rounded-circle border",
-              style: {
-                width: "12px",
-                height: "12px",
-                backgroundColor: grp.color.toLowerCase().includes("black") ? "#0f172a" : grp.color.toLowerCase().includes("white") ? "#ffffff" : grp.color.toLowerCase().includes("blue") ? "#1d4ed8" : grp.color.toLowerCase().includes("natural") ? "#f5f0e1" : "#94a3b8"
+              key: t.key,
+              className: `badge px-2.5 py-1.5 fs-11 font-monospace border ${!hasStock ? "bg-danger-subtle text-danger border-danger-subtle" : bal <= 0 ? "bg-success-subtle text-success border-success-subtle" : "bg-warning-subtle text-dark border-warning-subtle"}`
+            },
+            t.label,
+            ": ",
+            !hasStock ? `Stock Not Available (${bal.toFixed(2)}m needed)` : `Need ${bal.toFixed(2)}m / ${t.requiredMeters.toFixed(2)}m${picked > 0 ? ` (Picked ${picked.toFixed(2)}m)` : ""}`
+          );
+        })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "table-responsive bg-white border rounded shadow-xs" }, /* @__PURE__ */ import_react38.default.createElement("table", { className: "table table-hover align-middle mb-0", style: { fontSize: "13px" } }, /* @__PURE__ */ import_react38.default.createElement("thead", { className: "table-light" }, /* @__PURE__ */ import_react38.default.createElement("tr", { className: "text-secondary fs-11 fw-bold text-uppercase" }, /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "180px" } }, "Fabric"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "90px" } }, "Width"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { minWidth: "130px" } }, "Colour"), targets.length > 0 && /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "150px" }, className: "text-end" }, "PO Needed"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "150px" }, className: "text-end" }, "Available Quantity"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "120px" }, className: "text-center" }, "Bales / Lots"), /* @__PURE__ */ import_react38.default.createElement("th", { style: { width: "40px" } }))), /* @__PURE__ */ import_react38.default.createElement("tbody", null, stockGroups.length === 0 ? /* @__PURE__ */ import_react38.default.createElement("tr", null, /* @__PURE__ */ import_react38.default.createElement("td", { colSpan: targets.length > 0 ? 7 : 6, className: "text-center py-5" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-danger fw-bold fs-14 mb-1" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-alert-circle me-1" }), targets.length > 0 ? `Stock Not Available in Warehouse (${targetLabel})` : "No available stock found in Warehouse."), /* @__PURE__ */ import_react38.default.createElement("div", { className: "text-muted fs-12" }, targets.length > 0 ? "Selected PO fabric & width is not available in our warehouse stock." : "Try clearing search or vendor/invoice filters."))) : stockGroups.map((grp) => {
+          const grpFabNorm = normalizeFab(grp.fabricQuality);
+          const grpWidthNorm = normalizeWidth(grp.width);
+          const matchedTarget = targets.find(
+            (t) => (grpFabNorm === t.fabNorm || grpFabNorm.includes(t.fabNorm) || t.fabNorm.includes(grpFabNorm)) && (!t.widthNorm || !grpWidthNorm || grpWidthNorm === t.widthNorm) && isColorMatchForTarget(grp.color, t.colorNorm)
+          );
+          const targetRem = matchedTarget ? Math.max(0, Number((matchedTarget.requiredMeters - getDispatchedForTarget(matchedTarget)).toFixed(2))) : 0;
+          return /* @__PURE__ */ import_react38.default.createElement(
+            "tr",
+            {
+              key: grp.key,
+              style: { cursor: "pointer" },
+              onClick: () => {
+                setSelectedStockGroupKey(grp.key);
+                setExpandedBaleId(null);
               }
-            }
-          ), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-medium text-dark" }, grp.color))),
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace text-dark fs-14" }, grp.totalMeters.toFixed(1), "m")),
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-dark border rounded-pill px-2.5 py-1 fs-11 fw-semibold" }, grp.bales.length, " bale(s)")),
-          /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center text-muted" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-chevron-right fs-16" }))
-        )))));
+            },
+            /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "fw-bold text-dark" }, grp.fabricQuality)),
+            /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("span", { className: "font-monospace text-dark" }, grp.width)),
+            /* @__PURE__ */ import_react38.default.createElement("td", null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2" }, /* @__PURE__ */ import_react38.default.createElement(
+              "span",
+              {
+                className: "d-inline-block rounded-circle border",
+                style: {
+                  width: "12px",
+                  height: "12px",
+                  backgroundColor: grp.color.toLowerCase().includes("black") ? "#0f172a" : grp.color.toLowerCase().includes("white") ? "#ffffff" : grp.color.toLowerCase().includes("blue") ? "#1d4ed8" : grp.color.toLowerCase().includes("natural") ? "#f5f0e1" : "#94a3b8"
+                }
+              }
+            ), /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-medium text-dark" }, grp.color))),
+            targets.length > 0 && /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, matchedTarget ? targetRem > 0 ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-warning-subtle text-dark border border-warning-subtle font-monospace fs-12 px-2 py-1" }, targetRem.toFixed(2), "m") : /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-success-subtle text-success border border-success-subtle fs-11 px-2 py-1" }, "Fulfilled \u2713") : "\u2014"),
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-end" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "fw-bold font-monospace text-dark fs-14" }, grp.totalMeters.toFixed(1), "m")),
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "badge bg-light text-dark border rounded-pill px-2.5 py-1 fs-11 fw-semibold" }, grp.bales.length, " bale(s)")),
+            /* @__PURE__ */ import_react38.default.createElement("td", { className: "text-center text-muted" }, /* @__PURE__ */ import_react38.default.createElement("i", { className: "ti ti-chevron-right fs-16" }))
+          );
+        })))));
       }
       return /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("div", { className: "mb-3 p-2.5 px-3 bg-white border rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-2xs", style: { borderColor: "#cbd5e1" } }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "d-flex align-items-center gap-2.5" }, /* @__PURE__ */ import_react38.default.createElement(
         "button",
@@ -54555,11 +54629,10 @@ Please match the recorded pieces and metres with the vendor's stated summary.`
       "input",
       {
         type: "text",
-        className: "form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace",
-        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px" },
+        className: "form-control form-control-sm bg-light fs-13 fw-bold text-dark font-monospace",
+        style: { borderColor: "#cbd5e1", height: "38px", borderRadius: "6px", cursor: "not-allowed" },
         value: externalChallanNo,
-        disabled: !isSectionEditable("header"),
-        onChange: (e) => setExternalChallanNo(e.target.value),
+        readOnly: true,
         placeholder: "e.g. 2196 (Page 20 slip)",
         required: true
       }

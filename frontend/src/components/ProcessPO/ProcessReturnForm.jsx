@@ -621,11 +621,10 @@ export default function ProcessReturnForm({
                   </label>
                   <input
                     type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    className="form-control form-control-sm bg-light fs-13 fw-bold text-dark font-monospace"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px', cursor: 'not-allowed' }}
                     value={externalChallanNo}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setExternalChallanNo(e.target.value)}
+                    readOnly
                     placeholder="e.g. 2196 (Page 20 slip)"
                     required
                   />

@@ -1176,22 +1176,27 @@ export default function ProcessChallanForm({
   const getPOTargetCriteria = () => {
     if (isEmergencyDispatch || selectedPOs.length === 0) return [];
     const linkedObjs = availablePOs.filter(p => selectedPOs.some(ref => isPOMatched(p, ref)));
-    const targets = [];
-    const seen = new Set();
+    const targetMap = new Map();
 
-    const addTarget = (fabRaw, widthRaw) => {
+    const addTarget = (fabRaw, widthRaw, colorRaw = '', qtyMeters = 0) => {
       const fabNorm = normalizeFab(fabRaw);
       if (!fabNorm || fabNorm === 'fabric' || fabNorm === 'fabric (auto generated)') return;
       const wRaw = widthRaw || extractWidthFromText(fabRaw);
       const widthNorm = normalizeWidth(wRaw);
-      const key = `${fabNorm}___${widthNorm}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        targets.push({
+      const colorNorm = String(colorRaw || '').trim().toLowerCase();
+      const key = `${fabNorm}___${widthNorm}___${colorNorm}`;
+      const qty = parseFloat(qtyMeters) || 0;
+      if (!targetMap.has(key)) {
+        targetMap.set(key, {
+          key,
           fabNorm,
           widthNorm,
-          label: widthNorm ? `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, '').trim()} (${widthNorm}")` : String(fabRaw).trim()
+          colorNorm,
+          requiredMeters: qty,
+          label: `${String(fabRaw).replace(/\s*\[[^\]]+\]/g, '').trim()}${widthNorm ? ` (${widthNorm}")` : ''}${colorRaw ? ` • ${colorRaw}` : ''}`
         });
+      } else {
+        targetMap.get(key).requiredMeters = Number((targetMap.get(key).requiredMeters + qty).toFixed(2));
       }
     };
 
@@ -1200,13 +1205,37 @@ export default function ProcessChallanForm({
         po.items.forEach(it => {
           const fab = it.fabric_quality || it.fabric_name || it.fabric || po.fabric_quality || po.fabric_name;
           const w = it.width || po.width;
-          addTarget(fab, w);
+          const col = it.color_name || po.color_name || '';
+          const qty = parseFloat(it.quantity_meters || it.meters || it.total_meters || 0) || 0;
+          addTarget(fab, w, col, qty);
         });
       } else {
-        addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width);
+        addTarget(po.fabric_quality || po.fabric_name || po.fabric, po.width, po.color_name || '', po.total_meters);
       }
     });
-    return targets;
+    return Array.from(targetMap.values());
+  };
+
+  const isColorMatchForTarget = (rollColorRaw, targetColorNorm) => {
+    if (!targetColorNorm) return true;
+    const rc = String(rollColorRaw || '').trim().toLowerCase();
+    if (!rc) return true;
+    return rc === targetColorNorm;
+  };
+
+  const getDispatchedForTarget = (target) => {
+    if (!target) return 0;
+    return items.reduce((sum, it) => {
+      const itFab = normalizeFab(it.fabric_name || it.fabric_quality);
+      const itWidth = normalizeWidth(it.width || extractWidthFromText(it.fabric_name));
+      const fabOk = itFab === target.fabNorm || itFab.includes(target.fabNorm) || target.fabNorm.includes(itFab);
+      const widthOk = !target.widthNorm || !itWidth || itWidth === target.widthNorm;
+      const colorOk = isColorMatchForTarget(it.color_name, target.colorNorm);
+      if (fabOk && widthOk && colorOk) {
+        return sum + (parseFloat(it.dispatched_meters) || 0);
+      }
+      return sum;
+    }, 0);
   };
 
   const doesRollMatchPOTargets = (roll, targets) => {
@@ -1216,9 +1245,8 @@ export default function ProcessChallanForm({
     return targets.some(t => {
       const fabOk = rollFabNorm === t.fabNorm || rollFabNorm.includes(t.fabNorm) || t.fabNorm.includes(rollFabNorm);
       if (!fabOk) return false;
-      if (t.widthNorm && rollWidthNorm) {
-        return rollWidthNorm === t.widthNorm;
-      }
+      if (t.widthNorm && rollWidthNorm && rollWidthNorm !== t.widthNorm) return false;
+      if (!isColorMatchForTarget(roll.color, t.colorNorm)) return false;
       return true;
     });
   };
@@ -1766,11 +1794,10 @@ export default function ProcessChallanForm({
                   </label>
                   <input
                     type="text"
-                    className="form-control form-control-sm bg-white fs-13 fw-bold text-dark font-monospace"
-                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px' }}
+                    className="form-control form-control-sm bg-light fs-13 fw-bold text-dark font-monospace"
+                    style={{ borderColor: '#cbd5e1', height: '38px', borderRadius: '6px', cursor: 'not-allowed' }}
                     value={challanNumber}
-                    disabled={!isSectionEditable('header')}
-                    onChange={(e) => setChallanNumber(e.target.value)}
+                    readOnly
                     placeholder="e.g. CH-4903"
                     required
                   />
@@ -2781,22 +2808,54 @@ export default function ProcessChallanForm({
 
                   if (!activeGroup) {
                     return (
-                      <div className="table-responsive bg-white border rounded shadow-xs">
+                      <>
+                        {targets.length > 0 && (
+                          <div className="mb-3 p-2.5 px-3 bg-white border rounded-3 d-flex flex-wrap align-items-center gap-2" style={{ borderColor: '#cbd5e1' }}>
+                            <span className="fs-11 fw-bold text-secondary text-uppercase me-1">
+                              PO Requirement by Fabric &amp; Width:
+                            </span>
+                            {targets.map(t => {
+                              const picked = getDispatchedForTarget(t);
+                              const bal = Math.max(0, Number((t.requiredMeters - picked).toFixed(2)));
+                              const hasStock = filteredBales.some(roll => doesRollMatchPOTargets(roll, [t]));
+                              return (
+                                <span
+                                  key={t.key}
+                                  className={`badge px-2.5 py-1.5 fs-11 font-monospace border ${
+                                    !hasStock
+                                      ? 'bg-danger-subtle text-danger border-danger-subtle'
+                                      : bal <= 0
+                                        ? 'bg-success-subtle text-success border-success-subtle'
+                                        : 'bg-warning-subtle text-dark border-warning-subtle'
+                                  }`}
+                                >
+                                  {t.label}: {!hasStock
+                                    ? `Stock Not Available (${bal.toFixed(2)}m needed)`
+                                    : `Need ${bal.toFixed(2)}m / ${t.requiredMeters.toFixed(2)}m${picked > 0 ? ` (Picked ${picked.toFixed(2)}m)` : ''}`}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className="table-responsive bg-white border rounded shadow-xs">
                         <table className="table table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
                           <thead className="table-light">
                             <tr className="text-secondary fs-11 fw-bold text-uppercase">
-                              <th style={{ minWidth: '200px' }}>Fabric</th>
-                              <th style={{ width: '100px' }}>Width</th>
-                              <th style={{ minWidth: '150px' }}>Colour</th>
-                              <th style={{ width: '160px' }} className="text-end">Available Quantity</th>
-                              <th style={{ width: '130px' }} className="text-center">Bales / Lots</th>
-                              <th style={{ width: '50px' }}></th>
+                              <th style={{ minWidth: '180px' }}>Fabric</th>
+                              <th style={{ width: '90px' }}>Width</th>
+                              <th style={{ minWidth: '130px' }}>Colour</th>
+                              {targets.length > 0 && (
+                                <th style={{ width: '150px' }} className="text-end">PO Needed</th>
+                              )}
+                              <th style={{ width: '150px' }} className="text-end">Available Quantity</th>
+                              <th style={{ width: '120px' }} className="text-center">Bales / Lots</th>
+                              <th style={{ width: '40px' }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {stockGroups.length === 0 ? (
                               <tr>
-                                <td colSpan={6} className="text-center py-5">
+                                <td colSpan={targets.length > 0 ? 7 : 6} className="text-center py-5">
                                   <div className="text-danger fw-bold fs-14 mb-1">
                                     <i className="ti ti-alert-circle me-1"></i>
                                     {targets.length > 0
@@ -2811,7 +2870,18 @@ export default function ProcessChallanForm({
                                 </td>
                               </tr>
                             ) : (
-                              stockGroups.map(grp => (
+                              stockGroups.map(grp => {
+                                const grpFabNorm = normalizeFab(grp.fabricQuality);
+                                const grpWidthNorm = normalizeWidth(grp.width);
+                                const matchedTarget = targets.find(t =>
+                                  (grpFabNorm === t.fabNorm || grpFabNorm.includes(t.fabNorm) || t.fabNorm.includes(grpFabNorm)) &&
+                                  (!t.widthNorm || !grpWidthNorm || grpWidthNorm === t.widthNorm) &&
+                                  isColorMatchForTarget(grp.color, t.colorNorm)
+                                );
+                                const targetRem = matchedTarget
+                                  ? Math.max(0, Number((matchedTarget.requiredMeters - getDispatchedForTarget(matchedTarget)).toFixed(2)))
+                                  : 0;
+                                return (
                                 <tr
                                   key={grp.key}
                                   style={{ cursor: 'pointer' }}
@@ -2843,6 +2913,21 @@ export default function ProcessChallanForm({
                                       <span className="fw-medium text-dark">{grp.color}</span>
                                     </div>
                                   </td>
+                                  {targets.length > 0 && (
+                                    <td className="text-end">
+                                      {matchedTarget ? (
+                                        targetRem > 0 ? (
+                                          <span className="badge bg-warning-subtle text-dark border border-warning-subtle font-monospace fs-12 px-2 py-1">
+                                            {targetRem.toFixed(2)}m
+                                          </span>
+                                        ) : (
+                                          <span className="badge bg-success-subtle text-success border border-success-subtle fs-11 px-2 py-1">
+                                            Fulfilled ✓
+                                          </span>
+                                        )
+                                      ) : '—'}
+                                    </td>
+                                  )}
                                   <td className="text-end">
                                     <span className="fw-bold font-monospace text-dark fs-14">
                                       {grp.totalMeters.toFixed(1)}m
@@ -2857,11 +2942,13 @@ export default function ProcessChallanForm({
                                     <i className="ti ti-chevron-right fs-16"></i>
                                   </td>
                                 </tr>
-                              ))
+                                );
+                              })
                             )}
                           </tbody>
                         </table>
                       </div>
+                      </>
                     );
                   }
 

@@ -2765,6 +2765,19 @@ export default function OrderDetailView({
       [k]: nextList
     }));
 
+    // 1.5 Clear stored DYED rates for any removed widths so re-selecting a width later starts fresh at 0
+    const removedWidths = currentList.filter(x => !nextList.includes(x));
+    if (removedWidths.length > 0) {
+      setWidthDyedRates(prev => {
+        const nextRates = { ...prev };
+        removedWidths.forEach(rw => {
+          const rk = `${artName}___${fabricQuality || ''}___${role || ''}___${rw}`;
+          delete nextRates[rk];
+        });
+        return nextRates;
+      });
+    }
+
     // 2. Never auto-select a PO width when adding widths; only clear if an already-selected PO width was removed
     const curPO = groupPoWidths[k] || '';
     let newPO = curPO;
@@ -2777,7 +2790,7 @@ export default function OrderDetailView({
     }
 
     const rateKey = `${artName}___${fabricQuality || ''}___${role || ''}___${newPO}`;
-    const storedRate = widthDyedRates[rateKey];
+    const storedRate = (removedWidths.includes(newPO) || !newPO) ? undefined : widthDyedRates[rateKey];
 
     // 3. Update consumptionRows
     setConsumptionRows(prevRows => prevRows.map(r => {
@@ -2785,9 +2798,11 @@ export default function OrderDetailView({
       const matchFab = !fabricQuality || r.fabricQuality === fabricQuality;
       const matchRole = !role || !r.role || r.role.toLowerCase() === role.toLowerCase();
       if (matchArt && matchFab && matchRole) {
-        const nextDyed = (storedRate !== undefined && storedRate !== null && storedRate !== '')
-          ? (parseFloat(storedRate) || 0)
-          : (parseFloat(r.dyedRate) || 0);
+        const nextDyed = nextList.length === 0
+          ? 0
+          : (storedRate !== undefined && storedRate !== null && storedRate !== '')
+            ? (parseFloat(storedRate) || 0)
+            : (newPO ? (parseFloat(r.dyedRate) || 0) : 0);
         return {
           ...r,
           width: newPO,
@@ -4906,8 +4921,8 @@ export default function OrderDetailView({
                                   return (
                                     <div
                                       key={w || `po_${wIdx}`}
-                                      role="button"
-                                      tabIndex={0}
+                                      role={isConsumptionEditing ? "button" : undefined}
+                                      tabIndex={isConsumptionEditing ? 0 : undefined}
                                       className="d-inline-flex align-items-center gap-1.5 font-monospace fw-semibold transition-all"
                                       style={{
                                         minWidth: '94px',
@@ -4918,11 +4933,19 @@ export default function OrderDetailView({
                                         border: isPoW ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
                                         color: isPoW ? '#15803d' : '#64748b',
                                         fontSize: '11.5px',
-                                        cursor: 'pointer',
+                                        cursor: isConsumptionEditing ? 'pointer' : 'default',
+                                        opacity: (!isConsumptionEditing && !isPoW) ? 0.65 : 1,
                                         userSelect: 'none'
                                       }}
-                                      onClick={() => handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w)}
-                                      title={isPoW ? `Selected for Purchase Order (${w})` : `Click to select ${w} for Print / Process PO`}
+                                      onClick={() => {
+                                        if (!isConsumptionEditing) return;
+                                        handleSetPOWidthForGroup(group.articleName, group.fabricQuality, group.role, w);
+                                      }}
+                                      title={
+                                        !isConsumptionEditing
+                                          ? (isPoW ? `Selected for Purchase Order (${w}) — Click Edit to change` : 'Click Edit to select width for PO')
+                                          : (isPoW ? `Selected for Purchase Order (${w})` : `Click to select ${w} for Print / Process PO`)
+                                      }
                                     >
                                       <i
                                         className={isPoW ? "ti ti-circle-check-filled text-success" : "ti ti-circle text-muted"}
