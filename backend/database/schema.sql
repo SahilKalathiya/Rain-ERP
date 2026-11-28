@@ -685,3 +685,39 @@ CREATE TABLE IF NOT EXISTS process_qc_records (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (return_id) REFERENCES process_returns(id) ON DELETE CASCADE
 );
+
+-- =======================================================
+-- MODULE 4: CUTTING & CONSUMPTION PORTAL
+-- =======================================================
+
+-- 30. CUTTING PURCHASE ORDERS (P1) & WORKFLOW PAYLOAD
+CREATE TABLE IF NOT EXISTS cutting_pos (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. PO-CUT-2026-001
+  po_number VARCHAR(50) NOT NULL UNIQUE,
+  entry_mode VARCHAR(30) DEFAULT '',
+  style_name VARCHAR(150) DEFAULT '',
+  color_name VARCHAR(100) DEFAULT '',
+  lot_id VARCHAR(50) DEFAULT '',
+  fabric_width VARCHAR(30) DEFAULT '',
+  garments_to_cut INT DEFAULT 0,
+  fabric_to_issue DECIMAL(12,2) DEFAULT 0.00,
+  status VARCHAR(50) DEFAULT 'Draft',
+  remarks TEXT,
+  payload JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 31. OLD FABRIC STOCK LEDGER (Usable Balance After Step 6)
+CREATE TABLE IF NOT EXISTS old_fabric_stock (
+  id VARCHAR(30) PRIMARY KEY, -- e.g. OLD-STK-01
+  date DATE NOT NULL,
+  po_number VARCHAR(50) NOT NULL,
+  style_name VARCHAR(150) NOT NULL,
+  color_name VARCHAR(100),
+  lot_id VARCHAR(50),
+  usable_meters DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  width VARCHAR(30),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

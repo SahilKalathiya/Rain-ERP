@@ -54,6 +54,7 @@ export default function ProcessQCView({
   const [returnContextPieces, setReturnContextPieces] = useState([]);
   const [returnContextMeta, setReturnContextMeta] = useState(null);
   const [selectedPieceNos, setSelectedPieceNos] = useState([]);
+  const [expandedBatchIds, setExpandedBatchIds] = useState({});
 
   // Open a specific piece for inspection
   const handleOpenPieceQC = (record, keepReturnContext = false) => {
@@ -203,11 +204,13 @@ export default function ProcessQCView({
 
     if (onSaveQC) {
       if (returnContextPieces.length > 0 && returnContextMeta && selectedPieceNos.length > 1) {
+        const sharedBatchGroupId = `BATCH-${Date.now().toString().slice(-5)}`;
         const batchPayloads = selectedPieceNos.map((pNo, i) => {
           const pObj = returnContextPieces.find(p => Number(p.piece_no) === Number(pNo));
           const existingQc = (qcRecords || []).find(q => q.return_id === returnContextMeta.id && Number(q.piece_no) === Number(pNo));
           return buildPayloadForPiece({
             id: existingQc?.id || `PQC-${Date.now().toString().slice(-4)}-${pNo}`,
+            batch_group_id: existingQc?.batch_group_id || sharedBatchGroupId,
             return_id: returnContextMeta.id,
             piece_no: pNo,
             original_length: pObj?.meters ? parseFloat(pObj.meters) : selectedPiece.original_length,
@@ -241,6 +244,28 @@ export default function ProcessQCView({
 
     return matchesSearch && matchesOutcome;
   });
+
+  // Group batch-inspected QC records so multi-Than QC shows as one expandable group row
+  const groupedRecords = (() => {
+    const map = new Map();
+    filteredRecords.forEach((q) => {
+      const key =
+        q.batch_group_id ||
+        (q.id && /^PQC-\d+-\d+$/.test(q.id)
+          ? `${q.return_id || ''}::${q.id.replace(/-\d+$/, '')}`
+          : q.id);
+      if (!map.has(key)) {
+        map.set(key, { groupKey: key, items: [q] });
+      } else {
+        map.get(key).items.push(q);
+      }
+    });
+    return Array.from(map.values()).map((g) => ({
+      ...g,
+      primary: g.items[0],
+      isBatch: g.items.length > 1
+    }));
+  })();
 
   // KPI Calculations
   const totalInspected = qcRecords.length;
@@ -394,40 +419,63 @@ export default function ProcessQCView({
                       </td>
                     </tr>
                   ) : (
-                    filteredRecords.map((q) => (
-                      <tr
-                        key={q.id}
-                        onClick={() => handleOpenPieceQC(q)}
-                        style={{
-                          cursor: 'pointer',
-                          backgroundColor: '#ffffff'
-                        }}
-                      >
-                        {/* QC ID */}
-                        <td className="ps-3 py-3">
-                          <span
-                            className="badge font-monospace fw-bold px-2 py-1.5"
+                    groupedRecords.map((grp) => {
+                      const q = grp.primary;
+                      const isExpanded = Boolean(expandedBatchIds[grp.groupKey]);
+                      const sortedPieces = [...grp.items].sort((a, b) => Number(a.piece_no) - Number(b.piece_no));
+                      const totalBatchMeters = grp.items.reduce((s, item) => s + (parseFloat(item.original_length) || 0), 0);
+                      const baseQcId = grp.isBatch
+                        ? (q.id ? q.id.replace(/-\d+$/, '') : grp.groupKey)
+                        : q.id;
+                      const thanLabel = grp.isBatch
+                        ? `Thans ${sortedPieces.length <= 4 ? sortedPieces.map((i) => `#${i.piece_no}`).join(', ') : `#${sortedPieces[0].piece_no} – #${sortedPieces[sortedPieces.length - 1].piece_no}`}`
+                        : `Than #${q.piece_no}`;
+
+                      return (
+                        <React.Fragment key={grp.groupKey}>
+                          <tr
+                            onClick={() => {
+                              if (grp.isBatch) {
+                                setExpandedBatchIds((prev) => ({ ...prev, [grp.groupKey]: !prev[grp.groupKey] }));
+                              } else {
+                                handleOpenPieceQC(q);
+                              }
+                            }}
                             style={{
-                              background: '#f1f5f9',
-                              color: '#0f172a',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '12px'
+                              cursor: 'pointer',
+                              backgroundColor: '#ffffff'
                             }}
                           >
-                            {q.id}
-                          </span>
-                        </td>
+                            {/* QC ID */}
+                            <td className="ps-3 py-3">
+                              <span
+                                className="badge font-monospace fw-bold px-2 py-1.5"
+                                style={{
+                                  background: '#f1f5f9',
+                                  color: '#0f172a',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                {baseQcId}
+                              </span>
+                              {grp.isBatch && (
+                                <small className="text-primary fw-semibold d-block mt-0.5 fs-11">
+                                  {grp.items.length} Thans Batch
+                                </small>
+                              )}
+                            </td>
 
-                        {/* Than / Piece */}
-                        <td className="fw-bold text-dark fs-13">
-                          Than #{q.piece_no}
-                          <small className="text-muted fs-11 d-block">{q.return_id}</small>
-                        </td>
+                            {/* Than / Piece */}
+                            <td className="fw-bold text-dark fs-13">
+                              {thanLabel}
+                              <small className="text-muted fs-11 d-block">{q.return_id}</small>
+                            </td>
 
-                        {/* Length */}
-                        <td className="fw-semibold text-dark fs-13">
-                          {Number(q.original_length).toFixed(2)} m
-                        </td>
+                            {/* Length */}
+                            <td className="fw-semibold text-dark fs-13">
+                              {totalBatchMeters.toFixed(2)} m
+                            </td>
 
                         {/* Outcome */}
                         <td>
@@ -491,7 +539,9 @@ export default function ProcessQCView({
                             </span>
                           )}
                           {q.division_type === 'None' && q.qc_outcome === 'Accepted' && (
-                            <span className="text-secondary fs-12">Single Than</span>
+                            <span className={grp.isBatch ? 'badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold' : 'text-secondary fs-12'}>
+                              {grp.isBatch ? `Batch (${grp.items.length} Thans)` : 'Single Than'}
+                            </span>
                           )}
                           {q.qc_outcome === 'Full Rejection' && (
                             <span className="badge bg-danger-subtle text-danger fs-11">
@@ -536,21 +586,89 @@ export default function ProcessQCView({
 
                         {/* Actions */}
                         <td className="text-end pe-3">
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm px-2.5 py-1 rounded-2 shadow-xs d-flex align-items-center gap-1 fs-12 fw-semibold ms-auto"
-                            style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPieceQC(q);
-                            }}
-                          >
-                            <i className="ti ti-pencil fs-13"></i>
-                            <span>Inspect</span>
-                          </button>
+                          <div className="d-inline-flex align-items-center gap-1.5">
+                            {grp.isBatch && (
+                              <button
+                                type="button"
+                                className="btn btn-light border btn-sm px-2.5 py-1 rounded-2 fs-12 fw-semibold text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedBatchIds((prev) => ({ ...prev, [grp.groupKey]: !prev[grp.groupKey] }));
+                                }}
+                              >
+                                <i className={`ti ${isExpanded ? 'ti-chevron-up' : 'ti-chevron-down'} me-1`}></i>
+                                <span>{isExpanded ? 'Hide' : `Details (${grp.items.length})`}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm px-2.5 py-1 rounded-2 shadow-xs d-flex align-items-center gap-1 fs-12 fw-semibold"
+                              style={{ background: '#4f46e5', borderColor: '#4f46e5' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPieceQC(q);
+                              }}
+                            >
+                              <i className="ti ti-pencil fs-13"></i>
+                              <span>Inspect</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    ))
+
+                      {grp.isBatch && isExpanded && sortedPieces.map((item) => (
+                        <tr
+                          key={item.id}
+                          onClick={() => handleOpenPieceQC(item)}
+                          style={{ cursor: 'pointer', backgroundColor: '#f8fafc' }}
+                        >
+                          <td className="ps-4 py-2">
+                            <span className="badge bg-white text-secondary border font-monospace fs-11">
+                              {item.id}
+                            </span>
+                          </td>
+                          <td className="fw-semibold text-dark fs-12">
+                            Than #{item.piece_no}
+                            <small className="text-muted fs-10 d-block">{item.return_id}</small>
+                          </td>
+                          <td className="font-monospace fs-12 text-dark">
+                            {Number(item.original_length).toFixed(2)} m
+                          </td>
+                          <td>
+                            <span className={`badge px-2 py-0.5 rounded-pill fs-10 ${item.qc_outcome === 'Accepted' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}`}>
+                              {item.qc_outcome}
+                            </span>
+                          </td>
+                          <td className="text-secondary fs-11">
+                            {item.division_type === 'None' ? 'Single Than' : item.division_type}
+                          </td>
+                          <td className="font-monospace fs-12">
+                            {item.adjusted_yield > 0 ? `${item.adjusted_yield} pcs` : '-'}
+                          </td>
+                          <td>
+                            <span className={`badge fs-10 ${item.color_fastness === 'Pass' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}`}>
+                              {item.color_fastness === 'Pass' ? 'PASS' : 'FAIL'}
+                            </span>
+                          </td>
+                          <td className="text-secondary fs-11">{item.inspector_name || 'Priya Sharma'}</td>
+                          <td className="text-secondary fs-11">{item.notes || '-'}</td>
+                          <td className="text-end pe-3">
+                            <button
+                              type="button"
+                              className="btn btn-light border btn-xs px-2 py-0.5 fs-11 text-primary fw-semibold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPieceQC(item);
+                              }}
+                            >
+                              Inspect Than
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

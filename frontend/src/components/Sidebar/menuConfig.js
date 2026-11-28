@@ -33,6 +33,18 @@ export const navigationMenu = [
         ]
       },
       {
+        label: 'Cutting & Consumption',
+        icon: 'ti ti-scissors',
+        open: false,
+        submenu: [
+          { label: 'Lot & Metering Tally', link: '/cutting-tally' },
+          { label: 'Cutting PO (P1)', link: '/cutting-orders' },
+          { label: 'Checklist Gate', link: '/cutting-checklist' },
+          { label: 'Cutting Sheet', link: '/cutting-sheet' },
+          { label: 'Consumption & Stock', link: '/cutting-consumption' }
+        ]
+      },
+      {
         label: 'Masters',
         icon: 'ti ti-database',
         open: false,
@@ -45,7 +57,8 @@ export const navigationMenu = [
           { label: 'Fabrics', link: '/fabrics' },
           { label: 'Vendors', link: '/vendors' },
           { label: 'Transporters', link: '/transporters' },
-          { label: 'Thread Master', link: '/thread-master' }
+          { label: 'Thread Master', link: '/thread-master' },
+          { label: 'Layer Man', link: '/layer-men' }
         ]
       },
       {

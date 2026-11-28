@@ -79,10 +79,8 @@ export default function TransporterMasterView({
   const capitalizeWords = (str) => {
     if (!str) return '';
     return String(str)
-      .toUpperCase()
-      .replace(/(\d+)\s*L\b/g, '$1L')
-      .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-      .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+      .toLowerCase()
+      .replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
   };
 
   const handleSave = (e) => {

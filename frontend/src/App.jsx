@@ -7,8 +7,10 @@ import ArticleMasterView from './components/Masters/ArticleMasterView';
 import SizeMasterView from './components/Masters/SizeMasterView';
 import AccessoriesMasterView from './components/Masters/AccessoriesMasterView';
 import ColorMasterView from './components/Masters/ColorMasterView';
+import LayerManMasterView from './components/Masters/LayerManMasterView';
 import ProcurementDashboard from './components/Procurement/ProcurementDashboard';
 import ProcessModule from './components/ProcessPO/ProcessModule';
+import CuttingModule from './components/Cutting/CuttingModule';
 import ActivityLogView from './components/ActivityLog/ActivityLogView';
 import ProfileSettingsView from './components/Profile/ProfileSettingsView';
 import AuthPage from './components/Auth/AuthPage';
@@ -211,6 +213,9 @@ export default function App() {
     if (currentRoute === '/colors') {
       return <ColorMasterView />;
     }
+    if (currentRoute === '/layer-men') {
+      return <LayerManMasterView />;
+    }
 
     // 4. Module 3: Process PO & Job Work Module
     if (currentRoute.startsWith('/process') || currentRoute.startsWith('/job-work')) {
@@ -223,6 +228,16 @@ export default function App() {
       return (
         <ProcessModule
           initialTab={processTab}
+          currentRoute={currentRoute}
+          onNavigate={handleRouteNavigate}
+        />
+      );
+    }
+
+    // 4.5 Module 4: Cutting & Consumption Portal
+    if (currentRoute.startsWith('/cutting')) {
+      return (
+        <CuttingModule
           currentRoute={currentRoute}
           onNavigate={handleRouteNavigate}
         />

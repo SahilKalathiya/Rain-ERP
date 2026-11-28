@@ -759,7 +759,7 @@ export default function PurchaseOrderForm({
       ]
   }));
 
-  const [showAllVendors, setShowAllVendors] = useState(false);
+  const [showAllVendors, setShowAllVendors] = useState(true);
 
   // Requirement 2: Filter vendors strictly based on PO Type (Fabric Supplier for Fabric PO)
   const displayedVendors = useMemo(() => {
@@ -1562,7 +1562,7 @@ export default function PurchaseOrderForm({
                 value={formData.vendorId}
                 onChange={(e) => handleVendorChange(e.target.value)}
               >
-                <option value="">Select Fabric Supplier...</option>
+                <option value="">Select Vendor...</option>
                 {displayedVendors.length === 0 ? (
                   <option value="" disabled>No Fabric Suppliers found in Vendor Master ({vendors.length} total vendors)</option>
                 ) : (

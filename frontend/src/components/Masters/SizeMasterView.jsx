@@ -4,10 +4,8 @@ import { initialSizeSeries, getStoredData, setStoredData } from '../../data/sale
 const autoCapitalizeWords = (text) => {
   if (!text) return '';
   return String(text)
-    .toUpperCase()
-    .replace(/(\d+)\s*L\b/g, '$1L')
-    .replace(/(\d+(?:\.\d+)?)\s*MM\b/g, '$1 MM')
-    .replace(/(\d+(?:\.\d+)?)\s*CM\b/g, '$1 CM');
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
 };
 
 export default function SizeMasterView() {
@@ -357,16 +355,16 @@ export default function SizeMasterView() {
     const finalObj = {
       ...seriesFormData,
       name: autoCapitalizeWords(seriesFormData.name.trim()),
-      sizes: cleanSizes.map((s) => autoCapitalizeWords(s.sizeName.trim())),
+      sizes: cleanSizes.map((s) => s.sizeName.trim().toUpperCase()),
       sizeDetails: cleanSizes.map((s) => ({
-        size: autoCapitalizeWords(s.sizeName.trim()),
+        size: s.sizeName.trim().toUpperCase(),
         label: autoCapitalizeWords((s.displayName || s.sizeName).trim())
       })),
       sizeRecords: cleanSizes.map((s, idx) => ({
         ...s,
         id: s.id || `SZ-${seriesFormData.id}-${String(idx + 1).padStart(2, '0')}`,
         seriesId: seriesFormData.id,
-        sizeName: autoCapitalizeWords(s.sizeName.trim()),
+        sizeName: s.sizeName.trim().toUpperCase(),
         displayName: autoCapitalizeWords((s.displayName || s.sizeName).trim()),
         description: (s.description || '').trim()
       }))

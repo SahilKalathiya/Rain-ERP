@@ -1260,46 +1260,108 @@ export default function ProcessChallanForm({
     });
   };
 
-  // Auto-Fulfill Pending Balance (FIFO sequence: matches PO Fabric + Width, oldest stock first)
+  // Auto-Fulfill Pending Balance (FIFO sequence: strictly capped per PO Fabric + Width + Color requirement)
   const handleAutoFulfillBalance = () => {
-    let remainingNeeded = balancePendingMeters;
-    if (remainingNeeded <= 0) {
+    if (balancePendingMeters <= 0) {
       alert('Order requirement is already 100% fulfilled!');
       return;
     }
 
     const targets = getPOTargetCriteria();
     const targetLabel = targets.map(t => t.label).join(', ');
-    const matchingRolls = sortRollsFIFO(
-      warehouseStockPool.filter(roll => {
-        const avail = parseFloat(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters) || 0;
-        return avail > 0 && doesRollMatchPOTargets(roll, targets);
-      })
-    );
-
-    if (matchingRolls.length === 0) {
-      alert(
-        targets.length > 0
-          ? `⚠️ Stock Not Available!\n\nRequired fabric & width (${targetLabel}) is not available in our Warehouse Stock.`
-          : '⚠️ No available stock found in Warehouse Stock.'
-      );
-      return;
-    }
-
     const newItems = [...items];
     const updatedStock = [...warehouseStockPool];
 
-    for (let m = 0; m < matchingRolls.length; m++) {
-      const roll = matchingRolls[m];
-      const idx = updatedStock.findIndex(r => r.id === roll.id);
-      if (idx === -1) continue;
-      const avail = parseFloat(updatedStock[idx].availableMeters !== undefined ? updatedStock[idx].availableMeters : updatedStock[idx].meters) || 0;
+    // Helper to compute already-picked meters for a target from newItems
+    const getPickedFor = (t) => newItems.reduce((sum, it) => {
+      const itFab = normalizeFabName(it.fabric_name);
+      const itWidth = normalizeWidthVal(it.fabric_name);
+      const itColor = normalizeColorName(it.color_name);
+      const fabOk = itFab === t.fabNorm || itFab.includes(t.fabNorm) || t.fabNorm.includes(itFab);
+      const widthOk = !t.widthNorm || !itWidth || itWidth === t.widthNorm;
+      const colorOk = isColorMatchForTarget(itColor, t.colorNorm);
+      return (fabOk && widthOk && colorOk) ? sum + (parseFloat(it.dispatched_meters) || 0) : sum;
+    }, 0);
 
-      if (avail > 0) {
+    let anyAllocated = false;
+    const missingTargets = [];
+
+    if (targets.length > 0) {
+      for (const t of targets) {
+        let targetRemaining = Number(Math.max(0, (t.requiredMeters || 0) - getPickedFor(t)).toFixed(2));
+        if (targetRemaining <= 0) continue;
+
+        const matchingRolls = sortRollsFIFO(
+          updatedStock.filter(roll => {
+            const avail = parseFloat(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters) || 0;
+            return avail > 0 && doesRollMatchPOTargets(roll, [t]);
+          })
+        );
+
+        for (let m = 0; m < matchingRolls.length && targetRemaining > 0; m++) {
+          const roll = matchingRolls[m];
+          const idx = updatedStock.findIndex(r => r.id === roll.id);
+          if (idx === -1) continue;
+          const avail = parseFloat(updatedStock[idx].availableMeters !== undefined ? updatedStock[idx].availableMeters : updatedStock[idx].meters) || 0;
+          if (avail <= 0) continue;
+
+          const foldCode = roll.folding || foldingNotation || 'L100';
+          if (avail <= targetRemaining) {
+            const actualMtrs = computeFoldedMeters(avail, foldCode);
+            newItems.push({
+              id: Date.now() + Math.random() + m,
+              bale_roll_no: roll.baleNo,
+              invoice_no: roll.invoiceNo,
+              vendor_name: roll.vendorName || '',
+              fabric_name: roll.fabric,
+              color_name: roll.color,
+              original_piece_meters: avail,
+              dispatched_meters: actualMtrs,
+              is_partial_cut: false,
+              folding: foldCode,
+              remaining_stock_meters: 0
+            });
+            targetRemaining = Number(Math.max(0, targetRemaining - actualMtrs).toFixed(2));
+            updatedStock[idx] = { ...updatedStock[idx], availableMeters: 0 };
+            anyAllocated = true;
+          } else {
+            const actualCut = computeFoldedMeters(targetRemaining, foldCode);
+            newItems.push({
+              id: Date.now() + Math.random() + m,
+              bale_roll_no: roll.baleNo,
+              invoice_no: roll.invoiceNo,
+              vendor_name: roll.vendorName || '',
+              fabric_name: roll.fabric,
+              color_name: roll.color,
+              original_piece_meters: avail,
+              dispatched_meters: actualCut,
+              is_partial_cut: true,
+              folding: foldCode,
+              remaining_stock_meters: Number((avail - targetRemaining).toFixed(2))
+            });
+            updatedStock[idx] = { ...updatedStock[idx], availableMeters: Number((avail - targetRemaining).toFixed(2)) };
+            targetRemaining = 0;
+            anyAllocated = true;
+          }
+        }
+
+        if (targetRemaining > 0) {
+          missingTargets.push(`${t.label}: ${targetRemaining.toFixed(2)} m`);
+        }
+      }
+    } else {
+      let remainingNeeded = balancePendingMeters;
+      const matchingRolls = sortRollsFIFO(
+        updatedStock.filter(roll => (parseFloat(roll.availableMeters !== undefined ? roll.availableMeters : roll.meters) || 0) > 0)
+      );
+      for (let m = 0; m < matchingRolls.length && remainingNeeded > 0; m++) {
+        const roll = matchingRolls[m];
+        const idx = updatedStock.findIndex(r => r.id === roll.id);
+        if (idx === -1) continue;
+        const avail = parseFloat(updatedStock[idx].availableMeters !== undefined ? updatedStock[idx].availableMeters : updatedStock[idx].meters) || 0;
+        if (avail <= 0) continue;
         const foldCode = roll.folding || foldingNotation || 'L100';
-
         if (avail <= remainingNeeded) {
-          // Take whole bale (Scenario A)
           const actualMtrs = computeFoldedMeters(avail, foldCode);
           newItems.push({
             id: Date.now() + Math.random() + m,
@@ -1316,8 +1378,8 @@ export default function ProcessChallanForm({
           });
           remainingNeeded = Number(Math.max(0, remainingNeeded - actualMtrs).toFixed(2));
           updatedStock[idx] = { ...updatedStock[idx], availableMeters: 0 };
+          anyAllocated = true;
         } else {
-          // Cut piece from bale (Scenario B)
           const actualCut = computeFoldedMeters(remainingNeeded, foldCode);
           newItems.push({
             id: Date.now() + Math.random() + m,
@@ -1334,17 +1396,28 @@ export default function ProcessChallanForm({
           });
           updatedStock[idx] = { ...updatedStock[idx], availableMeters: Number((avail - remainingNeeded).toFixed(2)) };
           remainingNeeded = 0;
-          break;
+          anyAllocated = true;
         }
       }
-      if (remainingNeeded <= 0) break;
+      if (remainingNeeded > 0) {
+        missingTargets.push(`Remaining: ${remainingNeeded.toFixed(2)} m`);
+      }
+    }
+
+    if (!anyAllocated) {
+      alert(
+        targets.length > 0
+          ? `⚠️ Stock Not Available!\n\nRequired fabric & width (${targetLabel}) is not available in our Warehouse Stock.`
+          : '⚠️ No available stock found in Warehouse Stock.'
+      );
+      return;
     }
 
     setItems(newItems);
     setWarehouseStockPool(updatedStock);
 
-    if (remainingNeeded > 0) {
-      alert(`⚠️ Partial FIFO Allocation: Allocated available stock for ${targetLabel || 'selected PO'}. Still short by ${remainingNeeded.toFixed(2)} m (not enough stock in warehouse).`);
+    if (missingTargets.length > 0) {
+      alert(`⚠️ Partial FIFO Allocation:\nAllocated available stock up to each item's PO limit.\n\nStill short / Not in stock:\n• ${missingTargets.join('\n• ')}`);
     }
   };
 

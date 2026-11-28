@@ -57,5 +57,11 @@ export const api = {
 
   // 6. Audit Logs
   getAuditLogs: () => request('/procurement/audit-logs'),
-  saveAuditLog: (log) => request('/procurement/audit-logs', { method: 'POST', body: JSON.stringify(log) })
+  saveAuditLog: (log) => request('/procurement/audit-logs', { method: 'POST', body: JSON.stringify(log) }),
+
+  // 7. Module 4: Cutting & Consumption
+  getCuttingPOs: () => request('/cutting/pos'),
+  saveCuttingPO: (po) => request('/cutting/pos', { method: 'POST', body: JSON.stringify(po) }),
+  getOldFabricStock: () => request('/cutting/old-stock'),
+  saveOldFabricStock: (entry) => request('/cutting/old-stock', { method: 'POST', body: JSON.stringify(entry) })
 };
